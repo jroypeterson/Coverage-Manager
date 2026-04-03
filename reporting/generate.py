@@ -216,30 +216,21 @@ def main(sample_mode=False):
             step_results[name] = f"failed: {e}"
             return None
 
-    # ============ S&P 500 NON-HEALTHCARE ============
+    # ============ S&P 500 ============
     sp500_result_df = None
     if not sample_mode:
         def _fetch_sp500():
             nonlocal sp500_result_df
-            logger.info("Fetching S&P 500 constituents for non-healthcare report...")
+            logger.info("Fetching S&P 500 constituents...")
             sp500_tickers, sp500_info = fetch_sp500_tickers()
-            coverage_tickers_upper = {str(t).strip().upper() for t in df["Ticker"]}
 
-            sp500_non_hc = []
-            for t in sp500_tickers:
-                info_entry = sp500_info.get(t, {})
-                gics = info_entry.get("GICS Sector", "")
-                if gics == "Health Care":
-                    continue
-                if t.upper() in coverage_tickers_upper:
-                    continue
-                sp500_non_hc.append((t, info_entry))
+            sp500_all = [(t, sp500_info.get(t, {})) for t in sp500_tickers]
 
-            logger.info("Non-healthcare S&P 500 tickers (excl. coverage): %s", len(sp500_non_hc))
-            if not sp500_non_hc:
+            logger.info("S&P 500 tickers: %s", len(sp500_all))
+            if not sp500_all:
                 return
 
-            sp500_yf_tickers = [t for t, _ in sp500_non_hc]
+            sp500_yf_tickers = [t for t, _ in sp500_all]
             sp500_results_data = batch_download_prices(sp500_yf_tickers)
 
             logger.info("Fetching fundamentals for %s S&P 500 tickers...", len(sp500_yf_tickers))
@@ -251,7 +242,7 @@ def main(sample_mode=False):
             )
 
             sp500_rows = []
-            for t, info_entry in sp500_non_hc:
+            for t, info_entry in sp500_all:
                 returns = compute_returns(sp500_results_data.get(t))
                 fund = sp500_fundamentals.get(t, {col: None for col in FUND_COLS + VAL_COLS})
                 is_ttm = sp500_is_ttm.get(t, {"Rev Grw": False, "EPS Grw": False})
@@ -268,7 +259,7 @@ def main(sample_mode=False):
                 )
                 sp500_rows.append(row_data)
             sp500_result_df = pd.DataFrame(sp500_rows)
-            logger.info("S&P 500 non-healthcare report: %s tickers", len(sp500_result_df))
+            logger.info("S&P 500 report: %s tickers", len(sp500_result_df))
 
         run_step("sp500", _fetch_sp500)
     else:
@@ -291,7 +282,7 @@ def main(sample_mode=False):
                 continue
             write_excel_sheet(wb, tab_name, seg_df, info_cols)
         if sp500_result_df is not None and not sp500_result_df.empty:
-            write_excel_sheet(wb, "Non-HC S&P 500", sp500_result_df, info_cols)
+            write_excel_sheet(wb, "S&P 500", sp500_result_df, info_cols)
         wb.save(OUTPUT_XLSX)
         logger.info("Saved: %s", OUTPUT_XLSX)
 
@@ -303,7 +294,7 @@ def main(sample_mode=False):
     def _generate_html():
         logger.info("Generating HTML reports...")
         for tab_name, html_suffix, report_title in SECTOR_SEGMENTS:
-            if tab_name == "Non-HC S&P 500":
+            if tab_name == "S&P 500":
                 seg_df = sp500_result_df if sp500_result_df is not None else pd.DataFrame()
             else:
                 seg_df = segment_dfs.get(tab_name, pd.DataFrame())

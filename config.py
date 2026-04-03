@@ -39,7 +39,7 @@ SECTOR_SEGMENTS = [
     ("Biopharma", "biopharma", "Coverage Universe Performance — Biopharma"),
     ("HC Svcs & MedTech", "hc_svcs_medtech", "Coverage Universe Performance — HC Services & MedTech"),
     ("PA & Other", "pa_other", "Coverage Universe Performance — PA & Other"),
-    ("Non-HC S&P 500", "sp500_non_hc", "Non-Healthcare S&P 500 Performance"),
+    ("S&P 500", "sp500", "S&P 500 Performance"),
 ]
 
 # ── Sample mode ──────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ def archive_old_files(reports_dir, old_reports_dir, today_str):
         os.path.join(reports_dir, "coverage_hc_svcs_medtech_*.html"),
         os.path.join(reports_dir, "coverage_pa_other_*.html"),
         os.path.join(reports_dir, "coverage_sp500_non_hc_*.html"),
+        os.path.join(reports_dir, "coverage_sp500_*.html"),
     ]
     moved = 0
     for pattern in patterns:
