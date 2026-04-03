@@ -11,7 +11,7 @@ import sys
 import os
 
 from config import (
-    CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, API_KEYS, TODAY,
+    CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, SAMPLE_REPORTS_DIR, API_KEYS, TODAY,
     BIOPHARMA_VALUES, HC_SERVICES_MEDTECH_VALUES, SECTOR_SEGMENTS, SAMPLE_TICKERS,
 )
 from ticker_utils import normalize_ticker, MANUAL_TICKER_MAP
@@ -76,8 +76,9 @@ def main(sample_mode=False):
 
     if sample_mode:
         logger.info("=== SAMPLE PREVIEW MODE ===")
-        OUTPUT_XLSX = REPORTS_DIR / "sample_preview.xlsx"
-        OUTPUT_HTML = REPORTS_DIR / "sample_preview.html"
+        os.makedirs(SAMPLE_REPORTS_DIR, exist_ok=True)
+        OUTPUT_XLSX = SAMPLE_REPORTS_DIR / "sample_preview.xlsx"
+        OUTPUT_HTML = SAMPLE_REPORTS_DIR / "sample_preview.html"
         sample_set = {t.upper() for t in SAMPLE_TICKERS}
     else:
         archive_old_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY)
@@ -289,7 +290,7 @@ def main(sample_mode=False):
                 logger.info("Skipping empty HTML report: %s", tab_name)
                 continue
             if sample_mode:
-                html_path = REPORTS_DIR / f"sample_{html_suffix}.html"
+                html_path = SAMPLE_REPORTS_DIR / f"sample_{html_suffix}.html"
             else:
                 html_path = REPORTS_DIR / f"coverage_{html_suffix}_{TODAY}.html"
             seg_health = health_data if tab_name == "Consolidated" else None

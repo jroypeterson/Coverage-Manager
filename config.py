@@ -17,6 +17,7 @@ CSV_PATH = DATA_DIR / "coverage_universe_tickers.csv"
 REPORTS_DIR = SCRIPT_DIR / "reports"
 BACKUPS_DIR = SCRIPT_DIR / "backups"
 OLD_REPORTS_DIR = REPORTS_DIR / "old reports"
+SAMPLE_REPORTS_DIR = REPORTS_DIR / "samples"
 CACHE_DIR = SCRIPT_DIR / "cache"
 
 # ── API keys (.env) ──────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 import pandas as pd
 
-REPORTS_DIR = Path(__file__).resolve().parent / "reports"
+from config import SAMPLE_REPORTS_DIR
 
 # Mock rows: Ticker, Company, Sector(JP), Subsector(JP), YF Sector, YF Industry, Country, Exchange, currency, fundamentals, returns
 MOCK_DATA = [
@@ -368,8 +368,8 @@ updateCount();
 </body>
 </html>"""
 
-os.makedirs(REPORTS_DIR, exist_ok=True)
-out_path = REPORTS_DIR / "sample_preview.html"
+os.makedirs(SAMPLE_REPORTS_DIR, exist_ok=True)
+out_path = SAMPLE_REPORTS_DIR / "sample_preview.html"
 with open(out_path, "w", encoding="utf-8") as f:
     f.write(html)
 print(f"Sample HTML saved to: {out_path}")
