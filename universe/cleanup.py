@@ -7,27 +7,19 @@ and tests price availability. Safe to re-run (idempotent).
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
-import shutil
 import re
 import time
 import os
 
-from ticker_utils import (
+from universe.ticker_utils import (
     CSV_PATH, SUFFIX_TO_EXCHANGE, SPACE_SUFFIX_TO_EXCHANGE,
     EXCHANGE_NORMALIZE, get_exchange_from_suffix, normalize_exchange,
-    normalize_company_for_comparison,
+    normalize_company_for_comparison, backup_csv,
 )
+from logging_utils import configure_logging, get_logger, log_exception
 
+logger = get_logger("cleanup_tickers")
 
-def backup_csv(path):
-    """Create a timestamped backup of the CSV in the backups subfolder."""
-    backup_dir = os.path.join(os.path.dirname(path), "backups")
-    os.makedirs(backup_dir, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    basename = os.path.splitext(os.path.basename(path))[0]
-    backup_path = os.path.join(backup_dir, f"{basename}_{ts}.csv")
-    shutil.copy2(path, backup_path)
-    return backup_path
 
 
 
@@ -99,7 +91,7 @@ def fill_missing_exchanges(df):
 
     # Batch yfinance lookup for remaining
     if needs_lookup:
-        print(f"  Looking up {len(needs_lookup)} exchanges via yfinance...")
+        logger.info("Looking up %s exchanges via yfinance...", len(needs_lookup))
         for idx, ticker in needs_lookup:
             try:
                 info = yf.Ticker(ticker).fast_info
@@ -108,8 +100,8 @@ def fill_missing_exchanges(df):
                     norm = normalize_exchange(raw_ex)
                     df.at[idx, "Exchange"] = norm
                     changes[ticker] = f"-> {norm} (yfinance)"
-            except Exception:
-                pass
+            except Exception as e:
+                log_exception(logger, f"Exchange fill failed for {ticker}", e)
             time.sleep(0.1)
 
     return df, changes
@@ -132,7 +124,7 @@ def fill_missing_company_names(df):
     if not missing:
         return df, changes
 
-    print(f"  Looking up {len(missing)} company names via yfinance...")
+    logger.info("Looking up %s company names via yfinance...", len(missing))
     for idx, ticker in missing:
         try:
             info = yf.Ticker(ticker).info
@@ -140,8 +132,8 @@ def fill_missing_company_names(df):
             if long_name:
                 df.at[idx, "Company Name"] = long_name
                 changes[ticker] = long_name
-        except Exception:
-            pass
+        except Exception as e:
+            log_exception(logger, f"Company name lookup failed for {ticker}", e)
         time.sleep(0.1)
 
     return df, changes
@@ -165,7 +157,7 @@ def test_price_availability(df):
             tickers.append(yf_t)
             ticker_to_orig[yf_t] = orig
 
-    print(f"  Testing price availability for {len(tickers)} tickers...")
+    logger.info("Testing price availability for %s tickers...", len(tickers))
     batch_size = 20  # Smaller batches — yfinance silently returns NaN in large batches
     has_data = set()
 
@@ -184,8 +176,8 @@ def test_price_availability(df):
                 for t in batch:
                     if t in close.columns and close[t].dropna().any():
                         found.add(t)
-        except Exception:
-            pass
+        except Exception as e:
+            log_exception(logger, f"Batch price availability lookup failed for {batch}", e)
         return found
 
     # First pass
@@ -193,25 +185,25 @@ def test_price_availability(df):
         batch = tickers[i:i + batch_size]
         batch_num = i // batch_size + 1
         total_batches = (len(tickers) + batch_size - 1) // batch_size
-        print(f"    Batch {batch_num}/{total_batches}...")
+        logger.info("Batch %s/%s...", batch_num, total_batches)
         has_data.update(download_batch(batch))
 
     # Retry pass — individually check tickers that failed
     # (yfinance batch downloads can silently drop valid tickers or error on bad ones)
     missing_tickers = [t for t in tickers if t not in has_data]
     if missing_tickers:
-        print(f"  Retrying {len(missing_tickers)} tickers individually...")
+        logger.info("Retrying %s tickers individually...", len(missing_tickers))
         for i, t in enumerate(missing_tickers):
             if i > 0 and i % 50 == 0:
-                print(f"    {i}/{len(missing_tickers)}...")
+                logger.info("%s/%s...", i, len(missing_tickers))
             try:
                 data = yf.download(t, period="5d", progress=False)
                 if not data.empty:
                     close = data["Close"]
                     if close.dropna().any():
                         has_data.add(t)
-            except Exception:
-                pass
+            except Exception as e:
+                log_exception(logger, f"Single ticker price availability lookup failed for {t}", e)
 
     for yf_t in tickers:
         if yf_t not in has_data:
@@ -254,6 +246,7 @@ def print_summary(backup_path, orig_count, clean_count, dupes_removed,
 
 
 def main():
+    configure_logging()
     print("=" * 60)
     print("Coverage Universe Ticker Cleanup")
     print("=" * 60)
@@ -266,6 +259,12 @@ def main():
     # Step 2: Load and dedup
     print("\n2. Deduplicating tickers...")
     df = pd.read_csv(CSV_PATH)
+
+    # Drop orphaned unnamed columns (e.g. from trailing commas)
+    unnamed = [c for c in df.columns if c.startswith("Unnamed:")]
+    if unnamed:
+        df = df.drop(columns=unnamed)
+        logger.info("Dropped orphaned columns: %s", unnamed)
     orig_count = len(df)
     df, conflicts_df = load_and_dedup(df)
     dupes_removed = orig_count - len(df)

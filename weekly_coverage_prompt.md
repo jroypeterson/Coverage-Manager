@@ -8,7 +8,7 @@ Create a concise email-style report with recommended additions to my coverage un
 ## Main ticker file to check
 The master coverage list is at:
 
-Coverage Manager/coverage_universe_tickers.csv
+Coverage Manager/data/coverage_universe_tickers.csv
 
 Read this file and build a set of all companies already present, using:
 - Ticker
@@ -304,7 +304,7 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 - Prefer institutional-quality coverage logic.
 
 ## Working method
-1. Read Coverage Manager/coverage_universe_tickers.csv and extract all tickers and company names.
+1. Read Coverage Manager/data/coverage_universe_tickers.csv and extract all tickers and company names.
 2. Pull the Finnhub IPO calendar for the last 10 days (primary IPO source).
 3. Search Gmail for IPO summary emails and related new-listing emails from the last 7-10 days.
 4. Extract candidate newly public companies and relevant listing events from both sources.
@@ -317,4 +317,4 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 11. Draft the Gmail email and save the dated markdown report (with Company Summaries section).
 12. For each recommended company, use web search to research and generate a full company background briefing following the Full Company Background Report template above. Compile all briefings into a single file and save as Coverage Manager/reports/company_backgrounds_YYYY-MM-DD.md.
 13. Ask me which additions (if any) I want to add to the CSV.
-14. For any I approve, append them to Coverage Manager/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file.
+14. For any I approve, append them to Coverage Manager/data/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file.

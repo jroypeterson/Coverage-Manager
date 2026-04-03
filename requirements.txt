@@ -2,4 +2,6 @@ pandas>=2.0.0
 yfinance>=0.2.30
 openpyxl>=3.1.0
 requests>=2.31.0
-xhtml2pdf>=0.2.15
+lxml>=4.9.0
+python-dotenv>=1.0.0
+pytest>=7.0.0

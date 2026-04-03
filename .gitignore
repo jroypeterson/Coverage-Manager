@@ -1,7 +1,14 @@
 .env
 reports/
+old reports/
+cache/
 __pycache__/
 *.pyc
 backups/
 .claude/
 *.png
+*.tmp*
+*.log
+.venv/
+.pytest_cache/
+run_log.csv

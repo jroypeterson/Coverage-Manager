@@ -7,35 +7,29 @@ Sector -> Sector (JP), Subsector -> Subsector (JP). Safe to re-run (idempotent).
 import pandas as pd
 import yfinance as yf
 import requests
-import shutil
 import time
 import os
 from datetime import datetime
 
-from ticker_utils import (
+from universe.ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
-    EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, normalize_company_for_comparison,
+    EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
+    normalize_company_for_comparison, backup_csv,
 )
+from logging_utils import configure_logging, get_logger, log_exception
+
+logger = get_logger("enrich_identifiers")
 
 # New columns in desired order
 NEW_COLUMNS_ORDER = [
     "Ticker", "Exchange", "Exchange Code", "Exchange Full Name",
     "Listing Type", "Other Listings", "Year Listed",
     "ISIN", "FIGI", "Composite FIGI", "Share Class FIGI", "CIK",
-    "Company Name", "Country (HQ)", "Country (Listing)", "Currency", "Website",
+    "Company Name", "Country (HQ)", "Country (Listing)", "Country (ISO)",
+    "Currency", "Website",
     "YF Sector", "YF Industry", "Sector (JP)", "Subsector (JP)",
 ]
 
-
-def backup_csv(path):
-    """Create a timestamped backup of the CSV in the backups subfolder."""
-    backup_dir = os.path.join(os.path.dirname(path), "backups")
-    os.makedirs(backup_dir, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    basename = os.path.splitext(os.path.basename(path))[0]
-    backup_path = os.path.join(backup_dir, f"{basename}_{ts}.csv")
-    shutil.copy2(path, backup_path)
-    return backup_path
 
 
 def cell_is_empty(val):
@@ -63,7 +57,7 @@ def fetch_yfinance_identifiers(df):
             continue
 
         if i > 0 and i % 50 == 0:
-            print(f"  yfinance: {i}/{total}...")
+            logger.info("yfinance: %s/%s...", i, total)
 
         data = {}
         try:
@@ -74,8 +68,8 @@ def fetch_yfinance_identifiers(df):
                 isin = t.isin
                 if isin and isin != "-" and "error" not in str(isin).lower():
                     data["ISIN"] = isin
-            except Exception:
-                pass
+            except Exception as e:
+                log_exception(logger, f"ISIN lookup failed for {orig_ticker}", e)
 
             # Info dict
             try:
@@ -98,11 +92,11 @@ def fetch_yfinance_identifiers(df):
                         year = datetime.utcfromtimestamp(first_trade_ms).year
                         if 1900 < year <= datetime.now().year:
                             data["Year Listed"] = str(year)
-            except Exception:
-                pass
+            except Exception as e:
+                log_exception(logger, f"Info lookup failed for {orig_ticker}", e)
 
-        except Exception:
-            pass
+        except Exception as e:
+            log_exception(logger, f"Ticker lookup failed for {orig_ticker}", e)
 
         results[orig_ticker] = data
         time.sleep(0.05)  # Light rate limiting
@@ -148,7 +142,7 @@ def fetch_openfigi_identifiers(df):
     for batch_idx in range(0, len(items), batch_size):
         batch = items[batch_idx:batch_idx + batch_size]
         batch_num = batch_idx // batch_size + 1
-        print(f"  OpenFIGI batch {batch_num}/{total_batches} ({len(batch)} items)...")
+        logger.info("OpenFIGI batch %s/%s (%s items)...", batch_num, total_batches, len(batch))
 
         payload = [item for _, item in batch]
         try:
@@ -166,7 +160,7 @@ def fetch_openfigi_identifiers(df):
                                 "Share Class FIGI": d.get("shareClassFIGI", ""),
                             }
             elif resp.status_code == 429:
-                print(f"    Rate limited, waiting 10s...")
+                logger.warning("OpenFIGI rate limited, waiting 10s...")
                 time.sleep(10)
                 # Retry this batch
                 try:
@@ -183,12 +177,12 @@ def fetch_openfigi_identifiers(df):
                                         "Composite FIGI": d.get("compositeFIGI", ""),
                                         "Share Class FIGI": d.get("shareClassFIGI", ""),
                                     }
-                except Exception:
-                    pass
+                except Exception as e:
+                    log_exception(logger, "OpenFIGI retry failed", e)
             else:
-                print(f"    OpenFIGI error: HTTP {resp.status_code}")
+                logger.warning("OpenFIGI error: HTTP %s", resp.status_code)
         except Exception as e:
-            print(f"    OpenFIGI request error: {e}")
+            log_exception(logger, "OpenFIGI request error", e)
 
         # Rate limiting: 25 req/min without API key
         if batch_num < total_batches:
@@ -207,7 +201,7 @@ def fetch_sec_cik_map():
     try:
         resp = requests.get(url, headers=headers, timeout=15)
         if resp.status_code != 200:
-            print(f"  SEC EDGAR error: HTTP {resp.status_code}")
+            logger.warning("SEC EDGAR error: HTTP %s", resp.status_code)
             return {}
         data = resp.json()
         cik_map = {}
@@ -216,10 +210,10 @@ def fetch_sec_cik_map():
             cik = entry.get("cik_str")
             if ticker and cik:
                 cik_map[ticker] = str(cik)
-        print(f"  SEC EDGAR: loaded {len(cik_map)} ticker->CIK mappings")
+        logger.info("SEC EDGAR: loaded %s ticker->CIK mappings", len(cik_map))
         return cik_map
     except Exception as e:
-        print(f"  SEC EDGAR error: {e}")
+        log_exception(logger, "SEC EDGAR error", e)
         return {}
 
 
@@ -294,7 +288,7 @@ def enrich_dataframe(df, yf_data, figi_data, cik_map, listing_types, other_listi
     new_cols = [
         "Exchange Code", "Exchange Full Name", "Listing Type", "Other Listings",
         "Year Listed", "ISIN", "FIGI", "Composite FIGI", "Share Class FIGI", "CIK",
-        "Country (HQ)", "Country (Listing)", "Currency", "Website",
+        "Country (HQ)", "Country (Listing)", "Country (ISO)", "Currency", "Website",
         "YF Sector", "YF Industry",
     ]
     for col in new_cols:
@@ -345,6 +339,14 @@ def enrich_dataframe(df, yf_data, figi_data, cik_map, listing_types, other_listi
             country = EXCHANGE_TO_COUNTRY.get(exchange, "")
             if country:
                 df.at[idx, "Country (Listing)"] = country
+
+        # Country (ISO) from Country (Listing)
+        if cell_is_empty(row.get("Country (ISO)")):
+            country_listing = df.at[idx, "Country (Listing)"]
+            if not cell_is_empty(country_listing):
+                iso = COUNTRY_TO_ISO.get(str(country_listing).strip(), "")
+                if iso:
+                    df.at[idx, "Country (ISO)"] = iso
 
         # Listing Type
         if cell_is_empty(row.get("Listing Type")):
@@ -401,6 +403,7 @@ def print_summary(df, yf_data, figi_data, cik_map):
 
 
 def main():
+    configure_logging()
     print("=" * 60)
     print("Coverage Universe Identifier Enrichment")
     print("=" * 60)

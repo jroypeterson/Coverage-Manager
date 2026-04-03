@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Coverage Discovery Output",
+  "description": "Schema for Claude-generated candidate company recommendations. Any AI or human producing discovery output must conform to this schema.",
+  "type": "object",
+  "required": ["date", "candidates"],
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "ISO date of the discovery run (YYYY-MM-DD)"
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["company", "ticker", "exchange", "sector", "trigger"],
+        "properties": {
+          "company": {
+            "type": "string",
+            "description": "Full company name"
+          },
+          "ticker": {
+            "type": "string",
+            "pattern": "^[A-Z0-9.\\-]+$",
+            "description": "Ticker symbol (uppercase, may include dots/hyphens for non-US)"
+          },
+          "exchange": {
+            "type": "string",
+            "description": "Exchange name (e.g., NASDAQ, NYSE, TSE)"
+          },
+          "market_cap": {
+            "type": ["number", "null"],
+            "description": "Market capitalization in USD"
+          },
+          "sector": {
+            "type": "string",
+            "description": "Sector classification using Sector (JP) conventions"
+          },
+          "subsector": {
+            "type": ["string", "null"],
+            "description": "Subsector classification using Subsector (JP) conventions"
+          },
+          "listing_date": {
+            "type": ["string", "null"],
+            "format": "date",
+            "description": "IPO or listing date if applicable (YYYY-MM-DD)"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": ["IPO", "Direct listing", "Spin-off", "Carve-out", "New candidate", "Russell addition"],
+            "description": "What triggered this recommendation"
+          },
+          "peers": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Ticker symbols of peer companies already in the coverage universe"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Short reason to add (1-2 sentences)"
+          },
+          "business_summary": {
+            "type": "string",
+            "description": "2-4 sentence elevator pitch in 1st person plural"
+          },
+          "approved": {
+            "type": "boolean",
+            "default": false,
+            "description": "Set to true after user review to approve for addition"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,14 +1,14 @@
 @echo off
 title Weekly Coverage Universe Builder
-cd /d "C:\Users\jroyp\Dropbox\Claude Folder"
+cd /d "C:\Users\jroyp\Dropbox\Claude Folder\Coverage Manager"
 echo ============================================
 echo   Weekly Coverage Universe Builder
 echo   %date% %time%
 echo ============================================
 echo.
-echo Starting Claude Code with weekly coverage prompt...
+echo Running weekly build workflow...
 echo.
-"C:\Users\jroyp\.local\bin\claude.exe" "run the prompt in Coverage Manager/weekly_coverage_prompt.md"
+python cli.py weekly-build --skip-discovery
 echo.
 echo ============================================
 echo   Done. Press any key to close.
