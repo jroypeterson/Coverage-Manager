@@ -67,12 +67,16 @@ def format_mkt_cap(value, currency=""):
     billions = av / 1e9
     if billions >= 100:
         return f"{sign}{billions:,.1f}"
-    elif billions >= 0.05:
+    elif billions >= 10:
         return f"{sign}{billions:.1f}"
+    elif billions >= 1:
+        return f"{sign}{billions:.2f}"
+    elif billions >= 0.01:
+        return f"{sign}{billions:.2f}"
     elif av > 0:
         return f"{sign}{billions:.3f}"
     else:
-        return "0.0"
+        return "0.00"
 
 
 def format_price(value, currency=""):
