@@ -11,7 +11,7 @@ import re
 import time
 import os
 
-from universe.ticker_utils import (
+from ticker_utils import (
     CSV_PATH, SUFFIX_TO_EXCHANGE, SPACE_SUFFIX_TO_EXCHANGE,
     EXCHANGE_NORMALIZE, get_exchange_from_suffix, normalize_exchange,
     normalize_company_for_comparison, backup_csv,

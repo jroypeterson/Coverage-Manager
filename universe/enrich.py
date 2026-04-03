@@ -11,7 +11,7 @@ import time
 import os
 from datetime import datetime
 
-from universe.ticker_utils import (
+from ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
     normalize_company_for_comparison, backup_csv,

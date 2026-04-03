@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from config import CSV_PATH, DATA_DIR, TODAY
-from universe.ticker_utils import normalize_company_for_comparison
+from ticker_utils import normalize_company_for_comparison
 from audit import log_change
 from logging_utils import get_logger
 

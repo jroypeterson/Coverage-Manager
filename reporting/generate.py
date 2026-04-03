@@ -14,7 +14,7 @@ from config import (
     CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, API_KEYS, TODAY,
     BIOPHARMA_VALUES, HC_SERVICES_MEDTECH_VALUES, SECTOR_SEGMENTS, SAMPLE_TICKERS,
 )
-from universe.ticker_utils import normalize_ticker, MANUAL_TICKER_MAP
+from ticker_utils import normalize_ticker, MANUAL_TICKER_MAP
 from logging_utils import configure_logging, get_logger
 
 from reporting.calcs import (
@@ -114,6 +114,8 @@ def main(sample_mode=False):
 
     # FMP fallback for missing US tickers
     fmp_key = API_KEYS.get("FMP_API_KEY")
+    if not fmp_key:
+        logger.warning("FMP_API_KEY not set — skipping FMP fallback for missing tickers")
     if fmp_key:
         missing = [t for t in yf_tickers if t not in all_results and "." not in t]
         if missing:

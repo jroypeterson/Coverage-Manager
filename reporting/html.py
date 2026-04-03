@@ -1,7 +1,13 @@
 """HTML report generation and ticker health reporting."""
 
+import html as _html_mod
 import json
 from datetime import datetime
+
+
+def _esc(val):
+    """Escape a value for safe HTML insertion."""
+    return _html_mod.escape(str(val)) if val else ""
 
 import pandas as pd
 
@@ -116,11 +122,11 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
         val = row.get("Ticker", "")
         if pd.isna(val) or str(val) == "nan":
             val = ""
-        cells.append(f'<td class="info">{val}</td>')
+        cells.append(f'<td class="info">{_esc(val)}</td>')
         val = row.get("Company Name", "")
         if pd.isna(val) or str(val) == "nan":
             val = ""
-        cells.append(f'<td class="info">{val}</td>')
+        cells.append(f'<td class="info">{_esc(val)}</td>')
         for col in VAL_COLS:
             v = row.get(col)
             if col == "Price":
@@ -131,7 +137,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
             val = row.get(col, "")
             if pd.isna(val) or str(val) == "nan":
                 val = ""
-            cells.append(f'<td class="info">{val}</td>')
+            cells.append(f'<td class="info">{_esc(val)}</td>')
         for col in PERIOD_COLS:
             val = row.get(col)
             if val is not None and not pd.isna(val):
@@ -164,12 +170,12 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
                         text_color = "#8B0000" if num_val < 0 else "#006400" if num_val > 0 else "#333"
                         cells.append(f'<td class="fund" style="background-color:{bg};color:{text_color}">{num_val:.1f}{asterisk}</td>')
                     except (TypeError, ValueError):
-                        cells.append(f'<td class="fund">{val}{asterisk}</td>')
+                        cells.append(f'<td class="fund">{_esc(val)}{asterisk}</td>')
                 else:
                     try:
                         cells.append(f'<td class="fund">{float(val):.1f}x</td>')
                     except (TypeError, ValueError):
-                        cells.append(f'<td class="fund">{val}</td>')
+                        cells.append(f'<td class="fund">{_esc(val)}</td>')
             else:
                 cells.append('<td class="fund na">-</td>')
         html_rows.append("<tr>" + "".join(cells) + "</tr>")

@@ -1,6 +1,6 @@
 """Tests for ticker_utils normalization and exchange mapping."""
 
-from universe.ticker_utils import (
+from ticker_utils import (
     normalize_ticker, get_exchange_from_suffix, normalize_exchange,
     normalize_company_for_comparison, MANUAL_TICKER_MAP,
     EXCHANGE_NORMALIZE, COUNTRY_TO_ISO,

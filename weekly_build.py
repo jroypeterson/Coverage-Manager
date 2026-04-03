@@ -112,7 +112,7 @@ def _step_email():
     return {"sent": len(html_files)}
 
 
-def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run=False):
+def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run=False, force=False):
     """Run the full weekly build pipeline."""
     logger.info("=" * 60)
     logger.info("Weekly Build -- %s", TODAY)
@@ -127,8 +127,12 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
     logger.info("[1/5] Validating coverage universe...")
     status, result = run_step("validate", _step_validate)
     steps["validate"] = status
+    validation_ok = True
     if result:
         logger.info("  %d rows, %d errors, %d warnings", result["rows"], result["errors"], result["warnings"])
+        if result["errors"] > 0:
+            validation_ok = False
+            logger.warning("  Validation errors found — downstream steps will be blocked")
 
     # Step 2: Archive old reports
     logger.info("[2/5] Archiving old reports...")
@@ -182,9 +186,10 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
                 # Auto-commit pre-approved candidates (approved=true in output JSON)
                 pre_approved = [c for c in valid if c.get("approved")]
                 if pre_approved:
-                    # Re-stage with only approved ones
-                    stage_candidates(pre_approved, staging_path)
-                    added = commit_staged_candidates(staging_path)
+                    # Write a separate commit file so the full staging file is preserved
+                    commit_path = DATA_DIR / f"approved_candidates_{TODAY}.csv"
+                    stage_candidates(pre_approved, commit_path)
+                    added = commit_staged_candidates(commit_path)
                     logger.info("  Committed %d pre-approved candidates", added)
                     return {"status": "committed", "added": added, "total_valid": len(valid)}
 
@@ -195,8 +200,16 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
         if result:
             logger.info("  Discovery: %s", result.get("status", "unknown"))
 
+    # Block downstream steps if validation found hard errors (unless --force)
+    blocked = not validation_ok and not force
+    if blocked:
+        logger.warning("Blocking downstream steps due to validation errors (use --force to override)")
+
     # Step 4: Performance reports
-    if skip_performance:
+    if blocked:
+        logger.info("[4/5] Performance reports... BLOCKED (validation errors)")
+        steps["performance"] = "blocked"
+    elif skip_performance:
         logger.info("[4/5] Performance reports... SKIPPED")
         steps["performance"] = "skipped"
     elif dry_run:
@@ -208,7 +221,10 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
         steps["performance"] = status
 
     # Step 5: Email
-    if skip_email:
+    if blocked:
+        logger.info("[5/5] Email... BLOCKED (validation errors)")
+        steps["email"] = "blocked"
+    elif skip_email:
         logger.info("[5/5] Email... SKIPPED")
         steps["email"] = "skipped"
     elif dry_run:

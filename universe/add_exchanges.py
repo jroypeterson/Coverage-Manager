@@ -4,7 +4,7 @@ from datetime import date
 import warnings
 import time
 
-from universe.ticker_utils import CSV_PATH, get_exchange_from_suffix, normalize_exchange
+from ticker_utils import CSV_PATH, get_exchange_from_suffix, normalize_exchange
 from logging_utils import configure_logging, get_logger, log_exception
 
 warnings.filterwarnings("ignore")

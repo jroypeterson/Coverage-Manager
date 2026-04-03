@@ -59,6 +59,11 @@ def build_parser():
         action="store_true",
         help="Validate and report only, no mutations.",
     )
+    wb_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Continue past validation errors instead of halting.",
+    )
 
     cache_parser = subparsers.add_parser(
         "cache-clear",
@@ -104,6 +109,7 @@ def main():
             skip_performance=args.skip_performance,
             skip_email=args.skip_email,
             dry_run=args.dry_run,
+            force=args.force,
         )
     elif args.command == "cache-clear":
         from cache import cache_clear, cache_stats

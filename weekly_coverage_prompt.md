@@ -169,9 +169,22 @@ Target: usually 3 to 10 recommendations. Fewer is fine if the week is quiet.
 ## Email output
 Create a Gmail draft to jroypeterson@gmail.com with:
 
-Subject: Weekly Coverage Universe Additions — [date]
+Subject: [Agentic Investing] — Weekly Coverage Universe Additions — [date]
 
 Body: HTML table with all recommendations, followed by a "Company Summaries" section with the 2-4 sentence elevator pitch for each recommended company (from field 11), notes section, signed "Coverage Universe Builder"
+
+After the notes section, include:
+
+### CSV Changes
+A brief note of any additions or removals made to coverage_universe_tickers.csv this week (ticker, company name, and whether added or removed). If no changes were made, state: "No changes to the coverage universe CSV this week."
+
+### Report Files Generated
+A bulleted list of all report files saved this week with their filenames and a one-line description of what each file contains. For example:
+- `weekly_coverage_universe_additions_2026-04-03.md` — Weekly recommendations report with candidate analysis
+- `company_backgrounds_2026-04-03.md` — Full company background briefings for recommended companies
+- `coverage_performance_2026-04-03.xlsx` — Excel performance workbook for the full coverage universe
+- `coverage_consolidated_2026-04-03.html` — Consolidated HTML performance report (all sectors)
+- (etc. for each HTML sector report generated)
 
 ## File output
 Before creating new files, move any prior dated report and performance files into:

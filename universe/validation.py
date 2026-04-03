@@ -7,7 +7,7 @@ Returns errors (hard failures) and warnings (informational).
 import pandas as pd
 
 from config import CSV_PATH, REQUIRED_COLUMNS, EXPECTED_COLUMNS
-from universe.ticker_utils import normalize_company_for_comparison
+from ticker_utils import normalize_company_for_comparison
 from logging_utils import get_logger
 
 logger = get_logger("validation")
