@@ -263,7 +263,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
   td.fund {{ text-align: center; font-weight: 500; }}
   td.na {{ color: #bbb; background: #fafafa; }}
   th.fund-hdr {{ background: #1a5276; }}
-  tr:hover td {{ opacity: 0.85; }}
+  tr:hover td {{ box-shadow: inset 0 0 0 999px rgba(30, 90, 160, 0.12); outline: 1px solid rgba(30, 90, 160, 0.25); }}
   tr:nth-child(even) td.info {{ background: #f9f9f9; }}
   .row-count {{ margin-bottom: 8px; font-size: 12px; color: #888; }}
   .filter-row th {{ background: #3e5871; padding: 4px; }}
