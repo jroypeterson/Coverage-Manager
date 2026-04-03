@@ -77,6 +77,17 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
                     currency = row.get("_currency", "")
                     cell = ws.cell(row=row_idx, column=col_idx, value=format_price(val, currency))
                     cell.font = Font(size=9)
+                elif col_name == "% 52Wk Hi":
+                    if val is not None and not pd.isna(val):
+                        pct = float(val)
+                        cell = ws.cell(row=row_idx, column=col_idx, value=round(pct, 1))
+                        cell.number_format = '0.0"%"'
+                        hex_color = get_color(pct - 100)
+                        cell.fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+                        cell.font = Font(size=9)
+                    else:
+                        cell = ws.cell(row=row_idx, column=col_idx, value="N/A")
+                        cell.font = Font(color="999999", size=9)
                 elif val is not None and not pd.isna(val):
                     if col_name in FUND_PCT_COLS:
                         asterisk = "*" if needs_asterisk else ""
@@ -116,7 +127,7 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
     # Column widths
     ws.column_dimensions["A"].width = 12
     ws.column_dimensions["B"].width = 30
-    val_widths = {"Mkt Cap": 13, "Enterprise Value": 15, "Net Debt": 13, "Price": 10}
+    val_widths = {"Mkt Cap": 13, "Enterprise Value": 15, "Net Debt": 13, "Price": 10, "% 52Wk Hi": 11}
     for i, vc in enumerate(VAL_COLS):
         ws.column_dimensions[get_column_letter(3 + i)].width = val_widths.get(vc, 12)
     meta_start = 3 + len(VAL_COLS)

@@ -17,7 +17,7 @@ RETURN_COLS = PERIOD_COLS + ANNUAL_COLS
 # ── Fundamental column constants ──────────────────────────────────────────
 
 FUND_COLS = ["Fwd P/E", "EV/EBITDA", "EV/S", "PEG", "Gross Mgn", "Op Mgn", "ROE", "Rev Grw", "EPS Grw"]
-VAL_COLS = ["Mkt Cap", "Enterprise Value", "Net Debt", "Price"]
+VAL_COLS = ["Mkt Cap", "Enterprise Value", "Net Debt", "Price", "% 52Wk Hi"]
 FUND_PCT_COLS = {"Gross Mgn", "Op Mgn", "ROE", "Rev Grw", "EPS Grw"}
 FUND_RATIO_COLS = {"Fwd P/E", "EV/EBITDA", "EV/S", "PEG"}
 FUND_MONEY_COLS = {"Mkt Cap", "Enterprise Value", "Net Debt"}
@@ -27,6 +27,7 @@ FUND_DISPLAY_NAMES = {
     "Enterprise Value": "Enterprise Value ($B)",
     "Net Debt": "Net Debt ($B)",
     "Price": "Price",
+    "% 52Wk Hi": "% 52Wk Hi",
     "Fwd P/E": "Fwd P/E (NTM)",
     "EV/EBITDA": "EV/EBITDA (TTM)",
     "EV/S": "EV/S (TTM)",
@@ -192,6 +193,20 @@ def get_html_color(value):
 
 # ── Composite helpers ─────────────────────────────────────────────────────
 
+def calc_pct_of_52wk_high(hist):
+    """Calculate current price as a percentage of 52-week high."""
+    if hist is None or len(hist) < 2:
+        return None
+    one_year_ago = hist.index[-1] - pd.Timedelta(days=365)
+    year_data = hist[hist.index >= one_year_ago]
+    if year_data.empty:
+        return None
+    high = year_data.max()
+    if high <= 0:
+        return None
+    return (year_data.iloc[-1] / high) * 100
+
+
 def compute_returns(hist):
     """Compute all return columns from a price history Series."""
     if hist is None or (hasattr(hist, '__len__') and len(hist) == 0):
@@ -207,6 +222,7 @@ def compute_returns(hist):
     returns["3Y"] = calc_period_return(hist, 365 * 3)
     returns["5Y"] = calc_period_return(hist, 365 * 5)
     returns["10Y"] = calc_period_return(hist, 365 * 10)
+    returns["% 52Wk Hi"] = calc_pct_of_52wk_high(hist)
     return returns
 
 
@@ -229,6 +245,6 @@ def build_result_row(ticker, company, sector, subsector, yf_sector, yf_industry,
         "_is_ttm_eps": is_ttm["EPS Grw"],
         "_currency": currency,
     }
-    row.update(returns)
     row.update(fund)
+    row.update(returns)  # returns last so price-derived fields (% 52Wk Hi) aren't overwritten by fund nulls
     return row

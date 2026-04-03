@@ -186,6 +186,19 @@ A bulleted list of all report files saved this week with their filenames and a o
 - `coverage_consolidated_2026-04-03.html` — Consolidated HTML performance report (all sectors)
 - (etc. for each HTML sector report generated)
 
+## Slack notification
+After the email draft is created and all reports are generated, send a message to the Slack channel #all-jp-personal-hub with a brief summary:
+
+- Subject line (matching the email subject)
+- Number of recommendations this week
+- One-line summary for each recommended company (ticker, trigger, and short reason)
+- Whether any CSV changes were made
+- A note that the full report and performance files have been emailed
+
+- A Dropbox link to the reports folder: https://www.dropbox.com/home/Claude%20Folder/Coverage%20Manager/reports
+
+Keep the Slack message concise — no tables, no HTML. Use plain text with line breaks.
+
 ## File output
 Before creating new files, move any prior dated report and performance files into:
 

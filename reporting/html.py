@@ -131,6 +131,13 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
             v = row.get(col)
             if col == "Price":
                 cells.append(f'<td class="fund">{format_price(v, currency)}</td>')
+            elif col == "% 52Wk Hi":
+                if v is not None and not pd.isna(v):
+                    pct = float(v)
+                    bg = get_html_color(pct - 100)  # color relative to 100%
+                    cells.append(f'<td class="fund" style="background-color:{bg}">{pct:.1f}%</td>')
+                else:
+                    cells.append('<td class="fund na">-</td>')
             else:
                 cells.append(f'<td class="fund">{format_mkt_cap(v, currency)}</td>')
         for col in ["Sector (JP)", "Subsector (JP)", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]:
