@@ -23,9 +23,9 @@ FUND_RATIO_COLS = {"Fwd P/E", "EV/EBITDA", "EV/S", "PEG"}
 FUND_MONEY_COLS = {"Mkt Cap", "Enterprise Value", "Net Debt"}
 
 FUND_DISPLAY_NAMES = {
-    "Mkt Cap": "Mkt Cap ($B)",
-    "Enterprise Value": "Enterprise Value ($B)",
-    "Net Debt": "Net Debt ($B)",
+    "Mkt Cap": "Mkt Cap (USD $B)",
+    "Enterprise Value": "EV (USD $B)",
+    "Net Debt": "Net Debt (USD $B)",
     "Price": "Price",
     "% 52Wk Hi": "% 52Wk Hi",
     "Fwd P/E": "Fwd P/E (NTM)",
@@ -58,35 +58,21 @@ def _currency_prefix(currency):
 
 
 def format_mkt_cap(value, currency=""):
-    """Format value in billions. USD: bare number. Foreign: symbol prefix + appropriate unit suffix."""
+    """Format value in USD billions. Values are pre-converted to USD."""
     if value is None or pd.isna(value):
         return "N/A"
     v = float(value)
-    is_foreign = currency and currency != "USD"
     sign = "-" if v < 0 else ""
     av = abs(v)
-
-    if is_foreign:
-        prefix = _currency_prefix(currency)
-        if av >= 1e12:
-            return f"{sign}{prefix}{av/1e12:.1f}T"
-        if av >= 1e9:
-            return f"{sign}{prefix}{av/1e9:.1f}B"
-        if av >= 1e6:
-            return f"{sign}{prefix}{av/1e6:.1f}M"
-        return f"{sign}{prefix}{av:.0f}"
+    billions = av / 1e9
+    if billions >= 100:
+        return f"{sign}{billions:,.1f}"
+    elif billions >= 0.05:
+        return f"{sign}{billions:.1f}"
+    elif av > 0:
+        return f"{sign}{billions:.3f}"
     else:
-        # USD: always in billions, no $ or B suffix
-        billions = av / 1e9
-        if billions >= 100:
-            return f"{sign}{billions:,.1f}"
-        elif billions >= 0.05:
-            return f"{sign}{billions:.1f}"
-        elif av > 0:
-            # 3 significant figures for small values
-            return f"{sign}{billions:.3f}"
-        else:
-            return "0.0"
+        return "0.0"
 
 
 def format_price(value, currency=""):

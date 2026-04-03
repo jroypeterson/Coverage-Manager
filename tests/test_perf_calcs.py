@@ -115,10 +115,10 @@ class TestFormatMktCap:
         result = format_mkt_cap(500e6)
         assert "0.5" in result
 
-    def test_foreign_currency(self):
+    def test_values_are_usd(self):
+        # Values are pre-converted to USD; currency param is ignored for mkt cap
         result = format_mkt_cap(5e12, "JPY")
-        assert "¥" in result
-        assert "T" in result
+        assert "5,000.0" in result
 
     def test_none(self):
         assert format_mkt_cap(None) == "N/A"

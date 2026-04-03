@@ -32,6 +32,7 @@ from providers.yfinance_provider import (
 from reporting.excel import write_excel_sheet
 from reporting.html import write_html_report, build_ticker_health_data
 from reporting.email import archive_old_files, send_email_report
+from providers.fx_provider import fetch_fx_rates
 
 warnings.filterwarnings("ignore")
 logger = get_logger("generate_performance")
@@ -147,6 +148,26 @@ def main(sample_mode=False):
     )
     fund_count = sum(1 for v in all_fundamentals.values() if v.get("Mkt Cap") is not None)
     logger.info("Fundamentals loaded for %s tickers", fund_count)
+
+    # Convert Mkt Cap, EV, Net Debt to USD
+    unique_currencies = {c for c in all_currencies.values() if c and c != "USD"}
+    fx_rates = fetch_fx_rates(unique_currencies) if unique_currencies else {"USD": 1.0}
+    usd_convert_fields = ["Mkt Cap", "Enterprise Value", "Net Debt"]
+    converted = 0
+    for yf_t, fund in all_fundamentals.items():
+        currency = all_currencies.get(yf_t, "USD")
+        if not currency or currency == "USD":
+            continue
+        rate = fx_rates.get(currency)
+        if rate is None:
+            continue
+        for field in usd_convert_fields:
+            val = fund.get(field)
+            if val is not None:
+                fund[field] = val * rate
+        converted += 1
+    if converted:
+        logger.info("Converted Mkt Cap/EV/Net Debt to USD for %d non-USD tickers", converted)
 
     # Build ticker health data (no extra API calls)
     health_data = build_ticker_health_data(df_unique, yf_tickers, ticker_map, all_results, all_fundamentals)
