@@ -1,7 +1,7 @@
 # Coverage Manager — Project Instructions
 
 ## Git sync
-After making code changes, always commit and push to GitHub (`origin master`) before ending the conversation. Use descriptive commit messages.
+After making code changes, always commit and push to GitHub (`origin master`) before ending the conversation. Also push after completing a significant change or when it has been a while since the last push — don't let unpushed work accumulate. Use descriptive commit messages.
 
 ## Project structure
 - `cli.py` — CLI entry point
