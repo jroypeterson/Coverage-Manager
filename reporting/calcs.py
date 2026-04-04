@@ -217,7 +217,8 @@ def compute_returns(hist):
 
 
 def build_result_row(ticker, company, sector, subsector, yf_sector, yf_industry,
-                     country_iso, exchange, returns, fund, is_ttm, currency):
+                     country_iso, exchange, returns, fund, is_ttm, currency,
+                     core=""):
     """Build a standardized result row dict."""
     def _clean(val):
         return val if val != "nan" else ""
@@ -227,6 +228,7 @@ def build_result_row(ticker, company, sector, subsector, yf_sector, yf_industry,
         "Company Name": _clean(company),
         "Sector (JP)": _clean(sector),
         "Subsector (JP)": _clean(subsector),
+        "Core": _clean(core),
         "YF Sector": _clean(yf_sector),
         "YF Industry": _clean(yf_industry),
         "Country (ISO)": _clean(country_iso),

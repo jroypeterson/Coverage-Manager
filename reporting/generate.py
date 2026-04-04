@@ -196,11 +196,12 @@ def main(sample_mode=False):
             exchange=str(row.get("Exchange", "")).strip(),
             returns=returns, fund=fund, is_ttm=is_ttm,
             currency=all_currencies.get(yf_t, ""),
+            core=str(row.get("Core", "")).strip(),
         )
         results.append(result_row)
 
     result_df = pd.DataFrame(results)
-    info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
+    info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "Core", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
 
     # ── Step tracking ────────────────────────────────────────────────────────
     step_results = {}
