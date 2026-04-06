@@ -51,7 +51,8 @@ def fetch_yfinance_identifiers(df):
     for i, (_, row) in enumerate(df.iterrows()):
         orig_ticker = str(row["Ticker"]).strip()
         company = str(row.get("Company Name", "")).strip()
-        yf_ticker = normalize_ticker(orig_ticker, company)
+        exchange = str(row.get("Exchange", "")).strip()
+        yf_ticker = normalize_ticker(orig_ticker, company, exchange)
 
         if not yf_ticker:
             continue
@@ -118,7 +119,7 @@ def fetch_openfigi_identifiers(df):
         exchange = str(row.get("Exchange", "")).strip()
         company = str(row.get("Company Name", "")).strip()
 
-        yf_ticker = normalize_ticker(orig_ticker, company)
+        yf_ticker = normalize_ticker(orig_ticker, company, exchange)
         if not yf_ticker:
             continue
 

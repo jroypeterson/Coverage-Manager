@@ -36,6 +36,35 @@ class TestNormalizeTicker:
         assert normalize_ticker("") is None
         assert normalize_ticker("nan") is None
 
+    def test_exchange_fallback_xetra(self):
+        assert normalize_ticker("FRE", exchange="XETRA") == "FRE.DE"
+
+    def test_exchange_fallback_six(self):
+        assert normalize_ticker("SOON", exchange="SIX") == "SOON.SW"
+
+    def test_exchange_fallback_lse(self):
+        assert normalize_ticker("CVSG", exchange="LSE") == "CVSG.L"
+
+    def test_exchange_fallback_tsx(self):
+        assert normalize_ticker("CPH", exchange="TSX") == "CPH.TO"
+
+    def test_exchange_fallback_nse(self):
+        assert normalize_ticker("SUNPHARMA", exchange="NSE") == "SUNPHARMA.NS"
+
+    def test_exchange_no_suffix_for_us(self):
+        assert normalize_ticker("AAPL", exchange="NASDAQ") == "AAPL"
+        assert normalize_ticker("JNJ", exchange="NYSE") == "JNJ"
+
+    def test_exchange_manual_map_takes_precedence(self):
+        # BAYN is in MANUAL_TICKER_MAP — should use that, not exchange fallback
+        assert normalize_ticker("BAYN", exchange="XETRA") == "BAYN.DE"
+
+    def test_exchange_ignored_when_dot_suffix_present(self):
+        assert normalize_ticker("ROG.SW", exchange="SIX") == "ROG.SW"
+
+    def test_exchange_ignored_when_space_suffix_present(self):
+        assert normalize_ticker("AZN LN", exchange="LSE") == "AZN.L"
+
     def test_whitespace_handling(self):
         assert normalize_ticker("  AAPL  ") == "AAPL"
 

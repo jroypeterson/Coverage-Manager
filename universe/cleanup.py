@@ -152,7 +152,8 @@ def test_price_availability(df):
         company = str(row.get("Company Name", "")).strip()
         if not orig or orig == "#N/A":
             continue
-        yf_t = normalize_ticker(orig, company)
+        exchange = str(row.get("Exchange", "")).strip()
+        yf_t = normalize_ticker(orig, company, exchange)
         if yf_t:
             tickers.append(yf_t)
             ticker_to_orig[yf_t] = orig

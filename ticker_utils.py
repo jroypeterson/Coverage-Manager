@@ -59,6 +59,27 @@ MANUAL_TICKER_MAP = {
     "VAR1": "VAR1.DE",
 }
 
+# ── Exchange → yfinance suffix (reverse of SUFFIX_TO_EXCHANGE) ─────────────
+
+EXCHANGE_TO_YF_SUFFIX = {
+    "TSE": ".T", "TWSE": ".TW", "HKEX": ".HK", "SSE": ".SS", "SZSE": ".SZ",
+    "NSE": ".NS", "KRX": ".KS", "KOSDAQ": ".KQ",
+    "OMX Stockholm": ".ST", "OMX Copenhagen": ".CO", "OMX Helsinki": ".HE",
+    "Oslo Bors": ".OL", "SIX": ".SW", "XETRA": ".DE", "Frankfurt": ".F",
+    "Euronext Paris": ".PA", "Euronext Brussels": ".BR",
+    "Borsa Italiana": ".MI", "BME Madrid": ".MC",
+    "LSE": ".L", "ASX": ".AX", "NZX": ".NZ", "JSE": ".JO",
+    "Tadawul": ".SR", "ADX": ".AE",
+    "TSX": ".TO", "TSXV": ".V", "WSE": ".WA", "BMV": ".MX",
+    "B3": ".SA", "IDX": ".JK",
+}
+
+# US exchanges — no suffix needed for yfinance
+_US_EXCHANGES = {
+    "NYSE", "NASDAQ", "NYSE American", "NYSE Arca", "OTC", "BATS",
+    "OQB", "OQX", "PCX",
+}
+
 # ── Exchange suffix mappings ────────────────────────────────────────────────
 
 # Dot-suffix → exchange name (e.g. ".T" → "TSE")
@@ -180,11 +201,11 @@ def backup_csv(path):
     return backup_path
 
 
-def normalize_ticker(ticker, company_name=""):
+def normalize_ticker(ticker, company_name="", exchange=""):
     """Normalize a ticker string to yfinance format.
 
     Handles manual mappings, space-separated exchange suffixes,
-    and colon-separated formats.
+    colon-separated formats, and Exchange column fallback.
     """
     t = str(ticker).strip()
     if t in ("#N/A", "", "nan"):
@@ -215,6 +236,12 @@ def normalize_ticker(ticker, company_name=""):
     # Already has a dot (e.g., ROG.SW, 4519.T)
     if "." in t or ":" in t:
         return t.replace(":", ".")
+    # Plain ticker — use Exchange column to add yfinance suffix
+    ex = str(exchange).strip() if exchange else ""
+    if ex and ex != "nan" and ex not in _US_EXCHANGES:
+        yf_suffix = EXCHANGE_TO_YF_SUFFIX.get(ex)
+        if yf_suffix:
+            return f"{t}{yf_suffix}"
     return t
 
 

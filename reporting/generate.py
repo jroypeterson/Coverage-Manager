@@ -107,7 +107,8 @@ def main(sample_mode=False):
     for _, row in df_unique.iterrows():
         orig = str(row["Ticker"]).strip()
         company = str(row.get("Company Name", "")).strip()
-        yf_t = normalize_ticker(orig, company)
+        exchange = str(row.get("Exchange", "")).strip()
+        yf_t = normalize_ticker(orig, company, exchange)
         if yf_t:
             yf_tickers.append(yf_t)
             ticker_map[yf_t] = orig
@@ -179,7 +180,8 @@ def main(sample_mode=False):
     for _, row in df_unique.iterrows():
         orig_ticker = str(row["Ticker"]).strip()
         company = str(row.get("Company Name", "")).strip()
-        yf_t = normalize_ticker(orig_ticker, company)
+        exchange = str(row.get("Exchange", "")).strip()
+        yf_t = normalize_ticker(orig_ticker, company, exchange)
 
         hist = all_results.get(yf_t) if yf_t else None
         returns = compute_returns(hist)
