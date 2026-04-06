@@ -30,6 +30,9 @@ from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import (
     fetch_fundamentals, fetch_fundamentals_parallel, batch_download_prices,
 )
+from providers.alphavantage_provider import (
+    fetch_fundamentals as fetch_av_fundamentals,
+)
 from reporting.excel import write_excel_sheet
 from reporting.html import write_html_report, build_ticker_health_data
 from reporting.email import archive_old_files, send_email_report
@@ -71,10 +74,14 @@ def _split_into_segments(result_df):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
-def main(sample_mode=False):
+def main(sample_mode=False, refresh=False):
     global OUTPUT_XLSX, OUTPUT_HTML
     configure_logging()
     os.makedirs(REPORTS_DIR, exist_ok=True)
+    use_cache = not refresh
+
+    if refresh:
+        logger.info("Cache bypass enabled (--refresh)")
 
     if sample_mode:
         logger.info("=== SAMPLE PREVIEW MODE ===")
@@ -114,7 +121,7 @@ def main(sample_mode=False):
             ticker_map[yf_t] = orig
 
     logger.info("Downloading data for %s tickers (this may take several minutes)...", len(yf_tickers))
-    all_results = batch_download_prices(yf_tickers)
+    all_results = batch_download_prices(yf_tickers, use_cache=use_cache)
 
     # FMP fallback for missing US tickers
     fmp_key = API_KEYS.get("FMP_API_KEY")
@@ -146,10 +153,33 @@ def main(sample_mode=False):
     # Fetch yfinance fundamentals for all tickers (parallel)
     logger.info("Fetching yfinance fundamentals for %s tickers...", len(yf_tickers))
     all_fundamentals, all_is_ttm, all_currencies = fetch_fundamentals_parallel(
-        yf_tickers, finnhub_data, max_workers=10
+        yf_tickers, finnhub_data, max_workers=10, use_cache=use_cache
     )
     fund_count = sum(1 for v in all_fundamentals.values() if v.get("Mkt Cap") is not None)
     logger.info("Fundamentals loaded for %s tickers", fund_count)
+
+    # AlphaVantage fallback for tickers still missing fundamentals
+    av_key = API_KEYS.get("ALPHAVANTAGE_API_KEY")
+    if av_key:
+        missing_fund = [t for t in yf_tickers if all_fundamentals.get(t, {}).get("Mkt Cap") is None]
+        if missing_fund:
+            logger.info("Trying AlphaVantage fallback for %s tickers missing fundamentals...", len(missing_fund))
+            av_filled = 0
+            for t in missing_fund:
+                # AlphaVantage uses plain symbols (strip suffix for lookup)
+                av_symbol = t.split(".")[0] if "." in t else t
+                av_data = fetch_av_fundamentals(av_symbol, av_key, use_cache=use_cache)
+                if av_data and av_data.get("Mkt Cap") is not None:
+                    # Merge AV data into fundamentals (only fill None fields)
+                    fund = all_fundamentals.get(t, {})
+                    for key, val in av_data.items():
+                        if val is not None and fund.get(key) is None:
+                            fund[key] = val
+                    all_fundamentals[t] = fund
+                    av_filled += 1
+            logger.info("AlphaVantage filled fundamentals for %s additional tickers", av_filled)
+    else:
+        logger.info("ALPHAVANTAGE_API_KEY not set — skipping AlphaVantage fallback")
 
     # Convert Mkt Cap, EV, Net Debt to USD
     unique_currencies = {c for c in all_currencies.values() if c and c != "USD"}

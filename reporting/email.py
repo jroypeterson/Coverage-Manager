@@ -78,8 +78,24 @@ def send_email_report(gmail_addr, gmail_pass, html_paths, today_str):
             )
             msg.attach(part)
 
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(gmail_addr, gmail_pass)
-        server.send_message(msg)
-    logger.info("Emailed %s report(s) to %s", len(html_paths), gmail_addr)
+    last_err = None
+    for attempt in range(3):
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
+                server.starttls()
+                server.login(gmail_addr, gmail_pass)
+                server.send_message(msg)
+            logger.info("Emailed %s report(s) to %s", len(html_paths), gmail_addr)
+            return
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error("Gmail authentication failed — check GMAIL_APP_PASSWORD: %s", e)
+            raise
+        except (smtplib.SMTPException, OSError) as e:
+            last_err = e
+            if attempt < 2:
+                wait = 5 * (attempt + 1)
+                logger.warning("Email send failed (attempt %d/3): %s — retrying in %ds", attempt + 1, e, wait)
+                time.sleep(wait)
+            else:
+                logger.error("Email send failed after 3 attempts: %s", e)
+                raise

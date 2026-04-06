@@ -8,7 +8,7 @@ import yfinance as yf
 
 from cache import cache_get, cache_set
 from reporting.calcs import FUND_COLS, VAL_COLS
-from logging_utils import get_logger, log_exception
+from logging_utils import get_logger, log_exception, retry_on_failure
 
 logger = get_logger("providers.yfinance")
 
@@ -98,6 +98,12 @@ def batch_download_prices(tickers, start="2015-01-01", batch_size=50, use_cache=
     return all_results
 
 
+@retry_on_failure(max_retries=2, base_delay=1.0, logger_name="providers.yfinance")
+def _fetch_ticker_info(yf_ticker):
+    """Fetch yfinance Ticker.info with retry on transient failures."""
+    return yf.Ticker(yf_ticker).info
+
+
 def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
     """Fetch fundamental data from yfinance, enriched with Finnhub for US tickers.
 
@@ -131,7 +137,7 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
             return result, is_ttm, currency
 
     try:
-        info = yf.Ticker(yf_ticker).info
+        info = _fetch_ticker_info(yf_ticker)
         if not info:
             return result, is_ttm, currency
 
@@ -188,7 +194,7 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
     return result, is_ttm, currency
 
 
-def fetch_fundamentals_parallel(yf_tickers, finnhub_data=None, max_workers=10):
+def fetch_fundamentals_parallel(yf_tickers, finnhub_data=None, max_workers=10, use_cache=True):
     """Fetch fundamentals for a list of tickers in parallel.
 
     Returns (all_fundamentals, all_is_ttm, all_currencies) dicts keyed by yf_ticker.
@@ -203,7 +209,7 @@ def fetch_fundamentals_parallel(yf_tickers, finnhub_data=None, max_workers=10):
 
     def _fetch_one(yf_t):
         fh = finnhub_data.get(yf_t)
-        return yf_t, fetch_fundamentals(yf_t, finnhub_metrics=fh)
+        return yf_t, fetch_fundamentals(yf_t, finnhub_metrics=fh, use_cache=use_cache)
 
     completed = 0
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

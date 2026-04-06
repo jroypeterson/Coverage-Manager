@@ -3,9 +3,20 @@
 import pandas as pd
 import requests
 
-from logging_utils import get_logger, log_exception
+from logging_utils import get_logger, log_exception, retry_on_failure
 
 logger = get_logger("providers.fmp")
+
+
+@retry_on_failure(max_retries=2, base_delay=1.0, logger_name="providers.fmp")
+def _fmp_request(url):
+    """Make an FMP API request with retry on transient failures."""
+    resp = requests.get(url, timeout=10)
+    if resp.status_code == 429:
+        raise Exception(f"FMP rate limited (429)")
+    if resp.status_code != 200:
+        return None
+    return resp.json()
 
 
 def fetch_historical_prices(ticker, api_key):
@@ -15,10 +26,7 @@ def fetch_historical_prices(ticker, api_key):
     """
     try:
         url = f"https://financialmodelingprep.com/stable/historical-price-eod/full?symbol={ticker}&apikey={api_key}"
-        resp = requests.get(url, timeout=10)
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
+        data = _fmp_request(url)
         if not data or not isinstance(data, list):
             return None
         df = pd.DataFrame(data)

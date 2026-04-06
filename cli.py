@@ -122,7 +122,7 @@ def main():
     elif args.command == "performance":
         from reporting import generate
 
-        generate.main(sample_mode=args.sample)
+        generate.main(sample_mode=args.sample, refresh=args.refresh)
     else:
         parser.error(f"Unknown command: {args.command}")
 
