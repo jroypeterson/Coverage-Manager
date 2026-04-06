@@ -187,7 +187,9 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
                 cells.append('<td class="fund na">-</td>')
         raw_mktcap = row.get("Mkt Cap")
         mktcap_attr = f' data-mktcap="{float(raw_mktcap)}"' if raw_mktcap is not None and not pd.isna(raw_mktcap) else ' data-mktcap="0"'
-        html_rows.append(f"<tr{mktcap_attr}>" + "".join(cells) + "</tr>")
+        is_etf = row.get("_is_etf", False)
+        etf_class = ' class="etf-row"' if is_etf else ""
+        html_rows.append(f"<tr{mktcap_attr}{etf_class}>" + "".join(cells) + "</tr>")
 
     def split_header(name):
         idx = name.find(" (")
@@ -306,6 +308,9 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
   .health-section.info {{ background: #f0f0f0; border-left: 3px solid #999; }}
   .annual-col {{ }}
   .annual-col.hidden {{ display: none; }}
+  tr:not(.etf-row) + tr.etf-row td {{ border-top: 2px solid #2c3e50; }}
+  tr.etf-row td.info {{ background: #e8edf2; font-weight: 600; }}
+  tr.etf-row:nth-child(even) td.info {{ background: #dfe5ec; }}
   .toggle-annual {{ background: #2c3e50; color: white; border: 1px solid #1a252f; border-radius: 4px;
     padding: 4px 10px; font-size: 11px; cursor: pointer; margin-left: 10px; }}
   .toggle-annual:hover {{ background: #3e5871; }}

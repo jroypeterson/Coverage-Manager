@@ -42,6 +42,34 @@ SECTOR_SEGMENTS = [
     ("S&P 500", "sp500", "S&P 500 Performance"),
 ]
 
+# ── ETF benchmarks per report segment ────────────────────────────────────
+
+SEGMENT_ETFS = {
+    "Biopharma": [
+        ("XLV", "Health Care Select Sector SPDR"),
+        ("XBI", "SPDR S&P Biotech ETF"),
+    ],
+    "HC Svcs & MedTech": [
+        ("XLV", "Health Care Select Sector SPDR"),
+        ("XBI", "SPDR S&P Biotech ETF"),
+    ],
+    "S&P 500": [
+        ("XLE", "Energy Select Sector SPDR"),
+        ("XLB", "Materials Select Sector SPDR"),
+        ("XLU", "Utilities Select Sector SPDR"),
+        ("XLP", "Consumer Staples Select Sector SPDR"),
+        ("XLI", "Industrial Select Sector SPDR"),
+        ("XLRE", "Real Estate Select Sector SPDR"),
+        ("XLC", "Communication Services Select Sector SPDR"),
+        ("XLV", "Health Care Select Sector SPDR"),
+        ("XLK", "Technology Select Sector SPDR"),
+        ("XLY", "Consumer Discretionary Select Sector SPDR"),
+        ("XLF", "Financial Select Sector SPDR"),
+        ("XBI", "SPDR S&P Biotech ETF"),
+        ("SPYM", "SPDR Portfolio S&P 500 ETF"),
+    ],
+}
+
 # ── Sample mode ──────────────────────────────────────────────────────────────
 
 SAMPLE_TICKERS = ["ISRG", "BLLN", "HTFL", "JAN", "WELL", "NTRA"]

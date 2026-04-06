@@ -26,6 +26,14 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
     )
     fund_header_fill = PatternFill(start_color="1A5276", end_color="1A5276", fill_type="solid")
     val_header_fill = PatternFill(start_color="1A5276", end_color="1A5276", fill_type="solid")
+    etf_info_fill = PatternFill(start_color="D6DEE5", end_color="D6DEE5", fill_type="solid")
+    etf_font_bold = Font(bold=True, size=9)
+    etf_top_border = Border(
+        left=Side(style="thin", color="D0D0D0"),
+        right=Side(style="thin", color="D0D0D0"),
+        top=Side(style="medium", color="2C3E50"),
+        bottom=Side(style="thin", color="D0D0D0"),
+    )
 
     all_cols = info_cols + RETURN_COLS + FUND_COLS
 
@@ -45,7 +53,11 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
 
     # Write data
     val_and_fund_cols = set(FUND_COLS + VAL_COLS)
+    prev_was_etf = False
     for row_idx, (_, row) in enumerate(df.iterrows(), 2):
+        is_etf = row.get("_is_etf", False)
+        is_first_etf = is_etf and not prev_was_etf
+        prev_was_etf = is_etf
         for col_idx, col_name in enumerate(all_cols, 1):
             val = row.get(col_name)
             if col_name in RETURN_COLS:
@@ -121,7 +133,14 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
                 cell = ws.cell(row=row_idx, column=col_idx, value=display_val)
                 cell.font = Font(size=9)
 
-            cell.border = thin_border
+            # ETF benchmark row styling
+            if is_etf and col_name not in RETURN_COLS:
+                cell.fill = etf_info_fill
+                cell.font = etf_font_bold
+            if is_first_etf:
+                cell.border = etf_top_border
+            else:
+                cell.border = thin_border
             cell.alignment = Alignment(horizontal="center" if col_name in RETURN_COLS or col_name in val_and_fund_cols else "left", vertical="center")
 
     # Column widths

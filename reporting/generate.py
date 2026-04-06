@@ -13,6 +13,7 @@ import os
 from config import (
     CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, SAMPLE_REPORTS_DIR, API_KEYS, TODAY,
     BIOPHARMA_VALUES, HC_SERVICES_MEDTECH_VALUES, SECTOR_SEGMENTS, SAMPLE_TICKERS,
+    SEGMENT_ETFS,
 )
 from ticker_utils import normalize_ticker, MANUAL_TICKER_MAP
 from logging_utils import configure_logging, get_logger
@@ -267,8 +268,42 @@ def main(sample_mode=False):
         logger.info("Skipping S&P 500 report (sample mode)")
         step_results["sp500"] = "skipped"
 
+    # ============ ETF BENCHMARKS ============
+    # Collect all unique ETF tickers needed across segments
+    all_etf_tickers = list({t for etfs in SEGMENT_ETFS.values() for t, _ in etfs})
+    etf_row_cache = {}  # ticker -> result row dict
+    if all_etf_tickers and not sample_mode:
+        logger.info("Fetching ETF benchmark data for %s tickers...", len(all_etf_tickers))
+        etf_prices = batch_download_prices(all_etf_tickers)
+        for etf_ticker, etf_name in {t: n for etfs in SEGMENT_ETFS.values() for t, n in etfs}.items():
+            hist = etf_prices.get(etf_ticker)
+            returns = compute_returns(hist)
+            etf_row = build_result_row(
+                ticker=etf_ticker, company=etf_name,
+                sector="ETF", subsector="", yf_sector="", yf_industry="",
+                country_iso="USA", exchange="",
+                returns=returns,
+                fund={col: None for col in FUND_COLS + VAL_COLS},
+                is_ttm={"Rev Grw": False, "EPS Grw": False},
+                currency="USD",
+            )
+            etf_row["_is_etf"] = True
+            etf_row_cache[etf_ticker] = etf_row
+
     # ============ EXCEL OUTPUT ============
     segment_dfs = _split_into_segments(result_df)
+
+    # Append ETF benchmark rows to coverage segments
+    if etf_row_cache:
+        for seg_name in list(segment_dfs.keys()):
+            etf_list = SEGMENT_ETFS.get(seg_name, [])
+            if etf_list:
+                etf_rows = [etf_row_cache[t] for t, _ in etf_list if t in etf_row_cache]
+                if etf_rows:
+                    segment_dfs[seg_name] = pd.concat(
+                        [segment_dfs[seg_name], pd.DataFrame(etf_rows)],
+                        ignore_index=True,
+                    )
 
     def _generate_excel():
         logger.info("Generating Excel file...")
@@ -283,7 +318,15 @@ def main(sample_mode=False):
                 continue
             write_excel_sheet(wb, tab_name, seg_df, info_cols)
         if sp500_result_df is not None and not sp500_result_df.empty:
-            write_excel_sheet(wb, "S&P 500", sp500_result_df, info_cols)
+            sp500_with_etfs = sp500_result_df
+            sp500_etf_list = SEGMENT_ETFS.get("S&P 500", [])
+            if sp500_etf_list and etf_row_cache:
+                etf_rows = [etf_row_cache[t] for t, _ in sp500_etf_list if t in etf_row_cache]
+                if etf_rows:
+                    sp500_with_etfs = pd.concat(
+                        [sp500_result_df, pd.DataFrame(etf_rows)], ignore_index=True,
+                    )
+            write_excel_sheet(wb, "S&P 500", sp500_with_etfs, info_cols)
         wb.save(OUTPUT_XLSX)
         logger.info("Saved: %s", OUTPUT_XLSX)
 
@@ -297,6 +340,11 @@ def main(sample_mode=False):
         for tab_name, html_suffix, report_title in SECTOR_SEGMENTS:
             if tab_name == "S&P 500":
                 seg_df = sp500_result_df if sp500_result_df is not None else pd.DataFrame()
+                sp500_etf_list = SEGMENT_ETFS.get("S&P 500", [])
+                if not seg_df.empty and sp500_etf_list and etf_row_cache:
+                    etf_rows = [etf_row_cache[t] for t, _ in sp500_etf_list if t in etf_row_cache]
+                    if etf_rows:
+                        seg_df = pd.concat([seg_df, pd.DataFrame(etf_rows)], ignore_index=True)
             else:
                 seg_df = segment_dfs.get(tab_name, pd.DataFrame())
             if seg_df.empty:
