@@ -1,7 +1,7 @@
 """Weekly build orchestrator.
 
 Runs the full weekly coverage workflow as a series of independently-failable steps:
-validate -> archive -> enrich -> performance -> email -> slack.
+validate -> archive -> discovery -> performance -> email -> slack.
 
 Each step reports its own status. The full pipeline completes even if individual
 steps fail (except for fatal errors in the data pipeline).
@@ -76,14 +76,6 @@ def _step_archive():
             moved += 1
 
     return {"moved": moved}
-
-
-def _step_enrich():
-    """Run enrichment on any new/unenriched tickers."""
-    from universe import enrich
-
-    enrich.main()
-    return {}
 
 
 def _step_performance():

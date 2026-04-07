@@ -8,7 +8,7 @@ from logging_utils import get_logger
 
 logger = get_logger("reporting.slack")
 
-SLACK_CHANNEL = "#all-jp-personal-hub"
+SLACK_CHANNEL = "#stock-price-alerts"
 
 
 def send_slack_notification(webhook_url, message):
