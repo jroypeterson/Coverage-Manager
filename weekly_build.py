@@ -1,7 +1,7 @@
 """Weekly build orchestrator.
 
 Runs the full weekly coverage workflow as a series of independently-failable steps:
-validate -> archive -> discovery -> performance -> email -> slack.
+validate -> archive -> discovery -> performance -> email -> sigma-export -> slack.
 
 Each step reports its own status. The full pipeline completes even if individual
 steps fail (except for fatal errors in the data pipeline).
@@ -86,6 +86,18 @@ def _step_performance():
     return {}
 
 
+def _step_sigma_export():
+    """Push ticker metadata to the sigma-alert clone.
+
+    Coverage Manager owns the company-name/sector data; sigma-alert just
+    consumes it. We write directly to the sibling clone and commit only the
+    metadata file so any other in-flight work in sigma-alert is left alone.
+    """
+    from reporting.sigma_export import export_and_push
+
+    return export_and_push(CSV_PATH)
+
+
 def _step_email():
     """Send performance reports via email."""
     import glob
@@ -116,7 +128,7 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
     steps = {}
 
     # Step 1: Validate
-    logger.info("[1/6] Validating coverage universe...")
+    logger.info("[1/7] Validating coverage universe...")
     status, result = run_step("validate", _step_validate)
     steps["validate"] = status
     validation_ok = True
@@ -127,7 +139,7 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
             logger.warning("  Validation errors found — downstream steps will be blocked")
 
     # Step 2: Archive old reports
-    logger.info("[2/6] Archiving old reports...")
+    logger.info("[2/7] Archiving old reports...")
     if not dry_run:
         status, result = run_step("archive", _step_archive)
         steps["archive"] = status
@@ -136,10 +148,10 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
 
     # Step 3: Discovery
     if skip_discovery:
-        logger.info("[3/6] Discovery... SKIPPED")
+        logger.info("[3/7] Discovery... SKIPPED")
         steps["discovery"] = "skipped"
     else:
-        logger.info("[3/6] Discovery...")
+        logger.info("[3/7] Discovery...")
 
         def _step_discovery():
             from discovery.candidates import (
@@ -199,44 +211,69 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
 
     # Step 4: Performance reports
     if blocked:
-        logger.info("[4/6] Performance reports... BLOCKED (validation errors)")
+        logger.info("[4/7] Performance reports... BLOCKED (validation errors)")
         steps["performance"] = "blocked"
     elif skip_performance:
-        logger.info("[4/6] Performance reports... SKIPPED")
+        logger.info("[4/7] Performance reports... SKIPPED")
         steps["performance"] = "skipped"
     elif dry_run:
-        logger.info("[4/6] Performance reports... SKIPPED (dry run)")
+        logger.info("[4/7] Performance reports... SKIPPED (dry run)")
         steps["performance"] = "skipped (dry run)"
     else:
-        logger.info("[4/6] Generating performance reports...")
+        logger.info("[4/7] Generating performance reports...")
         status, _ = run_step("performance", _step_performance)
         steps["performance"] = status
 
     # Step 5: Email
     if blocked:
-        logger.info("[5/6] Email... BLOCKED (validation errors)")
+        logger.info("[5/7] Email... BLOCKED (validation errors)")
         steps["email"] = "blocked"
     elif skip_email:
-        logger.info("[5/6] Email... SKIPPED")
+        logger.info("[5/7] Email... SKIPPED")
         steps["email"] = "skipped"
     elif dry_run:
-        logger.info("[5/6] Email... SKIPPED (dry run)")
+        logger.info("[5/7] Email... SKIPPED (dry run)")
         steps["email"] = "skipped (dry run)"
     else:
-        logger.info("[5/6] Sending email...")
+        logger.info("[5/7] Sending email...")
         status, _ = run_step("email", _step_email)
         steps["email"] = status
 
-    # Step 6: Slack notification
+    # Step 6: Sigma-alert metadata export
+    if dry_run:
+        logger.info("[6/7] Sigma export... SKIPPED (dry run)")
+        steps["sigma_export"] = "skipped (dry run)"
+    else:
+        logger.info("[6/7] Exporting ticker metadata to sigma-alert...")
+        status, result = run_step("sigma_export", _step_sigma_export)
+        if result:
+            outcome = result.get("status", "unknown")
+            tickers = result.get("tickers", 0)
+            reason = result.get("reason", "")
+            if outcome == "skipped":
+                steps["sigma_export"] = f"skipped: {reason}"
+            elif outcome in ("pushed", "committed", "committed_not_pushed", "unchanged"):
+                detail = f"{outcome} ({tickers} tickers)"
+                if reason:
+                    detail = f"{detail} — {reason}"
+                steps["sigma_export"] = detail
+            elif outcome == "failed":
+                steps["sigma_export"] = f"failed: {reason}"
+            else:
+                steps["sigma_export"] = status
+        else:
+            steps["sigma_export"] = status
+
+    # Step 7: Slack notification
     slack_url = API_KEYS.get("SLACK_WEBHOOK_URL")
     if not slack_url:
-        logger.info("[6/6] Slack... SKIPPED (no SLACK_WEBHOOK_URL in .env)")
+        logger.info("[7/7] Slack... SKIPPED (no SLACK_WEBHOOK_URL in .env)")
         steps["slack"] = "skipped"
     elif dry_run:
-        logger.info("[6/6] Slack... SKIPPED (dry run)")
+        logger.info("[7/7] Slack... SKIPPED (dry run)")
         steps["slack"] = "skipped (dry run)"
     else:
-        logger.info("[6/6] Sending Slack notification...")
+        logger.info("[7/7] Sending Slack notification...")
         from reporting.slack import send_slack_notification, format_weekly_build_summary
         message = format_weekly_build_summary(TODAY, steps)
         ok = send_slack_notification(slack_url, message)

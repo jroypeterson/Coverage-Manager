@@ -78,7 +78,8 @@ python cli.py --verbose performance --sample
 3. **discovery** — writes a discovery input JSON, then looks for `data/discovery_output_<DATE>.json` produced by running `weekly_coverage_prompt.md` in Claude. Validated candidates are staged; rows with `approved=true` are auto-committed to the universe CSV
 4. **performance** — generates Excel + HTML reports
 5. **email** — sends HTML reports via Gmail
-6. **slack** — posts a build summary to the webhook URL
+6. **sigma-export** — writes `ticker_metadata.json` (company name, sector, subsector for every ticker) into the sibling `../sigma-alert/` clone and commits/pushes only that file. The sigma-alert screener loads this file at startup so its Slack alerts can show company names and sector tags. See `reporting/sigma_export.py`
+7. **slack** — posts a build summary to the webhook URL
 
 Flags: `--skip-discovery`, `--skip-performance`, `--skip-email`, `--dry-run`, `--force`.
 
@@ -88,7 +89,7 @@ The Windows scheduled task runs `C:\Users\jroyp\run_weekly_coverage.bat` every F
 
 | Command | Description |
 |---------|-------------|
-| `weekly-build` | Runs the full pipeline (validate → archive → discovery → performance → email → slack). |
+| `weekly-build` | Runs the full pipeline (validate → archive → discovery → performance → email → sigma-export → slack). |
 | `performance` | Fetches price history and fundamentals, then produces Excel and HTML reports. |
 | `performance --sample` | Generates a reduced preview using a small subset of tickers. |
 | `performance --refresh` | Bypass cache and refetch all data. |
