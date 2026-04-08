@@ -250,12 +250,15 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
             outcome = result.get("status", "unknown")
             tickers = result.get("tickers", 0)
             reason = result.get("reason", "")
+            missing = result.get("missing_metadata") or {}
             if outcome == "skipped":
                 steps["sigma_export"] = f"skipped: {reason}"
             elif outcome in ("pushed", "committed", "committed_not_pushed", "unchanged"):
                 detail = f"{outcome} ({tickers} tickers)"
                 if reason:
                     detail = f"{detail} — {reason}"
+                if missing:
+                    detail = f"{detail} | sigma-alert flagged {len(missing)} missing: {sorted(missing)}"
                 steps["sigma_export"] = detail
             elif outcome == "failed":
                 steps["sigma_export"] = f"failed: {reason}"
