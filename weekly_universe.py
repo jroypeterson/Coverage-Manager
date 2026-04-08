@@ -1,0 +1,384 @@
+"""Universe-side weekly orchestrator.
+
+Owns the universe management half of the weekly pipeline:
+validate -> archive -> discovery -> export-artifacts -> sigma-export.
+
+Produces a versioned, published artifact contract under `exports/` that other
+projects in this workspace consume (forensic_triage, biotech_triage,
+idea_generation, 13F analyzer). See `exports/manifest.json` and
+`exports/universe_status.json` for the contract.
+
+Returns a standardized result dict; see `_make_result` for the shape.
+"""
+
+import json
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+from config import CSV_PATH, DATA_DIR, OLD_REPORTS_DIR, REPORTS_DIR, SCRIPT_DIR, TODAY
+from logging_utils import get_logger
+from pipeline_utils import collect_failures, run_step
+
+logger = get_logger("weekly_universe")
+
+EXPORTS_DIR = SCRIPT_DIR / "exports"
+EXPORTS_SCHEMA_VERSION = 1
+
+UNIVERSE_ARCHIVE_PATTERNS = [
+    "weekly_coverage_universe_additions_*.md",
+    "company_backgrounds_*.md",
+]
+
+
+# ── Steps ────────────────────────────────────────────────────────────────────
+
+
+def _step_validate():
+    """Run CSV validation. Returns a dict with rows/errors/warnings/passed."""
+    import pandas as pd
+
+    from universe import validation
+
+    df = pd.read_csv(CSV_PATH)
+    errors, warnings = validation.run_all_validations(df)
+
+    for w in warnings:
+        logger.info("  WARN: %s", w)
+    for e in errors:
+        logger.warning("  ERROR: %s", e)
+
+    return {
+        "rows": len(df),
+        "errors": errors,
+        "warnings": warnings,
+        "passed": len(errors) == 0,
+    }
+
+
+def _step_archive_universe():
+    """Archive prior dated universe-side outputs (discovery md files)."""
+    from reporting.email import archive_files
+
+    return archive_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY, UNIVERSE_ARCHIVE_PATTERNS)
+
+
+def _step_discovery(dry_run=False):
+    """Run the discovery candidate pipeline. Mirrors the original logic from weekly_build."""
+    from discovery.candidates import (
+        commit_staged_candidates,
+        stage_candidates,
+        validate_discovery_output,
+        write_discovery_input,
+    )
+
+    input_path = write_discovery_input()
+    logger.info("  Discovery input written to %s", input_path)
+
+    output_path = DATA_DIR / f"discovery_output_{TODAY}.json"
+    if not output_path.exists():
+        logger.info("  No discovery output found at %s", output_path)
+        logger.info("  Run the weekly coverage prompt in Claude, save output as:")
+        logger.info("    %s", output_path)
+        return {"status": "awaiting output", "input_written": str(input_path)}
+
+    valid, errors = validate_discovery_output(output_path)
+    for e in errors:
+        logger.warning("  Validation: %s", e)
+    logger.info("  %d valid candidates, %d validation errors", len(valid), len(errors))
+
+    if not valid:
+        return {"status": "no valid candidates", "errors": len(errors)}
+
+    staging_path = stage_candidates(valid)
+    logger.info("  Staged to %s", staging_path)
+    logger.info("  Review the staging file, set approved=true for candidates to add")
+
+    if not dry_run:
+        pre_approved = [c for c in valid if c.get("approved")]
+        if pre_approved:
+            commit_path = DATA_DIR / f"approved_candidates_{TODAY}.csv"
+            stage_candidates(pre_approved, commit_path)
+            added = commit_staged_candidates(commit_path)
+            logger.info("  Committed %d pre-approved candidates", added)
+            return {"status": "committed", "added": added, "total_valid": len(valid)}
+
+    return {"status": "staged", "valid": len(valid), "staging_path": str(staging_path)}
+
+
+def _find_last_discovery_run():
+    """Return the date string of the most recent discovery_output_*.json file, or None."""
+    candidates = sorted(DATA_DIR.glob("discovery_output_*.json"))
+    if not candidates:
+        return None
+    # Filename pattern: discovery_output_YYYY-MM-DD.json
+    name = candidates[-1].stem  # discovery_output_YYYY-MM-DD
+    return name.replace("discovery_output_", "") or None
+
+
+def _step_export_artifacts(validation_result):
+    """Write the published universe artifacts to the `exports/` directory.
+
+    Produces four files described in `exports/manifest.json`:
+      - universe.csv              — snapshot of the coverage universe CSV
+      - universe_metadata.json    — {ticker: {name, sector, subsector}} dict
+      - universe_status.json      — versioned status + validation contract
+      - manifest.json             — directory of files in this exports/ folder
+
+    `validation_result` is the dict returned by `_step_validate` and feeds the
+    status file's validation_passed / errors / warnings fields.
+    """
+    # NOTE: transitional debt — `build_metadata` lives in `reporting/sigma_export.py`
+    # but is conceptually a universe-side helper. Pass 1 reuses it as-is to keep
+    # the diff small and avoid risk to the sigma-alert push. Follow-up: move it
+    # to `universe/artifacts.py` and have sigma_export import it from there.
+    from reporting.sigma_export import build_metadata
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # 1. Snapshot the CSV.
+    universe_csv_path = EXPORTS_DIR / "universe.csv"
+    shutil.copyfile(CSV_PATH, universe_csv_path)
+
+    # 2. Build the structured metadata dict (ticker -> {name, sector, subsector}).
+    metadata = build_metadata(CSV_PATH)
+    metadata_path = EXPORTS_DIR / "universe_metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+    # 3. Status / contract file.
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        source_path = str(Path(CSV_PATH).relative_to(SCRIPT_DIR)).replace("\\", "/")
+    except ValueError:
+        source_path = str(CSV_PATH).replace("\\", "/")
+    status = {
+        "schema_version": EXPORTS_SCHEMA_VERSION,
+        "dataset_version": TODAY,
+        "generated_at": generated_at,
+        "source_path": source_path,
+        "row_count": validation_result["rows"],
+        "ticker_count": len(metadata),
+        "validation_passed": validation_result["passed"],
+        "validation_errors": list(validation_result["errors"]),
+        "validation_warnings": list(validation_result["warnings"]),
+        "last_discovery_run": _find_last_discovery_run(),
+    }
+    status_path = EXPORTS_DIR / "universe_status.json"
+    status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
+
+    # 4. Manifest — describes the contract for downstream consumers.
+    manifest = {
+        "schema_version": EXPORTS_SCHEMA_VERSION,
+        "generated_at": generated_at,
+        "description": (
+            "Coverage Manager published universe artifacts. Downstream projects "
+            "should read these files instead of importing Coverage Manager code "
+            "or hitting fundamentals providers directly. Files are committed to "
+            "git so consumers get history, reproducibility, and rollback."
+        ),
+        "files": [
+            {
+                "name": "universe.csv",
+                "purpose": "Canonical coverage universe ticker list (snapshot of data/coverage_universe_tickers.csv)",
+                "format": "csv",
+            },
+            {
+                "name": "universe_metadata.json",
+                "purpose": "Structured metadata keyed by ticker: {name, sector, subsector}",
+                "format": "json",
+            },
+            {
+                "name": "universe_status.json",
+                "purpose": "Versioned status + validation contract (read schema_version before consuming)",
+                "format": "json",
+                "schema_version": EXPORTS_SCHEMA_VERSION,
+            },
+            {
+                "name": "manifest.json",
+                "purpose": "This file — directory of published artifacts",
+                "format": "json",
+            },
+        ],
+    }
+    manifest_path = EXPORTS_DIR / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    def _rel(p):
+        try:
+            return str(Path(p).relative_to(SCRIPT_DIR)).replace("\\", "/")
+        except ValueError:
+            return str(p).replace("\\", "/")
+
+    return {
+        "artifacts": [
+            _rel(universe_csv_path),
+            _rel(metadata_path),
+            _rel(status_path),
+            _rel(manifest_path),
+        ],
+        "ticker_count": len(metadata),
+    }
+
+
+def _step_sigma_export():
+    """Push ticker metadata to the sigma-alert clone (unchanged from prior weekly_build)."""
+    from reporting.sigma_export import export_and_push
+
+    return export_and_push(CSV_PATH)
+
+
+# ── Result helper ────────────────────────────────────────────────────────────
+
+
+def _make_result(steps, validation_passed, artifacts):
+    """Build the standardized orchestrator result shape."""
+    return {
+        "command": "weekly-universe",
+        "date": TODAY,
+        "validation_passed": validation_passed,
+        "steps": steps,
+        "artifacts": artifacts,
+        "failures": collect_failures(steps),
+    }
+
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+
+
+def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
+    """Run the universe-side weekly pipeline.
+
+    Args:
+        skip_discovery: Skip the discovery step (used by the Friday scheduled task).
+        dry_run: Validate and report only — no mutations to disk or remote.
+        force: Continue past validation errors (informational here; the wrapper
+            uses validation_passed in the returned dict to gate the report side).
+        log_audit: Whether to write a row to run_log.csv. The wrapper passes
+            this through; direct CLI invocation defaults to True.
+
+    Returns the standardized result dict (see `_make_result`).
+    """
+    logger.info("=" * 60)
+    logger.info("Weekly Universe -- %s", TODAY)
+    logger.info("=" * 60)
+
+    if dry_run:
+        logger.info("DRY RUN -- no mutations will be made")
+
+    steps = {}
+    artifacts = []
+    validation_passed = False
+
+    # Step 1: Validate
+    logger.info("[1/5] Validating coverage universe...")
+    status, validation_result = run_step("validate", _step_validate)
+    steps["validate"] = status
+    if validation_result:
+        logger.info(
+            "  %d rows, %d errors, %d warnings",
+            validation_result["rows"],
+            len(validation_result["errors"]),
+            len(validation_result["warnings"]),
+        )
+        validation_passed = validation_result["passed"]
+        if not validation_passed:
+            logger.warning("  Validation errors found")
+    else:
+        # Validation step itself failed (CSV unreadable, etc.) — treat as not passed
+        # and synthesize a minimal result for the export step so it can still emit
+        # a status file documenting the failure.
+        validation_result = {
+            "rows": 0,
+            "errors": [f"validate step crashed: {steps['validate']}"],
+            "warnings": [],
+            "passed": False,
+        }
+
+    # Step 2: Archive universe outputs
+    logger.info("[2/5] Archiving prior universe outputs...")
+    if dry_run:
+        steps["archive"] = "skipped (dry run)"
+    else:
+        status, _ = run_step("archive", _step_archive_universe)
+        steps["archive"] = status
+
+    # Step 3: Discovery
+    if skip_discovery:
+        logger.info("[3/5] Discovery... SKIPPED")
+        steps["discovery"] = "skipped"
+    else:
+        logger.info("[3/5] Discovery...")
+        status, result = run_step("discovery", _step_discovery, dry_run=dry_run)
+        steps["discovery"] = status
+        if result:
+            logger.info("  Discovery: %s", result.get("status", "unknown"))
+
+    # Step 4: Export artifacts (the new published contract)
+    if dry_run:
+        logger.info("[4/5] Export artifacts... SKIPPED (dry run)")
+        steps["export_artifacts"] = "skipped (dry run)"
+    else:
+        logger.info("[4/5] Writing published artifacts to exports/...")
+        status, export_result = run_step(
+            "export_artifacts", _step_export_artifacts, validation_result
+        )
+        steps["export_artifacts"] = status
+        if export_result:
+            artifacts.extend(export_result["artifacts"])
+            logger.info(
+                "  Wrote %d artifacts (%d tickers)",
+                len(export_result["artifacts"]),
+                export_result["ticker_count"],
+            )
+
+    # Step 5: Sigma-alert metadata export
+    if dry_run:
+        logger.info("[5/5] Sigma export... SKIPPED (dry run)")
+        steps["sigma_export"] = "skipped (dry run)"
+    else:
+        logger.info("[5/5] Exporting ticker metadata to sigma-alert...")
+        status, result = run_step("sigma_export", _step_sigma_export)
+        if result:
+            outcome = result.get("status", "unknown")
+            tickers = result.get("tickers", 0)
+            reason = result.get("reason", "")
+            missing = result.get("missing_metadata") or {}
+            if outcome == "skipped":
+                steps["sigma_export"] = f"skipped: {reason}"
+            elif outcome in ("pushed", "committed", "committed_not_pushed", "unchanged"):
+                detail = f"{outcome} ({tickers} tickers)"
+                if reason:
+                    detail = f"{detail} — {reason}"
+                if missing:
+                    detail = f"{detail} | sigma-alert flagged {len(missing)} missing: {sorted(missing)}"
+                steps["sigma_export"] = detail
+            elif outcome == "failed":
+                steps["sigma_export"] = f"failed: {reason}"
+            else:
+                steps["sigma_export"] = status
+        else:
+            steps["sigma_export"] = status
+
+    # Summary
+    logger.info("")
+    logger.info("-- Weekly Universe Summary --")
+    for step_name, status in steps.items():
+        logger.info("%-20s %s", step_name, status)
+
+    failures = collect_failures(steps)
+    if failures:
+        logger.warning("Weekly universe completed with %d failure(s): %s", len(failures), failures)
+    else:
+        logger.info("Weekly universe completed successfully")
+
+    # Audit log
+    if log_audit and not dry_run:
+        try:
+            from audit import log_run
+
+            notes = "discovery skipped" if skip_discovery else ""
+            log_run("weekly-universe", steps, notes=notes)
+        except Exception as e:
+            logger.warning("Failed to write audit log: %s", e)
+
+    return _make_result(steps, validation_passed, artifacts)

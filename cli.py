@@ -37,7 +37,7 @@ def build_parser():
 
     wb_parser = subparsers.add_parser(
         "weekly-build",
-        help="Run the full weekly coverage workflow.",
+        help="Run the full weekly coverage workflow (universe + reporting).",
     )
     wb_parser.add_argument(
         "--skip-discovery",
@@ -64,6 +64,25 @@ def build_parser():
         action="store_true",
         help="Continue past validation errors instead of halting.",
     )
+
+    wu_parser = subparsers.add_parser(
+        "weekly-universe",
+        help="Run only the universe-side weekly pipeline (validate, discovery, exports, sigma-export).",
+    )
+    wu_parser.add_argument("--skip-discovery", action="store_true", help="Skip the discovery step.")
+    wu_parser.add_argument("--dry-run", action="store_true", help="Validate and report only, no mutations.")
+    wu_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Informational; the universe pipeline does not gate on validation, but the flag is accepted for symmetry with weekly-build.",
+    )
+
+    wr_parser = subparsers.add_parser(
+        "weekly-report",
+        help="Run only the reporting-side weekly pipeline (performance, email).",
+    )
+    wr_parser.add_argument("--skip-email", action="store_true", help="Skip sending email.")
+    wr_parser.add_argument("--dry-run", action="store_true", help="Validate and report only, no mutations.")
 
     cache_parser = subparsers.add_parser(
         "cache-clear",
@@ -110,6 +129,21 @@ def main():
             skip_email=args.skip_email,
             dry_run=args.dry_run,
             force=args.force,
+        )
+    elif args.command == "weekly-universe":
+        import weekly_universe
+
+        weekly_universe.main(
+            skip_discovery=args.skip_discovery,
+            dry_run=args.dry_run,
+            force=args.force,
+        )
+    elif args.command == "weekly-report":
+        import weekly_report
+
+        weekly_report.main(
+            skip_email=args.skip_email,
+            dry_run=args.dry_run,
         )
     elif args.command == "cache-clear":
         from cache import cache_clear, cache_stats

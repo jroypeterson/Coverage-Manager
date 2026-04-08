@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "dataset_version": "2026-04-08",
+  "generated_at": "2026-04-08T23:49:06Z",
+  "source_path": "data/coverage_universe_tickers.csv",
+  "row_count": 1082,
+  "ticker_count": 1093,
+  "validation_passed": true,
+  "validation_errors": [],
+  "validation_warnings": [
+    "3 possible duplicate company name(s) (normalized): ['siegfried holding', 'shimadzu', 'vericel']",
+    "851 ticker(s) missing Subsector (JP) value"
+  ],
+  "last_discovery_run": null
+}

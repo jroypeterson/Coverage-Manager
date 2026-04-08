@@ -1,305 +1,129 @@
-"""Weekly build orchestrator.
+"""Weekly build wrapper.
 
-Runs the full weekly coverage workflow as a series of independently-failable steps:
-validate -> archive -> discovery -> performance -> email -> sigma-export -> slack.
+Thin orchestrator that calls weekly_universe.main() and weekly_report.main()
+in sequence, gates the report side on validation results, sends the combined
+Slack summary, and writes a parent `weekly-build` row to the audit log.
 
-Each step reports its own status. The full pipeline completes even if individual
-steps fail (except for fatal errors in the data pipeline).
+The actual step logic lives in `weekly_universe.py` and `weekly_report.py`.
+This file exists to preserve the existing CLI surface (`cli.py weekly-build`)
+and the Friday scheduled task (`run_weekly_coverage.bat`) without changes.
 """
 
-import os
-import sys
-from datetime import datetime
+from collections import OrderedDict
 
-from config import CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, API_KEYS, TODAY
+import weekly_report
+import weekly_universe
+from config import API_KEYS, TODAY
 from logging_utils import get_logger
+from pipeline_utils import collect_failures
 
 logger = get_logger("weekly_build")
 
 
-def run_step(name, fn, *args, **kwargs):
-    """Run a pipeline step, catching and logging failures.
+def _gate_report(skip_performance, validation_passed, force):
+    """Decide whether to run the report side. Returns (run_report, blocked_reason).
 
-    Returns (status_string, result_or_none).
+    `force` and `validation_passed` are kept as separate concepts: we never
+    collapse them into a single boolean passed downstream.
     """
-    try:
-        result = fn(*args, **kwargs)
-        return "ok", result
-    except Exception as e:
-        logger.warning("Step '%s' failed: %s", name, e)
-        return f"failed: {e}", None
-
-
-def _step_validate():
-    """Run CSV validation."""
-    from universe import validation
-    import pandas as pd
-
-    df = pd.read_csv(CSV_PATH)
-    errors, warnings = validation.run_all_validations(df)
-
-    for w in warnings:
-        logger.info("  WARN: %s", w)
-    for e in errors:
-        logger.warning("  ERROR: %s", e)
-
-    return {
-        "rows": len(df),
-        "errors": len(errors),
-        "warnings": len(warnings),
-    }
-
-
-def _step_archive():
-    """Archive old dated reports."""
-    from reporting.email import archive_old_files
-
-    os.makedirs(OLD_REPORTS_DIR, exist_ok=True)
-
-    # Archive performance reports
-    archive_old_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY)
-
-    # Also archive old weekly additions and company backgrounds
-    import glob
-    import shutil
-
-    moved = 0
-    for pattern in [
-        os.path.join(REPORTS_DIR, "weekly_coverage_universe_additions_*.md"),
-        os.path.join(REPORTS_DIR, "company_backgrounds_*.md"),
-    ]:
-        for f in glob.glob(pattern):
-            if TODAY in os.path.basename(f):
-                continue
-            dest = os.path.join(OLD_REPORTS_DIR, os.path.basename(f))
-            shutil.move(f, dest)
-            moved += 1
-
-    return {"moved": moved}
-
-
-def _step_performance():
-    """Generate performance reports."""
-    from reporting import generate
-
-    generate.main(sample_mode=False)
-    return {}
-
-
-def _step_sigma_export():
-    """Push ticker metadata to the sigma-alert clone.
-
-    Coverage Manager owns the company-name/sector data; sigma-alert just
-    consumes it. We write directly to the sibling clone and commit only the
-    metadata file so any other in-flight work in sigma-alert is left alone.
-    """
-    from reporting.sigma_export import export_and_push
-
-    return export_and_push(CSV_PATH)
-
-
-def _step_email():
-    """Send performance reports via email."""
-    import glob
-    from reporting.email import send_email_report
-
-    gmail_addr = API_KEYS.get("GMAIL_ADDRESS")
-    gmail_pass = API_KEYS.get("GMAIL_APP_PASSWORD")
-    if not gmail_addr or not gmail_pass:
-        return {"status": "skipped", "reason": "no credentials"}
-
-    html_files = glob.glob(os.path.join(REPORTS_DIR, f"coverage_*_{TODAY}.html"))
-    if not html_files:
-        return {"status": "skipped", "reason": "no HTML files found"}
-
-    send_email_report(gmail_addr, gmail_pass, html_files, TODAY)
-    return {"sent": len(html_files)}
+    if skip_performance:
+        return False, "skipped"
+    if not validation_passed and not force:
+        return False, "blocked: validation failed"
+    return True, None
 
 
 def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run=False, force=False):
-    """Run the full weekly build pipeline."""
+    """Run the full weekly build pipeline (universe + report)."""
     logger.info("=" * 60)
     logger.info("Weekly Build -- %s", TODAY)
     logger.info("=" * 60)
-
     if dry_run:
         logger.info("DRY RUN -- no mutations will be made")
 
-    steps = {}
+    # 1. Run universe side. Sub-orchestrators write their own audit rows.
+    universe_result = weekly_universe.main(
+        skip_discovery=skip_discovery,
+        dry_run=dry_run,
+        force=force,
+        log_audit=not dry_run,
+    )
+    validation_passed = universe_result["validation_passed"]
 
-    # Step 1: Validate
-    logger.info("[1/7] Validating coverage universe...")
-    status, result = run_step("validate", _step_validate)
-    steps["validate"] = status
-    validation_ok = True
-    if result:
-        logger.info("  %d rows, %d errors, %d warnings", result["rows"], result["errors"], result["warnings"])
-        if result["errors"] > 0:
-            validation_ok = False
-            logger.warning("  Validation errors found — downstream steps will be blocked")
+    # 2. Decide whether to run report side — explicit, no overloaded booleans.
+    run_report, blocked_reason = _gate_report(skip_performance, validation_passed, force)
 
-    # Step 2: Archive old reports
-    logger.info("[2/7] Archiving old reports...")
-    if not dry_run:
-        status, result = run_step("archive", _step_archive)
-        steps["archive"] = status
+    if run_report:
+        report_result = weekly_report.main(
+            skip_email=skip_email,
+            dry_run=dry_run,
+            log_audit=not dry_run,
+        )
     else:
-        steps["archive"] = "skipped (dry run)"
+        logger.info("Report side: %s", blocked_reason)
+        report_result = {
+            "command": "weekly-report",
+            "date": TODAY,
+            "validation_passed": validation_passed,
+            "steps": OrderedDict(
+                [
+                    ("validate", blocked_reason),
+                    ("archive", blocked_reason),
+                    ("performance", blocked_reason),
+                    ("email", blocked_reason),
+                ]
+            ),
+            "artifacts": [],
+            "failures": [],
+        }
 
-    # Step 3: Discovery
-    if skip_discovery:
-        logger.info("[3/7] Discovery... SKIPPED")
-        steps["discovery"] = "skipped"
-    else:
-        logger.info("[3/7] Discovery...")
+    # 3. Merge into a combined steps dict in execution order.
+    combined_steps = OrderedDict()
+    for k, v in universe_result["steps"].items():
+        combined_steps[k] = v
+    for k, v in report_result["steps"].items():
+        # Avoid clobbering universe's "validate" with report's "validate".
+        if k == "validate":
+            continue
+        combined_steps[k] = v
 
-        def _step_discovery():
-            from discovery.candidates import (
-                write_discovery_input, validate_discovery_output,
-                stage_candidates, commit_staged_candidates,
-            )
-            from config import DATA_DIR
+    combined_artifacts = list(universe_result["artifacts"]) + list(report_result["artifacts"])
 
-            # Write input JSON for Claude
-            input_path = write_discovery_input()
-            logger.info("  Discovery input written to %s", input_path)
-
-            # Check for output JSON (populated externally by Claude)
-            output_path = DATA_DIR / f"discovery_output_{TODAY}.json"
-            if not output_path.exists():
-                logger.info("  No discovery output found at %s", output_path)
-                logger.info("  Run the weekly coverage prompt in Claude, save output as:")
-                logger.info("    %s", output_path)
-                return {"status": "awaiting output", "input_written": str(input_path)}
-
-            # Validate candidates
-            valid, errors = validate_discovery_output(output_path)
-            for e in errors:
-                logger.warning("  Validation: %s", e)
-            logger.info("  %d valid candidates, %d validation errors", len(valid), len(errors))
-
-            if not valid:
-                return {"status": "no valid candidates", "errors": len(errors)}
-
-            # Stage candidates
-            staging_path = stage_candidates(valid)
-            logger.info("  Staged to %s", staging_path)
-            logger.info("  Review the staging file, set approved=true for candidates to add")
-
-            if not dry_run:
-                # Auto-commit pre-approved candidates (approved=true in output JSON)
-                pre_approved = [c for c in valid if c.get("approved")]
-                if pre_approved:
-                    # Write a separate commit file so the full staging file is preserved
-                    commit_path = DATA_DIR / f"approved_candidates_{TODAY}.csv"
-                    stage_candidates(pre_approved, commit_path)
-                    added = commit_staged_candidates(commit_path)
-                    logger.info("  Committed %d pre-approved candidates", added)
-                    return {"status": "committed", "added": added, "total_valid": len(valid)}
-
-            return {"status": "staged", "valid": len(valid), "staging_path": str(staging_path)}
-
-        status, result = run_step("discovery", _step_discovery)
-        steps["discovery"] = status
-        if result:
-            logger.info("  Discovery: %s", result.get("status", "unknown"))
-
-    # Block downstream steps if validation found hard errors (unless --force)
-    blocked = not validation_ok and not force
-    if blocked:
-        logger.warning("Blocking downstream steps due to validation errors (use --force to override)")
-
-    # Step 4: Performance reports
-    if blocked:
-        logger.info("[4/7] Performance reports... BLOCKED (validation errors)")
-        steps["performance"] = "blocked"
-    elif skip_performance:
-        logger.info("[4/7] Performance reports... SKIPPED")
-        steps["performance"] = "skipped"
-    elif dry_run:
-        logger.info("[4/7] Performance reports... SKIPPED (dry run)")
-        steps["performance"] = "skipped (dry run)"
-    else:
-        logger.info("[4/7] Generating performance reports...")
-        status, _ = run_step("performance", _step_performance)
-        steps["performance"] = status
-
-    # Step 5: Email
-    if blocked:
-        logger.info("[5/7] Email... BLOCKED (validation errors)")
-        steps["email"] = "blocked"
-    elif skip_email:
-        logger.info("[5/7] Email... SKIPPED")
-        steps["email"] = "skipped"
-    elif dry_run:
-        logger.info("[5/7] Email... SKIPPED (dry run)")
-        steps["email"] = "skipped (dry run)"
-    else:
-        logger.info("[5/7] Sending email...")
-        status, _ = run_step("email", _step_email)
-        steps["email"] = status
-
-    # Step 6: Sigma-alert metadata export
-    if dry_run:
-        logger.info("[6/7] Sigma export... SKIPPED (dry run)")
-        steps["sigma_export"] = "skipped (dry run)"
-    else:
-        logger.info("[6/7] Exporting ticker metadata to sigma-alert...")
-        status, result = run_step("sigma_export", _step_sigma_export)
-        if result:
-            outcome = result.get("status", "unknown")
-            tickers = result.get("tickers", 0)
-            reason = result.get("reason", "")
-            missing = result.get("missing_metadata") or {}
-            if outcome == "skipped":
-                steps["sigma_export"] = f"skipped: {reason}"
-            elif outcome in ("pushed", "committed", "committed_not_pushed", "unchanged"):
-                detail = f"{outcome} ({tickers} tickers)"
-                if reason:
-                    detail = f"{detail} — {reason}"
-                if missing:
-                    detail = f"{detail} | sigma-alert flagged {len(missing)} missing: {sorted(missing)}"
-                steps["sigma_export"] = detail
-            elif outcome == "failed":
-                steps["sigma_export"] = f"failed: {reason}"
-            else:
-                steps["sigma_export"] = status
-        else:
-            steps["sigma_export"] = status
-
-    # Step 7: Slack notification
+    # 4. Slack summary
     slack_url = API_KEYS.get("SLACK_WEBHOOK_URL")
     if not slack_url:
-        logger.info("[7/7] Slack... SKIPPED (no SLACK_WEBHOOK_URL in .env)")
-        steps["slack"] = "skipped"
+        logger.info("Slack... SKIPPED (no SLACK_WEBHOOK_URL in .env)")
+        slack_status = "skipped"
     elif dry_run:
-        logger.info("[7/7] Slack... SKIPPED (dry run)")
-        steps["slack"] = "skipped (dry run)"
+        logger.info("Slack... SKIPPED (dry run)")
+        slack_status = "skipped (dry run)"
     else:
-        logger.info("[7/7] Sending Slack notification...")
-        from reporting.slack import send_slack_notification, format_weekly_build_summary
-        message = format_weekly_build_summary(TODAY, steps)
-        ok = send_slack_notification(slack_url, message)
-        steps["slack"] = "ok" if ok else "failed: webhook error"
+        from reporting.slack import format_weekly_build_summary, send_slack_notification
 
-    # Summary
+        message = format_weekly_build_summary(TODAY, combined_steps)
+        ok = send_slack_notification(slack_url, message)
+        slack_status = "ok" if ok else "failed: webhook error"
+    combined_steps["slack"] = slack_status
+
+    # 5. Summary log
     logger.info("")
     logger.info("-- Weekly Build Summary --")
     logger.info("%-20s %s", "Step", "Status")
     logger.info("-" * 50)
-    for step_name, status in steps.items():
+    for step_name, status in combined_steps.items():
         logger.info("%-20s %s", step_name, status)
 
-    failed = [k for k, v in steps.items() if isinstance(v, str) and v.startswith("failed")]
-    if failed:
-        logger.warning("Weekly build completed with %d failure(s): %s", len(failed), failed)
+    failures = collect_failures(combined_steps)
+    if failures:
+        logger.warning("Weekly build completed with %d failure(s): %s", len(failures), failures)
     else:
         logger.info("Weekly build completed successfully")
 
-    # Log the run to audit trail
+    # 6. Parent audit row — preserves historical continuity for queries on command="weekly-build".
     if not dry_run:
         try:
             from audit import log_run
+
             notes_parts = []
             if skip_discovery:
                 notes_parts.append("discovery skipped")
@@ -307,8 +131,19 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
                 notes_parts.append("performance skipped")
             if skip_email:
                 notes_parts.append("email skipped")
-            log_run("weekly-build", steps, notes="; ".join(notes_parts))
+            if blocked_reason and not skip_performance:
+                notes_parts.append(blocked_reason)
+            log_run("weekly-build", combined_steps, notes="; ".join(notes_parts))
         except Exception as e:
-            logger.warning("Failed to write audit log: %s", e)
+            logger.warning("Failed to write parent audit log: %s", e)
 
-    return steps
+    return {
+        "command": "weekly-build",
+        "date": TODAY,
+        "validation_passed": validation_passed,
+        "steps": combined_steps,
+        "artifacts": combined_artifacts,
+        "failures": failures,
+        "universe": universe_result,
+        "report": report_result,
+    }

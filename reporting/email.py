@@ -16,39 +16,65 @@ from logging_utils import get_logger
 logger = get_logger("perf_email")
 
 
-def archive_old_files(reports_dir, old_reports_dir, today_str):
-    """Move prior dated performance files to old reports folder."""
-    os.makedirs(old_reports_dir, exist_ok=True)
-    patterns = [
-        os.path.join(reports_dir, "coverage_performance_*.xlsx"),
-        os.path.join(reports_dir, "coverage_performance_*.html"),
-        os.path.join(reports_dir, "coverage_consolidated_*.html"),
-        os.path.join(reports_dir, "coverage_biopharma_*.html"),
-        os.path.join(reports_dir, "coverage_hc_svcs_medtech_*.html"),
-        os.path.join(reports_dir, "coverage_pa_other_*.html"),
-        os.path.join(reports_dir, "coverage_sp500_non_hc_*.html"),
-        os.path.join(reports_dir, "coverage_sp500_*.html"),
-    ]
+REPORT_ARCHIVE_PATTERNS = [
+    "coverage_performance_*.xlsx",
+    "coverage_performance_*.html",
+    "coverage_consolidated_*.html",
+    "coverage_biopharma_*.html",
+    "coverage_hc_svcs_medtech_*.html",
+    "coverage_pa_other_*.html",
+    "coverage_sp500_non_hc_*.html",
+    "coverage_sp500_*.html",
+]
+
+
+def archive_files(source_dir, archive_dir, today_str, patterns, prune_days=60):
+    """Move files matching any of `patterns` from source_dir to archive_dir.
+
+    Files whose basename contains `today_str` are left in place. Files in
+    `archive_dir` older than `prune_days` are deleted to keep the archive bounded.
+
+    Args:
+        source_dir: Directory to scan for matching files.
+        archive_dir: Destination directory for moved files.
+        today_str: Date string; files containing this in the basename are skipped.
+        patterns: Iterable of glob patterns (basename globs, joined to source_dir).
+        prune_days: Delete files in archive_dir older than this many days.
+
+    Returns:
+        dict with keys 'moved' (count of files moved) and 'pruned' (count deleted).
+    """
+    os.makedirs(archive_dir, exist_ok=True)
     moved = 0
     for pattern in patterns:
-        for f in glob.glob(pattern):
+        for f in glob.glob(os.path.join(str(source_dir), pattern)):
             if today_str in os.path.basename(f):
                 continue
-            dest = os.path.join(old_reports_dir, os.path.basename(f))
+            dest = os.path.join(str(archive_dir), os.path.basename(f))
             shutil.move(f, dest)
             moved += 1
     if moved:
-        logger.info("Archived %s old file(s) to: %s", moved, old_reports_dir)
+        logger.info("Archived %s old file(s) to: %s", moved, archive_dir)
 
-    # Delete archived files older than 60 days
-    deleted = 0
-    cutoff = time.time() - 60 * 86400
-    for f in glob.glob(os.path.join(old_reports_dir, "*")):
-        if os.path.isfile(f) and os.path.getmtime(f) < cutoff:
-            os.remove(f)
-            deleted += 1
-    if deleted:
-        logger.info("Deleted %s archived file(s) older than 60 days", deleted)
+    pruned = 0
+    if prune_days and prune_days > 0:
+        cutoff = time.time() - prune_days * 86400
+        for f in glob.glob(os.path.join(str(archive_dir), "*")):
+            if os.path.isfile(f) and os.path.getmtime(f) < cutoff:
+                os.remove(f)
+                pruned += 1
+        if pruned:
+            logger.info("Deleted %s archived file(s) older than %s days", pruned, prune_days)
+
+    return {"moved": moved, "pruned": pruned}
+
+
+def archive_old_files(reports_dir, old_reports_dir, today_str):
+    """Backwards-compat wrapper: archive performance reports using the standard patterns.
+
+    New code should call `archive_files` directly with explicit patterns.
+    """
+    return archive_files(reports_dir, old_reports_dir, today_str, REPORT_ARCHIVE_PATTERNS)
 
 
 def send_email_report(gmail_addr, gmail_pass, html_paths, today_str):

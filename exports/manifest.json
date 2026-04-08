@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-08T23:49:06Z",
+  "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
+  "files": [
+    {
+      "name": "universe.csv",
+      "purpose": "Canonical coverage universe ticker list (snapshot of data/coverage_universe_tickers.csv)",
+      "format": "csv"
+    },
+    {
+      "name": "universe_metadata.json",
+      "purpose": "Structured metadata keyed by ticker: {name, sector, subsector}",
+      "format": "json"
+    },
+    {
+      "name": "universe_status.json",
+      "purpose": "Versioned status + validation contract (read schema_version before consuming)",
+      "format": "json",
+      "schema_version": 1
+    },
+    {
+      "name": "manifest.json",
+      "purpose": "This file \u2014 directory of published artifacts",
+      "format": "json"
+    }
+  ]
+}
