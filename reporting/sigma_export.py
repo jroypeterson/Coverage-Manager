@@ -10,12 +10,12 @@ commits and pushes only that single file. sigma-alert's CI does not (and
 should not) try to regenerate the file — it has no access to the CSV.
 """
 
-import csv
 import json
 import subprocess
 from pathlib import Path
 
 from logging_utils import get_logger
+from universe.artifacts import build_universe_metadata
 
 logger = get_logger("reporting.sigma_export")
 
@@ -30,6 +30,15 @@ MISSING_METADATA_RELPATH = "cache/missing_metadata.json"
 
 # Sector ETFs are not in the Coverage Manager universe but the sigma-alert
 # watchlist includes them, so we hard-code their display info here.
+#
+# TODO (Stage 2 follow-up): move this list into the sigma-alert repo itself.
+# The clean end state is that Coverage Manager publishes only generic
+# `exports/universe_metadata.json`, sigma-alert reads that file directly, and
+# sigma-alert applies its own ETF augmentation locally before consuming. That
+# eliminates the need for sigma_export to know anything about sigma-alert's
+# watchlist composition. Deferred from the current PR because moving the ETF
+# list cross-repo also requires updating sigma-alert's read path and adds
+# scope/risk to the GitHub Actions screener.
 SECTOR_ETFS = {
     "XLE": ("Energy Select Sector SPDR", "ETF"),
     "XLB": ("Materials Select Sector SPDR", "ETF"),
@@ -47,29 +56,21 @@ SECTOR_ETFS = {
 }
 
 
-def build_metadata(csv_path):
-    """Read the coverage CSV and return a {TICKER: {name, sector, subsector}} dict."""
-    metadata = {}
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            ticker = row.get("Ticker", "").strip().upper()
-            if not ticker or ticker == "#N/A":
-                continue
-            # Strip exchange suffix to match the format the screener uses
-            # ("ROG SW" -> "ROG", "FRE.DE" -> "FRE")
-            plain = ticker.split()[0] if " " in ticker else ticker
-            plain = plain.split(".")[0] if "." in plain else plain
-            metadata[plain] = {
-                "name": row.get("Company Name", "").strip(),
-                "sector": row.get("Sector (JP)", "").strip(),
-                "subsector": row.get("Subsector (JP)", "").strip(),
-            }
+def build_sigma_metadata(csv_path):
+    """Build the sigma-alert ticker metadata: generic universe + sigma-only ETFs.
 
+    The sigma-alert watchlist includes sector ETFs that are not part of the
+    coverage universe. This function composes the generic universe metadata
+    with those ETFs so the screener has display info for the full watchlist.
+
+    Generic exports under `exports/` must NOT use this function — they should
+    call `universe.artifacts.build_universe_metadata` directly so consumer-
+    specific tickers don't leak into the published artifact contract.
+    """
+    metadata = build_universe_metadata(csv_path)
     for ticker, (name, sector) in SECTOR_ETFS.items():
         if ticker not in metadata:
             metadata[ticker] = {"name": name, "sector": sector, "subsector": ""}
-
     return metadata
 
 
@@ -129,7 +130,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
             sorted(flagged_tickers),
         )
 
-    metadata = build_metadata(csv_path)
+    metadata = build_sigma_metadata(csv_path)
     target_path = target_dir / METADATA_FILENAME
 
     def _result(**fields):

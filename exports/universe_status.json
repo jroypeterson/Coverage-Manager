@@ -1,10 +1,15 @@
 {
   "schema_version": 1,
   "dataset_version": "2026-04-08",
-  "generated_at": "2026-04-08T23:49:06Z",
+  "generated_at": "2026-04-09T01:18:27Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1082,
-  "ticker_count": 1093,
+  "ticker_count": 1080,
+  "normalization_collisions": 2,
+  "collision_examples": [
+    "ROG",
+    "VCEL"
+  ],
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": [

@@ -19,6 +19,24 @@ def run_step(name, fn, *args, **kwargs):
         return f"failed: {e}", None
 
 
-def collect_failures(steps):
-    """Return the list of step names whose status starts with 'failed'."""
-    return [k for k, v in steps.items() if isinstance(v, str) and v.startswith("failed")]
+def collect_non_successes(steps):
+    """Return the list of step names whose status indicates non-success.
+
+    Non-success covers both:
+      - "failed: ..." — the step raised an exception
+      - "blocked: ..." — the step was prevented from running by a gating
+        decision (e.g. validation failed and --force was not passed)
+
+    Both are operationally non-success: a blocked report run produced no
+    report, just like a failed run did. Distinguishing them is for debugging
+    only and the prefix is preserved in the status string.
+
+    Statuses like "ok", "skipped", "skipped (dry run)", and "skipped: <reason>"
+    are NOT non-successes — they're either healthy or deliberate operator
+    choices.
+    """
+    return [
+        k
+        for k, v in steps.items()
+        if isinstance(v, str) and (v.startswith("failed") or v.startswith("blocked"))
+    ]

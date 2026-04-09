@@ -13,7 +13,7 @@ import os
 
 from config import API_KEYS, OLD_REPORTS_DIR, REPORTS_DIR, TODAY
 from logging_utils import get_logger
-from pipeline_utils import collect_failures, run_step
+from pipeline_utils import collect_non_successes, run_step
 
 logger = get_logger("weekly_report")
 
@@ -104,7 +104,7 @@ def _make_result(steps, validation_passed):
         "validation_passed": validation_passed,
         "steps": steps,
         "artifacts": [],
-        "failures": collect_failures(steps),
+        "non_successes": collect_non_successes(steps),
     }
 
 
@@ -182,9 +182,13 @@ def main(skip_email=False, dry_run=False, log_audit=True):
     for step_name, status in steps.items():
         logger.info("%-20s %s", step_name, status)
 
-    failures = collect_failures(steps)
-    if failures:
-        logger.warning("Weekly report completed with %d failure(s): %s", len(failures), failures)
+    non_successes = collect_non_successes(steps)
+    if non_successes:
+        logger.warning(
+            "Weekly report completed with %d non-success(es): %s",
+            len(non_successes),
+            non_successes,
+        )
     else:
         logger.info("Weekly report completed successfully")
 

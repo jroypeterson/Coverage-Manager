@@ -15,7 +15,7 @@ import weekly_report
 import weekly_universe
 from config import API_KEYS, TODAY
 from logging_utils import get_logger
-from pipeline_utils import collect_failures
+from pipeline_utils import collect_non_successes
 
 logger = get_logger("weekly_build")
 
@@ -74,7 +74,7 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
                 ]
             ),
             "artifacts": [],
-            "failures": [],
+            "non_successes": [],
         }
 
     # 3. Merge into a combined steps dict in execution order.
@@ -113,9 +113,17 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
     for step_name, status in combined_steps.items():
         logger.info("%-20s %s", step_name, status)
 
-    failures = collect_failures(combined_steps)
-    if failures:
-        logger.warning("Weekly build completed with %d failure(s): %s", len(failures), failures)
+    # Non-success covers both "failed:" (exception) and "blocked:" (gated).
+    # A blocked report run is operationally non-successful — the report didn't
+    # ship, even though no exception was raised — and must surface as such in
+    # logs and audit trails.
+    non_successes = collect_non_successes(combined_steps)
+    if non_successes:
+        logger.warning(
+            "Weekly build completed with %d non-success(es): %s",
+            len(non_successes),
+            non_successes,
+        )
     else:
         logger.info("Weekly build completed successfully")
 
@@ -143,7 +151,7 @@ def main(skip_discovery=False, skip_performance=False, skip_email=False, dry_run
         "validation_passed": validation_passed,
         "steps": combined_steps,
         "artifacts": combined_artifacts,
-        "failures": failures,
+        "non_successes": non_successes,
         "universe": universe_result,
         "report": report_result,
     }

@@ -52,7 +52,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     assert "validation_passed" in result
     assert "steps" in result
     assert "artifacts" in result
-    assert "failures" in result
+    assert "non_successes" in result
 
     # Clean fixture should pass validation
     assert result["validation_passed"] is True
@@ -72,7 +72,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     assert "skipped" in result["steps"]["export_artifacts"]
     assert "skipped" in result["steps"]["sigma_export"]
 
-    assert result["failures"] == []
+    assert result["non_successes"] == []
 
 
 def test_main_validation_failure_sets_validation_passed_false(monkeypatch, tmp_path):

@@ -43,7 +43,7 @@ def test_main_dry_run_returns_standardized_shape(monkeypatch, fixture_csv):
     assert "validation_passed" in result
     assert "steps" in result
     assert "artifacts" in result
-    assert "failures" in result
+    assert "non_successes" in result
 
     assert result["validation_passed"] is True
     assert set(result["steps"].keys()) == {"validate", "archive", "performance", "email"}
@@ -52,7 +52,7 @@ def test_main_dry_run_returns_standardized_shape(monkeypatch, fixture_csv):
     assert "skipped" in result["steps"]["archive"]
     assert "skipped" in result["steps"]["performance"]
     assert "skipped" in result["steps"]["email"]
-    assert result["failures"] == []
+    assert result["non_successes"] == []
 
 
 def test_main_no_force_parameter():

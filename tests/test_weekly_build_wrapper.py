@@ -26,7 +26,7 @@ def _make_universe_result(validation_passed=True, steps=None):
             ("sigma_export", "unchanged (411 tickers)"),
         ]),
         "artifacts": ["exports/universe.csv", "exports/universe_metadata.json"],
-        "failures": [],
+        "non_successes": [],
     }
 
 
@@ -42,7 +42,7 @@ def _make_report_result():
             ("email", "ok"),
         ]),
         "artifacts": [],
-        "failures": [],
+        "non_successes": [],
     }
 
 
@@ -121,7 +121,7 @@ def test_happy_path_runs_universe_then_report(stub_orchestrators):
     assert "performance" in result["steps"]
     assert "sigma_export" in result["steps"]
     assert result["validation_passed"] is True
-    assert result["failures"] == []
+    assert result["non_successes"] == []
 
 
 def test_validation_failure_blocks_report_side(monkeypatch, stub_orchestrators):
@@ -139,6 +139,36 @@ def test_validation_failure_blocks_report_side(monkeypatch, stub_orchestrators):
     assert result["steps"]["performance"] == "blocked: validation failed"
     assert result["steps"]["email"] == "blocked: validation failed"
     assert result["validation_passed"] is False
+    # Critical: blocked report-side steps must surface as non-success. A
+    # blocked report is operationally a non-success — the report didn't ship.
+    # Note: the universe's `validate` step ran cleanly (status "ok") even
+    # though its result was validation_passed=False, so it does NOT appear
+    # in non_successes — that's the right semantics: the step succeeded,
+    # the universe simply isn't in a state that allows the report to run.
+    assert "performance" in result["non_successes"]
+    assert "email" in result["non_successes"]
+    assert "archive" in result["non_successes"]
+    assert "validate" not in result["non_successes"]
+
+
+def test_blocked_run_logs_non_success_not_success(monkeypatch, stub_orchestrators, caplog):
+    """Regression guard: a blocked run must not log 'completed successfully'.
+    The original bug was that collect_failures only matched 'failed:' prefixes,
+    so blocked steps slipped through and the wrapper claimed success."""
+    import logging
+
+    def fake_universe(**kwargs):
+        stub_orchestrators["universe"].append(kwargs)
+        return _make_universe_result(validation_passed=False)
+
+    monkeypatch.setattr(weekly_build.weekly_universe, "main", fake_universe)
+
+    with caplog.at_level(logging.INFO):
+        weekly_build.main(skip_discovery=True, dry_run=True)
+
+    log_text = "\n".join(record.message for record in caplog.records)
+    assert "completed successfully" not in log_text
+    assert "non-success" in log_text
 
 
 def test_force_overrides_validation_failure(monkeypatch, stub_orchestrators):

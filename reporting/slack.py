@@ -47,16 +47,23 @@ def format_weekly_build_summary(today_str, steps):
             icon = ":white_check_mark:"
         elif isinstance(status, str) and status.startswith("failed"):
             icon = ":x:"
-        elif status in ("skipped", "blocked"):
+        elif isinstance(status, str) and status.startswith("blocked"):
+            # Distinct from a deliberate skip — a blocked step is non-success.
+            icon = ":no_entry:"
+        elif status == "skipped" or (isinstance(status, str) and status.startswith("skipped")):
             icon = ":fast_forward:"
         else:
             icon = ":large_blue_circle:"
         lines.append(f"{icon}  {step_name}: {status}")
 
-    failed = [k for k, v in steps.items() if isinstance(v, str) and v.startswith("failed")]
+    non_success = [
+        k
+        for k, v in steps.items()
+        if isinstance(v, str) and (v.startswith("failed") or v.startswith("blocked"))
+    ]
     lines.append("")
-    if failed:
-        lines.append(f":warning: {len(failed)} step(s) failed: {', '.join(failed)}")
+    if non_success:
+        lines.append(f":warning: {len(non_success)} step(s) non-success: {', '.join(non_success)}")
     else:
         lines.append(":rocket: All steps completed successfully")
 

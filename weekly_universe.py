@@ -18,7 +18,7 @@ from pathlib import Path
 
 from config import CSV_PATH, DATA_DIR, OLD_REPORTS_DIR, REPORTS_DIR, SCRIPT_DIR, TODAY
 from logging_utils import get_logger
-from pipeline_utils import collect_failures, run_step
+from pipeline_utils import collect_non_successes, run_step
 
 logger = get_logger("weekly_universe")
 
@@ -128,11 +128,7 @@ def _step_export_artifacts(validation_result):
     `validation_result` is the dict returned by `_step_validate` and feeds the
     status file's validation_passed / errors / warnings fields.
     """
-    # NOTE: transitional debt — `build_metadata` lives in `reporting/sigma_export.py`
-    # but is conceptually a universe-side helper. Pass 1 reuses it as-is to keep
-    # the diff small and avoid risk to the sigma-alert push. Follow-up: move it
-    # to `universe/artifacts.py` and have sigma_export import it from there.
-    from reporting.sigma_export import build_metadata
+    from universe.artifacts import build_universe_metadata_with_stats
 
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -141,7 +137,9 @@ def _step_export_artifacts(validation_result):
     shutil.copyfile(CSV_PATH, universe_csv_path)
 
     # 2. Build the structured metadata dict (ticker -> {name, sector, subsector}).
-    metadata = build_metadata(CSV_PATH)
+    #    Generic builder only — no consumer-specific augmentation. Sigma-alert
+    #    ETF injection lives in `reporting/sigma_export.build_sigma_metadata`.
+    metadata, build_stats = build_universe_metadata_with_stats(CSV_PATH)
     metadata_path = EXPORTS_DIR / "universe_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
@@ -158,6 +156,8 @@ def _step_export_artifacts(validation_result):
         "source_path": source_path,
         "row_count": validation_result["rows"],
         "ticker_count": len(metadata),
+        "normalization_collisions": build_stats["normalization_collisions"],
+        "collision_examples": build_stats["collision_examples"],
         "validation_passed": validation_result["passed"],
         "validation_errors": list(validation_result["errors"]),
         "validation_warnings": list(validation_result["warnings"]),
@@ -184,7 +184,11 @@ def _step_export_artifacts(validation_result):
             },
             {
                 "name": "universe_metadata.json",
-                "purpose": "Structured metadata keyed by ticker: {name, sector, subsector}",
+                "purpose": (
+                    "Generic structured metadata keyed by ticker: "
+                    "{name, sector, subsector}. Contains only tickers from the "
+                    "source CSV — no consumer-specific augmentation."
+                ),
                 "format": "json",
             },
             {
@@ -238,7 +242,7 @@ def _make_result(steps, validation_passed, artifacts):
         "validation_passed": validation_passed,
         "steps": steps,
         "artifacts": artifacts,
-        "failures": collect_failures(steps),
+        "non_successes": collect_non_successes(steps),
     }
 
 
@@ -365,9 +369,13 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
     for step_name, status in steps.items():
         logger.info("%-20s %s", step_name, status)
 
-    failures = collect_failures(steps)
-    if failures:
-        logger.warning("Weekly universe completed with %d failure(s): %s", len(failures), failures)
+    non_successes = collect_non_successes(steps)
+    if non_successes:
+        logger.warning(
+            "Weekly universe completed with %d non-success(es): %s",
+            len(non_successes),
+            non_successes,
+        )
     else:
         logger.info("Weekly universe completed successfully")
 

@@ -37,12 +37,22 @@ def log_run(command, steps, tickers_added=0, notes=""):
         steps: dict of {step_name: status_string}
         tickers_added: Number of tickers added to the universe
         notes: Any additional notes
+
+    The `steps_failed` column captures any non-success status — both
+    `failed: ...` (exception) and `blocked: ...` (gated). The status string
+    itself preserves the distinction so debugging stays unambiguous; the
+    column exists for monitoring/rollup queries that just need to know
+    "did this run fully succeed?".
     """
     _ensure_header(RUN_LOG_PATH, RUN_LOG_FIELDS)
 
     steps_run = ";".join(steps.keys())
     steps_ok = ";".join(k for k, v in steps.items() if v == "ok")
-    steps_failed = ";".join(k for k, v in steps.items() if isinstance(v, str) and v.startswith("failed"))
+    steps_failed = ";".join(
+        k
+        for k, v in steps.items()
+        if isinstance(v, str) and (v.startswith("failed") or v.startswith("blocked"))
+    )
 
     row = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
