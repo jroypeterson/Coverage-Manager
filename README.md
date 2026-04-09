@@ -7,9 +7,10 @@ Script-driven tooling for maintaining a coverage universe CSV, discovering new t
 - Maintains the master coverage universe at `data/coverage_universe_tickers.csv`
 - Cleans, deduplicates, validates, and enriches identifiers
 - Discovers new candidate tickers via an external Claude prompt and a staging workflow
+- **Publishes a versioned, generic artifact contract under `exports/`** for downstream projects (forensic_triage, biotech_triage, idea_generation, 13F analyzer, sigma-alert) to consume
 - Generates Excel and HTML performance reports segmented by `Sector (JP)` / `Subsector (JP)`
-- Emails reports via Gmail and posts a summary to Slack `#all-jp-personal-hub`
-- Orchestrates the whole thing as a `weekly-build` pipeline scheduled for Friday 8am
+- Emails reports via Gmail and posts a summary to Slack `#stock-price-alerts`
+- Orchestrates the whole thing as a `weekly-build` pipeline scheduled for Friday 8am, with separable `weekly-universe` and `weekly-report` subcommands for finer control
 
 ## Prerequisites
 
@@ -51,7 +52,9 @@ Alpha Vantage is used as a fallback fundamentals provider when Finnhub/FMP do no
 Run everything from this directory:
 
 ```bash
-python cli.py weekly-build              # Full Friday pipeline
+python cli.py weekly-build              # Full Friday pipeline (universe + report wrapper)
+python cli.py weekly-universe           # Just the universe-side pipeline (no perf reports)
+python cli.py weekly-report             # Just the reporting-side pipeline
 python cli.py performance               # Just generate reports
 python cli.py performance --sample      # Quick preview using a small subset
 python cli.py performance --refresh     # Bypass cache, refetch all data
@@ -69,27 +72,75 @@ Add `--verbose` for debug logs:
 python cli.py --verbose performance --sample
 ```
 
-### Weekly build
+### Weekly pipeline architecture
 
-`python cli.py weekly-build` runs:
+The weekly pipeline is split into two independently-runnable orchestrators with a thin wrapper that runs both. This decoupling lets the universe management half run without dragging the reporting half along — useful for downstream projects that consume the universe but don't need performance reports.
 
-1. **validate** — schema/data checks on the coverage CSV; hard errors block downstream steps unless `--force`
-2. **archive** — moves prior dated reports into `reports/old reports/`
-3. **discovery** — writes a discovery input JSON, then looks for `data/discovery_output_<DATE>.json` produced by running `weekly_coverage_prompt.md` in Claude. Validated candidates are staged; rows with `approved=true` are auto-committed to the universe CSV
-4. **performance** — generates Excel + HTML reports
-5. **email** — sends HTML reports via Gmail
-6. **sigma-export** — writes `ticker_metadata.json` (company name, sector, subsector for every ticker) into the sibling `../sigma-alert/` clone and commits/pushes only that file. The sigma-alert screener loads this file at startup so its Slack alerts can show company names and sector tags. See `reporting/sigma_export.py`
-7. **slack** — posts a build summary to the webhook URL
+**`weekly-universe`** — universe management half (validate → archive → discovery → export-artifacts → sigma-export):
+
+1. **validate** — schema/data checks on the coverage CSV; produces `validation_passed` boolean
+2. **archive** — moves prior dated discovery markdown files into `reports/old reports/`
+3. **discovery** — writes a discovery input JSON, then looks for `data/discovery_output_<DATE>.json` produced by running `weekly_coverage_prompt.md` in Claude. Validated candidates are staged; rows with `approved=true` are auto-committed
+4. **export-artifacts** — writes the published artifact contract under `exports/` (see Exports section below)
+5. **sigma-export** — writes `ticker_metadata.json` into the sibling `../sigma-alert/` clone and commits/pushes only that file. The screener loads it at startup so Slack alerts can show company names and sector tags. See `reporting/sigma_export.py`
+
+**`weekly-report`** — reporting half (validate read-only → archive → performance → email):
+
+1. **validate** — read-only validation, informational only; gating belongs in the wrapper
+2. **archive** — moves prior dated performance reports into `reports/old reports/`
+3. **performance** — generates Excel + HTML reports
+4. **email** — sends HTML reports via Gmail
+
+**`weekly-build`** — wrapper that runs `weekly-universe`, gates `weekly-report` on `validation_passed` (overridable with `--force`), merges results, posts a Slack summary to `#stock-price-alerts`, and writes a parent audit row. This is the entry point used by the Friday scheduled task; the CLI surface and `run_weekly_coverage.bat` are unchanged.
 
 Flags: `--skip-discovery`, `--skip-performance`, `--skip-email`, `--dry-run`, `--force`.
 
 The Windows scheduled task runs `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am.
 
+**Operational status semantics.** Step statuses fall into three buckets:
+
+- **Success**: `"ok"`, `"unchanged"`, deliberate skips (`"skipped"`, `"skipped (dry run)"`)
+- **Failed**: `"failed: <reason>"` — the step raised an exception
+- **Blocked**: `"blocked: <reason>"` — the step was prevented from running by a gating decision (e.g. validation failed and `--force` was not passed). **Blocked is non-success** — a blocked report run produced no report. Both failed and blocked appear in `run_log.csv`'s `steps_failed` column and in the wrapper's `non_successes` list. Slack uses `:x:` for failed and `:no_entry:` for blocked.
+
+Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never reverse-engineer the success state from the steps dict directly.
+
+### Exports — published artifact contract
+
+`exports/` is a versioned, **committed** interface for downstream projects. Files are committed to git so consumers get history, reproducibility, and rollback. The contract is **strictly generic**: artifacts describe the coverage universe and nothing else. Consumer-specific transforms belong in the consumer.
+
+| File | Purpose |
+|------|---------|
+| `exports/universe.csv` | Snapshot of `data/coverage_universe_tickers.csv` |
+| `exports/universe_metadata.json` | `{TICKER: {name, sector, subsector}}` derived only from CSV rows |
+| `exports/universe_status.json` | Versioned status + validation contract; **always read `schema_version` first** |
+| `exports/manifest.json` | Directory of files in `exports/` with their purpose |
+
+`universe_status.json` (schema v1) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. Invariant: `ticker_count + normalization_collisions == row_count`.
+
+Read pattern for downstream projects:
+
+```python
+import json
+from pathlib import Path
+
+CM_EXPORTS = Path("../Coverage Manager/exports")
+status = json.loads((CM_EXPORTS / "universe_status.json").read_text())
+assert status["schema_version"] == 1, "Coverage Manager exports schema changed"
+if not status["validation_passed"]:
+    raise RuntimeError(f"Universe failed validation: {status['validation_errors']}")
+metadata = json.loads((CM_EXPORTS / "universe_metadata.json").read_text())
+```
+
+The sigma-alert-specific `ticker_metadata.json` (in the sibling sigma-alert clone) is a **separate** artifact produced by `reporting/sigma_export.build_sigma_metadata`, which composes the generic builder with hardcoded sector ETFs. Don't conflate the two.
+
 ### Command details
 
 | Command | Description |
 |---------|-------------|
-| `weekly-build` | Runs the full pipeline (validate → archive → discovery → performance → email → sigma-export → slack). |
+| `weekly-build` | Wrapper that runs `weekly-universe` then `weekly-report`, gates the report on validation, posts a combined Slack summary. |
+| `weekly-universe` | Universe-side pipeline only: validate, archive, discovery, export-artifacts, sigma-export. |
+| `weekly-report` | Reporting-side pipeline only: validate (read-only), archive, performance, email. |
 | `performance` | Fetches price history and fundamentals, then produces Excel and HTML reports. |
 | `performance --sample` | Generates a reduced preview using a small subset of tickers. |
 | `performance --refresh` | Bypass cache and refetch all data. |
@@ -144,21 +195,28 @@ These commands modify `data/coverage_universe_tickers.csv` in place. A timestamp
 ```
 Coverage Manager/
 ├── cli.py                       # CLI entry point
-├── weekly_build.py              # Weekly pipeline orchestrator
+├── weekly_build.py              # Wrapper: runs weekly_universe + weekly_report
+├── weekly_universe.py           # Universe-side orchestrator
+├── weekly_report.py             # Reporting-side orchestrator
+├── pipeline_utils.py            # run_step / collect_non_successes helpers
 ├── weekly_coverage_prompt.md    # Discovery prompt run in Claude
 ├── config.py                    # Paths, API keys, segment definitions
 ├── cache.py                     # Disk cache for external API responses
 ├── audit.py                     # Run-log audit trail
-├── perf_data.py                 # Price and fundamentals fetching
 ├── ticker_utils.py              # Shared ticker helpers
 ├── logging_utils.py             # Logging configuration
 ├── providers/                   # yfinance, Finnhub, FMP, Alpha Vantage, FX
-├── reporting/                   # Excel, HTML, email, slack
-├── universe/                    # validation, cleanup, enrich, add-exchanges
+├── reporting/                   # Excel, HTML, email, slack, sigma_export
+├── universe/                    # validation, cleanup, enrich, add-exchanges, artifacts
 ├── discovery/                   # Candidate discovery and staging
 ├── tests/                       # pytest suite
 ├── data/
 │   └── coverage_universe_tickers.csv
+├── exports/                     # Published artifact contract (committed)
+│   ├── universe.csv
+│   ├── universe_metadata.json
+│   ├── universe_status.json
+│   └── manifest.json
 ├── backups/                     # Timestamped CSV backups
 ├── cache/                       # Cached API data (gitignored)
 ├── reports/                     # Generated reports (gitignored)
