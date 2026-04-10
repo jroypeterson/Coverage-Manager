@@ -107,7 +107,8 @@ The wrapper logs `"completed successfully"` only when **zero** steps are non-suc
 - Performance reports are emailed and posted to Slack `#stock-price-alerts` via `SLACK_WEBHOOK_URL` in `.env`
 - AlphaVantage is wired as a third fundamentals fallback after yfinance and FMP
 - `--refresh` flag bypasses cache and refetches all data; threaded through `generate.main()` to all providers
-- The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am
+- The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
+- Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
 
 ## Testing
 Run `python -m pytest tests/ -q` before committing. All tests must pass.

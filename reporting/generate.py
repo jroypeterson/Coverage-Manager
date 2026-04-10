@@ -9,6 +9,8 @@ import openpyxl
 import warnings
 import sys
 import os
+import re
+from datetime import datetime
 
 from config import (
     CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, SAMPLE_REPORTS_DIR, API_KEYS, TODAY,
@@ -70,6 +72,39 @@ def _split_into_segments(result_df):
     segments["HC Svcs & MedTech"] = result_df[hc_svcs_mask].reset_index(drop=True)
     segments["PA & Other"] = result_df[pa_other_mask].reset_index(drop=True)
     return segments
+
+
+def _build_additions_summary(additions_path):
+    """Parse the weekly additions markdown and return a plain-text summary.
+
+    Extracts the recommendations table and company summaries section to
+    include in the performance email body.
+    """
+    text = additions_path.read_text(encoding="utf-8")
+    lines = []
+    lines.append("=== Weekly Coverage Universe Additions ===\n")
+
+    # Extract each row from the recommendations table (lines starting with | N |)
+    for m in re.finditer(
+        r"^\|\s*(\d+)\s*\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|",
+        text, re.MULTILINE,
+    ):
+        num = m.group(1).strip()
+        company = m.group(2).strip().strip("*")
+        ticker = m.group(3).strip()
+        trigger = m.group(9).strip()
+        reason = m.group(11).strip()
+        lines.append(f"{num}. {ticker} ({company}) — {trigger} — {reason}")
+
+    # Extract company summaries
+    summary_match = re.search(
+        r"## Company Summaries\s*\n(.*?)(?=\n---|\n## |\Z)", text, re.DOTALL
+    )
+    if summary_match:
+        lines.append("\n--- Company Summaries ---\n")
+        lines.append(summary_match.group(1).strip())
+
+    return "\n".join(lines)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────
@@ -398,8 +433,24 @@ def main(sample_mode=False, refresh=False):
         gmail_pass = API_KEYS.get("GMAIL_APP_PASSWORD")
         if gmail_addr and gmail_pass and html_paths:
             def _send_email():
-                logger.info("Emailing %s HTML report(s)...", len(html_paths))
-                send_email_report(gmail_addr, gmail_pass, html_paths, TODAY)
+                # Look for weekly additions report to attach and summarize
+                additions_pattern = REPORTS_DIR / f"weekly_coverage_universe_additions_{TODAY}.md"
+                extra_attachments = []
+                body_lines = []
+                if additions_pattern.exists():
+                    extra_attachments.append(additions_pattern)
+                    body_lines.append(_build_additions_summary(additions_pattern))
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+                body_lines.append(f"Generated {timestamp}.\n")
+                body_lines.append("--- Attached Files ---")
+                for p in list(extra_attachments) + [str(p) for p in html_paths]:
+                    body_lines.append(f"  - {os.path.basename(str(p))}")
+                body_text = "\n".join(body_lines)
+                logger.info("Emailing %s HTML report(s) + %s extra attachment(s)...",
+                            len(html_paths), len(extra_attachments))
+                send_email_report(gmail_addr, gmail_pass, html_paths, TODAY,
+                                  extra_attachments=extra_attachments,
+                                  body_text=body_text)
             run_step("email", _send_email)
         else:
             logger.info("Skipping email (GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env)")

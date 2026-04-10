@@ -77,10 +77,13 @@ def archive_old_files(reports_dir, old_reports_dir, today_str):
     return archive_files(reports_dir, old_reports_dir, today_str, REPORT_ARCHIVE_PATTERNS)
 
 
-def send_email_report(gmail_addr, gmail_pass, html_paths, today_str):
+def send_email_report(gmail_addr, gmail_pass, html_paths, today_str,
+                      extra_attachments=None, body_text=None):
     """Send HTML reports as email attachments via Gmail SMTP.
 
-    Accepts a single path or list of paths.
+    Accepts a single path or list of paths.  *extra_attachments* is an
+    optional list of additional file paths (any type) to attach.
+    *body_text* replaces the default one-liner when provided.
     """
     if isinstance(html_paths, (str, os.PathLike)):
         html_paths = [html_paths]
@@ -90,8 +93,11 @@ def send_email_report(gmail_addr, gmail_pass, html_paths, today_str):
     msg["To"] = gmail_addr
     msg["Subject"] = f"Coverage Performance Reports — {today_str}"
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    msg.attach(MIMEText(f"{len(html_paths)} report(s) attached, generated {timestamp}.", "plain"))
+    if body_text:
+        msg.attach(MIMEText(body_text, "plain"))
+    else:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        msg.attach(MIMEText(f"{len(html_paths)} report(s) attached, generated {timestamp}.", "plain"))
 
     for html_path in html_paths:
         with open(html_path, "rb") as f:
@@ -101,6 +107,17 @@ def send_email_report(gmail_addr, gmail_pass, html_paths, today_str):
             part.add_header(
                 "Content-Disposition",
                 f"attachment; filename={os.path.basename(html_path)}",
+            )
+            msg.attach(part)
+
+    for extra_path in (extra_attachments or []):
+        with open(extra_path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename={os.path.basename(extra_path)}",
             )
             msg.attach(part)
 
