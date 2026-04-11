@@ -152,22 +152,88 @@ def validate(entries, universe_csv_path=CSV_PATH):
     return errors, warnings
 
 
+def _append_universe_row(row, universe_csv_path=CSV_PATH):
+    """Append a fully-formed row dict to the coverage universe CSV.
+
+    Reads the existing fieldnames from the CSV header so any extra columns
+    on disk (beyond what `enrich_single_ticker` produces) are preserved as
+    blanks instead of lost. Used by `add(..., create_if_missing=True)`.
+    """
+    import csv
+
+    path = Path(universe_csv_path)
+    with open(path, encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        existing_rows = list(reader)
+
+    # Preserve all existing fieldnames; fill blanks for any not in `row`
+    new_row = {col: row.get(col, "") for col in fieldnames}
+    # If `row` has columns the CSV doesn't yet know about, extend fieldnames
+    for col in row:
+        if col not in fieldnames:
+            fieldnames.append(col)
+            new_row[col] = row[col]
+
+    existing_rows.append(new_row)
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(existing_rows)
+
+
 def add(ticker, buy_price=None, target_price=None, notes="", path=WATCHLIST_PATH,
-        universe_csv_path=CSV_PATH, today=None):
+        universe_csv_path=CSV_PATH, today=None,
+        create_if_missing=False, sector_jp=None, exchange_hint=None,
+        dry_run=False):
     """Add a ticker to the watchlist (or update its fields if already present).
 
     Enforces subset-of-universe and price sanity before writing. Returns the
     updated entry dict.
+
+    New-ticker escape hatch:
+      When `create_if_missing=True` and `ticker` is not already in the
+      coverage universe, this function will call
+      `universe.enrich.enrich_single_ticker(ticker, sector_jp, exchange_hint)`
+      to build a new universe row and append it to the universe CSV before
+      adding to the watchlist. `sector_jp` is required in that path because
+      the Sector (JP) taxonomy is user-curated and no API can fill it.
+
+      Pass `dry_run=True` to validate the ticker and build the new universe
+      row (if needed) without writing anything to disk. Returns a dict
+      describing what would happen — `{"watchlist_entry": ..., "universe_row":
+      ..., "would_create_universe_row": bool}` — so callers can preview the
+      change before committing.
     """
     ticker = (ticker or "").strip()
     if not ticker:
         raise WatchlistError("ticker is required")
 
-    universe = _load_universe_tickers(universe_csv_path)
-    if ticker not in universe:
-        raise WatchlistError(
-            f"{ticker} is not in the coverage universe — add it via discovery first"
-        )
+    universe_rows = _load_universe_rows(universe_csv_path)
+    universe_row_created = None
+
+    if ticker not in universe_rows:
+        if not create_if_missing:
+            raise WatchlistError(
+                f"{ticker} is not in the coverage universe — add it via "
+                f"discovery first, or re-run with create_if_missing=True "
+                f"(CLI: --sector <Sector>) to auto-enrich"
+            )
+        if not sector_jp:
+            raise WatchlistError(
+                f"{ticker} is not in the coverage universe and no sector_jp "
+                f"was provided — sector is required when creating a new "
+                f"universe row (it's user-curated, no API can fill it)"
+            )
+        # Lazy import so `universe.watchlist` doesn't drag pandas/yfinance
+        # into lightweight callers that only need load/validate.
+        from universe.enrich import enrich_single_ticker, EnrichError
+        try:
+            universe_row_created = enrich_single_ticker(
+                ticker, sector_jp=sector_jp, exchange_hint=exchange_hint
+            )
+        except EnrichError as e:
+            raise WatchlistError(f"could not enrich {ticker}: {e}") from e
 
     buy = _parse_price(buy_price, "Buy Price") if buy_price not in (None, "") else None
     tgt = _parse_price(target_price, "Target Price") if target_price not in (None, "") else None
@@ -194,6 +260,15 @@ def add(ticker, buy_price=None, target_price=None, notes="", path=WATCHLIST_PATH
         }
         entries.append(entry)
 
+    if dry_run:
+        return {
+            "watchlist_entry": entry,
+            "universe_row": universe_row_created,
+            "would_create_universe_row": universe_row_created is not None,
+        }
+
+    if universe_row_created is not None:
+        _append_universe_row(universe_row_created, universe_csv_path=universe_csv_path)
     save(entries, path)
     return entry
 

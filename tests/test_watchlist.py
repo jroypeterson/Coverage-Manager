@@ -1,6 +1,7 @@
 """Tests for the watchlist module."""
 
 import csv
+from unittest.mock import patch
 
 import pytest
 
@@ -145,3 +146,156 @@ def test_validate_flags_missing_universe_metadata(tmp_path, wl_path):
     sector_errors = [e for e in errors if "NO_SECTOR" in e]
     assert len(sector_errors) == 1
     assert "Sector (JP)" in sector_errors[0]
+
+
+# ── create_if_missing escape hatch ───────────────────────────────────────────
+
+
+def _fake_enriched_row(ticker):
+    """Canned universe row for NEWCO — matches the ALLOWED_SECTORS_JP taxonomy."""
+    return {
+        "Ticker": ticker,
+        "Exchange": "NYSE",
+        "Exchange Code": "NYQ",
+        "Exchange Full Name": "NYSE",
+        "Listing Type": "Primary",
+        "Other Listings": "",
+        "Year Listed": "2024",
+        "ISIN": "US9999999999",
+        "FIGI": "BBG000NEWCO",
+        "Composite FIGI": "BBG000NEWCO",
+        "Share Class FIGI": "BBG001NEWCO",
+        "CIK": "1999999",
+        "Company Name": "New Co Inc.",
+        "Country (HQ)": "United States",
+        "Country (Listing)": "United States",
+        "Country (ISO)": "USA",
+        "Currency": "USD",
+        "Website": "https://example.com",
+        "YF Sector": "Industrials",
+        "YF Industry": "Specialty Business Services",
+        "Sector (JP)": "Other",
+        "Subsector (JP)": "",
+        "Core": "",
+    }
+
+
+def test_add_create_if_missing_appends_universe_row_and_watchlist(fake_universe, wl_path):
+    """When create_if_missing=True and the ticker isn't in the universe,
+    the helper builds a row, appends it to the universe CSV, and the
+    watchlist add proceeds normally."""
+    with patch(
+        "universe.enrich.enrich_single_ticker",
+        return_value=_fake_enriched_row("NEWCO"),
+    ) as mock_enrich:
+        entry = wl.add(
+            "NEWCO",
+            buy_price=10,
+            target_price=20,
+            path=wl_path,
+            universe_csv_path=fake_universe,
+            today="2026-04-11",
+            create_if_missing=True,
+            sector_jp="Other",
+        )
+
+    mock_enrich.assert_called_once_with("NEWCO", sector_jp="Other", exchange_hint=None)
+    assert entry["Ticker"] == "NEWCO"
+
+    # Universe CSV should now contain NEWCO
+    with open(fake_universe, encoding="utf-8", newline="") as f:
+        rows = list(csv.DictReader(f))
+    tickers = {r["Ticker"] for r in rows}
+    assert "NEWCO" in tickers
+    newco_row = next(r for r in rows if r["Ticker"] == "NEWCO")
+    assert newco_row["Company Name"] == "New Co Inc."
+    assert newco_row["Sector (JP)"] == "Other"
+    assert newco_row["ISIN"] == "US9999999999"
+
+    # Watchlist has the entry
+    entries = wl.load(wl_path)
+    assert len(entries) == 1
+    assert entries[0]["Ticker"] == "NEWCO"
+    assert entries[0]["Buy Price"] == 10.0
+
+
+def test_add_create_if_missing_without_sector_errors(fake_universe, wl_path):
+    with pytest.raises(wl.WatchlistError, match="sector_jp"):
+        wl.add(
+            "NEWCO",
+            path=wl_path,
+            universe_csv_path=fake_universe,
+            create_if_missing=True,
+            sector_jp=None,
+        )
+
+
+def test_add_missing_ticker_without_create_if_missing_still_errors(fake_universe, wl_path):
+    """Backward compat: default path unchanged — no auto-create."""
+    with pytest.raises(wl.WatchlistError, match="not in the coverage universe"):
+        wl.add(
+            "NEWCO",
+            path=wl_path,
+            universe_csv_path=fake_universe,
+        )
+
+
+def test_add_dry_run_does_not_write_anything(fake_universe, wl_path):
+    with patch(
+        "universe.enrich.enrich_single_ticker",
+        return_value=_fake_enriched_row("NEWCO"),
+    ):
+        result = wl.add(
+            "NEWCO",
+            buy_price=10,
+            target_price=20,
+            path=wl_path,
+            universe_csv_path=fake_universe,
+            today="2026-04-11",
+            create_if_missing=True,
+            sector_jp="Other",
+            dry_run=True,
+        )
+
+    assert result["would_create_universe_row"] is True
+    assert result["universe_row"]["Company Name"] == "New Co Inc."
+    assert result["watchlist_entry"]["Ticker"] == "NEWCO"
+
+    # Neither file should have been touched
+    with open(fake_universe, encoding="utf-8", newline="") as f:
+        tickers = {r["Ticker"] for r in csv.DictReader(f)}
+    assert "NEWCO" not in tickers
+    assert wl.load(wl_path) == []
+
+
+def test_add_create_if_missing_passes_exchange_hint(fake_universe, wl_path):
+    with patch(
+        "universe.enrich.enrich_single_ticker",
+        return_value=_fake_enriched_row("NEWCO"),
+    ) as mock_enrich:
+        wl.add(
+            "NEWCO",
+            path=wl_path,
+            universe_csv_path=fake_universe,
+            create_if_missing=True,
+            sector_jp="Other",
+            exchange_hint="LSE",
+        )
+    mock_enrich.assert_called_once_with("NEWCO", sector_jp="Other", exchange_hint="LSE")
+
+
+def test_add_create_if_missing_surfaces_enrich_failure(fake_universe, wl_path):
+    from universe.enrich import EnrichError
+
+    with patch(
+        "universe.enrich.enrich_single_ticker",
+        side_effect=EnrichError("could not resolve required metadata for NOPE"),
+    ):
+        with pytest.raises(wl.WatchlistError, match="could not enrich NOPE"):
+            wl.add(
+                "NOPE",
+                path=wl_path,
+                universe_csv_path=fake_universe,
+                create_if_missing=True,
+                sector_jp="Tech",
+            )

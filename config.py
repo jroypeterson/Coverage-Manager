@@ -78,3 +78,21 @@ SAMPLE_TICKERS = ["ISRG", "BLLN", "HTFL", "JAN", "WELL", "NTRA"]
 
 REQUIRED_COLUMNS = ["Ticker", "Company Name", "Sector (JP)"]
 EXPECTED_COLUMNS = ["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsector (JP)"]
+
+# ── Sector (JP) taxonomy ─────────────────────────────────────────────────────
+# The user-curated sector taxonomy. Used by `watchlist add --sector` (and the
+# underlying `enrich_single_ticker` helper) to reject typos before writing a
+# new row into the universe CSV. Kept in sync with the values actually used
+# in `data/coverage_universe_tickers.csv`'s `Sector (JP)` column.
+ALLOWED_SECTORS_JP = {
+    "Tech",
+    "SaaS",
+    "PA",
+    "Fintech",
+    "Biopharma",
+    "MedTech",
+    "Life Science Tools",
+    "Healthcare Services",
+    "Healthcare Real Estate",
+    "Other",
+}

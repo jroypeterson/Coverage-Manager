@@ -11,6 +11,7 @@ import time
 import os
 from datetime import datetime
 
+from config import ALLOWED_SECTORS_JP, API_KEYS
 from ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
@@ -18,6 +19,10 @@ from ticker_utils import (
     normalize_company_for_comparison, backup_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
+
+
+class EnrichError(Exception):
+    """Raised when single-ticker enrichment cannot produce a viable universe row."""
 
 logger = get_logger("enrich_identifiers")
 
@@ -75,6 +80,296 @@ def validate_isin_for_row(isin, row, ticker=""):
         )
         return None
     return s
+
+
+# ── Single-ticker enrichment ────────────────────────────────────────────────
+# Used by `universe.watchlist.add(..., create_if_missing=True)` to build a
+# universe row for a brand-new ticker without running the full 1091-row
+# enrich pipeline. FMP's `/stable/profile` endpoint covers US names cleanly
+# in one call; yfinance + OpenFIGI + SEC EDGAR fill in whatever FMP misses.
+
+_UNIVERSE_ROW_COLUMNS = [
+    "Ticker", "Exchange", "Exchange Code", "Exchange Full Name",
+    "Listing Type", "Other Listings", "Year Listed",
+    "ISIN", "FIGI", "Composite FIGI", "Share Class FIGI", "CIK",
+    "Company Name", "Country (HQ)", "Country (Listing)", "Country (ISO)",
+    "Currency", "Website",
+    "YF Sector", "YF Industry", "Sector (JP)", "Subsector (JP)", "Core",
+]
+
+# FMP's exchange names → Coverage Manager's standard Exchange column values.
+_FMP_EXCHANGE_NORMALIZE = {
+    "NASDAQ Global Select": "NASDAQ",
+    "NASDAQ Global Market": "NASDAQ",
+    "NASDAQ Capital Market": "NASDAQ",
+    "NASDAQ": "NASDAQ",
+    "New York Stock Exchange": "NYSE",
+    "New York Stock Exchange Arca": "NYSE Arca",
+    "NYSE": "NYSE",
+    "NYSE American": "NYSE American",
+    "NYSEArca": "NYSE Arca",
+    "AMEX": "NYSE American",
+    "BATS": "BATS",
+    "OTC": "OTC",
+}
+
+
+def validate_sector_jp(sector):
+    """Raise `EnrichError` if `sector` is not in the user-curated taxonomy."""
+    if not sector or not str(sector).strip():
+        raise EnrichError(
+            "sector_jp is required when creating a new universe row — "
+            f"must be one of: {sorted(ALLOWED_SECTORS_JP)}"
+        )
+    if sector not in ALLOWED_SECTORS_JP:
+        raise EnrichError(
+            f"unknown Sector (JP): {sector!r}. Allowed values: "
+            f"{sorted(ALLOWED_SECTORS_JP)}"
+        )
+
+
+def _fetch_fmp_profile(ticker):
+    """Hit FMP `/stable/profile` for a single ticker. Returns dict or {}.
+
+    Uses the stable endpoint (the legacy `/api/v3/profile` was retired for
+    non-grandfathered accounts in August 2025). No error on network issues;
+    returns empty so the caller falls back to yfinance.
+    """
+    key = API_KEYS.get("FMP_API_KEY", "")
+    if not key:
+        return {}
+    try:
+        url = f"https://financialmodelingprep.com/stable/profile?symbol={ticker}&apikey={key}"
+        resp = requests.get(url, timeout=15)
+        if resp.status_code != 200:
+            logger.warning("FMP profile %s: HTTP %s", ticker, resp.status_code)
+            return {}
+        body = resp.json()
+        if not body:
+            return {}
+        return body[0] if isinstance(body, list) else body
+    except Exception as e:
+        log_exception(logger, f"FMP profile lookup failed for {ticker}", e)
+        return {}
+
+
+def _normalize_fmp_exchange(fmp_exchange_full, fmp_exchange_short):
+    """Pick a Coverage-Manager-canonical exchange name from FMP's fields."""
+    for candidate in (fmp_exchange_full, fmp_exchange_short):
+        if not candidate:
+            continue
+        s = str(candidate).strip()
+        if s in _FMP_EXCHANGE_NORMALIZE:
+            return _FMP_EXCHANGE_NORMALIZE[s]
+    # Fall back to short code if it already matches a known exchange name
+    s = str(fmp_exchange_short or "").strip()
+    if s and s in EXCHANGE_TO_COUNTRY:
+        return s
+    return ""
+
+
+def _empty_row():
+    return {c: "" for c in _UNIVERSE_ROW_COLUMNS}
+
+
+# Reverse of COUNTRY_TO_ISIN_PREFIX, built lazily, for normalizing FMP's
+# country field (which sometimes returns ISO 3166 alpha-2 codes like "US"
+# instead of full names like "United States").
+_ISIN_PREFIX_TO_COUNTRY = {v: k for k, v in COUNTRY_TO_ISIN_PREFIX.items()}
+
+
+def _normalize_country_name(raw):
+    """Return a full country name for `raw`, which may be an ISO alpha-2
+    code (FMP sometimes returns "US" instead of "United States") or the
+    full name already. Unknown values pass through unchanged."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    if len(s) == 2 and s.upper() in _ISIN_PREFIX_TO_COUNTRY:
+        return _ISIN_PREFIX_TO_COUNTRY[s.upper()]
+    return s
+
+
+def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
+    """Build a full universe-CSV row for a brand-new ticker.
+
+    Contract:
+      - Validates `sector_jp` against the ALLOWED_SECTORS_JP taxonomy.
+      - Primary source: FMP `/stable/profile` (ISIN, CIK, IPO year, sector,
+        industry, website, exchange, currency, country, company name).
+      - Fallback: yfinance `Ticker.info` + `Ticker.isin` for anything FMP
+        left blank. Uses `exchange_hint` to normalize the yfinance symbol
+        when the ticker has a regional suffix.
+      - FIGI fields come from OpenFIGI (`fetch_openfigi_identifiers` on a
+        single-row DataFrame).
+      - CIK fallback: SEC EDGAR bulk map (for when FMP omits CIK on non-US
+        names or when the SEC map lags a ticker rebrand).
+      - Runs `validate_isin_for_row` so a wrong-country ISIN from yfinance
+        never lands in the row.
+
+    Raises `EnrichError` when the result is missing any of the
+    watchlist-required metadata fields: Company Name, Sector (JP), Currency,
+    Exchange. `Sector (JP)` comes from the caller; the other three must come
+    from the data sources.
+
+    Returns a dict keyed by the universe CSV's column names, suitable for
+    appending to `data/coverage_universe_tickers.csv` via csv.DictWriter.
+    """
+    validate_sector_jp(sector_jp)
+
+    ticker = str(ticker or "").strip()
+    if not ticker:
+        raise EnrichError("ticker is required")
+
+    row = _empty_row()
+    row["Ticker"] = ticker
+    row["Sector (JP)"] = sector_jp
+    row["Listing Type"] = "Primary"
+
+    sources_used = []
+
+    # ── 1. FMP /stable/profile ───────────────────────────────────────────
+    fmp = _fetch_fmp_profile(ticker)
+    if fmp:
+        sources_used.append("fmp")
+        row["Company Name"] = str(fmp.get("companyName", "") or "").strip()
+        row["ISIN"] = str(fmp.get("isin", "") or "").strip()
+        cik = str(fmp.get("cik", "") or "").strip().lstrip("0")
+        if cik:
+            row["CIK"] = cik
+        ipo = str(fmp.get("ipoDate", "") or "").strip()
+        if ipo and len(ipo) >= 4:
+            row["Year Listed"] = ipo[:4]
+        row["Website"] = str(fmp.get("website", "") or "").strip()
+        row["YF Sector"] = str(fmp.get("sector", "") or "").strip()
+        row["YF Industry"] = str(fmp.get("industry", "") or "").strip()
+        row["Currency"] = str(fmp.get("currency", "") or "").strip()
+        row["Country (HQ)"] = _normalize_country_name(fmp.get("country", ""))
+        exch = _normalize_fmp_exchange(
+            fmp.get("exchangeFullName"), fmp.get("exchange")
+        )
+        if exch:
+            row["Exchange"] = exch
+
+    # Exchange hint override (non-US cases where FMP is weak)
+    if exchange_hint:
+        row["Exchange"] = exchange_hint
+
+    # ── 2. Derive country (Listing)/(ISO) from exchange ──────────────────
+    if row["Exchange"] and not row["Country (Listing)"]:
+        row["Country (Listing)"] = EXCHANGE_TO_COUNTRY.get(row["Exchange"], "")
+    if row["Country (HQ)"] and not row["Country (Listing)"]:
+        row["Country (Listing)"] = row["Country (HQ)"]
+    if row["Country (Listing)"]:
+        row["Country (ISO)"] = COUNTRY_TO_ISO.get(row["Country (Listing)"], "")
+
+    # ── 3. yfinance fallback for empty fields ────────────────────────────
+    needs_yf = not all(row[c] for c in ("Company Name", "Currency", "ISIN", "Year Listed"))
+    if needs_yf:
+        try:
+            yf_ticker = normalize_ticker(
+                ticker,
+                company_name=row.get("Company Name", ""),
+                exchange=row.get("Exchange", ""),
+            )
+            if yf_ticker:
+                yt = yf.Ticker(yf_ticker)
+                sources_used.append("yfinance")
+
+                if not row["ISIN"]:
+                    try:
+                        candidate_isin = yt.isin
+                        checked = validate_isin_for_row(candidate_isin, row, ticker=ticker)
+                        if checked:
+                            row["ISIN"] = checked
+                    except Exception as e:
+                        log_exception(logger, f"yfinance ISIN failed for {ticker}", e)
+
+                try:
+                    info = yt.info or {}
+                except Exception as e:
+                    log_exception(logger, f"yfinance info failed for {ticker}", e)
+                    info = {}
+
+                if info:
+                    if not row["Company Name"]:
+                        row["Company Name"] = str(info.get("longName", "") or info.get("shortName", "")).strip()
+                    if not row["Exchange Code"]:
+                        row["Exchange Code"] = str(info.get("exchange", "") or "").strip()
+                    if not row["Exchange Full Name"]:
+                        row["Exchange Full Name"] = str(info.get("fullExchangeName", "") or "").strip()
+                    if not row["Currency"]:
+                        row["Currency"] = str(info.get("currency", "") or "").strip()
+                    if not row["Country (HQ)"]:
+                        row["Country (HQ)"] = str(info.get("country", "") or "").strip()
+                    if not row["Website"]:
+                        row["Website"] = str(info.get("website", "") or "").strip()
+                    if not row["YF Sector"]:
+                        row["YF Sector"] = str(info.get("sector", "") or "").strip()
+                    if not row["YF Industry"]:
+                        row["YF Industry"] = str(info.get("industry", "") or "").strip()
+                    if not row["Year Listed"]:
+                        first_trade_ms = info.get("firstTradeDateEpochUtc") or info.get("firstTradeDateMilliseconds")
+                        if first_trade_ms:
+                            if first_trade_ms > 1e12:
+                                first_trade_ms = first_trade_ms / 1000
+                            year = datetime.utcfromtimestamp(first_trade_ms).year
+                            if 1900 < year <= datetime.now().year:
+                                row["Year Listed"] = str(year)
+        except Exception as e:
+            log_exception(logger, f"yfinance fallback failed for {ticker}", e)
+
+    # Re-derive country fields if yfinance filled Country (HQ)
+    if row["Country (HQ)"] and not row["Country (Listing)"]:
+        row["Country (Listing)"] = row["Country (HQ)"]
+    if row["Country (Listing)"] and not row["Country (ISO)"]:
+        row["Country (ISO)"] = COUNTRY_TO_ISO.get(row["Country (Listing)"], "")
+
+    # ── 4. OpenFIGI for FIGI fields ──────────────────────────────────────
+    if not row["FIGI"] or not row["Composite FIGI"]:
+        try:
+            mini_df = pd.DataFrame([{
+                "Ticker": ticker,
+                "Company Name": row["Company Name"],
+                "Exchange": row["Exchange"],
+            }])
+            figi_map = fetch_openfigi_identifiers(mini_df)
+            figi_data = figi_map.get(ticker, {})
+            if figi_data:
+                sources_used.append("openfigi")
+                for key in ("FIGI", "Composite FIGI", "Share Class FIGI"):
+                    if not row[key] and figi_data.get(key):
+                        row[key] = figi_data[key]
+        except Exception as e:
+            log_exception(logger, f"OpenFIGI lookup failed for {ticker}", e)
+
+    # ── 5. SEC EDGAR CIK fallback ────────────────────────────────────────
+    if not row["CIK"]:
+        try:
+            cik_map = fetch_sec_cik_map()
+            cik = cik_map.get(ticker.upper(), "")
+            if cik:
+                row["CIK"] = cik
+                sources_used.append("sec")
+        except Exception as e:
+            log_exception(logger, f"SEC CIK lookup failed for {ticker}", e)
+
+    logger.info(
+        "enrich_single_ticker(%s): sources=%s",
+        ticker, ",".join(sources_used) or "none",
+    )
+
+    # ── 6. Validate required watchlist metadata fields ───────────────────
+    required = ("Company Name", "Exchange", "Currency", "Sector (JP)")
+    missing = [f for f in required if not row[f]]
+    if missing:
+        raise EnrichError(
+            f"could not resolve required metadata for {ticker}: missing "
+            f"{', '.join(missing)}. Sources tried: {sources_used or ['none']}. "
+            f"Check the ticker spelling or pass --exchange for non-US names."
+        )
+
+    return row
 
 
 def fetch_yfinance_identifiers(df):

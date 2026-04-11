@@ -95,6 +95,37 @@ def build_parser():
     wl_add.add_argument("--buy", type=float, default=None, help="Buy price (local currency).")
     wl_add.add_argument("--target", type=float, default=None, help="Target price (local currency).")
     wl_add.add_argument("--notes", type=str, default="", help="Free-form notes.")
+    wl_add.add_argument(
+        "--sector",
+        type=str,
+        default=None,
+        help=(
+            "Sector (JP) — required when the ticker isn't already in the "
+            "coverage universe. Passing this opts into auto-enriching a new "
+            "universe row via FMP/yfinance/OpenFIGI before adding to the "
+            "watchlist. Must match the user-curated taxonomy "
+            "(Tech, SaaS, PA, Fintech, Biopharma, MedTech, Life Science Tools, "
+            "Healthcare Services, Healthcare Real Estate, Other)."
+        ),
+    )
+    wl_add.add_argument(
+        "--exchange",
+        type=str,
+        default=None,
+        help=(
+            "Optional exchange hint (e.g. NASDAQ, NYSE, LSE, TSE) for when "
+            "the data sources can't resolve it on their own. Only used when "
+            "--sector is passed and the ticker is being newly created."
+        ),
+    )
+    wl_add.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Preview the watchlist entry and any new universe row that would "
+            "be written, without touching disk."
+        ),
+    )
 
     wl_rm = wl_sub.add_parser("remove", help="Remove a ticker from the watchlist.")
     wl_rm.add_argument("ticker")
@@ -176,13 +207,30 @@ def main():
 
         if args.wl_command == "add":
             try:
-                entry = watchlist.add(
-                    args.ticker, buy_price=args.buy, target_price=args.target, notes=args.notes
+                result = watchlist.add(
+                    args.ticker,
+                    buy_price=args.buy,
+                    target_price=args.target,
+                    notes=args.notes,
+                    create_if_missing=bool(args.sector),
+                    sector_jp=args.sector,
+                    exchange_hint=args.exchange,
+                    dry_run=args.dry_run,
                 )
             except watchlist.WatchlistError as e:
                 print(f"Error: {e}")
                 raise SystemExit(1)
-            print(f"Added/updated: {entry}")
+            if args.dry_run:
+                print("[dry-run] no files written")
+                if result.get("would_create_universe_row"):
+                    print("Would append new universe row:")
+                    for k, v in result["universe_row"].items():
+                        if v:
+                            print(f"  {k}: {v}")
+                    print()
+                print(f"Would add watchlist entry: {result['watchlist_entry']}")
+            else:
+                print(f"Added/updated: {result}")
         elif args.wl_command == "remove":
             removed = watchlist.remove(args.ticker)
             if removed:
