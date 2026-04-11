@@ -18,7 +18,7 @@ def fixture_csv(tmp_path):
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsector (JP)"],
+            fieldnames=["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsector (JP)", "Currency"],
         )
         writer.writeheader()
         writer.writerow(
@@ -28,6 +28,7 @@ def fixture_csv(tmp_path):
                 "Company Name": "Apple Inc",
                 "Sector (JP)": "Tech",
                 "Subsector (JP)": "Hardware",
+                "Currency": "USD",
             }
         )
         writer.writerow(
@@ -37,6 +38,7 @@ def fixture_csv(tmp_path):
                 "Company Name": "Moderna Inc",
                 "Sector (JP)": "Biopharma",
                 "Subsector (JP)": "Biotech",
+                "Currency": "USD",
             }
         )
     return csv_path
@@ -186,6 +188,41 @@ def test_normalization_collisions_are_surfaced(monkeypatch, tmp_path):
     assert "ROG" in status["collision_examples"]
 
 
+def test_watchlist_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
+    """The watchlist export step produces csv + json + status and joins with universe metadata."""
+    from universe import watchlist as wl
+
+    wl_csv = tmp_path / "watchlist.csv"
+    wl.add(
+        "AAPL", buy_price=150, target_price=220, notes="core",
+        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    )
+
+    exports_dir = tmp_path / "exports"
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
+
+    result = weekly_universe._step_export_watchlist()
+
+    assert (exports_dir / "watchlist.csv").exists()
+    assert (exports_dir / "watchlist.json").exists()
+    assert (exports_dir / "watchlist_status.json").exists()
+    assert result["entry_count"] == 1
+    assert result["validation_passed"] is True
+
+    joined = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
+    assert joined["AAPL"]["buy_price"] == 150
+    assert joined["AAPL"]["target_price"] == 220
+    assert joined["AAPL"]["name"] == "Apple Inc"
+    assert joined["AAPL"]["sector"] == "Tech"
+
+    status = json.loads((exports_dir / "watchlist_status.json").read_text(encoding="utf-8"))
+    assert status["schema_version"] == 1
+    assert status["entry_count"] == 1
+    assert status["validation_passed"] is True
+
+
 def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
     exports_dir = tmp_path / "exports"
     monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
@@ -202,5 +239,8 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "universe.csv",
         "universe_metadata.json",
         "universe_status.json",
+        "watchlist.csv",
+        "watchlist.json",
+        "watchlist_status.json",
         "manifest.json",
     }

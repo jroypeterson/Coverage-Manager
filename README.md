@@ -11,6 +11,7 @@ Script-driven tooling for maintaining a coverage universe CSV, discovering new t
 - Generates Excel and HTML performance reports segmented by `Sector (JP)` / `Subsector (JP)`
 - Emails reports via Gmail and posts a summary to Slack `#stock-price-alerts`
 - Orchestrates the whole thing as a `weekly-build` pipeline scheduled for Friday 8am, with separable `weekly-universe` and `weekly-report` subcommands for finer control
+- Maintains a **core watchlist** (subset of the universe with buy/target prices + notes) with its own weekly Monday report, published artifact, and sigma-alert integration
 
 ## Prerequisites
 
@@ -64,6 +65,11 @@ python cli.py enrich                    # Identifier enrichment (Finnhub/FMP)
 python cli.py add-exchanges             # Populate Exchange column via yfinance
 python cli.py cache-clear               # Clear all cached external data
 python cli.py cache-clear --namespace fundamentals
+python cli.py watchlist add TICKER --buy 30 --target 75 --notes "..."  # Add to core watchlist
+python cli.py watchlist remove TICKER   # Remove from core watchlist
+python cli.py watchlist list            # Print the core watchlist
+python cli.py watchlist validate        # Validate (subset + required metadata)
+python cli.py watchlist-report          # Generate the Monday core watchlist report
 ```
 
 Add `--verbose` for debug logs:
@@ -114,6 +120,9 @@ Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never
 | `exports/universe.csv` | Snapshot of `data/coverage_universe_tickers.csv` |
 | `exports/universe_metadata.json` | `{TICKER: {name, sector, subsector}}` derived only from CSV rows |
 | `exports/universe_status.json` | Versioned status + validation contract; **always read `schema_version` first** |
+| `exports/watchlist.csv` | Snapshot of `data/watchlist.csv` (core watchlist; buy/target in local currency) |
+| `exports/watchlist.json` | `{TICKER: {buy_price, target_price, date_added, notes, name, sector, subsector}}` joined with universe metadata |
+| `exports/watchlist_status.json` | Versioned status + validation contract for the watchlist (separate schema) |
 | `exports/manifest.json` | Directory of files in `exports/` with their purpose |
 
 `universe_status.json` (schema v1) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. Invariant: `ticker_count + normalization_collisions == row_count`.
@@ -149,6 +158,8 @@ The sigma-alert-specific `ticker_metadata.json` (in the sibling sigma-alert clon
 | `enrich` | Adds identifier columns (ISIN, FIGI, CIK, etc.) from Finnhub and FMP. |
 | `add-exchanges` | Resolves exchange names by suffix or yfinance lookup. |
 | `cache-clear` | Clears cached API data; optional `--namespace` to clear one bucket. |
+| `watchlist add/remove/list/validate` | Manage `data/watchlist.csv` — the core watchlist of tickers you own or are watching. `add` and `validate` enforce subset-of-universe and require non-empty `Company Name`, `Sector (JP)`, `Currency`, `Exchange` on the universe row. |
+| `watchlist-report` | Generate the weekly Monday core watchlist report (HTML + Excel + email + Slack). |
 
 ## Output
 
@@ -211,18 +222,23 @@ Coverage Manager/
 ├── discovery/                   # Candidate discovery and staging
 ├── tests/                       # pytest suite
 ├── data/
-│   └── coverage_universe_tickers.csv
+│   ├── coverage_universe_tickers.csv
+│   └── watchlist.csv             # Core watchlist (buy/target/notes)
 ├── exports/                     # Published artifact contract (committed)
 │   ├── universe.csv
 │   ├── universe_metadata.json
 │   ├── universe_status.json
+│   ├── watchlist.csv
+│   ├── watchlist.json
+│   ├── watchlist_status.json
 │   └── manifest.json
 ├── backups/                     # Timestamped CSV backups
 ├── cache/                       # Cached API data (gitignored)
 ├── reports/                     # Generated reports (gitignored)
 │   ├── old reports/             # Archived previous runs
 │   └── samples/                 # Sample previews
-├── run_weekly_coverage.bat      # Windows scheduled-task entry point
+├── run_weekly_coverage.bat      # Windows scheduled-task entry point (Fri 8am)
+├── run_watchlist_monday.bat     # Windows scheduled-task entry point (Mon 8am)
 ├── requirements.txt
 └── .env                         # API keys (not committed)
 ```

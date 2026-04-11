@@ -57,12 +57,13 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     # Clean fixture should pass validation
     assert result["validation_passed"] is True
 
-    # All five steps appear in the steps dict
+    # All steps appear in the steps dict
     assert set(result["steps"].keys()) == {
         "validate",
         "archive",
         "discovery",
         "export_artifacts",
+        "export_watchlist",
         "sigma_export",
     }
     assert result["steps"]["validate"] == "ok"
@@ -70,6 +71,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     # Dry run skips mutation steps
     assert "skipped" in result["steps"]["archive"]
     assert "skipped" in result["steps"]["export_artifacts"]
+    assert "skipped" in result["steps"]["export_watchlist"]
     assert "skipped" in result["steps"]["sigma_export"]
 
     assert result["non_successes"] == []

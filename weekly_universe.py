@@ -198,6 +198,25 @@ def _step_export_artifacts(validation_result):
                 "schema_version": EXPORTS_SCHEMA_VERSION,
             },
             {
+                "name": "watchlist.csv",
+                "purpose": "Snapshot of data/watchlist.csv — personal watchlist (subset of universe with buy/target prices and notes).",
+                "format": "csv",
+            },
+            {
+                "name": "watchlist.json",
+                "purpose": (
+                    "Watchlist entries joined with universe metadata: "
+                    "{ticker: {buy_price, target_price, date_added, notes, name, sector, subsector}}."
+                ),
+                "format": "json",
+            },
+            {
+                "name": "watchlist_status.json",
+                "purpose": "Versioned status + validation contract for the watchlist (read schema_version first).",
+                "format": "json",
+                "schema_version": EXPORTS_SCHEMA_VERSION,
+            },
+            {
                 "name": "manifest.json",
                 "purpose": "This file — directory of published artifacts",
                 "format": "json",
@@ -221,6 +240,89 @@ def _step_export_artifacts(validation_result):
             _rel(manifest_path),
         ],
         "ticker_count": len(metadata),
+    }
+
+
+def _step_export_watchlist():
+    """Publish the watchlist as a standalone artifact under `exports/`.
+
+    Writes three files alongside the universe artifacts:
+      - watchlist.csv           — snapshot of data/watchlist.csv
+      - watchlist.json          — {ticker: {buy_price, target_price, date_added,
+                                  notes, name, sector, subsector}} joined with
+                                  universe metadata for one-stop downstream read
+      - watchlist_status.json   — versioned status + validation contract
+
+    Kept separate from `universe_status.json` so consumers that don't care about
+    the watchlist aren't forced to parse it, and so its schema can evolve
+    independently.
+    """
+    from universe import watchlist as wl
+    from universe.artifacts import build_universe_metadata
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    entries = wl.load(wl.WATCHLIST_PATH)
+    errors, warnings = wl.validate(entries, universe_csv_path=CSV_PATH)
+    for w in warnings:
+        logger.info("  watchlist WARN: %s", w)
+    for e in errors:
+        logger.warning("  watchlist ERROR: %s", e)
+
+    # 1. CSV snapshot
+    csv_out = EXPORTS_DIR / "watchlist.csv"
+    if wl.WATCHLIST_PATH.exists():
+        shutil.copyfile(wl.WATCHLIST_PATH, csv_out)
+    else:
+        csv_out.write_text(",".join(wl.WATCHLIST_COLUMNS) + "\n", encoding="utf-8")
+
+    # 2. Joined JSON — watchlist fields + universe metadata for each ticker
+    metadata = build_universe_metadata(CSV_PATH)
+    joined = {}
+    for e in entries:
+        t = e["Ticker"]
+        meta_key = t.split()[0].split(".")[0].upper()
+        meta = metadata.get(meta_key, {})
+        joined[t] = {
+            "buy_price": e.get("Buy Price"),
+            "target_price": e.get("Target Price"),
+            "date_added": e.get("Date Added", ""),
+            "notes": e.get("Notes", ""),
+            "name": meta.get("name", ""),
+            "sector": meta.get("sector", ""),
+            "subsector": meta.get("subsector", ""),
+        }
+    json_out = EXPORTS_DIR / "watchlist.json"
+    json_out.write_text(json.dumps(joined, indent=2) + "\n", encoding="utf-8")
+
+    # 3. Status file
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        source_path = str(wl.WATCHLIST_PATH.relative_to(SCRIPT_DIR)).replace("\\", "/")
+    except ValueError:
+        source_path = str(wl.WATCHLIST_PATH).replace("\\", "/")
+    status = {
+        "schema_version": EXPORTS_SCHEMA_VERSION,
+        "dataset_version": TODAY,
+        "generated_at": generated_at,
+        "source_path": source_path,
+        "entry_count": len(entries),
+        "validation_passed": len(errors) == 0,
+        "validation_errors": list(errors),
+        "validation_warnings": list(warnings),
+    }
+    status_out = EXPORTS_DIR / "watchlist_status.json"
+    status_out.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
+
+    def _rel(p):
+        try:
+            return str(Path(p).relative_to(SCRIPT_DIR)).replace("\\", "/")
+        except ValueError:
+            return str(p).replace("\\", "/")
+
+    return {
+        "artifacts": [_rel(csv_out), _rel(json_out), _rel(status_out)],
+        "entry_count": len(entries),
+        "validation_passed": len(errors) == 0,
     }
 
 
@@ -333,6 +435,22 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 "  Wrote %d artifacts (%d tickers)",
                 len(export_result["artifacts"]),
                 export_result["ticker_count"],
+            )
+
+    # Step 4b: Watchlist artifact export
+    if dry_run:
+        logger.info("[4b/5] Export watchlist... SKIPPED (dry run)")
+        steps["export_watchlist"] = "skipped (dry run)"
+    else:
+        logger.info("[4b/5] Writing watchlist artifact to exports/...")
+        status, wl_result = run_step("export_watchlist", _step_export_watchlist)
+        steps["export_watchlist"] = status
+        if wl_result:
+            artifacts.extend(wl_result["artifacts"])
+            logger.info(
+                "  Wrote watchlist (%d entries, validation_passed=%s)",
+                wl_result["entry_count"],
+                wl_result["validation_passed"],
             )
 
     # Step 5: Sigma-alert metadata export

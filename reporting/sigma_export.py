@@ -22,6 +22,11 @@ logger = get_logger("reporting.sigma_export")
 # Sigma-alert clone is a sibling of Coverage Manager in the Dropbox folder.
 SIGMA_ALERT_DIR = Path(__file__).resolve().parent.parent.parent / "sigma-alert"
 METADATA_FILENAME = "ticker_metadata.json"
+# Core watchlist pushed alongside ticker_metadata.json so the sigma
+# screener can surface watchlist hits in its own section of the Slack
+# digest. Schema mirrors exports/watchlist.json — ticker-keyed, with
+# buy/target/notes joined against universe metadata.
+CORE_WATCHLIST_FILENAME = "core_watchlist.json"
 # Sigma-alert's EOD screener writes this file when it finds watchlist tickers
 # that are missing from ticker_metadata.json (or have a blank name). It's the
 # only way the screener — running in CI with no access to the Coverage Manager
@@ -72,6 +77,34 @@ def build_sigma_metadata(csv_path):
         if ticker not in metadata:
             metadata[ticker] = {"name": name, "sector": sector, "subsector": ""}
     return metadata
+
+
+def build_core_watchlist_payload(csv_path):
+    """Return the {ticker: {...}} dict to write into sigma-alert.
+
+    Uses the same join logic as `weekly_universe._step_export_watchlist` so the
+    two files stay in sync: each entry has buy/target/notes from the personal
+    watchlist CSV plus name/sector/subsector from the universe CSV.
+    """
+    from universe import watchlist as wl
+
+    entries = wl.load(wl.WATCHLIST_PATH)
+    metadata = build_universe_metadata(csv_path)
+    out = {}
+    for e in entries:
+        t = e["Ticker"]
+        meta_key = t.split()[0].split(".")[0].upper()
+        meta = metadata.get(meta_key, {})
+        out[t] = {
+            "buy_price": e.get("Buy Price"),
+            "target_price": e.get("Target Price"),
+            "date_added": e.get("Date Added", ""),
+            "notes": e.get("Notes", ""),
+            "name": meta.get("name", ""),
+            "sector": meta.get("sector", ""),
+            "subsector": meta.get("subsector", ""),
+        }
+    return out
 
 
 def read_missing_metadata_flag(target_dir=SIGMA_ALERT_DIR):
@@ -131,34 +164,49 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
         )
 
     metadata = build_sigma_metadata(csv_path)
-    target_path = target_dir / METADATA_FILENAME
+    watchlist_payload = build_core_watchlist_payload(csv_path)
+
+    files = {
+        METADATA_FILENAME: json.dumps(metadata, indent=2) + "\n",
+        CORE_WATCHLIST_FILENAME: json.dumps(watchlist_payload, indent=2) + "\n",
+    }
 
     def _result(**fields):
-        out = {"tickers": len(metadata)}
+        out = {"tickers": len(metadata), "watchlist_entries": len(watchlist_payload)}
         if flagged_tickers:
             out["missing_metadata"] = flagged_tickers
         out.update(fields)
         return out
 
-    new_content = json.dumps(metadata, indent=2) + "\n"
-    if target_path.exists() and target_path.read_text(encoding="utf-8") == new_content:
+    # Write files that actually changed; stage all tracked files so we pick up
+    # anything the previous run left in an inconsistent state.
+    changed_any = False
+    for name, content in files.items():
+        path = target_dir / name
+        if path.exists() and path.read_text(encoding="utf-8") == content:
+            continue
+        path.write_text(content, encoding="utf-8")
+        logger.info("Wrote %s (%d bytes)", path, len(content))
+        changed_any = True
+
+    if not changed_any:
         return _result(status="unchanged")
 
-    target_path.write_text(new_content, encoding="utf-8")
-    logger.info("Wrote %d ticker entries to %s", len(metadata), target_path)
-
-    # Stage only the metadata file — leave any other unstaged work in sigma-alert alone.
-    _, rc = _git(target_dir, "add", METADATA_FILENAME)
-    if rc != 0:
-        return _result(status="failed", reason="git add failed")
+    for name in files:
+        _, rc = _git(target_dir, "add", name)
+        if rc != 0:
+            return _result(status="failed", reason=f"git add {name} failed")
 
     # Was anything actually staged? (handles the rare case where file content
     # changed but git normalizes line endings to match HEAD)
-    _, rc = _git(target_dir, "diff", "--cached", "--quiet", "--", METADATA_FILENAME)
+    _, rc = _git(target_dir, "diff", "--cached", "--quiet", "--", *files.keys())
     if rc == 0:
         return _result(status="unchanged")
 
-    _, rc = _git(target_dir, "commit", "-m", "Sync ticker metadata from Coverage Manager")
+    _, rc = _git(
+        target_dir, "commit", "-m",
+        "Sync ticker metadata + core watchlist from Coverage Manager",
+    )
     if rc != 0:
         return _result(status="failed", reason="git commit failed")
 

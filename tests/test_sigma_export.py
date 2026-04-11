@@ -7,10 +7,18 @@ sigma-alert watchlist needs but the coverage universe does not contain.
 """
 
 import csv
+import json
 
 import pytest
 
-from reporting.sigma_export import SECTOR_ETFS, build_sigma_metadata
+from reporting import sigma_export
+from reporting.sigma_export import (
+    CORE_WATCHLIST_FILENAME,
+    SECTOR_ETFS,
+    build_core_watchlist_payload,
+    build_sigma_metadata,
+    export_and_push,
+)
 from universe.artifacts import build_universe_metadata
 
 
@@ -92,3 +100,77 @@ def test_sigma_metadata_does_not_overwrite_existing_csv_ticker(tmp_path):
     # CSV value, not the hardcoded ETF tuple
     assert sigma["XBI"]["name"] == "XBI From Coverage CSV"
     assert sigma["XBI"]["sector"] == "Biopharma"
+
+
+# ── Core watchlist export ──────────────────────────────────────────────
+
+
+def test_build_core_watchlist_payload_joins_universe_metadata(
+    monkeypatch, tmp_path, fixture_csv,
+):
+    """The payload must include buy/target/notes plus name/sector from the universe."""
+    from universe import watchlist as wl
+
+    wl_csv = tmp_path / "watchlist.csv"
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
+    wl.add(
+        "AAPL", buy_price=150, target_price=220, notes="core long",
+        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    )
+
+    payload = build_core_watchlist_payload(fixture_csv)
+    assert set(payload.keys()) == {"AAPL"}
+    entry = payload["AAPL"]
+    assert entry["buy_price"] == 150
+    assert entry["target_price"] == 220
+    assert entry["notes"] == "core long"
+    assert entry["name"] == "Apple Inc"
+    assert entry["sector"] == "Tech"
+    assert entry["subsector"] == "Hardware"
+
+
+def test_export_and_push_writes_both_files(monkeypatch, tmp_path, fixture_csv):
+    """export_and_push must write both ticker_metadata.json and core_watchlist.json
+    into the target dir. Git operations are stubbed."""
+    from universe import watchlist as wl
+
+    wl_csv = tmp_path / "watchlist.csv"
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
+    wl.add(
+        "MRNA", buy_price=40, target_price=100,
+        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    )
+
+    target_dir = tmp_path / "sigma-alert"
+    target_dir.mkdir()
+    (target_dir / ".git").mkdir()
+
+    calls = []
+
+    def fake_git(cwd, *args):
+        calls.append(args)
+        # `git diff --cached --quiet` returns 1 when there are staged changes.
+        # Return 1 here so export_and_push proceeds past the unchanged-check.
+        if args[:3] == ("diff", "--cached", "--quiet"):
+            return "", 1
+        return "", 0
+
+    monkeypatch.setattr(sigma_export, "_git", fake_git)
+
+    result = export_and_push(fixture_csv, target_dir=target_dir, push=False)
+
+    assert (target_dir / "ticker_metadata.json").exists()
+    assert (target_dir / CORE_WATCHLIST_FILENAME).exists()
+
+    payload = json.loads((target_dir / CORE_WATCHLIST_FILENAME).read_text())
+    assert "MRNA" in payload
+    assert payload["MRNA"]["buy_price"] == 40
+    assert payload["MRNA"]["sector"] == "Biopharma"
+
+    # Confirm both files were `git add`-ed
+    add_calls = [c for c in calls if c and c[0] == "add"]
+    added_files = {c[1] for c in add_calls}
+    assert added_files == {"ticker_metadata.json", CORE_WATCHLIST_FILENAME}
+
+    assert result["status"] == "committed"
+    assert result["watchlist_entries"] == 1
