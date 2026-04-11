@@ -187,6 +187,23 @@ COUNTRY_TO_ISO = {
     "United Arab Emirates": "ARE",
 }
 
+# Country full name → ISO 3166-1 alpha-2 (the prefix an ISIN uses).
+# Used by enrich to sanity-check ISINs against the row's listing country —
+# yfinance occasionally returns a wrong-country ISIN for rebranded tickers
+# (e.g. "FI" returned a Swiss ISIN for Fiserv after the FISV→FI rebrand).
+COUNTRY_TO_ISIN_PREFIX = {
+    "United States": "US", "United Kingdom": "GB", "Germany": "DE",
+    "France": "FR", "Belgium": "BE", "Switzerland": "CH",
+    "Italy": "IT", "Spain": "ES", "Japan": "JP",
+    "Hong Kong": "HK", "South Korea": "KR", "Taiwan": "TW",
+    "China": "CN", "Australia": "AU", "New Zealand": "NZ",
+    "Canada": "CA", "Brazil": "BR", "India": "IN",
+    "Sweden": "SE", "Denmark": "DK", "Finland": "FI",
+    "Norway": "NO", "Poland": "PL", "Mexico": "MX",
+    "South Africa": "ZA", "Saudi Arabia": "SA",
+    "United Arab Emirates": "AE",
+}
+
 # ── Functions ───────────────────────────────────────────────────────────────
 
 

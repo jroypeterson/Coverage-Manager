@@ -120,8 +120,8 @@ Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never
 | `exports/universe.csv` | Snapshot of `data/coverage_universe_tickers.csv` |
 | `exports/universe_metadata.json` | `{TICKER: {name, sector, subsector}}` derived only from CSV rows |
 | `exports/universe_status.json` | Versioned status + validation contract; **always read `schema_version` first** |
-| `exports/watchlist.csv` | Snapshot of `data/watchlist.csv` (core watchlist; buy/target in local currency) |
-| `exports/watchlist.json` | `{TICKER: {buy_price, target_price, date_added, notes, name, sector, subsector}}` joined with universe metadata |
+| `exports/watchlist.csv` | Core watchlist joined with the full universe row — every universe column followed by `Buy Price`, `Target Price`, `Date Added`, `Notes`. Source `data/watchlist.csv` stays a thin 5-col hand-edit file; join happens at export time. |
+| `exports/watchlist.json` | `{TICKER: {...}}` with legacy flat keys (`buy_price`, `target_price`, `date_added`, `notes`, `name`, `sector`, `subsector`) **plus** every raw universe column under its original header name (e.g. `"Company Name"`, `"ISIN"`, `"Sector (JP)"`). Legacy keys preserved for back-compat. |
 | `exports/watchlist_status.json` | Versioned status + validation contract for the watchlist (separate schema) |
 | `exports/manifest.json` | Directory of files in `exports/` with their purpose |
 

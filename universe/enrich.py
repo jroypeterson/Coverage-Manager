@@ -14,6 +14,7 @@ from datetime import datetime
 from ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
+    COUNTRY_TO_ISIN_PREFIX,
     normalize_company_for_comparison, backup_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
@@ -40,6 +41,42 @@ def cell_is_empty(val):
     return s == "" or s == "nan"
 
 
+def validate_isin_for_row(isin, row, ticker=""):
+    """Return `isin` if its 2-letter country prefix matches the row's listing
+    country (or HQ as fallback), else `None`. Logs a warning on mismatch.
+
+    yfinance occasionally returns a wrong-country ISIN for rebranded tickers
+    — observed with the new "FI" ticker for Fiserv, which returned a Swiss
+    ISIN after the FISV→FI rebrand. This guard rejects such mismatches so
+    they don't silently land in the universe CSV.
+
+    Behavior when the row has no country info or the country isn't in
+    `COUNTRY_TO_ISIN_PREFIX`: no check is applied, the ISIN is accepted.
+    """
+    if not isin:
+        return None
+    s = str(isin).strip()
+    if not s or s == "-" or "error" in s.lower():
+        return None
+    expected_prefix = None
+    checked_country = ""
+    for country_field in ("Country (Listing)", "Country (HQ)"):
+        country = str(row.get(country_field, "") or "").strip()
+        if country and country in COUNTRY_TO_ISIN_PREFIX:
+            expected_prefix = COUNTRY_TO_ISIN_PREFIX[country]
+            checked_country = country
+            break
+    isin_prefix = s[:2].upper()
+    if expected_prefix and isin_prefix != expected_prefix:
+        logger.warning(
+            "ISIN mismatch for %s: got %s (prefix %s) but row is listed in "
+            "%s (expected prefix %s) — rejecting",
+            ticker or "?", s, isin_prefix, checked_country, expected_prefix,
+        )
+        return None
+    return s
+
+
 def fetch_yfinance_identifiers(df):
     """Fetch identifiers from yfinance for all tickers.
 
@@ -64,11 +101,11 @@ def fetch_yfinance_identifiers(df):
         try:
             t = yf.Ticker(yf_ticker)
 
-            # ISIN
+            # ISIN — sanity-checked against the row's listing country.
             try:
-                isin = t.isin
-                if isin and isin != "-" and "error" not in str(isin).lower():
-                    data["ISIN"] = isin
+                checked = validate_isin_for_row(t.isin, row, ticker=orig_ticker)
+                if checked:
+                    data["ISIN"] = checked
             except Exception as e:
                 log_exception(logger, f"ISIN lookup failed for {orig_ticker}", e)
 
