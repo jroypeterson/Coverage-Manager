@@ -11,6 +11,7 @@ idea_generation, 13F analyzer). See `exports/manifest.json` and
 Returns a standardized result dict; see `_make_result` for the shape.
 """
 
+import csv
 import json
 import shutil
 from datetime import datetime, timezone
@@ -199,14 +200,19 @@ def _step_export_artifacts(validation_result):
             },
             {
                 "name": "watchlist.csv",
-                "purpose": "Snapshot of data/watchlist.csv — personal watchlist (subset of universe with buy/target prices and notes).",
+                "purpose": (
+                    "Personal watchlist joined with universe metadata — all "
+                    "coverage universe columns plus Buy Price, Target Price, "
+                    "Date Added, Notes appended at the end."
+                ),
                 "format": "csv",
             },
             {
                 "name": "watchlist.json",
                 "purpose": (
-                    "Watchlist entries joined with universe metadata: "
-                    "{ticker: {buy_price, target_price, date_added, notes, name, sector, subsector}}."
+                    "Watchlist entries joined with the full universe row: "
+                    "{ticker: {buy_price, target_price, date_added, notes, "
+                    "name, sector, subsector, <all universe columns...>}}."
                 ),
                 "format": "json",
             },
@@ -247,15 +253,22 @@ def _step_export_watchlist():
     """Publish the watchlist as a standalone artifact under `exports/`.
 
     Writes three files alongside the universe artifacts:
-      - watchlist.csv           — snapshot of data/watchlist.csv
+      - watchlist.csv           — personal watchlist joined with the full
+                                  universe row: all universe columns plus the
+                                  watchlist-unique fields (Buy Price, Target
+                                  Price, Date Added, Notes) appended
       - watchlist.json          — {ticker: {buy_price, target_price, date_added,
-                                  notes, name, sector, subsector}} joined with
-                                  universe metadata for one-stop downstream read
+                                  notes, name, sector, subsector, <all
+                                  universe columns...>}} joined for one-stop
+                                  downstream read
       - watchlist_status.json   — versioned status + validation contract
 
     Kept separate from `universe_status.json` so consumers that don't care about
     the watchlist aren't forced to parse it, and so its schema can evolve
-    independently.
+    independently. The source `data/watchlist.csv` stays a thin 5-column
+    hand-editable file; the join happens here at export time so the published
+    artifact carries every label a consumer might want without bloating the
+    file the user edits.
     """
     from universe import watchlist as wl
     from universe.artifacts import build_universe_metadata
@@ -268,21 +281,43 @@ def _step_export_watchlist():
     for e in errors:
         logger.warning("  watchlist ERROR: %s", e)
 
-    # 1. CSV snapshot
-    csv_out = EXPORTS_DIR / "watchlist.csv"
-    if wl.WATCHLIST_PATH.exists():
-        shutil.copyfile(wl.WATCHLIST_PATH, csv_out)
-    else:
-        csv_out.write_text(",".join(wl.WATCHLIST_COLUMNS) + "\n", encoding="utf-8")
+    # Read universe rows + header so the export mirrors whatever columns the
+    # coverage universe currently carries (auto-tracks schema changes there).
+    universe_rows = wl._load_universe_rows(CSV_PATH)
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+        universe_fieldnames = list(csv.DictReader(f).fieldnames or [])
 
-    # 2. Joined JSON — watchlist fields + universe metadata for each ticker
+    watchlist_unique_cols = [c for c in wl.WATCHLIST_COLUMNS if c != "Ticker"]
+    csv_fieldnames = universe_fieldnames + [
+        c for c in watchlist_unique_cols if c not in universe_fieldnames
+    ]
+
+    # 1. CSV — universe columns first, then watchlist-unique columns appended
+    csv_out = EXPORTS_DIR / "watchlist.csv"
+    with open(csv_out, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for e in sorted(entries, key=lambda x: x["Ticker"].upper()):
+            t = e["Ticker"]
+            row = dict(universe_rows.get(t, {}))
+            row["Ticker"] = t
+            row["Buy Price"] = "" if e.get("Buy Price") is None else e["Buy Price"]
+            row["Target Price"] = "" if e.get("Target Price") is None else e["Target Price"]
+            row["Date Added"] = e.get("Date Added", "")
+            row["Notes"] = e.get("Notes", "")
+            writer.writerow(row)
+
+    # 2. Joined JSON — keep the legacy flat keys (buy_price/name/sector/...)
+    # for back-compat, then layer on every raw universe column so new
+    # consumers can read any label from the coverage universe.
     metadata = build_universe_metadata(CSV_PATH)
     joined = {}
     for e in entries:
         t = e["Ticker"]
         meta_key = t.split()[0].split(".")[0].upper()
         meta = metadata.get(meta_key, {})
-        joined[t] = {
+        row = universe_rows.get(t, {})
+        entry = {
             "buy_price": e.get("Buy Price"),
             "target_price": e.get("Target Price"),
             "date_added": e.get("Date Added", ""),
@@ -291,6 +326,11 @@ def _step_export_watchlist():
             "sector": meta.get("sector", ""),
             "subsector": meta.get("subsector", ""),
         }
+        for col in universe_fieldnames:
+            if col == "Ticker":
+                continue
+            entry[col] = row.get(col, "")
+        joined[t] = entry
     json_out = EXPORTS_DIR / "watchlist.json"
     json_out.write_text(json.dumps(joined, indent=2) + "\n", encoding="utf-8")
 

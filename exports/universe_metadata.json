@@ -5398,5 +5398,50 @@
     "name": "York Space Systems Inc",
     "sector": "Tech",
     "subsector": "Space / Satellite Manufacturing"
+  },
+  "NHP": {
+    "name": "National Healthcare Properties Inc",
+    "sector": "Healthcare Real Estate",
+    "subsector": "Senior Housing REIT"
+  },
+  "LULU": {
+    "name": "Lululemon Athletica Inc.",
+    "sector": "PA",
+    "subsector": ""
+  },
+  "BE": {
+    "name": "Bloom Energy Corporation",
+    "sector": "PA",
+    "subsector": ""
+  },
+  "BRO": {
+    "name": "Brown & Brown Inc.",
+    "sector": "Fintech",
+    "subsector": ""
+  },
+  "CPRT": {
+    "name": "Copart Inc.",
+    "sector": "PA",
+    "subsector": ""
+  },
+  "FI": {
+    "name": "Fiserv Inc.",
+    "sector": "Fintech",
+    "subsector": ""
+  },
+  "KRC": {
+    "name": "Kilroy Realty Corporation",
+    "sector": "Healthcare Real Estate",
+    "subsector": ""
+  },
+  "Q": {
+    "name": "Qnity Electronics Inc.",
+    "sector": "Tech",
+    "subsector": ""
+  },
+  "ULS": {
+    "name": "UL Solutions Inc.",
+    "sector": "Other",
+    "subsector": ""
   }
 }

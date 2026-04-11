@@ -216,6 +216,30 @@ def test_watchlist_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert joined["AAPL"]["target_price"] == 220
     assert joined["AAPL"]["name"] == "Apple Inc"
     assert joined["AAPL"]["sector"] == "Tech"
+    # Every universe column should be present under its raw header name too.
+    assert joined["AAPL"]["Company Name"] == "Apple Inc"
+    assert joined["AAPL"]["Exchange"] == "NASDAQ"
+    assert joined["AAPL"]["Sector (JP)"] == "Tech"
+    assert joined["AAPL"]["Subsector (JP)"] == "Hardware"
+    assert joined["AAPL"]["Currency"] == "USD"
+
+    # The CSV should carry all universe columns + the watchlist-unique
+    # columns (Buy Price, Target Price, Date Added, Notes) appended at the end.
+    with open(exports_dir / "watchlist.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        header = reader.fieldnames
+        rows = list(reader)
+    assert header[0] == "Ticker"
+    for col in ["Exchange", "Company Name", "Sector (JP)", "Subsector (JP)", "Currency"]:
+        assert col in header
+    assert header[-4:] == ["Buy Price", "Target Price", "Date Added", "Notes"]
+    assert len(rows) == 1
+    assert rows[0]["Ticker"] == "AAPL"
+    assert rows[0]["Company Name"] == "Apple Inc"
+    assert rows[0]["Buy Price"] == "150.0"
+    assert rows[0]["Target Price"] == "220.0"
+    assert rows[0]["Date Added"] == "2026-04-11"
+    assert rows[0]["Notes"] == "core"
 
     status = json.loads((exports_dir / "watchlist_status.json").read_text(encoding="utf-8"))
     assert status["schema_version"] == 1
