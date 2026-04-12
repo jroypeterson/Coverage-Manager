@@ -192,19 +192,21 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
     # Call 2: ratios-ttm (always)
     ratios = _fetch_ratios(ticker, api_key)
     if ratios:
-        result["Fwd P/E"] = _safe_float(ratios.get("peRatioTTM") or ratios.get("priceEarningsRatioTTM"))
-        result["EV/EBITDA"] = _safe_float(ratios.get("enterpriseValueOverEBITDATTM"))
-        result["PEG"] = _safe_float(ratios.get("priceEarningsToGrowthRatioTTM") or ratios.get("pegRatioTTM"))
+        # FMP ratios-ttm uses priceToEarningsRatioTTM (trailing P/E — best available)
+        result["Fwd P/E"] = _safe_float(ratios.get("priceToEarningsRatioTTM"))
+        result["EV/EBITDA"] = _safe_float(ratios.get("enterpriseValueMultipleTTM"))
+        result["PEG"] = _safe_float(ratios.get("priceToEarningsGrowthRatioTTM"))
         result["EV/S"] = _safe_float(ratios.get("priceToSalesRatioTTM"))
         result["Gross Mgn"] = _pct(ratios.get("grossProfitMarginTTM"))
         result["Op Mgn"] = _pct(ratios.get("operatingProfitMarginTTM"))
-        result["ROE"] = _pct(ratios.get("returnOnEquityTTM"))
+        # ROE not in ratios-ttm — comes from key-metrics-ttm below
 
-    # Call 3: key-metrics-ttm (only if EV/Net Debt/EV/S still missing)
+    # Call 3: key-metrics-ttm (EV, Net Debt, EV/S, ROE live here)
     needs_key_metrics = (
         result["Enterprise Value"] is None
         or result["Net Debt"] is None
         or result["EV/S"] is None
+        or result["ROE"] is None
     )
     if needs_key_metrics:
         km = _fetch_key_metrics(ticker, api_key)
@@ -212,11 +214,15 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
             if result["Enterprise Value"] is None:
                 result["Enterprise Value"] = _safe_float(km.get("enterpriseValueTTM") or km.get("enterpriseValue"))
             if result["Net Debt"] is None:
-                result["Net Debt"] = _safe_float(km.get("netDebtTTM") or km.get("netDebt"))
+                # netDebtToEBITDATTM exists but we need absolute Net Debt
+                # Derive from EV - Mkt Cap if not directly available
+                pass  # handled below via EV - Mkt Cap derivation
             if result["EV/S"] is None:
                 evs = _safe_float(km.get("evToSalesTTM") or km.get("evToSales"))
                 if evs is not None:
                     result["EV/S"] = evs
+            if result["ROE"] is None:
+                result["ROE"] = _pct(km.get("returnOnEquityTTM"))
 
     # Derive Net Debt from EV - Mkt Cap if still missing
     if result["Net Debt"] is None and result["Enterprise Value"] is not None and result["Mkt Cap"] is not None:

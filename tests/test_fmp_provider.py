@@ -36,19 +36,19 @@ SAMPLE_PROFILE = {
 }
 
 SAMPLE_RATIOS = {
-    "peRatioTTM": 72.5,
-    "enterpriseValueOverEBITDATTM": 55.3,
-    "priceEarningsToGrowthRatioTTM": 3.2,
+    "priceToEarningsRatioTTM": 72.5,
+    "enterpriseValueMultipleTTM": 55.3,
+    "priceToEarningsGrowthRatioTTM": 3.2,
     "priceToSalesRatioTTM": 22.1,
     "grossProfitMarginTTM": 0.67,
     "operatingProfitMarginTTM": 0.35,
-    "returnOnEquityTTM": 0.18,
 }
 
 SAMPLE_KEY_METRICS = {
     "enterpriseValueTTM": 175000000000,
     "netDebtTTM": -5000000000,
     "evToSalesTTM": 22.0,
+    "returnOnEquityTTM": 0.18,
 }
 
 SAMPLE_GROWTH = {
@@ -233,7 +233,7 @@ class TestDecimalNormalization:
     """Verify that FMP's decimal ratios (0.45) become percentages (45.0)."""
 
     @patch("providers.fmp_provider._fetch_financial_growth", return_value={})
-    @patch("providers.fmp_provider._fetch_key_metrics", return_value={})
+    @patch("providers.fmp_provider._fetch_key_metrics")
     @patch("providers.fmp_provider._fetch_ratios")
     @patch("providers.fmp_provider.fetch_profile")
     @patch("providers.fmp_provider.cache_get", return_value=None)
@@ -243,8 +243,8 @@ class TestDecimalNormalization:
         mock_ratios.return_value = {
             "grossProfitMarginTTM": 0.452,
             "operatingProfitMarginTTM": 0.231,
-            "returnOnEquityTTM": 0.089,
         }
+        mock_km.return_value = {"returnOnEquityTTM": 0.089}
 
         result, _, _ = fetch_fundamentals("TEST", "key", use_cache=False)
         assert result["Gross Mgn"] == pytest.approx(45.2)
