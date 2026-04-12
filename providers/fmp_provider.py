@@ -1,23 +1,60 @@
-"""Financial Modeling Prep (FMP) API provider — fallback price source."""
+"""Financial Modeling Prep (FMP) API provider — prices and fundamentals."""
+
+import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pandas as pd
 import requests
 
+from cache import cache_get, cache_set
+from reporting.calcs import FUND_COLS, VAL_COLS
 from logging_utils import get_logger, log_exception, retry_on_failure
 
 logger = get_logger("providers.fmp")
 
+# Cache TTL
+FUND_CACHE_TTL_HOURS = 24.0
+
+# ── Rate limiter ────────────────────────────────────────────────────────────
+
+class _RateLimiter:
+    """Token-bucket rate limiter for FMP API (300 calls/min)."""
+
+    def __init__(self, calls_per_minute=300):
+        self._interval = 60.0 / calls_per_minute
+        self._lock = threading.Lock()
+        self._last_call = 0.0
+
+    def wait(self):
+        with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last_call
+            if elapsed < self._interval:
+                time.sleep(self._interval - elapsed)
+            self._last_call = time.monotonic()
+
+
+_rate_limiter = _RateLimiter(calls_per_minute=300)
+
+# ── Low-level request ───────────────────────────────────────────────────────
 
 @retry_on_failure(max_retries=2, base_delay=1.0, logger_name="providers.fmp")
 def _fmp_request(url):
     """Make an FMP API request with retry on transient failures."""
+    _rate_limiter.wait()
     resp = requests.get(url, timeout=10)
     if resp.status_code == 429:
-        raise Exception(f"FMP rate limited (429)")
+        raise Exception("FMP rate limited (429)")
+    if resp.status_code == 402:
+        logger.warning("FMP 402 (payment required) — endpoint may be gated")
+        return None
     if resp.status_code != 200:
         return None
     return resp.json()
 
+
+# ── Price history (existing) ────────────────────────────────────────────────
 
 def fetch_historical_prices(ticker, api_key):
     """Get historical prices from FMP API as fallback (US tickers only).
@@ -39,3 +76,203 @@ def fetch_historical_prices(ticker, api_key):
     except Exception as e:
         log_exception(logger, f"FMP historical lookup failed for {ticker}", e)
         return None
+
+
+# ── Profile ─────────────────────────────────────────────────────────────────
+
+def fetch_profile(ticker, api_key):
+    """Fetch FMP /stable/profile for a ticker. Returns dict or {}.
+
+    Shared by enrich.py (universe enrichment) and fundamentals fetching.
+    """
+    if not api_key:
+        return {}
+    try:
+        url = f"https://financialmodelingprep.com/stable/profile?symbol={ticker}&apikey={api_key}"
+        data = _fmp_request(url)
+        if not data:
+            return {}
+        return data[0] if isinstance(data, list) else data
+    except Exception as e:
+        log_exception(logger, f"FMP profile lookup failed for {ticker}", e)
+        return {}
+
+
+# ── Fundamentals (progressive endpoint strategy) ────────────────────────────
+
+def _fetch_ratios(ticker, api_key):
+    """Fetch FMP /stable/ratios-ttm for a ticker. Returns dict or {}."""
+    try:
+        url = f"https://financialmodelingprep.com/stable/ratios-ttm?symbol={ticker}&apikey={api_key}"
+        data = _fmp_request(url)
+        if not data:
+            return {}
+        return data[0] if isinstance(data, list) else data
+    except Exception as e:
+        log_exception(logger, f"FMP ratios lookup failed for {ticker}", e)
+        return {}
+
+
+def _fetch_key_metrics(ticker, api_key):
+    """Fetch FMP /stable/key-metrics-ttm for a ticker. Returns dict or {}."""
+    try:
+        url = f"https://financialmodelingprep.com/stable/key-metrics-ttm?symbol={ticker}&apikey={api_key}"
+        data = _fmp_request(url)
+        if not data:
+            return {}
+        return data[0] if isinstance(data, list) else data
+    except Exception as e:
+        log_exception(logger, f"FMP key-metrics lookup failed for {ticker}", e)
+        return {}
+
+
+def _fetch_financial_growth(ticker, api_key):
+    """Fetch FMP /stable/financial-growth for a ticker. Returns dict or {}."""
+    try:
+        url = f"https://financialmodelingprep.com/stable/financial-growth?symbol={ticker}&period=annual&limit=1&apikey={api_key}"
+        data = _fmp_request(url)
+        if not data:
+            return {}
+        return data[0] if isinstance(data, list) else data
+    except Exception as e:
+        log_exception(logger, f"FMP financial-growth lookup failed for {ticker}", e)
+        return {}
+
+
+def _safe_float(val):
+    """Convert a value to float, returning None if not possible."""
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        return f if f == f else None  # reject NaN
+    except (ValueError, TypeError):
+        return None
+
+
+def _pct(val):
+    """Convert decimal ratio (0.45) to percentage (45.0). None-safe."""
+    f = _safe_float(val)
+    return f * 100 if f is not None else None
+
+
+def fetch_fundamentals(ticker, api_key, use_cache=True):
+    """Fetch fundamentals from FMP using progressive endpoint strategy.
+
+    Progressive calls:
+      1. profile (always) — Mkt Cap, currency
+      2. ratios-ttm (always) — P/E, EV/EBITDA, PEG, margins, ROE
+      3. key-metrics-ttm (only if EV/Net Debt/EV/S still missing)
+      4. financial-growth (only if Rev Growth/EPS Growth still missing)
+
+    Returns (result, is_ttm, currency) matching yfinance_provider contract.
+    """
+    result = {col: None for col in FUND_COLS + VAL_COLS}
+    is_ttm = {"Rev Grw": False, "EPS Grw": False}
+    currency = ""
+
+    cache_key = f"fmp_{ticker}"
+    if use_cache:
+        cached = cache_get("fundamentals", cache_key, FUND_CACHE_TTL_HOURS)
+        if cached is not None:
+            return cached.get("result", result), cached.get("is_ttm", is_ttm), cached.get("currency", currency)
+
+    if not api_key:
+        return result, is_ttm, currency
+
+    # Call 1: profile (always)
+    profile = fetch_profile(ticker, api_key)
+    if not profile:
+        return result, is_ttm, currency
+
+    result["Mkt Cap"] = _safe_float(profile.get("marketCap"))
+    currency = str(profile.get("currency") or "")
+    result["Price"] = _safe_float(profile.get("price"))
+
+    # Call 2: ratios-ttm (always)
+    ratios = _fetch_ratios(ticker, api_key)
+    if ratios:
+        result["Fwd P/E"] = _safe_float(ratios.get("peRatioTTM") or ratios.get("priceEarningsRatioTTM"))
+        result["EV/EBITDA"] = _safe_float(ratios.get("enterpriseValueOverEBITDATTM"))
+        result["PEG"] = _safe_float(ratios.get("priceEarningsToGrowthRatioTTM") or ratios.get("pegRatioTTM"))
+        result["EV/S"] = _safe_float(ratios.get("priceToSalesRatioTTM"))
+        result["Gross Mgn"] = _pct(ratios.get("grossProfitMarginTTM"))
+        result["Op Mgn"] = _pct(ratios.get("operatingProfitMarginTTM"))
+        result["ROE"] = _pct(ratios.get("returnOnEquityTTM"))
+
+    # Call 3: key-metrics-ttm (only if EV/Net Debt/EV/S still missing)
+    needs_key_metrics = (
+        result["Enterprise Value"] is None
+        or result["Net Debt"] is None
+        or result["EV/S"] is None
+    )
+    if needs_key_metrics:
+        km = _fetch_key_metrics(ticker, api_key)
+        if km:
+            if result["Enterprise Value"] is None:
+                result["Enterprise Value"] = _safe_float(km.get("enterpriseValueTTM") or km.get("enterpriseValue"))
+            if result["Net Debt"] is None:
+                result["Net Debt"] = _safe_float(km.get("netDebtTTM") or km.get("netDebt"))
+            if result["EV/S"] is None:
+                evs = _safe_float(km.get("evToSalesTTM") or km.get("evToSales"))
+                if evs is not None:
+                    result["EV/S"] = evs
+
+    # Derive Net Debt from EV - Mkt Cap if still missing
+    if result["Net Debt"] is None and result["Enterprise Value"] is not None and result["Mkt Cap"] is not None:
+        result["Net Debt"] = result["Enterprise Value"] - result["Mkt Cap"]
+
+    # Call 4: financial-growth (only if Rev Growth/EPS Growth still missing)
+    needs_growth = result["Rev Grw"] is None or result["EPS Grw"] is None
+    if needs_growth:
+        fg = _fetch_financial_growth(ticker, api_key)
+        if fg:
+            if result["Rev Grw"] is None:
+                result["Rev Grw"] = _pct(fg.get("revenueGrowth"))
+            if result["EPS Grw"] is None:
+                result["EPS Grw"] = _pct(fg.get("epsgrowth") or fg.get("epsGrowth"))
+
+    # Cache if we got meaningful data
+    if use_cache and result.get("Mkt Cap") is not None:
+        cache_set("fundamentals", cache_key, {
+            "result": result.copy(),
+            "is_ttm": is_ttm.copy(),
+            "currency": currency,
+        })
+
+    return result, is_ttm, currency
+
+
+def fetch_fundamentals_parallel(tickers, api_key, max_workers=10, use_cache=True):
+    """Fetch FMP fundamentals for multiple tickers in parallel.
+
+    Returns (all_fundamentals, all_is_ttm, all_currencies) dicts keyed by ticker.
+    """
+    all_fundamentals = {}
+    all_is_ttm = {}
+    all_currencies = {}
+
+    def _fetch_one(t):
+        return t, fetch_fundamentals(t, api_key, use_cache=use_cache)
+
+    completed = 0
+    total = len(tickers)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_one, t): t for t in tickers}
+        for future in as_completed(futures):
+            try:
+                t, (fund_result, is_ttm, currency) = future.result()
+                all_fundamentals[t] = fund_result
+                all_is_ttm[t] = is_ttm
+                all_currencies[t] = currency
+            except Exception as e:
+                t = futures[future]
+                log_exception(logger, f"FMP fundamentals failed for {t}", e)
+                all_fundamentals[t] = {col: None for col in FUND_COLS + VAL_COLS}
+                all_is_ttm[t] = {"Rev Grw": False, "EPS Grw": False}
+                all_currencies[t] = ""
+            completed += 1
+            if completed % 100 == 0:
+                logger.info("FMP fundamentals %s/%s...", completed, total)
+
+    return all_fundamentals, all_is_ttm, all_currencies

@@ -4,6 +4,7 @@ All paths, API keys, segment definitions, and shared constants live here.
 Other modules import from config rather than defining their own.
 """
 
+import os
 from datetime import date
 from pathlib import Path
 
@@ -69,6 +70,12 @@ SEGMENT_ETFS = {
         ("SPYM", "SPDR Portfolio S&P 500 ETF"),
     ],
 }
+
+# ── Provider priority ────────────────────────────────────────────────────────
+# Controls which fundamentals provider is tried first in the reporting pipeline.
+# "yf_first"  = legacy behavior (yfinance primary, FMP/AV as fallbacks)
+# "fmp_first" = FMP primary for fundamentals (switch after validation comparison)
+PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "yf_first")
 
 # ── Sample mode ──────────────────────────────────────────────────────────────
 
