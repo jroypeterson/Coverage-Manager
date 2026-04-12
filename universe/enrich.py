@@ -19,6 +19,7 @@ from ticker_utils import (
     normalize_company_for_comparison, backup_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
+from providers.fmp_provider import fetch_profile as _fmp_fetch_profile
 
 
 class EnrichError(Exception):
@@ -131,26 +132,10 @@ def validate_sector_jp(sector):
 def _fetch_fmp_profile(ticker):
     """Hit FMP `/stable/profile` for a single ticker. Returns dict or {}.
 
-    Uses the stable endpoint (the legacy `/api/v3/profile` was retired for
-    non-grandfathered accounts in August 2025). No error on network issues;
-    returns empty so the caller falls back to yfinance.
+    Delegates to the shared fmp_provider.fetch_profile implementation.
     """
     key = API_KEYS.get("FMP_API_KEY", "")
-    if not key:
-        return {}
-    try:
-        url = f"https://financialmodelingprep.com/stable/profile?symbol={ticker}&apikey={key}"
-        resp = requests.get(url, timeout=15)
-        if resp.status_code != 200:
-            logger.warning("FMP profile %s: HTTP %s", ticker, resp.status_code)
-            return {}
-        body = resp.json()
-        if not body:
-            return {}
-        return body[0] if isinstance(body, list) else body
-    except Exception as e:
-        log_exception(logger, f"FMP profile lookup failed for {ticker}", e)
-        return {}
+    return _fmp_fetch_profile(ticker, key)
 
 
 def _normalize_fmp_exchange(fmp_exchange_full, fmp_exchange_short):

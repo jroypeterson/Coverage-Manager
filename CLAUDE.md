@@ -104,12 +104,34 @@ The wrapper logs `"completed successfully"` only when **zero** steps are non-suc
 ## Sibling projects
 - `../sigma-alert/` — GitHub Actions stock screener that consumes `ticker_metadata.json` and `core_watchlist.json` from Coverage Manager. The weekly-build `sigma-export` step writes both files directly into the sigma-alert clone and pushes them in a single commit. The screener surfaces watchlist hits in a "Core Watchlist" subcategory at the top of each sigma tier. See `reporting/sigma_export.py`.
 
+## Provider architecture (fundamentals)
+
+Fundamentals fetching uses a **provider chain** (`providers/provider_chain.py`) that coordinates fallback and field-level merging:
+
+```
+PROVIDER_PRIORITY (config.py, env-overridable)
+├── "yf_first" (default) → yfinance → FMP → AlphaVantage
+└── "fmp_first"           → FMP → yfinance → AlphaVantage
+```
+
+- **FMP** (`providers/fmp_provider.py`): Progressive endpoint strategy — profile + ratios (2 calls always), key-metrics and financial-growth only if fields still missing. Rate limited at 300 calls/min.
+- **yfinance** (`providers/yfinance_provider.py`): Single `Ticker.info` call per ticker.
+- **AlphaVantage** (`providers/alphavantage_provider.py`): OVERVIEW endpoint, final fallback only.
+- **Finnhub** TTM overlay always wins for Rev Grw, EPS Grw, and PEG regardless of primary provider.
+
+**Success rule**: Mkt Cap present AND currency present AND at least one of (EV, Fwd P/E, EV/EBITDA, EV/S, Gross Mgn, Op Mgn, ROE, Rev Grw, EPS Grw). If primary returns partial, fields are merged from secondary without overwriting.
+
+**Prices are NOT affected** — yfinance `batch_download_prices` remains primary for prices, with FMP historical as fallback for missing US tickers. `% 52Wk Hi` stays derived from price history.
+
+**To revert**: Set `PROVIDER_PRIORITY=yf_first` (the default). No code deleted — existing providers are still present as fallbacks.
+
+**To switch to FMP-first**: Set env `PROVIDER_PRIORITY=fmp_first` or change the default in `config.py`. Only do this after a successful validation comparison run.
+
 ## Key conventions
 - Sector classification uses `Sector (JP)` and `Subsector (JP)` columns (user-defined taxonomy)
 - Market cap, EV, and Net Debt are converted to USD at report time
 - Price stays in local currency
 - Performance reports are emailed and posted to Slack `#stock-price-alerts` via `SLACK_WEBHOOK_URL` in `.env`
-- AlphaVantage is wired as a third fundamentals fallback after yfinance and FMP
 - `--refresh` flag bypasses cache and refetches all data; threaded through `generate.main()` to all providers
 - The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
 - Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
