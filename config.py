@@ -75,7 +75,7 @@ SEGMENT_ETFS = {
 # Controls which fundamentals provider is tried first in the reporting pipeline.
 # "yf_first"  = legacy behavior (yfinance primary, FMP/AV as fallbacks)
 # "fmp_first" = FMP primary for fundamentals (switch after validation comparison)
-PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "yf_first")
+PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "fmp_first")
 
 # ── Sample mode ──────────────────────────────────────────────────────────────
 
