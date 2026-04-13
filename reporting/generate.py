@@ -4,6 +4,8 @@ Coordinates data fetching, return calculations, and report generation.
 Heavy lifting is delegated to perf_calcs, perf_data, perf_excel, perf_html, perf_email.
 """
 
+import json
+import time
 import pandas as pd
 import openpyxl
 import warnings
@@ -105,11 +107,24 @@ def _build_additions_summary(additions_path):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+def _fmt_duration(seconds):
+    """Format seconds as human-readable duration."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    m, s = divmod(int(seconds), 60)
+    if m < 60:
+        return f"{m}m {s}s"
+    h, m = divmod(m, 60)
+    return f"{h}h {m}m {s}s"
+
+
 def main(sample_mode=False, refresh=False):
     global OUTPUT_XLSX, OUTPUT_HTML
     configure_logging()
     os.makedirs(REPORTS_DIR, exist_ok=True)
     use_cache = not refresh
+    pipeline_start = time.monotonic()
+    step_timings = []  # list of (step_name, duration_seconds, detail)
 
     if refresh:
         logger.info("Cache bypass enabled (--refresh)")
@@ -152,6 +167,7 @@ def main(sample_mode=False, refresh=False):
             ticker_map[yf_t] = orig
 
     logger.info("Downloading data for %s tickers (this may take several minutes)...", len(yf_tickers))
+    t0 = time.monotonic()
     all_results = batch_download_prices(yf_tickers, use_cache=use_cache)
 
     # FMP fallback for missing US tickers
@@ -170,23 +186,28 @@ def main(sample_mode=False, refresh=False):
                     fmp_found += 1
             logger.info("FMP resolved %s additional tickers", fmp_found)
 
+    step_timings.append(("prices", time.monotonic() - t0, f"{len(all_results)}/{len(yf_tickers)} tickers"))
     logger.info("Total tickers with data: %s", len(all_results))
 
     # Fetch Finnhub metrics for US tickers (no dot in symbol = likely US)
     finnhub_key = API_KEYS.get("FINNHUB_API_KEY")
     finnhub_data = {}
+    t0 = time.monotonic()
     if finnhub_key:
         us_yf_tickers = [t for t in yf_tickers if "." not in t]
         logger.info("Fetching Finnhub fundamentals for %s US tickers...", len(us_yf_tickers))
         finnhub_data = fetch_finnhub_parallel(us_yf_tickers, finnhub_key)
         logger.info("Finnhub returned data for %s tickers", len(finnhub_data))
+    step_timings.append(("finnhub", time.monotonic() - t0, f"{len(finnhub_data)} tickers"))
 
     # Fetch fundamentals via provider chain (handles FMP/yfinance/AV fallback)
     logger.info("Fetching fundamentals for %s tickers via provider chain...", len(yf_tickers))
+    t0 = time.monotonic()
     all_fundamentals, all_is_ttm, all_currencies = fetch_all_fundamentals(
         yf_tickers, finnhub_data=finnhub_data, max_workers=10, use_cache=use_cache
     )
     fund_count = sum(1 for v in all_fundamentals.values() if v.get("Mkt Cap") is not None)
+    step_timings.append(("fundamentals", time.monotonic() - t0, f"{fund_count}/{len(yf_tickers)} tickers"))
     logger.info("Fundamentals loaded for %s tickers", fund_count)
 
     # Convert Mkt Cap, EV, Net Debt to USD
@@ -249,13 +270,16 @@ def main(sample_mode=False, refresh=False):
 
     def run_step(name, fn, *args, **kwargs):
         """Run a pipeline step, catching and logging failures."""
+        t0 = time.monotonic()
         try:
             result = fn(*args, **kwargs)
             step_results[name] = "ok"
+            step_timings.append((name, time.monotonic() - t0, "ok"))
             return result
         except Exception as e:
             logger.warning("Step '%s' failed: %s", name, e)
             step_results[name] = f"failed: {e}"
+            step_timings.append((name, time.monotonic() - t0, f"failed: {e}"))
             return None
 
     # ============ S&P 500 ============
@@ -433,9 +457,37 @@ def main(sample_mode=False, refresh=False):
         step_results["email"] = "skipped"
 
     # ============ SUMMARY ============
+    total_duration = time.monotonic() - pipeline_start
     logger.info("-- Pipeline Summary --")
     for step_name, status in step_results.items():
         logger.info("  %-15s %s", step_name, status)
+
+    logger.info("-- Step Timings --")
+    for step_name, duration, detail in step_timings:
+        logger.info("  %-20s %10s  %s", step_name, _fmt_duration(duration), detail)
+    logger.info("  %-20s %10s", "TOTAL", _fmt_duration(total_duration))
+
+    # Write timing log to reports/
+    timing_log_path = REPORTS_DIR / "performance_timing.jsonl"
+    timing_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "date": TODAY,
+        "sample_mode": sample_mode,
+        "refresh": refresh,
+        "total_seconds": round(total_duration, 1),
+        "total_formatted": _fmt_duration(total_duration),
+        "steps": [
+            {"step": name, "seconds": round(dur, 1), "detail": detail}
+            for name, dur, detail in step_timings
+        ],
+    }
+    try:
+        with open(timing_log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(timing_entry) + "\n")
+        logger.info("Timing log appended to %s", timing_log_path)
+    except Exception as e:
+        logger.warning("Failed to write timing log: %s", e)
+
     logger.info("Done!")
 
 
