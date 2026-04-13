@@ -53,7 +53,7 @@ def fetch_metrics(ticker, api_key, max_retries=3, use_cache=True):
 
 
 def fetch_parallel(tickers, api_key, max_workers=10, batch_size=55, batch_pause=62, use_cache=True):
-    """Fetch Finnhub metrics in parallel, respecting the 60 req/min rate limit.
+    """Fetch Finnhub metrics in parallel, respecting the 60 req/min free tier limit.
 
     Checks cache first for each ticker. Only fetches uncached tickers from API.
     Processes in batches of 55 with a 62-second pause between batches.
