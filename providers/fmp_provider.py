@@ -161,9 +161,10 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
 
     Progressive calls:
       1. profile (always) — Mkt Cap, currency
-      2. ratios-ttm (always) — P/E, EV/EBITDA, PEG, margins, ROE
-      3. key-metrics-ttm (only if EV/Net Debt/EV/S still missing)
-      4. financial-growth (only if Rev Growth/EPS Growth still missing)
+      2. ratios-ttm (always) — P/E, EV/EBITDA, PEG, margins
+      3. key-metrics-ttm (only if EV/Net Debt/EV/S/ROE still missing)
+
+    financial-growth is skipped (402 on Starter tier; Finnhub covers growth).
 
     Returns (result, is_ttm, currency) matching yfinance_provider contract.
     """
@@ -176,6 +177,8 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
         cached = cache_get("fundamentals", cache_key, FUND_CACHE_TTL_HOURS)
         if cached is not None:
             return cached.get("result", result), cached.get("is_ttm", is_ttm), cached.get("currency", currency)
+    # Note: even with use_cache=False (--refresh), we still WRITE to cache below
+    # so that later steps (e.g. S&P 500) can benefit from warm cache.
 
     if not api_key:
         return result, is_ttm, currency
@@ -228,18 +231,11 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
     if result["Net Debt"] is None and result["Enterprise Value"] is not None and result["Mkt Cap"] is not None:
         result["Net Debt"] = result["Enterprise Value"] - result["Mkt Cap"]
 
-    # Call 4: financial-growth (only if Rev Growth/EPS Growth still missing)
-    needs_growth = result["Rev Grw"] is None or result["EPS Grw"] is None
-    if needs_growth:
-        fg = _fetch_financial_growth(ticker, api_key)
-        if fg:
-            if result["Rev Grw"] is None:
-                result["Rev Grw"] = _pct(fg.get("revenueGrowth"))
-            if result["EPS Grw"] is None:
-                result["EPS Grw"] = _pct(fg.get("epsgrowth") or fg.get("epsGrowth"))
+    # financial-growth endpoint is skipped — it returns 402 on FMP Starter tier,
+    # and Finnhub TTM overlay covers Rev Grw / EPS Grw anyway.
 
-    # Cache if we got meaningful data
-    if use_cache and result.get("Mkt Cap") is not None:
+    # Always cache results (even on --refresh) so later pipeline steps benefit
+    if result.get("Mkt Cap") is not None:
         cache_set("fundamentals", cache_key, {
             "result": result.copy(),
             "is_ttm": is_ttm.copy(),

@@ -112,17 +112,15 @@ class TestFetchProfile:
 # ── Unit tests: fetch_fundamentals ──────────────────────────────────────────
 
 class TestFetchFundamentals:
-    @patch("providers.fmp_provider._fetch_financial_growth")
     @patch("providers.fmp_provider._fetch_key_metrics")
     @patch("providers.fmp_provider._fetch_ratios")
     @patch("providers.fmp_provider.fetch_profile")
     @patch("providers.fmp_provider.cache_get", return_value=None)
     @patch("providers.fmp_provider.cache_set")
-    def test_full_response(self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km, mock_fg):
+    def test_full_response(self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km):
         mock_profile.return_value = SAMPLE_PROFILE
         mock_ratios.return_value = SAMPLE_RATIOS
         mock_km.return_value = SAMPLE_KEY_METRICS
-        mock_fg.return_value = SAMPLE_GROWTH
 
         result, is_ttm, currency = fetch_fundamentals("ISRG", "test_key", use_cache=False)
 
@@ -135,21 +133,20 @@ class TestFetchFundamentals:
         assert result["Gross Mgn"] == 67.0
         assert result["Op Mgn"] == 35.0
         assert result["ROE"] == 18.0
-        # Growth from financial-growth endpoint (also decimal → pct)
-        assert result["Rev Grw"] == 17.0
-        assert result["EPS Grw"] == 25.0
+        # Growth fields are None from FMP (skipped — Finnhub covers these)
+        assert result["Rev Grw"] is None
+        assert result["EPS Grw"] is None
         # Key metrics
         assert result["Enterprise Value"] == 175000000000
         assert result["Net Debt"] == -5000000000
 
-    @patch("providers.fmp_provider._fetch_financial_growth")
     @patch("providers.fmp_provider._fetch_key_metrics")
     @patch("providers.fmp_provider._fetch_ratios")
     @patch("providers.fmp_provider.fetch_profile")
     @patch("providers.fmp_provider.cache_get", return_value=None)
     @patch("providers.fmp_provider.cache_set")
     def test_progressive_skips_key_metrics_when_not_needed(
-        self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km, mock_fg
+        self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km
     ):
         """key-metrics is NOT called if EV/S comes from ratios and EV/Net Debt are present."""
         profile_with_ev = {**SAMPLE_PROFILE}
@@ -157,31 +154,11 @@ class TestFetchFundamentals:
         # ratios provides EV/S
         ratios_with_evs = {**SAMPLE_RATIOS, "priceToSalesRatioTTM": 22.1}
         mock_ratios.return_value = ratios_with_evs
-        mock_fg.return_value = SAMPLE_GROWTH
 
         # key-metrics still called because EV and Net Debt are None from profile+ratios
         fetch_fundamentals("ISRG", "test_key", use_cache=False)
         # key-metrics IS called because Enterprise Value and Net Debt are still None
         assert mock_km.called
-
-    @patch("providers.fmp_provider._fetch_financial_growth")
-    @patch("providers.fmp_provider._fetch_key_metrics")
-    @patch("providers.fmp_provider._fetch_ratios")
-    @patch("providers.fmp_provider.fetch_profile")
-    @patch("providers.fmp_provider.cache_get", return_value=None)
-    @patch("providers.fmp_provider.cache_set")
-    def test_growth_skipped_when_present(
-        self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km, mock_fg
-    ):
-        """financial-growth NOT called if both Rev Grw and EPS Grw are already set."""
-        mock_profile.return_value = SAMPLE_PROFILE
-        # Simulate ratios that somehow include growth (unlikely but tests the logic)
-        ratios_with_growth = {**SAMPLE_RATIOS}
-        mock_ratios.return_value = ratios_with_growth
-        mock_km.return_value = SAMPLE_KEY_METRICS
-        # Growth will be None from ratios, so financial-growth IS called
-        fetch_fundamentals("ISRG", "test_key", use_cache=False)
-        assert mock_fg.called
 
     @patch("providers.fmp_provider.fetch_profile")
     @patch("providers.fmp_provider.cache_get", return_value=None)
@@ -216,6 +193,24 @@ class TestFetchFundamentals:
 
 # ── Unit tests: rate limiter ────────────────────────────────────────────────
 
+class TestCacheBehavior:
+    @patch("providers.fmp_provider._fetch_key_metrics", return_value={})
+    @patch("providers.fmp_provider._fetch_ratios", return_value={})
+    @patch("providers.fmp_provider.fetch_profile")
+    @patch("providers.fmp_provider.cache_get", return_value=None)
+    @patch("providers.fmp_provider.cache_set")
+    def test_writes_cache_even_when_use_cache_false(self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km):
+        """With use_cache=False (--refresh), cache reads are skipped but writes still happen."""
+        mock_profile.return_value = {"marketCap": 1000, "currency": "USD"}
+
+        fetch_fundamentals("TEST", "key", use_cache=False)
+
+        # cache_get should NOT have been called (use_cache=False skips reads)
+        mock_cget.assert_not_called()
+        # cache_set SHOULD have been called (always writes for later pipeline steps)
+        mock_cset.assert_called_once()
+
+
 class TestRateLimiter:
     def test_rate_limiter_creates(self):
         rl = _RateLimiter(calls_per_minute=600)
@@ -232,13 +227,12 @@ class TestRateLimiter:
 class TestDecimalNormalization:
     """Verify that FMP's decimal ratios (0.45) become percentages (45.0)."""
 
-    @patch("providers.fmp_provider._fetch_financial_growth", return_value={})
     @patch("providers.fmp_provider._fetch_key_metrics")
     @patch("providers.fmp_provider._fetch_ratios")
     @patch("providers.fmp_provider.fetch_profile")
     @patch("providers.fmp_provider.cache_get", return_value=None)
     @patch("providers.fmp_provider.cache_set")
-    def test_margins_are_percentages(self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km, mock_fg):
+    def test_margins_are_percentages(self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km):
         mock_profile.return_value = {"marketCap": 1000, "currency": "USD"}
         mock_ratios.return_value = {
             "grossProfitMarginTTM": 0.452,
