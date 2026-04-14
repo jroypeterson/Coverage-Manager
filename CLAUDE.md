@@ -110,31 +110,56 @@ Fundamentals fetching uses a **provider chain** (`providers/provider_chain.py`) 
 
 ```
 PROVIDER_PRIORITY (config.py, env-overridable)
-├── "fmp_first" (DEFAULT) → FMP → yfinance → AlphaVantage
-└── "yf_first"             → yfinance → FMP → AlphaVantage
+├── "yf_first"  (DEFAULT) → yfinance → FMP → AlphaVantage
+└── "fmp_first"           → FMP → yfinance → AlphaVantage
 ```
 
-- **FMP** (`providers/fmp_provider.py`): Progressive endpoint strategy — profile + ratios-ttm (2 calls always), key-metrics-ttm only if EV/Net Debt/EV/S/ROE still missing. `financial-growth` is skipped (402 on Starter tier). Rate limited at 300 calls/min. FMP Starter tier.
-- **yfinance** (`providers/yfinance_provider.py`): Single `Ticker.info` call per ticker. Fundamentals fallback.
+- **yfinance** (`providers/yfinance_provider.py`): Single `Ticker.info` call per ticker. This is now the default primary because it is materially faster on full-universe runs.
+- **FMP** (`providers/fmp_provider.py`): Progressive endpoint strategy — profile + ratios-ttm (2 calls always), key-metrics-ttm only if EV/Net Debt/EV/S/ROE still missing. `financial-growth` is skipped (402 on Starter tier). Rate limited at 300 calls/min. Used as fallback by default, or as primary only when you explicitly set `PROVIDER_PRIORITY=fmp_first`.
 - **AlphaVantage** (`providers/alphavantage_provider.py`): OVERVIEW endpoint, last-resort fallback only.
-- **Finnhub** (`providers/finnhub_provider.py`): TTM overlay for Rev Grw, EPS Grw, and PEG. Free tier (60 req/min). **Biggest bottleneck on cold-cache runs** — consider removing in favor of yfinance growth merge (see open thread below).
+- **Finnhub** (`providers/finnhub_provider.py`): TTM overlay for Rev Grw, EPS Grw, and PEG for US tickers. Free tier (60 req/min), so cold-cache refreshes can still be slow.
 
 **Success rule**: Mkt Cap present AND at least one of (EV, Fwd P/E, EV/EBITDA, EV/S, Gross Mgn, Op Mgn, ROE, Rev Grw, EPS Grw). If primary returns partial, fields are merged from secondary without overwriting.
 
-**Cache behavior**: FMP always writes to cache even on `--refresh` (skip reads only), so the S&P 500 step benefits from warm cache populated by the coverage universe step.
+**Why the default changed**: the refactor had drifted into an expensive path where ordinary report runs effectively paid the FMP multi-endpoint fan-out across the whole universe. `yf_first` keeps the normal report path faster while preserving FMP as fallback and as an explicit comparison mode.
 
 **Prices are NOT affected** — yfinance `batch_download_prices` remains primary for prices, with FMP historical as fallback for missing US tickers. `% 52Wk Hi` stays derived from price history.
 
+**S&P 500 benchmark tab**: `reporting/generate.py` now builds the S&P 500 benchmark in price-only mode for speed. It still computes benchmark returns, but it does not do a second full fundamentals pull for the entire S&P 500 universe. Do not reintroduce benchmark fundamentals into the default report path unless you want a materially slower run.
+
 **Timing log**: Each run appends step timings to `reports/performance_timing.jsonl` (JSONL, one entry per run).
 
-**To revert to yfinance-first**: Set env `PROVIDER_PRIORITY=yf_first`. No code deleted — existing providers are still present as fallbacks.
+**To force FMP-first for a comparison run**: Set env `PROVIDER_PRIORITY=fmp_first`. No code deleted — existing providers are still present as fallbacks.
+
+## Source cross-check workflow
+
+Use `python cli.py cross-check` to run a separate source-validation pass without generating reports. This exists because "is the report producible?" and "do the providers agree?" are different questions.
+
+- Entry point: `source_validation.py`
+- CLI: `python cli.py cross-check` or `python cli.py cross-check --sample`
+- Outputs:
+  - `reports/source_crosscheck_YYYY-MM-DD.csv`
+  - `reports/source_crosscheck_YYYY-MM-DD.json`
+
+What it does:
+
+- Deduplicates and normalizes the coverage universe once, using the same ticker normalization rules as reporting
+- Pulls overlapping fields from `yfinance`, `FMP`, and `Finnhub` where available
+- Computes either relative deltas or absolute deltas depending on the field
+- Flags large disagreements using per-field thresholds
+
+Important comparison rules:
+
+- Monetary fields (`Price`, `Mkt Cap`, `Enterprise Value`, `Net Debt`) are not compared across mismatched currencies. That is intentional to avoid false positives from provider unit differences.
+- Finnhub is mainly used for overlapping growth and PEG fields.
+- The cross-check is diagnostic only; it does not gate report generation.
 
 ## Key conventions
 - Sector classification uses `Sector (JP)` and `Subsector (JP)` columns (user-defined taxonomy)
 - Market cap, EV, and Net Debt are converted to USD at report time
 - Price stays in local currency
 - Performance reports are emailed and posted to Slack `#stock-price-alerts` via `SLACK_WEBHOOK_URL` in `.env`
-- `--refresh` flag bypasses cache reads and refetches from APIs; FMP still writes to cache so later steps benefit. **Avoid `--refresh` on full runs** — Finnhub free tier causes multi-hour stalls on cold cache
+- `--refresh` flag bypasses cache reads and refetches from APIs. Avoid it on full runs unless you really need it; provider latency, especially Finnhub on cold cache, is still the main runtime cost
 - The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
 - Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
 

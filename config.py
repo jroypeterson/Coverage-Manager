@@ -73,9 +73,12 @@ SEGMENT_ETFS = {
 
 # ── Provider priority ────────────────────────────────────────────────────────
 # Controls which fundamentals provider is tried first in the reporting pipeline.
-# "yf_first"  = legacy behavior (yfinance primary, FMP/AV as fallbacks)
-# "fmp_first" = FMP primary for fundamentals (switch after validation comparison)
-PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "fmp_first")
+# "yf_first"  = yfinance primary, FMP/AV as fallbacks. This is materially
+#               faster because it avoids the 2-3 FMP endpoint fan-out for most
+#               covered names.
+# "fmp_first" = FMP primary for fundamentals when you explicitly want to bias
+#               toward that source during a comparison run.
+PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "yf_first")
 
 # ── Sample mode ──────────────────────────────────────────────────────────────
 

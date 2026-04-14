@@ -59,6 +59,8 @@ python cli.py weekly-report             # Just the reporting-side pipeline
 python cli.py performance               # Just generate reports
 python cli.py performance --sample      # Quick preview using a small subset
 python cli.py performance --refresh     # Bypass cache, refetch all data
+python cli.py cross-check               # Cross-check overlapping fields across providers
+python cli.py cross-check --sample      # Quick validation run on the sample set
 python cli.py validate                  # Validate the coverage CSV
 python cli.py cleanup                   # Dedup and normalize tickers
 python cli.py enrich                    # Identifier enrichment (Finnhub/FMP)
@@ -153,6 +155,7 @@ The sigma-alert-specific `ticker_metadata.json` (in the sibling sigma-alert clon
 | `performance` | Fetches price history and fundamentals, then produces Excel and HTML reports. |
 | `performance --sample` | Generates a reduced preview using a small subset of tickers. |
 | `performance --refresh` | Bypass cache and refetch all data. |
+| `cross-check` | Runs a separate source validation pass across yfinance, FMP, and Finnhub, then flags large discrepancies to dated CSV/JSON outputs in `reports/`. |
 | `validate` | Runs schema and data validation against `data/coverage_universe_tickers.csv`. |
 | `cleanup` | Removes duplicates, normalizes ticker formatting, flags conflicts. |
 | `enrich` | Adds identifier columns (ISIN, FIGI, CIK, etc.) from Finnhub and FMP. |
@@ -177,9 +180,24 @@ Each report contains price returns over multiple periods (1D, 1W, QTD, YTD, 1Y, 
 
 Previous reports are archived to `reports/old reports/` automatically.
 
+Runtime notes:
+
+- The default fundamentals priority is now `yf_first` in `config.py`. This keeps normal report runs faster because yfinance is typically one call per ticker, while FMP often fans out into multiple endpoint calls.
+- The S&P 500 benchmark tab is now built in price-only mode for speed. It still computes benchmark returns, but it does not run a second full fundamentals pass for the S&P 500 universe.
+- `PROVIDER_PRIORITY=fmp_first` is still available when you explicitly want to bias toward FMP for a comparison run.
+
 ### `performance --sample`
 
 Writes sample HTML files into `reports/samples/` for quick preview.
+
+### `cross-check`
+
+Writes the following files to `reports/`:
+
+- `source_crosscheck_YYYY-MM-DD.csv`
+- `source_crosscheck_YYYY-MM-DD.json`
+
+This command is a separate data-validation pass, not part of report generation. It fetches overlapping fields from yfinance, FMP, and Finnhub where available, computes discrepancies, and flags large differences using per-field thresholds. Monetary fields are skipped when providers report different currencies so the output focuses on real disagreements rather than unit mismatches.
 
 ### `cleanup` / `enrich` / `add-exchanges`
 

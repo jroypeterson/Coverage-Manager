@@ -35,6 +35,21 @@ def build_parser():
         help="Bypass cache and fetch fresh data from all sources.",
     )
 
+    crosscheck_parser = subparsers.add_parser(
+        "cross-check",
+        help="Compare overlapping fields across providers and flag large discrepancies.",
+    )
+    crosscheck_parser.add_argument(
+        "--sample",
+        action="store_true",
+        help="Run the comparison on the sample ticker set only.",
+    )
+    crosscheck_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Bypass cache and fetch fresh data from all sources.",
+    )
+
     wb_parser = subparsers.add_parser(
         "weekly-build",
         help="Run the full weekly coverage workflow (universe + reporting).",
@@ -277,6 +292,10 @@ def main():
         from reporting import generate
 
         generate.main(sample_mode=args.sample, refresh=args.refresh)
+    elif args.command == "cross-check":
+        import source_validation
+
+        source_validation.main(sample_mode=args.sample, refresh=args.refresh)
     else:
         parser.error(f"Unknown command: {args.command}")
 

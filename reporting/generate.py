@@ -5,31 +5,30 @@ Heavy lifting is delegated to perf_calcs, perf_data, perf_excel, perf_html, perf
 """
 
 import json
-import time
-import pandas as pd
-import openpyxl
-import warnings
-import sys
 import os
 import re
+import sys
+import time
 from datetime import datetime
+
+import openpyxl
+import pandas as pd
+import warnings
 
 from config import (
     CSV_PATH, REPORTS_DIR, OLD_REPORTS_DIR, SAMPLE_REPORTS_DIR, API_KEYS, TODAY,
     BIOPHARMA_VALUES, HC_SERVICES_MEDTECH_VALUES, SECTOR_SEGMENTS, SAMPLE_TICKERS,
     SEGMENT_ETFS,
 )
-from ticker_utils import normalize_ticker, MANUAL_TICKER_MAP
+from ticker_utils import normalize_ticker
 from logging_utils import configure_logging, get_logger
 
 from reporting.calcs import (
-    ANNUAL_YEARS, PERIOD_COLS, ANNUAL_COLS, RETURN_COLS,
     FUND_COLS, VAL_COLS,
     compute_returns, build_result_row,
 )
 from providers.wikipedia_provider import fetch_sp500_tickers
 from providers.fmp_provider import fetch_historical_prices as try_fmp_historical
-from providers.finnhub_provider import fetch_metrics as fetch_finnhub_metrics
 from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import batch_download_prices
 from providers.provider_chain import fetch_all_fundamentals
@@ -63,13 +62,37 @@ def classify_sector_group(row):
 def _split_into_segments(result_df):
     """Split result_df into segment DataFrames keyed by tab name."""
     segments = {"Consolidated": result_df}
-    biopharma_mask = result_df.apply(lambda r: classify_sector_group(r) == "Biopharma", axis=1)
-    hc_svcs_mask = result_df.apply(lambda r: classify_sector_group(r) == "HC Svcs & MedTech", axis=1)
+    sector = result_df.get("Sector (JP)", pd.Series(dtype="object")).fillna("").astype(str).str.strip()
+    subsector = result_df.get("Subsector (JP)", pd.Series(dtype="object")).fillna("").astype(str).str.strip()
+    biopharma_mask = sector.isin(BIOPHARMA_VALUES) | subsector.isin(BIOPHARMA_VALUES)
+    hc_svcs_mask = sector.isin(HC_SERVICES_MEDTECH_VALUES) | subsector.isin(HC_SERVICES_MEDTECH_VALUES)
     pa_other_mask = ~biopharma_mask & ~hc_svcs_mask
     segments["Biopharma"] = result_df[biopharma_mask].reset_index(drop=True)
     segments["HC Svcs & MedTech"] = result_df[hc_svcs_mask].reset_index(drop=True)
     segments["PA & Other"] = result_df[pa_other_mask].reset_index(drop=True)
     return segments
+
+
+def _prepare_universe_rows(df, sample_mode=False, sample_set=None):
+    """Normalize and deduplicate the coverage universe once per run."""
+    working = df.copy()
+    working["Ticker"] = working["Ticker"].fillna("").astype(str).str.strip()
+    valid_mask = (working["Ticker"] != "") & (working["Ticker"] != "#N/A")
+    if sample_mode and sample_set is not None:
+        valid_mask &= working["Ticker"].str.upper().isin(sample_set)
+    working = working.loc[valid_mask].drop_duplicates(subset=["Ticker"], keep="first").reset_index(drop=True)
+
+    yf_tickers = []
+    for row in working[["Ticker", "Company Name", "Exchange"]].fillna("").to_dict("records"):
+        yf_tickers.append(
+            normalize_ticker(
+                str(row.get("Ticker", "")).strip(),
+                str(row.get("Company Name", "")).strip(),
+                str(row.get("Exchange", "")).strip(),
+            )
+        )
+    working["_yf_ticker"] = yf_tickers
+    return working
 
 
 def _build_additions_summary(additions_path):
@@ -141,30 +164,16 @@ def main(sample_mode=False, refresh=False):
     logger.info("Reading coverage CSV...")
     df = pd.read_csv(CSV_PATH)
 
-    # Deduplicate tickers
-    seen = set()
-    unique_rows = []
-    for _, row in df.iterrows():
-        ticker = str(row.get("Ticker", "")).strip()
-        if ticker and ticker != "#N/A" and ticker not in seen:
-            if sample_mode and ticker.upper() not in sample_set:
-                continue
-            seen.add(ticker)
-            unique_rows.append(row)
-    df_unique = pd.DataFrame(unique_rows).reset_index(drop=True)
+    df_unique = _prepare_universe_rows(df, sample_mode=sample_mode, sample_set=sample_set if sample_mode else None)
     logger.info("Found %s unique tickers", len(df_unique))
 
     # Normalize tickers for yfinance
-    yf_tickers = []
-    ticker_map = {}  # yf_ticker -> original_ticker
-    for _, row in df_unique.iterrows():
-        orig = str(row["Ticker"]).strip()
-        company = str(row.get("Company Name", "")).strip()
-        exchange = str(row.get("Exchange", "")).strip()
-        yf_t = normalize_ticker(orig, company, exchange)
-        if yf_t:
-            yf_tickers.append(yf_t)
-            ticker_map[yf_t] = orig
+    yf_tickers = [t for t in df_unique["_yf_ticker"].tolist() if t]
+    ticker_map = {
+        row["_yf_ticker"]: row["Ticker"]
+        for row in df_unique[["Ticker", "_yf_ticker"]].to_dict("records")
+        if row["_yf_ticker"]
+    }
 
     logger.info("Downloading data for %s tickers (this may take several minutes)...", len(yf_tickers))
     t0 = time.monotonic()
@@ -236,12 +245,11 @@ def main(sample_mode=False, refresh=False):
 
     # Calculate returns
     results = []
-    for _, row in df_unique.iterrows():
-        orig_ticker = str(row["Ticker"]).strip()
+    for row in df_unique.to_dict("records"):
+        orig_ticker = row["Ticker"]
         company = str(row.get("Company Name", "")).strip()
         exchange = str(row.get("Exchange", "")).strip()
-        yf_t = normalize_ticker(orig_ticker, company, exchange)
-
+        yf_t = row.get("_yf_ticker")
         hist = all_results.get(yf_t) if yf_t else None
         returns = compute_returns(hist)
         fund = all_fundamentals.get(yf_t, {col: None for col in FUND_COLS + VAL_COLS})
@@ -299,19 +307,11 @@ def main(sample_mode=False, refresh=False):
             sp500_yf_tickers = [t for t, _ in sp500_all]
             sp500_results_data = batch_download_prices(sp500_yf_tickers)
 
-            logger.info("Fetching fundamentals for %s S&P 500 tickers...", len(sp500_yf_tickers))
-            sp500_finnhub = {}
-            if finnhub_key:
-                sp500_finnhub = fetch_finnhub_parallel(sp500_yf_tickers, finnhub_key)
-            sp500_fundamentals, sp500_is_ttm, sp500_currencies = fetch_all_fundamentals(
-                sp500_yf_tickers, finnhub_data=sp500_finnhub, max_workers=10
-            )
+            logger.info("Building S&P 500 benchmark tab in price-only mode for speed")
 
             sp500_rows = []
             for t, info_entry in sp500_all:
                 returns = compute_returns(sp500_results_data.get(t))
-                fund = sp500_fundamentals.get(t, {col: None for col in FUND_COLS + VAL_COLS})
-                is_ttm = sp500_is_ttm.get(t, {"Rev Grw": False, "EPS Grw": False})
                 row_data = build_result_row(
                     ticker=t,
                     company=info_entry.get("Company Name", ""),
@@ -320,8 +320,10 @@ def main(sample_mode=False, refresh=False):
                     yf_sector=info_entry.get("GICS Sector", ""),
                     yf_industry=info_entry.get("GICS Sub-Industry", ""),
                     country_iso="USA", exchange="",
-                    returns=returns, fund=fund, is_ttm=is_ttm,
-                    currency=sp500_currencies.get(t, ""),
+                    returns=returns,
+                    fund={col: None for col in FUND_COLS + VAL_COLS},
+                    is_ttm={"Rev Grw": False, "EPS Grw": False},
+                    currency="USD",
                 )
                 sp500_rows.append(row_data)
             sp500_result_df = pd.DataFrame(sp500_rows)
