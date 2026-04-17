@@ -24,7 +24,7 @@ from pipeline_utils import collect_non_successes, run_step
 logger = get_logger("weekly_universe")
 
 EXPORTS_DIR = SCRIPT_DIR / "exports"
-EXPORTS_SCHEMA_VERSION = 1
+EXPORTS_SCHEMA_VERSION = 2
 
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",
@@ -187,8 +187,8 @@ def _step_export_artifacts(validation_result):
                 "name": "universe_metadata.json",
                 "purpose": (
                     "Generic structured metadata keyed by ticker: "
-                    "{name, sector, subsector}. Contains only tickers from the "
-                    "source CSV — no consumer-specific augmentation."
+                    "{name, sector, subsector, sub_subsector}. Contains only "
+                    "tickers from the source CSV — no consumer-specific augmentation."
                 ),
                 "format": "json",
             },
@@ -212,7 +212,8 @@ def _step_export_artifacts(validation_result):
                 "purpose": (
                     "Watchlist entries joined with the full universe row: "
                     "{ticker: {buy_price, target_price, date_added, notes, "
-                    "name, sector, subsector, <all universe columns...>}}."
+                    "name, sector, subsector, sub_subsector, "
+                    "<all universe columns...>}}."
                 ),
                 "format": "json",
             },

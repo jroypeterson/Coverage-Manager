@@ -75,7 +75,12 @@ def build_sigma_metadata(csv_path):
     metadata = build_universe_metadata(csv_path)
     for ticker, (name, sector) in SECTOR_ETFS.items():
         if ticker not in metadata:
-            metadata[ticker] = {"name": name, "sector": sector, "subsector": ""}
+            metadata[ticker] = {
+                "name": name,
+                "sector": sector,
+                "subsector": "",
+                "sub_subsector": "",
+            }
     return metadata
 
 
@@ -103,6 +108,7 @@ def build_core_watchlist_payload(csv_path):
             "name": meta.get("name", ""),
             "sector": meta.get("sector", ""),
             "subsector": meta.get("subsector", ""),
+            "sub_subsector": meta.get("sub_subsector", ""),
         }
     return out
 

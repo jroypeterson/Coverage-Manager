@@ -119,8 +119,8 @@ def build_parser():
             "coverage universe. Passing this opts into auto-enriching a new "
             "universe row via FMP/yfinance/OpenFIGI before adding to the "
             "watchlist. Must match the user-curated taxonomy "
-            "(Tech, SaaS, PA, Fintech, Biopharma, MedTech, Life Science Tools, "
-            "Healthcare Services, Healthcare Real Estate, Other)."
+            "(Tech, SaaS, Fintech, Biopharma, MedTech, Life Science Tools, "
+            "Healthcare Services, Other)."
         ),
     )
     wl_add.add_argument(

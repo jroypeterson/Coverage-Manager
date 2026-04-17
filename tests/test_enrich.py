@@ -56,7 +56,7 @@ def test_isin_sentinel_values_rejected():
 
 
 def test_validate_sector_jp_accepts_known():
-    for s in ("Tech", "Biopharma", "Healthcare Real Estate", "Other"):
+    for s in ("Tech", "Biopharma", "Healthcare Services", "Other"):
         validate_sector_jp(s)  # no exception
 
 

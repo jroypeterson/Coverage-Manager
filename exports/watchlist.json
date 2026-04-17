@@ -5,7 +5,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Apple Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -26,8 +26,9 @@
     "Website": "https://www.apple.com",
     "YF Sector": "Technology",
     "YF Industry": "Consumer Electronics",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "ADI": {
@@ -36,7 +37,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Analog Devices Inc",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -57,8 +58,9 @@
     "Website": "https://www.analog.com",
     "YF Sector": "Technology",
     "YF Industry": "Semiconductors",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "ADSK": {
@@ -90,6 +92,7 @@
     "YF Industry": "Software - Application",
     "Sector (JP)": "Tech",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "AFRM": {
@@ -98,7 +101,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Affirm Holdings Inc",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -119,9 +122,42 @@
     "Website": "https://www.affirm.com",
     "YF Sector": "Financial Services",
     "YF Industry": "Credit Services",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
+  },
+  "ALMR": {
+    "buy_price": null,
+    "target_price": null,
+    "date_added": "2026-04-17",
+    "notes": "",
+    "name": "Alamar Biosciences, Inc.",
+    "sector": "MedTech",
+    "subsector": "Tools",
+    "Exchange": "NASDAQ",
+    "Exchange Code": "NGM",
+    "Exchange Full Name": "NasdaqGM",
+    "Listing Type": "Primary",
+    "Other Listings": "",
+    "Year Listed": "2026",
+    "ISIN": "",
+    "FIGI": "BBG012FD22W7",
+    "Composite FIGI": "BBG012FD22W7",
+    "Share Class FIGI": "BBG012FD22X6",
+    "CIK": "2104204",
+    "Company Name": "Alamar Biosciences, Inc.",
+    "Country (HQ)": "United States",
+    "Country (Listing)": "United States",
+    "Country (ISO)": "USA",
+    "Currency": "USD",
+    "Website": "www.alamarbio.com",
+    "YF Sector": "Healthcare",
+    "YF Industry": "Medical Devices",
+    "Sector (JP)": "MedTech",
+    "Subsector (JP)": "Tools",
+    "Sub-subsector (JP)": "",
+    "Core": ""
   },
   "AMZN": {
     "buy_price": null,
@@ -129,7 +165,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Amazon.com, Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -150,8 +186,9 @@
     "Website": "https://www.amazon.com",
     "YF Sector": "Consumer Cyclical",
     "YF Industry": "Internet Retail",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "BE": {
@@ -160,7 +197,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Bloom Energy Corporation",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
@@ -181,8 +218,9 @@
     "Website": "https://www.bloomenergy.com",
     "YF Sector": "Industrials",
     "YF Industry": "Electrical Equipment & Parts",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "BRO": {
@@ -214,6 +252,7 @@
     "YF Industry": "Insurance - Brokers",
     "Sector (JP)": "Fintech",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "CI": {
@@ -245,6 +284,7 @@
     "YF Industry": "Healthcare Plans",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Mgd Care",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "CPRT": {
@@ -253,7 +293,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Copart Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -274,8 +314,9 @@
     "Website": "https://www.copart.com",
     "YF Sector": "Industrials",
     "YF Industry": "Specialty Business Services",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "CRWD": {
@@ -284,7 +325,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "CrowdStrike Holdings, Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -305,8 +346,9 @@
     "Website": "https://www.crowdstrike.com",
     "YF Sector": "Technology",
     "YF Industry": "Software - Infrastructure",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "DOCS": {
@@ -338,6 +380,7 @@
     "YF Industry": "Health Information Services",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "HIT",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "EHC": {
@@ -369,6 +412,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "ENSG": {
@@ -400,6 +444,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "FI": {
@@ -431,6 +476,7 @@
     "YF Industry": "Information Technology Services",
     "Sector (JP)": "Fintech",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "FIVE": {
@@ -439,7 +485,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Five Below Inc",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -460,8 +506,9 @@
     "Website": "https://www.fivebelow.com",
     "YF Sector": "Consumer Cyclical",
     "YF Industry": "Specialty Retail",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "FMS": {
@@ -493,6 +540,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Dialysis",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "IDXX": {
@@ -524,7 +572,40 @@
     "YF Industry": "Diagnostics & Research",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Animal Health",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
+  },
+  "KLRA": {
+    "buy_price": null,
+    "target_price": null,
+    "date_added": "2026-04-17",
+    "notes": "",
+    "name": "Kailera Therapeutics, Inc.",
+    "sector": "Biopharma",
+    "subsector": "",
+    "Exchange": "NASDAQ",
+    "Exchange Code": "NGM",
+    "Exchange Full Name": "NasdaqGM",
+    "Listing Type": "Primary",
+    "Other Listings": "",
+    "Year Listed": "2026",
+    "ISIN": "",
+    "FIGI": "BBG01Q3NQQJ1",
+    "Composite FIGI": "BBG01Q3NQQJ1",
+    "Share Class FIGI": "BBG01Q3NQQK9",
+    "CIK": "2096997",
+    "Company Name": "Kailera Therapeutics, Inc.",
+    "Country (HQ)": "United States",
+    "Country (Listing)": "United States",
+    "Country (ISO)": "USA",
+    "Currency": "USD",
+    "Website": "www.kailera.com",
+    "YF Sector": "Healthcare",
+    "YF Industry": "Biotechnology",
+    "Sector (JP)": "Biopharma",
+    "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
+    "Core": ""
   },
   "KRC": {
     "buy_price": null,
@@ -532,8 +613,8 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Kilroy Realty Corporation",
-    "sector": "Healthcare Real Estate",
-    "subsector": "",
+    "sector": "Healthcare Services",
+    "subsector": "Healthcare Real Estate",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -553,8 +634,9 @@
     "Website": "https://www.kilroyrealty.com",
     "YF Sector": "Real Estate",
     "YF Industry": "REIT - Office",
-    "Sector (JP)": "Healthcare Real Estate",
-    "Subsector (JP)": "",
+    "Sector (JP)": "Healthcare Services",
+    "Subsector (JP)": "Healthcare Real Estate",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "LLY": {
@@ -586,6 +668,7 @@
     "YF Industry": "Drug Manufacturers - General",
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "LULU": {
@@ -594,7 +677,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Lululemon Athletica Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -615,9 +698,74 @@
     "Website": "https://corporate.lululemon.com",
     "YF Sector": "Consumer Cyclical",
     "YF Industry": "Apparel - Retail",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
+  },
+  "MAIR": {
+    "buy_price": null,
+    "target_price": null,
+    "date_added": "2026-04-17",
+    "notes": "",
+    "name": "Madison Air Solutions Corporation",
+    "sector": "Tech",
+    "subsector": "",
+    "Exchange": "NYSE",
+    "Exchange Code": "",
+    "Exchange Full Name": "",
+    "Listing Type": "Primary",
+    "Other Listings": "",
+    "Year Listed": "2026",
+    "ISIN": "US55658T1051",
+    "FIGI": "BBG020W40ST0",
+    "Composite FIGI": "BBG020W40ST0",
+    "Share Class FIGI": "BBG020W40TR0",
+    "CIK": "2098430",
+    "Company Name": "Madison Air Solutions Corporation",
+    "Country (HQ)": "United States",
+    "Country (Listing)": "United States",
+    "Country (ISO)": "USA",
+    "Currency": "USD",
+    "Website": "http://www.madisonair.com",
+    "YF Sector": "Industrials",
+    "YF Industry": "Industrial - Machinery",
+    "Sector (JP)": "Tech",
+    "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
+    "Core": ""
+  },
+  "MMED": {
+    "buy_price": null,
+    "target_price": null,
+    "date_added": "2026-04-17",
+    "notes": "",
+    "name": "MiniMed Group Inc",
+    "sector": "MedTech",
+    "subsector": "Diabetes Technology",
+    "Exchange": "NASDAQ",
+    "Exchange Code": "NMS",
+    "Exchange Full Name": "NasdaqGS",
+    "Listing Type": "Primary",
+    "Other Listings": "",
+    "Year Listed": "2026",
+    "ISIN": "US60365F1093",
+    "FIGI": "BBG01Z6N2YW2",
+    "Composite FIGI": "BBG01Z6N2YW2",
+    "Share Class FIGI": "BBG01Z6N2ZV0",
+    "CIK": "2062583",
+    "Company Name": "MiniMed Group Inc",
+    "Country (HQ)": "United States",
+    "Country (Listing)": "United States",
+    "Country (ISO)": "USA",
+    "Currency": "USD",
+    "Website": "https://www.minimed.com",
+    "YF Sector": "Healthcare",
+    "YF Industry": "Health Information Services",
+    "Sector (JP)": "MedTech",
+    "Subsector (JP)": "Diabetes Technology",
+    "Sub-subsector (JP)": "",
+    "Core": "Y"
   },
   "OPCH": {
     "buy_price": null,
@@ -648,6 +796,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "PACS": {
@@ -657,7 +806,7 @@
     "notes": "",
     "name": "PACS Group Inc",
     "sector": "Healthcare Services",
-    "subsector": "Post-acute",
+    "subsector": "Post-Acute",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -678,7 +827,8 @@
     "YF Sector": "Healthcare",
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
-    "Subsector (JP)": "Post-acute",
+    "Subsector (JP)": "Post-Acute",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "PNTG": {
@@ -688,7 +838,7 @@
     "notes": "",
     "name": "Pennant Group Inc",
     "sector": "Healthcare Services",
-    "subsector": "Post-acute",
+    "subsector": "Post-Acute",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
     "Exchange Full Name": "NasdaqGS",
@@ -709,7 +859,8 @@
     "YF Sector": "Healthcare",
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
-    "Subsector (JP)": "Post-acute",
+    "Subsector (JP)": "Post-Acute",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "Q": {
@@ -741,6 +892,7 @@
     "YF Industry": "Semiconductors",
     "Sector (JP)": "Tech",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "RPD": {
@@ -749,7 +901,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Rapid7, Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NGM",
@@ -770,8 +922,9 @@
     "Website": "https://www.rapid7.com",
     "YF Sector": "Technology",
     "YF Industry": "Software - Infrastructure",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "SPOT": {
@@ -780,7 +933,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Spotify Technology SA",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
@@ -801,8 +954,9 @@
     "Website": "https://www.spotify.com",
     "YF Sector": "Communication Services",
     "YF Industry": "Internet Content & Information",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "TSLA": {
@@ -811,7 +965,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Tesla, Inc.",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
@@ -832,8 +986,9 @@
     "Website": "https://www.tesla.com",
     "YF Sector": "Consumer Cyclical",
     "YF Industry": "Auto Manufacturers",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "U": {
@@ -842,7 +997,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Unity Software Inc",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
@@ -863,8 +1018,9 @@
     "Website": "https://unity.com",
     "YF Sector": "Technology",
     "YF Industry": "Software - Application",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "ULS": {
@@ -896,6 +1052,7 @@
     "YF Industry": "Specialty Business Services",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "V": {
@@ -904,7 +1061,7 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Visa Inc",
-    "sector": "PA",
+    "sector": "Other",
     "subsector": "",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
@@ -925,8 +1082,9 @@
     "Website": "https://www.visa.com",
     "YF Sector": "Financial Services",
     "YF Industry": "Credit Services",
-    "Sector (JP)": "PA",
+    "Sector (JP)": "Other",
     "Subsector (JP)": "",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "WAY": {
@@ -958,6 +1116,7 @@
     "YF Industry": "Health Information Services",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "HIT",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   },
   "WELL": {
@@ -966,8 +1125,8 @@
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Welltower Inc",
-    "sector": "Healthcare Real Estate",
-    "subsector": "",
+    "sector": "Healthcare Services",
+    "subsector": "Healthcare Real Estate",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -987,8 +1146,9 @@
     "Website": "https://www.welltower.com",
     "YF Sector": "Real Estate",
     "YF Industry": "REIT - Healthcare Facilities",
-    "Sector (JP)": "Healthcare Real Estate",
-    "Subsector (JP)": "",
+    "Sector (JP)": "Healthcare Services",
+    "Subsector (JP)": "Healthcare Real Estate",
+    "Sub-subsector (JP)": "",
     "Core": ""
   },
   "WST": {
@@ -1020,6 +1180,7 @@
     "YF Industry": "Medical Instruments & Supplies",
     "Sector (JP)": "MedTech",
     "Subsector (JP)": "Packaging",
+    "Sub-subsector (JP)": "",
     "Core": "Y"
   }
 }

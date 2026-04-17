@@ -173,10 +173,10 @@ Writes the following files to `reports/`:
 - `coverage_performance_YYYY-MM-DD.xlsx` — full Excel workbook
 - `coverage_biopharma_YYYY-MM-DD.html`
 - `coverage_hc_svcs_medtech_YYYY-MM-DD.html`
-- `coverage_pa_other_YYYY-MM-DD.html`
+- `coverage_other_YYYY-MM-DD.html`
 - `coverage_sp500_non_hc_YYYY-MM-DD.html`
 
-Each report contains price returns over multiple periods (1D, 1W, QTD, YTD, 1Y, 3Y, 5Y, 10Y, plus calendar-year annual returns) and fundamental metrics (Fwd P/E, EV/EBITDA, EV/S, PEG, margins, ROE, revenue and EPS growth). Market cap, EV, and Net Debt are converted to USD; price stays in local currency. ETF benchmark rows are included alongside ticker rows. Tickers are segmented by `Sector (JP)` / `Subsector (JP)` into Biopharma, HC Services & MedTech, PA & Other, and a Non-HC S&P 500 benchmark tab.
+Each report contains price returns over multiple periods (1D, 1W, QTD, YTD, 1Y, 3Y, 5Y, 10Y, plus calendar-year annual returns) and fundamental metrics (Fwd P/E, EV/EBITDA, EV/S, PEG, margins, ROE, revenue and EPS growth). Market cap, EV, and Net Debt are converted to USD; price stays in local currency. ETF benchmark rows are included alongside ticker rows. Tickers are segmented by `Sector (JP)` / `Subsector (JP)` into Biopharma, HC Services & MedTech, Other, and a Non-HC S&P 500 benchmark tab.
 
 Previous reports are archived to `reports/old reports/` automatically.
 

@@ -6,7 +6,7 @@ Returns errors (hard failures) and warnings (informational).
 
 import pandas as pd
 
-from config import CSV_PATH, REQUIRED_COLUMNS, EXPECTED_COLUMNS
+from config import CSV_PATH, REQUIRED_COLUMNS, EXPECTED_COLUMNS, ALLOWED_SECTORS_JP
 from ticker_utils import normalize_company_for_comparison
 from logging_utils import get_logger
 
@@ -88,6 +88,23 @@ def validate_exchange_populated(df):
     return warnings
 
 
+def validate_sector_taxonomy(df):
+    """Check that every Sector (JP) value is in ALLOWED_SECTORS_JP. Returns errors.
+
+    Catches stale taxonomy values (e.g. the retired "PA" sector) from slipping
+    back in via copy/paste of old CSV rows.
+    """
+    errors = []
+    if "Sector (JP)" not in df.columns:
+        return errors
+    values = df["Sector (JP)"].fillna("").astype(str).str.strip()
+    present = values[values != ""]
+    stale = sorted(set(present[~present.isin(ALLOWED_SECTORS_JP)]))
+    if stale:
+        errors.append(f"Unknown Sector (JP) value(s) (not in taxonomy): {stale}")
+    return errors
+
+
 def validate_subsector_populated(df):
     """Check that Subsector column is populated. Returns warnings."""
     warnings = []
@@ -108,6 +125,7 @@ def run_all_validations(df):
     errors.extend(validate_no_orphaned_columns(df))
     errors.extend(validate_no_blank_tickers(df))
     errors.extend(validate_no_duplicate_tickers(df))
+    errors.extend(validate_sector_taxonomy(df))
 
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))

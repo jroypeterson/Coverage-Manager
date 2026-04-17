@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-04-11T19:45:44Z",
+  "schema_version": 2,
+  "generated_at": "2026-04-17T19:40:26Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -10,14 +10,14 @@
     },
     {
       "name": "universe_metadata.json",
-      "purpose": "Generic structured metadata keyed by ticker: {name, sector, subsector}. Contains only tickers from the source CSV \u2014 no consumer-specific augmentation.",
+      "purpose": "Generic structured metadata keyed by ticker: {name, sector, subsector, sub_subsector}. Contains only tickers from the source CSV \u2014 no consumer-specific augmentation.",
       "format": "json"
     },
     {
       "name": "universe_status.json",
       "purpose": "Versioned status + validation contract (read schema_version before consuming)",
       "format": "json",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "name": "watchlist.csv",
@@ -26,14 +26,14 @@
     },
     {
       "name": "watchlist.json",
-      "purpose": "Watchlist entries joined with the full universe row: {ticker: {buy_price, target_price, date_added, notes, name, sector, subsector, <all universe columns...>}}.",
+      "purpose": "Watchlist entries joined with the full universe row: {ticker: {buy_price, target_price, date_added, notes, name, sector, subsector, sub_subsector, <all universe columns...>}}.",
       "format": "json"
     },
     {
       "name": "watchlist_status.json",
       "purpose": "Versioned status + validation contract for the watchlist (read schema_version first).",
       "format": "json",
-      "schema_version": 1
+      "schema_version": 2
     },
     {
       "name": "manifest.json",

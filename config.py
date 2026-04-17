@@ -39,7 +39,7 @@ SECTOR_SEGMENTS = [
     ("Consolidated", "consolidated", "Coverage Universe Performance — Consolidated"),
     ("Biopharma", "biopharma", "Coverage Universe Performance — Biopharma"),
     ("HC Svcs & MedTech", "hc_svcs_medtech", "Coverage Universe Performance — HC Services & MedTech"),
-    ("PA & Other", "pa_other", "Coverage Universe Performance — PA & Other"),
+    ("Other", "other", "Coverage Universe Performance — Other"),
     ("S&P 500", "sp500", "S&P 500 Performance"),
 ]
 
@@ -97,12 +97,10 @@ EXPECTED_COLUMNS = ["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsec
 ALLOWED_SECTORS_JP = {
     "Tech",
     "SaaS",
-    "PA",
     "Fintech",
     "Biopharma",
     "MedTech",
     "Life Science Tools",
     "Healthcare Services",
-    "Healthcare Real Estate",
     "Other",
 }

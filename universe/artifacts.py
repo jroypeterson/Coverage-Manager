@@ -29,7 +29,7 @@ def _normalize_ticker(raw):
 
 
 def build_universe_metadata(csv_path):
-    """Read the coverage CSV and return a `{TICKER: {name, sector, subsector}}` dict.
+    """Read the coverage CSV and return a `{TICKER: {name, sector, subsector, sub_subsector}}` dict.
 
     This is the **generic** builder: no ETFs, no consumer-specific augmentation.
     Every key in the returned dict corresponds to one or more rows in the source
@@ -79,6 +79,7 @@ def build_universe_metadata_with_stats(csv_path):
                 "name": row.get("Company Name", "").strip(),
                 "sector": row.get("Sector (JP)", "").strip(),
                 "subsector": row.get("Subsector (JP)", "").strip(),
+                "sub_subsector": row.get("Sub-subsector (JP)", "").strip(),
             }
             rows_kept += 1
 
