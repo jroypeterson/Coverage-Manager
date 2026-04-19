@@ -127,7 +127,7 @@ Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never
 | `exports/watchlist_status.json` | Versioned status + validation contract for the watchlist (separate schema) |
 | `exports/manifest.json` | Directory of files in `exports/` with their purpose |
 
-`universe_status.json` (schema v1) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. Invariant: `ticker_count + normalization_collisions == row_count`.
+`universe_status.json` (schema v2) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. Invariant: `ticker_count + normalization_collisions == row_count`.
 
 Read pattern for downstream projects:
 
@@ -137,7 +137,7 @@ from pathlib import Path
 
 CM_EXPORTS = Path("../Coverage Manager/exports")
 status = json.loads((CM_EXPORTS / "universe_status.json").read_text())
-assert status["schema_version"] == 1, "Coverage Manager exports schema changed"
+assert status["schema_version"] == 2, "Coverage Manager exports schema changed"
 if not status["validation_passed"]:
     raise RuntimeError(f"Universe failed validation: {status['validation_errors']}")
 metadata = json.loads((CM_EXPORTS / "universe_metadata.json").read_text())
