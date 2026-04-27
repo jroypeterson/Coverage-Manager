@@ -236,11 +236,17 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
                 f'<div class="ms-panel" style="display:none;"></div>'
                 f'</div></th>')
         elif i == mktcap_col_idx:
+            mktcap_input_style = (
+                "width:55px;font-size:10px;padding:2px 4px;border:1px solid #6a8aa8;"
+                "border-radius:3px;background:#2c3e50;color:#fff;text-align:center;"
+            )
             filter_cells_list.append(
-                '<th><input type="number" id="minMktCap" placeholder="Min $B" step="0.1" '
-                'style="width:70px;font-size:10px;padding:2px 4px;border:1px solid #6a8aa8;'
-                'border-radius:3px;background:#2c3e50;color:#fff;text-align:center;" '
-                'title="Minimum market cap in USD $B (e.g. 1 = $1B)"></th>')
+                f'<th><input type="number" id="minMktCap" placeholder="Min $B" step="0.1" '
+                f'style="{mktcap_input_style}margin-right:2px;" '
+                f'title="Minimum market cap in USD $B (e.g. 1 = $1B)">'
+                f'<input type="number" id="maxMktCap" placeholder="Max $B" step="0.1" '
+                f'style="{mktcap_input_style}" '
+                f'title="Maximum market cap in USD $B (e.g. 50 = $50B)"></th>')
         else:
             filter_cells_list.append("<th></th>")
     filter_cells = "".join(filter_cells_list)
@@ -358,7 +364,9 @@ function updateTriggerLabel(colIdx, checked, total) {{
 
 function applyFilters() {{
   var minCapInput = document.getElementById("minMktCap");
+  var maxCapInput = document.getElementById("maxMktCap");
   var minCap = minCapInput ? parseFloat(minCapInput.value) : NaN;
+  var maxCap = maxCapInput ? parseFloat(maxCapInput.value) : NaN;
   document.querySelectorAll("tbody tr").forEach(function(row) {{
     var show = true;
     for (var colIdx in selectedFilters) {{
@@ -367,9 +375,10 @@ function applyFilters() {{
       var cellText = row.children[parseInt(colIdx)].textContent.trim().toLowerCase();
       if (!allowed.has(cellText)) {{ show = false; break; }}
     }}
-    if (show && !isNaN(minCap)) {{
+    if (show && (!isNaN(minCap) || !isNaN(maxCap))) {{
       var mc = parseFloat(row.getAttribute("data-mktcap") || "0");
-      if (mc < minCap * 1e9) show = false;
+      if (!isNaN(minCap) && mc < minCap * 1e9) show = false;
+      if (show && !isNaN(maxCap) && mc > maxCap * 1e9) show = false;
     }}
     row.style.display = show ? "" : "none";
   }});
@@ -470,6 +479,10 @@ document.querySelectorAll(".ms-dropdown").forEach(function(dd) {{
 var minCapEl = document.getElementById("minMktCap");
 if (minCapEl) {{
   minCapEl.addEventListener("input", function() {{ applyFilters(); }});
+}}
+var maxCapEl = document.getElementById("maxMktCap");
+if (maxCapEl) {{
+  maxCapEl.addEventListener("input", function() {{ applyFilters(); }});
 }}
 
 document.addEventListener("click", function(e) {{
