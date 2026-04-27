@@ -20,6 +20,19 @@ def build_parser():
     subparsers.add_parser("enrich", help="Enrich the coverage CSV with identifiers.")
     subparsers.add_parser("validate", help="Validate the coverage CSV for errors and warnings.")
 
+    dc_parser = subparsers.add_parser(
+        "check-delisted",
+        help=(
+            "Probe yfinance for each universe ticker and flag those that look "
+            "delisted, acquired, or recycled to a non-equity instrument."
+        ),
+    )
+    dc_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass the identity cache and refetch from yfinance.",
+    )
+
     perf_parser = subparsers.add_parser(
         "performance",
         help="Generate the Excel and HTML performance reports.",
@@ -192,6 +205,11 @@ def main():
 
         exit_code = validation.main()
         raise SystemExit(exit_code)
+    elif args.command == "check-delisted":
+        from universe import delisted_check
+
+        result = delisted_check.main(use_cache=not args.no_cache)
+        raise SystemExit(0 if not result["flagged"] else 2)
     elif args.command == "weekly-build":
         import weekly_build
 

@@ -29,6 +29,8 @@ EXPORTS_SCHEMA_VERSION = 2
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",
     "company_backgrounds_*.md",
+    "delisted_check_*.md",
+    "delisted_check_*.csv",
 ]
 
 
@@ -374,6 +376,23 @@ def _step_sigma_export():
     return export_and_push(CSV_PATH)
 
 
+def _step_delisted_check():
+    """Probe yfinance identity for each universe ticker and flag mismatches.
+
+    Non-gating: only writes a report; never raises and never blocks downstream.
+    """
+    from universe import delisted_check
+
+    result = delisted_check.check_universe()
+    paths = delisted_check.write_report(result)
+    return {
+        "checked": result["checked"],
+        "flagged": len(result["flagged"]),
+        "missing_data": result["missing_data"],
+        "report": paths["md_path"],
+    }
+
+
 # ── Result helper ────────────────────────────────────────────────────────────
 
 
@@ -417,7 +436,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
     validation_passed = False
 
     # Step 1: Validate
-    logger.info("[1/5] Validating coverage universe...")
+    logger.info("[1/6] Validating coverage universe...")
     status, validation_result = run_step("validate", _step_validate)
     steps["validate"] = status
     if validation_result:
@@ -442,7 +461,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         }
 
     # Step 2: Archive universe outputs
-    logger.info("[2/5] Archiving prior universe outputs...")
+    logger.info("[2/6] Archiving prior universe outputs...")
     if dry_run:
         steps["archive"] = "skipped (dry run)"
     else:
@@ -451,21 +470,41 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
 
     # Step 3: Discovery
     if skip_discovery:
-        logger.info("[3/5] Discovery... SKIPPED")
+        logger.info("[3/6] Discovery... SKIPPED")
         steps["discovery"] = "skipped"
     else:
-        logger.info("[3/5] Discovery...")
+        logger.info("[3/6] Discovery...")
         status, result = run_step("discovery", _step_discovery, dry_run=dry_run)
         steps["discovery"] = status
         if result:
             logger.info("  Discovery: %s", result.get("status", "unknown"))
 
-    # Step 4: Export artifacts (the new published contract)
+    # Step 4: Delisted / recycled ticker check
     if dry_run:
-        logger.info("[4/5] Export artifacts... SKIPPED (dry run)")
+        logger.info("[4/6] Delisted check... SKIPPED (dry run)")
+        steps["delisted_check"] = "skipped (dry run)"
+    else:
+        logger.info("[4/6] Checking universe for delisted/recycled tickers...")
+        status, dc_result = run_step("delisted_check", _step_delisted_check)
+        if dc_result:
+            steps["delisted_check"] = (
+                f"{dc_result['flagged']} flagged of {dc_result['checked']} "
+                f"(missing data: {dc_result['missing_data']})"
+            )
+            if dc_result["flagged"]:
+                logger.warning(
+                    "  %d ticker(s) flagged — review %s",
+                    dc_result["flagged"], dc_result["report"],
+                )
+        else:
+            steps["delisted_check"] = status
+
+    # Step 5: Export artifacts (the new published contract)
+    if dry_run:
+        logger.info("[5/6] Export artifacts... SKIPPED (dry run)")
         steps["export_artifacts"] = "skipped (dry run)"
     else:
-        logger.info("[4/5] Writing published artifacts to exports/...")
+        logger.info("[5/6] Writing published artifacts to exports/...")
         status, export_result = run_step(
             "export_artifacts", _step_export_artifacts, validation_result
         )
@@ -478,12 +517,12 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 export_result["ticker_count"],
             )
 
-    # Step 4b: Watchlist artifact export
+    # Step 5b: Watchlist artifact export
     if dry_run:
-        logger.info("[4b/5] Export watchlist... SKIPPED (dry run)")
+        logger.info("[5b/6] Export watchlist... SKIPPED (dry run)")
         steps["export_watchlist"] = "skipped (dry run)"
     else:
-        logger.info("[4b/5] Writing watchlist artifact to exports/...")
+        logger.info("[5b/6] Writing watchlist artifact to exports/...")
         status, wl_result = run_step("export_watchlist", _step_export_watchlist)
         steps["export_watchlist"] = status
         if wl_result:
@@ -494,12 +533,12 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 wl_result["validation_passed"],
             )
 
-    # Step 5: Sigma-alert metadata export
+    # Step 6: Sigma-alert metadata export
     if dry_run:
-        logger.info("[5/5] Sigma export... SKIPPED (dry run)")
+        logger.info("[6/6] Sigma export... SKIPPED (dry run)")
         steps["sigma_export"] = "skipped (dry run)"
     else:
-        logger.info("[5/5] Exporting ticker metadata to sigma-alert...")
+        logger.info("[6/6] Exporting ticker metadata to sigma-alert...")
         status, result = run_step("sigma_export", _step_sigma_export)
         if result:
             outcome = result.get("status", "unknown")

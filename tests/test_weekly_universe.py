@@ -62,6 +62,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "validate",
         "archive",
         "discovery",
+        "delisted_check",
         "export_artifacts",
         "export_watchlist",
         "sigma_export",
@@ -70,6 +71,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     assert result["steps"]["discovery"] == "skipped"
     # Dry run skips mutation steps
     assert "skipped" in result["steps"]["archive"]
+    assert "skipped" in result["steps"]["delisted_check"]
     assert "skipped" in result["steps"]["export_artifacts"]
     assert "skipped" in result["steps"]["export_watchlist"]
     assert "skipped" in result["steps"]["sigma_export"]

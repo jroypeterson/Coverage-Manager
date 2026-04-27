@@ -1,0 +1,27 @@
+Ticker,Company Name,Sector (JP),Subsector (JP),Sub-subsector (JP),Country (HQ),Exchange,ISIN,Currency,Last Mkt Cap (USD),Last Price,Last Data Date,Delisted Date,Reason,Notes,Date Recorded
+ADVM,Adverum Biotechnologies,Biopharma,,,United States,NASDAQ,,USD,,,,2025-12,Acquired,Acquired by Eli Lilly for $3.56 + CVR,2026-04-27
+AKRO,Akero Therapeutics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-12,Acquired,Acquired by Novo Nordisk for $54.00 + CVR (~$4.7B),2026-04-27
+CRGX,CARGO Therapeutics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-08,Acquired,Acquired by Concentra Biosciences for $4.38 + CVR,2026-04-27
+ELEV,Elevation Oncology,Biopharma,,,United States,NASDAQ,,USD,,,,2025-07,Acquired,Acquired by Concentra Biosciences for $0.36 + CVR,2026-04-27
+FNA,Paragon 28,MedTech,Orthopedics,,United States,NYSE,,USD,,,,2025-04,Acquired,Acquired by Zimmer Biomet for $13.00 + CVR (~$1.1B),2026-04-27
+HLVX,HilleVax,Biopharma,,,United States,NASDAQ,,USD,,,,2025-09,Acquired,Acquired by XOMA Royalty for $1.95 + CVR,2026-04-27
+INZY,Inozyme Pharma,Biopharma,,,United States,NASDAQ,,USD,,,,2025-07,Acquired,Acquired by BioMarin for $4.00 (~$270M),2026-04-27
+ITOS,iTeos Therapeutics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-08,Acquired,Acquired by Concentra Biosciences for $10.05 + CVR,2026-04-27
+KRON,Kronos Bio,Biopharma,,,United States,NASDAQ,,USD,,,,2025-06,Acquired,Acquired by Concentra Biosciences for $0.57 + CVR,2026-04-27
+LVTX,LAVA Therapeutics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-11,Acquired,Acquired by XOMA Royalty for $1.04 + CVR,2026-04-27
+MURA,Mural Oncology,Biopharma,,,United States,NASDAQ,,USD,,,,2025-12,Acquired,Acquired by XOMA Royalty for $2.04,2026-04-27
+SCPH,scPharmaceuticals,Biopharma,,,United States,NASDAQ,,USD,,,,2025-10,Acquired,Acquired by MannKind for $5.35 + CVR,2026-04-27
+TSBX,Turnstone Biologics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-08,Acquired,Acquired by XOMA Royalty for $0.34 + CVR,2026-04-27
+VIGL,Vigil Neuroscience,Biopharma,,,United States,NASDAQ,,USD,,,,2025-08,Acquired,Acquired by Sanofi for $8.00 + CVR (~$470M),2026-04-27
+TTNP,Titan Pharmaceuticals,Biopharma,,,United States,NASDAQ,,USD,,,,2025-10,Merged,Merged with Black Titan Corporation,2026-04-27
+PIRS,Pieris Pharmaceuticals,Biopharma,,,United States,NASDAQ,,USD,,,,2024-12,Merged,"Reverse merger with Palvella Therapeutics, now PVLA",2026-04-27
+THRD,Third Harmonic Bio,Biopharma,,,United States,NASDAQ,,USD,,,,2025-07,Dissolved,Board approved dissolution; ~$5.13-5.33/share distribution,2026-04-27
+UBX,Unity Biotechnology,Biopharma,,,United States,NASDAQ,,USD,,,,2025-07,Dissolved,"Ceased operations, winding down and dissolving",2026-04-27
+LSDI,Lucy Scientific Discovery,Biopharma,,,United States,NASDAQ,,USD,,,,2024-07,Delisted,Delisted from Nasdaq for non-compliance,2026-04-27
+NYMX,Nymox Pharmaceutical,Biopharma,,,United States,NASDAQ,,USD,,,,2023-09,Delisted,"Delisted from Nasdaq, trades OTC as NYMXF",2026-04-27
+VIRX,Viracta Therapeutics,Biopharma,,,United States,NASDAQ,,USD,,,,2025-02,Delisted,Delisted from Nasdaq for non-compliance,2026-04-27
+ATNF,180 Life Sciences (now ETHZilla),Biopharma,,,United States,NASDAQ,,USD,,,,2025-08,Pivoted,"Renamed to ETHZilla (ETHZ), Ethereum treasury strategy",2026-04-27
+LPTX,Leap Therapeutics (now Cypherpunk),Biopharma,,,United States,NASDAQ,,USD,,,,2025-11,Pivoted,"Renamed to Cypherpunk Technologies (CYPH), Zcash treasury",2026-04-27
+PRTG,Portage Biotech (now ATON),Biopharma,,,United States,NASDAQ,,USD,,,,2025-09,Pivoted,"Renamed to ATON, TON blockchain treasury",2026-04-27
+ONVO,Organovo (now VivoSim Labs),Biopharma,,,United States,NASDAQ,,USD,,,,2025-04,Pivoted,"Renamed to VivoSim Labs (VIVS), pivoted away from bioprinting",2026-04-27
+PINC,Premier Inc,Healthcare Services,Other,,United States,NASDAQ,US74051N1028,USD,2336662016,28.26,2026-04-25,,Acquired and de-listed,"Last metrics from yfinance cache may reflect stale data; ticker is now reused by Purpose Multi-Asset Income ETF",2026-04-27

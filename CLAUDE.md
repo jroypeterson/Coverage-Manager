@@ -22,6 +22,7 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `config.py` — All paths, API keys, segment definitions
 - `data/coverage_universe_tickers.csv` — Master coverage universe
 - `data/watchlist.csv` — Core watchlist (subset of universe; buy/target prices + notes). Managed via `universe/watchlist.py` and the `watchlist` CLI subcommand. Published to `exports/watchlist*.{csv,json}` and reported Mondays via `run_watchlist_monday.bat`.
+- `data/delisted_tickers.csv` — Hand-managed archive of tickers that have been acquired/de-listed. Captures last-known sector + market cap so the data isn't lost when a row is removed from the active universe. Append manually after confirming a `delisted_check` flag is real. Schema: `Ticker, Company Name, Sector (JP), Subsector (JP), Sub-subsector (JP), Country (HQ), Exchange, ISIN, Currency, Last Mkt Cap (USD), Last Price, Last Data Date, Delisted Date, Reason, Notes, Date Recorded`. Supersedes the legacy `reports/delisted_tickers.xlsx` (which is gitignored and was migrated into this CSV on 2026-04-27).
 - `providers/` — External data sources (yfinance, Finnhub, FMP, AlphaVantage, FX)
 - `reporting/` — Report generation (Excel, HTML, email, Slack, sigma_export)
 - `universe/` — CSV validation, enrichment, cleanup
@@ -139,6 +140,25 @@ PROVIDER_PRIORITY (config.py, env-overridable)
 **Timing log**: Each run appends step timings to `reports/performance_timing.jsonl` (JSONL, one entry per run).
 
 **To force FMP-first for a comparison run**: Set env `PROVIDER_PRIORITY=fmp_first`. No code deleted — existing providers are still present as fallbacks.
+
+## Delisted / recycled ticker check
+
+`python cli.py check-delisted` probes yfinance for each universe ticker (via a lightweight `Ticker.info` pull, results cached for 7 days under `cache/identity/`) and flags rows that look delisted, acquired, or recycled to a non-equity instrument.
+
+Flag rules:
+- `quoteType` is `ETF`, `MUTUALFUND`, `INDEX`, `CURRENCY`, or `CRYPTOCURRENCY` → ticker has been recycled
+- yfinance returns nothing → likely delisted
+- Normalized fuzzy similarity between the universe `Company Name` and yfinance `longName`/`shortName` falls below 0.55 → ticker may have been recycled to a different issuer
+
+Outputs (in `reports/`, archived weekly):
+- `delisted_check_YYYY-MM-DD.csv` — flagged rows with reason
+- `delisted_check_YYYY-MM-DD.md` — human-readable summary
+
+The check is **non-gating** — it never blocks the report or the published artifacts. After confirming a flag is real, the user manually:
+1. Removes the row from `data/coverage_universe_tickers.csv`
+2. Appends an entry to `data/delisted_tickers.csv` with the last-known sector + market cap (the `Last Mkt Cap (USD)` / `Last Price` can be pulled from the most recent `cache/fundamentals/yf_<TICKER>.json` before clearing it)
+
+The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at least one flag is raised.
 
 ## Source cross-check workflow
 
