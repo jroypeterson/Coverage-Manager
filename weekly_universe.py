@@ -547,13 +547,15 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
             missing = result.get("missing_metadata") or {}
             if outcome == "skipped":
                 steps["sigma_export"] = f"skipped: {reason}"
-            elif outcome in ("pushed", "committed", "committed_not_pushed", "unchanged"):
+            elif outcome in ("pushed", "committed", "unchanged"):
                 detail = f"{outcome} ({tickers} tickers)"
                 if reason:
                     detail = f"{detail} — {reason}"
                 if missing:
                     detail = f"{detail} | sigma-alert flagged {len(missing)} missing: {sorted(missing)}"
                 steps["sigma_export"] = detail
+            elif outcome == "committed_not_pushed":
+                steps["sigma_export"] = f"failed: {reason} (commit is local in sigma-alert clone)"
             elif outcome == "failed":
                 steps["sigma_export"] = f"failed: {reason}"
             else:

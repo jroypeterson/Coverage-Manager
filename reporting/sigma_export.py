@@ -155,6 +155,23 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
     if not (target_dir / ".git").exists():
         return {"status": "skipped", "reason": f"{target_dir} is not a git repo"}
 
+    # Sync local clone with remote before writing. sigma-alert's GitHub Actions
+    # cron jobs commit cache updates to origin/master after each market close,
+    # so without rebasing first, our push is rejected as non-fast-forward and
+    # the export silently stalls — the original cause of the 2026-04-07 →
+    # 2026-04-29 core_watchlist drift.
+    if push:
+        branch, rc = _git(target_dir, "rev-parse", "--abbrev-ref", "HEAD")
+        if rc != 0:
+            return {"status": "failed", "reason": "could not determine current branch in sigma-alert clone"}
+        _, rc = _git(target_dir, "fetch", "origin", branch)
+        if rc != 0:
+            return {"status": "failed", "reason": f"git fetch origin {branch} failed in sigma-alert clone"}
+        _, rc = _git(target_dir, "rebase", f"origin/{branch}")
+        if rc != 0:
+            _git(target_dir, "rebase", "--abort")
+            return {"status": "failed", "reason": "pre-export rebase failed (sigma-alert working tree dirty or conflict)"}
+
     # Surface any tickers sigma-alert flagged as missing metadata. We log the
     # warning whether or not the export below ends up changing the file —
     # the operator needs to see the gaps so they can fix the source CSV.
