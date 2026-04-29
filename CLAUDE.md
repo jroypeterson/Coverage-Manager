@@ -113,6 +113,7 @@ The wrapper logs `"completed successfully"` only when **zero** steps are non-suc
 
 ## Sibling projects
 - `../sigma-alert/` — GitHub Actions stock screener that consumes `ticker_metadata.json` and `core_watchlist.json` from Coverage Manager. The weekly-build `sigma-export` step writes both files directly into the sigma-alert clone and pushes them in a single commit. The screener surfaces watchlist hits in a "Core Watchlist" subcategory at the top of each sigma tier. See `reporting/sigma_export.py`.
+  - **Auto-rebase before push** (added 2026-04-29): sigma-alert's CI cron jobs commit cache updates to its `origin/master`, so `sigma_export.export_and_push` does `git fetch origin <branch>` + `git rebase origin/<branch>` on the local clone before writing files. If the rebase fails (uncommitted local edits in the sigma-alert clone, or a merge conflict on a tracked file), the step returns `failed:` and `weekly_universe` flags it as `:x:` in the Slack run summary. Do not commit local edits inside the sigma-alert clone unless they are intentional — the next sigma_export will refuse to run. The historical failure that motivated this is documented in memory `project_sigma_alert_core_watchlist_missing.md`.
 
 ## Provider architecture (fundamentals)
 
