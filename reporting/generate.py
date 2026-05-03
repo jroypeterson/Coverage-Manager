@@ -56,7 +56,7 @@ def classify_sector_group(row):
         return "Biopharma"
     if sector in HC_SERVICES_MEDTECH_VALUES or subsector in HC_SERVICES_MEDTECH_VALUES:
         return "HC Svcs & MedTech"
-    return "Other"
+    return "Following: Non-HC"
 
 
 def _split_into_segments(result_df):
@@ -66,10 +66,10 @@ def _split_into_segments(result_df):
     subsector = result_df.get("Subsector (JP)", pd.Series(dtype="object")).fillna("").astype(str).str.strip()
     biopharma_mask = sector.isin(BIOPHARMA_VALUES) | subsector.isin(BIOPHARMA_VALUES)
     hc_svcs_mask = sector.isin(HC_SERVICES_MEDTECH_VALUES) | subsector.isin(HC_SERVICES_MEDTECH_VALUES)
-    other_mask = ~biopharma_mask & ~hc_svcs_mask
+    non_hc_mask = ~biopharma_mask & ~hc_svcs_mask
     segments["Biopharma"] = result_df[biopharma_mask].reset_index(drop=True)
     segments["HC Svcs & MedTech"] = result_df[hc_svcs_mask].reset_index(drop=True)
-    segments["Other"] = result_df[other_mask].reset_index(drop=True)
+    segments["Following: Non-HC"] = result_df[non_hc_mask].reset_index(drop=True)
     return segments
 
 

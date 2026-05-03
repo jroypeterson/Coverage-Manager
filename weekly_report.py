@@ -23,8 +23,9 @@ REPORT_ARCHIVE_PATTERNS = [
     "coverage_consolidated_*.html",
     "coverage_biopharma_*.html",
     "coverage_hc_svcs_medtech_*.html",
-    "coverage_pa_other_*.html",
-    "coverage_other_*.html",
+    "coverage_following_non_hc_*.html",
+    "coverage_pa_other_*.html",  # legacy — schema v1 era
+    "coverage_other_*.html",     # legacy — pre-rename "Other" segment files
     "coverage_sp500_non_hc_*.html",
     "coverage_sp500_*.html",
     "coverage_movers_*.html",

@@ -39,7 +39,10 @@ SECTOR_SEGMENTS = [
     ("Consolidated", "consolidated", "Coverage Universe Performance — Consolidated"),
     ("Biopharma", "biopharma", "Coverage Universe Performance — Biopharma"),
     ("HC Svcs & MedTech", "hc_svcs_medtech", "Coverage Universe Performance — HC Services & MedTech"),
-    ("Other", "other", "Coverage Universe Performance — Other"),
+    # "Following: Non-HC" bundles Tech + SaaS + Other + Fintech + Life Science
+    # Tools — every Sector (JP) value that isn't Biopharma or HC Svcs/MedTech.
+    # Avoids the prior name clash with the Sector (JP) value "Other".
+    ("Following: Non-HC", "following_non_hc", "Coverage Universe Performance — Following: Non-HC"),
     ("S&P 500", "sp500", "S&P 500 Performance"),
 ]
 
