@@ -80,6 +80,21 @@ SEGMENT_ETFS = {
 #               toward that source during a comparison run.
 PROVIDER_PRIORITY = os.environ.get("PROVIDER_PRIORITY", "yf_first")
 
+# ── Movers report ────────────────────────────────────────────────────────────
+# Flag a ticker as an "extreme weekly mover" if EITHER:
+#   |1W return| >= MOVERS_ABS_THRESHOLD_PCT, OR
+#   |z-score of 1W return vs Sector (JP) cohort| >= MOVERS_ZSCORE_THRESHOLD,
+# provided the cohort has at least MOVERS_MIN_PEER_COUNT peers (otherwise the
+# z-score is unstable and only the absolute threshold is applied).
+MOVERS_ABS_THRESHOLD_PCT = float(os.environ.get("MOVERS_ABS_THRESHOLD_PCT", "10.0"))
+MOVERS_ZSCORE_THRESHOLD = float(os.environ.get("MOVERS_ZSCORE_THRESHOLD", "2.0"))
+MOVERS_MIN_PEER_COUNT = int(os.environ.get("MOVERS_MIN_PEER_COUNT", "5"))
+# Cap on flagged-ticker count so a wild week doesn't blow up the LLM call
+# budget. Top-N picked by absolute |1W return| after thresholding.
+MOVERS_MAX_FLAGGED = int(os.environ.get("MOVERS_MAX_FLAGGED", "30"))
+# Anthropic model used for the per-ticker "why" summary. Haiku is fast & cheap.
+MOVERS_LLM_MODEL = os.environ.get("MOVERS_LLM_MODEL", "claude-haiku-4-5")
+
 # ── Sample mode ──────────────────────────────────────────────────────────────
 
 SAMPLE_TICKERS = ["ISRG", "BLLN", "HTFL", "JAN", "WELL", "NTRA"]

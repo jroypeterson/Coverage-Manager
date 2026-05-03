@@ -137,7 +137,7 @@ from pathlib import Path
 
 CM_EXPORTS = Path("../Coverage Manager/exports")
 status = json.loads((CM_EXPORTS / "universe_status.json").read_text())
-assert status["schema_version"] == 2, "Coverage Manager exports schema changed"
+assert status["schema_version"] == 3, "Coverage Manager exports schema changed"
 if not status["validation_passed"]:
     raise RuntimeError(f"Universe failed validation: {status['validation_errors']}")
 metadata = json.loads((CM_EXPORTS / "universe_metadata.json").read_text())

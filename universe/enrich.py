@@ -96,7 +96,7 @@ _UNIVERSE_ROW_COLUMNS = [
     "Company Name", "Country (HQ)", "Country (Listing)", "Country (ISO)",
     "Currency", "Website",
     "YF Sector", "YF Industry", "Sector (JP)", "Subsector (JP)",
-    "Sub-subsector (JP)", "Core",
+    "Sub-subsector (JP)",
 ]
 
 # FMP's exchange names → Coverage Manager's standard Exchange column values.

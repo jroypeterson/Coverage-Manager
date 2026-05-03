@@ -48,6 +48,32 @@ def build_parser():
         help="Bypass cache and fetch fresh data from all sources.",
     )
 
+    movers_parser = subparsers.add_parser(
+        "movers",
+        help=(
+            "Generate the weekly movers report — flag tickers with extreme "
+            "1W returns and pull a Finnhub-news + Claude-summary 'why' for "
+            "each. Reads the perf snapshot written by the most recent "
+            "`performance` run."
+        ),
+    )
+    movers_parser.add_argument(
+        "--date",
+        type=str,
+        default=None,
+        help="Snapshot date to load (YYYY-MM-DD). Defaults to today.",
+    )
+    movers_parser.add_argument(
+        "--no-news",
+        action="store_true",
+        help="Skip Finnhub news + Anthropic summary; flag-only output.",
+    )
+    movers_parser.add_argument(
+        "--no-slack",
+        action="store_true",
+        help="Skip the Slack post (still writes HTML/MD files).",
+    )
+
     crosscheck_parser = subparsers.add_parser(
         "cross-check",
         help="Compare overlapping fields across providers and flag large discrepancies.",
@@ -314,6 +340,15 @@ def main():
         import source_validation
 
         source_validation.main(sample_mode=args.sample, refresh=args.refresh)
+    elif args.command == "movers":
+        from movers_runner import run_movers_cli
+
+        exit_code = run_movers_cli(
+            snapshot_date=args.date,
+            skip_news=args.no_news,
+            skip_slack=args.no_slack,
+        )
+        raise SystemExit(exit_code)
     else:
         parser.error(f"Unknown command: {args.command}")
 

@@ -141,7 +141,15 @@ def _fmt_duration(seconds):
     return f"{h}h {m}m {s}s"
 
 
-def main(sample_mode=False, refresh=False):
+def main(sample_mode=False, refresh=False, skip_email=False):
+    """Generate performance reports.
+
+    Args:
+        sample_mode: Sample-mode preview run.
+        refresh: Bypass cache.
+        skip_email: Suppress the internal email send (set by weekly_report
+            so the orchestrator can own email attachments and avoid duplicates).
+    """
     global OUTPUT_XLSX, OUTPUT_HTML
     configure_logging()
     os.makedirs(REPORTS_DIR, exist_ok=True)
@@ -266,12 +274,26 @@ def main(sample_mode=False, refresh=False):
             exchange=str(row.get("Exchange", "")).strip(),
             returns=returns, fund=fund, is_ttm=is_ttm,
             currency=all_currencies.get(yf_t, ""),
-            core=str(row.get("Core", "")).strip(),
         )
         results.append(result_row)
 
     result_df = pd.DataFrame(results)
-    info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "Core", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
+    info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
+
+    # Persist the coverage perf snapshot so downstream steps (e.g. movers report)
+    # can read it without re-running the price/fundamentals pipeline. Pickle
+    # keeps the float types intact; the file lives under cache/ so it's
+    # gitignored. Sample-mode runs are skipped because they're partial.
+    if not sample_mode:
+        from config import CACHE_DIR
+        perf_snapshot_dir = CACHE_DIR / "perf"
+        perf_snapshot_dir.mkdir(parents=True, exist_ok=True)
+        perf_snapshot_path = perf_snapshot_dir / f"perf_df_{TODAY}.pkl"
+        try:
+            result_df.to_pickle(perf_snapshot_path)
+            logger.info("Saved perf snapshot: %s", perf_snapshot_path)
+        except Exception as e:
+            logger.warning("Failed to save perf snapshot: %s", e)
 
     # ── Step tracking ────────────────────────────────────────────────────────
     step_results = {}
@@ -427,7 +449,13 @@ def main(sample_mode=False, refresh=False):
     run_step("html", _generate_html)
 
     # ============ EMAIL REPORT ============
-    if not sample_mode:
+    if sample_mode:
+        logger.info("Skipping email (sample mode)")
+        step_results["email"] = "skipped"
+    elif skip_email:
+        logger.info("Skipping email (skip_email=True; orchestrator owns delivery)")
+        step_results["email"] = "skipped"
+    else:
         gmail_addr = API_KEYS.get("GMAIL_ADDRESS")
         gmail_pass = API_KEYS.get("GMAIL_APP_PASSWORD")
         if gmail_addr and gmail_pass and html_paths:
@@ -439,6 +467,10 @@ def main(sample_mode=False, refresh=False):
                 if additions_pattern.exists():
                     extra_attachments.append(additions_pattern)
                     body_lines.append(_build_additions_summary(additions_pattern))
+                # Pick up the movers HTML if it was generated this run.
+                movers_html = REPORTS_DIR / f"coverage_movers_{TODAY}.html"
+                if movers_html.exists() and movers_html not in html_paths:
+                    html_paths.append(movers_html)
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
                 body_lines.append(f"Generated {timestamp}.\n")
                 body_lines.append("--- Attached Files ---")
@@ -454,9 +486,6 @@ def main(sample_mode=False, refresh=False):
         else:
             logger.info("Skipping email (GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set in .env)")
             step_results["email"] = "skipped"
-    else:
-        logger.info("Skipping email (sample mode)")
-        step_results["email"] = "skipped"
 
     # ============ SUMMARY ============
     total_duration = time.monotonic() - pipeline_start

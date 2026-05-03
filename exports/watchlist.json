@@ -28,8 +28,7 @@
     "YF Industry": "Consumer Electronics",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "ADI": {
     "buy_price": null,
@@ -60,8 +59,7 @@
     "YF Industry": "Semiconductors",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "ADSK": {
     "buy_price": null,
@@ -92,8 +90,7 @@
     "YF Industry": "Software - Application",
     "Sector (JP)": "Tech",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "AFRM": {
     "buy_price": null,
@@ -124,8 +121,7 @@
     "YF Industry": "Credit Services",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "ALMR": {
     "buy_price": null,
@@ -156,8 +152,7 @@
     "YF Industry": "Medical Devices",
     "Sector (JP)": "MedTech",
     "Subsector (JP)": "Tools",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "AMZN": {
     "buy_price": null,
@@ -188,8 +183,7 @@
     "YF Industry": "Internet Retail",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "BE": {
     "buy_price": null,
@@ -220,8 +214,7 @@
     "YF Industry": "Electrical Equipment & Parts",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "BRO": {
     "buy_price": null,
@@ -252,8 +245,7 @@
     "YF Industry": "Insurance - Brokers",
     "Sector (JP)": "Fintech",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "CI": {
     "buy_price": null,
@@ -284,8 +276,7 @@
     "YF Industry": "Healthcare Plans",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Mgd Care",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "CPRT": {
     "buy_price": null,
@@ -316,8 +307,7 @@
     "YF Industry": "Specialty Business Services",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "CRWD": {
     "buy_price": null,
@@ -348,8 +338,7 @@
     "YF Industry": "Software - Infrastructure",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "DOCS": {
     "buy_price": null,
@@ -380,8 +369,7 @@
     "YF Industry": "Health Information Services",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "HIT",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "EHC": {
     "buy_price": null,
@@ -412,8 +400,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "ENSG": {
     "buy_price": null,
@@ -444,8 +431,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "FI": {
     "buy_price": null,
@@ -476,8 +462,7 @@
     "YF Industry": "Information Technology Services",
     "Sector (JP)": "Fintech",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "FIVE": {
     "buy_price": null,
@@ -508,8 +493,7 @@
     "YF Industry": "Specialty Retail",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "FMS": {
     "buy_price": null,
@@ -540,8 +524,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Dialysis",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "IDXX": {
     "buy_price": null,
@@ -572,8 +555,7 @@
     "YF Industry": "Diagnostics & Research",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Animal Health",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "KLRA": {
     "buy_price": null,
@@ -604,8 +586,7 @@
     "YF Industry": "Biotechnology",
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "KRC": {
     "buy_price": null,
@@ -636,8 +617,7 @@
     "YF Industry": "REIT - Office",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Healthcare Real Estate",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "LLY": {
     "buy_price": null,
@@ -668,8 +648,7 @@
     "YF Industry": "Drug Manufacturers - General",
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "LULU": {
     "buy_price": null,
@@ -700,8 +679,7 @@
     "YF Industry": "Apparel - Retail",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "MAIR": {
     "buy_price": null,
@@ -732,8 +710,7 @@
     "YF Industry": "Industrial - Machinery",
     "Sector (JP)": "Tech",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "MMED": {
     "buy_price": null,
@@ -764,8 +741,7 @@
     "YF Industry": "Health Information Services",
     "Sector (JP)": "MedTech",
     "Subsector (JP)": "Diabetes Technology",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "OPCH": {
     "buy_price": null,
@@ -796,8 +772,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "PACS": {
     "buy_price": null,
@@ -828,8 +803,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "PNTG": {
     "buy_price": null,
@@ -860,8 +834,7 @@
     "YF Industry": "Medical Care Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Post-Acute",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "Q": {
     "buy_price": null,
@@ -892,8 +865,7 @@
     "YF Industry": "Semiconductors",
     "Sector (JP)": "Tech",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "RPD": {
     "buy_price": null,
@@ -924,8 +896,7 @@
     "YF Industry": "Software - Infrastructure",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "SPOT": {
     "buy_price": null,
@@ -956,8 +927,7 @@
     "YF Industry": "Internet Content & Information",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "TSLA": {
     "buy_price": null,
@@ -988,8 +958,7 @@
     "YF Industry": "Auto Manufacturers",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "U": {
     "buy_price": null,
@@ -1020,8 +989,7 @@
     "YF Industry": "Software - Application",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "ULS": {
     "buy_price": null,
@@ -1052,8 +1020,7 @@
     "YF Industry": "Specialty Business Services",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "V": {
     "buy_price": null,
@@ -1084,8 +1051,7 @@
     "YF Industry": "Credit Services",
     "Sector (JP)": "Other",
     "Subsector (JP)": "",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "WAY": {
     "buy_price": null,
@@ -1116,8 +1082,7 @@
     "YF Industry": "Health Information Services",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "HIT",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   },
   "WELL": {
     "buy_price": null,
@@ -1148,8 +1113,7 @@
     "YF Industry": "REIT - Healthcare Facilities",
     "Sector (JP)": "Healthcare Services",
     "Subsector (JP)": "Healthcare Real Estate",
-    "Sub-subsector (JP)": "",
-    "Core": ""
+    "Sub-subsector (JP)": ""
   },
   "WST": {
     "buy_price": null,
@@ -1180,7 +1144,6 @@
     "YF Industry": "Medical Instruments & Supplies",
     "Sector (JP)": "MedTech",
     "Subsector (JP)": "Packaging",
-    "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Sub-subsector (JP)": ""
   }
 }

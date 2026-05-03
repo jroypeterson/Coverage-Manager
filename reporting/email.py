@@ -25,6 +25,8 @@ REPORT_ARCHIVE_PATTERNS = [
     "coverage_other_*.html",
     "coverage_sp500_non_hc_*.html",
     "coverage_sp500_*.html",
+    "coverage_movers_*.html",
+    "coverage_movers_*.md",
 ]
 
 

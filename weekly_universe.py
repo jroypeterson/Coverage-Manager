@@ -24,7 +24,7 @@ from pipeline_utils import collect_non_successes, run_step
 logger = get_logger("weekly_universe")
 
 EXPORTS_DIR = SCRIPT_DIR / "exports"
-EXPORTS_SCHEMA_VERSION = 2
+EXPORTS_SCHEMA_VERSION = 3
 
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",

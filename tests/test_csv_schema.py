@@ -12,7 +12,7 @@ def test_csv_has_expected_columns():
     df = pd.read_csv(CSV_PATH, nrows=0)
     expected = [
         "Ticker", "Exchange", "Company Name",
-        "Sector (JP)", "Subsector (JP)", "Core",
+        "Sector (JP)", "Subsector (JP)",
     ]
     for col in expected:
         assert col in df.columns, f"Missing expected column: {col}"

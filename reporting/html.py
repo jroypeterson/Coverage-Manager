@@ -112,7 +112,7 @@ def generate_health_html(health_data):
 
 def write_html_report(seg_df, html_path, report_title, health_data=None):
     """Write a standalone HTML performance report for a segment DataFrame."""
-    html_info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "Core", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
+    html_info_cols = ["Ticker", "Company Name"] + VAL_COLS + ["Sector (JP)", "Subsector (JP)", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]
     html_fund_cols = FUND_COLS
 
     html_rows = []
@@ -140,7 +140,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
                     cells.append('<td class="fund na">-</td>')
             else:
                 cells.append(f'<td class="fund">{format_mkt_cap(v, currency)}</td>')
-        for col in ["Sector (JP)", "Subsector (JP)", "Core", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]:
+        for col in ["Sector (JP)", "Subsector (JP)", "YF Sector", "YF Industry", "Country (ISO)", "Exchange"]:
             val = row.get(col, "")
             if pd.isna(val) or str(val) == "nan":
                 val = ""
@@ -214,9 +214,8 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
     val_offset = len(VAL_COLS)
     filterable_cols = {0: "Ticker", 1: "Company Name",
                        2 + val_offset: "Sector (JP)", 3 + val_offset: "Subsector (JP)",
-                       4 + val_offset: "Core",
-                       5 + val_offset: "YF Sector", 6 + val_offset: "YF Industry",
-                       7 + val_offset: "Country (ISO)", 8 + val_offset: "Exchange"}
+                       4 + val_offset: "YF Sector", 5 + val_offset: "YF Industry",
+                       6 + val_offset: "Country (ISO)", 7 + val_offset: "Exchange"}
     col_unique_values = {}
     for col_idx, col_name in filterable_cols.items():
         if col_name in seg_df.columns:

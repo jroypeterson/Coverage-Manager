@@ -46,11 +46,12 @@ def test_main_dry_run_returns_standardized_shape(monkeypatch, fixture_csv):
     assert "non_successes" in result
 
     assert result["validation_passed"] is True
-    assert set(result["steps"].keys()) == {"validate", "archive", "performance", "email"}
+    assert set(result["steps"].keys()) == {"validate", "archive", "performance", "movers", "email"}
     assert result["steps"]["validate"] == "ok"
     # Dry run skips everything else
     assert "skipped" in result["steps"]["archive"]
     assert "skipped" in result["steps"]["performance"]
+    assert "skipped" in result["steps"]["movers"]
     assert "skipped" in result["steps"]["email"]
     assert result["non_successes"] == []
 

@@ -4613,12 +4613,6 @@
     "subsector": "",
     "sub_subsector": ""
   },
-  "PINC": {
-    "name": "Purpose Multi-Asset Income ETF",
-    "sector": "Healthcare Services",
-    "subsector": "Other",
-    "sub_subsector": ""
-  },
   "PLRX": {
     "name": "Pliant Therapeutics Inc",
     "sector": "Biopharma",
@@ -6549,6 +6543,18 @@
     "name": "Kailera Therapeutics, Inc.",
     "sector": "Biopharma",
     "subsector": "",
+    "sub_subsector": ""
+  },
+  "ARXS": {
+    "name": "Arxis, Inc.",
+    "sector": "Other",
+    "subsector": "Aerospace & Defense Components",
+    "sub_subsector": ""
+  },
+  "XE": {
+    "name": "X-Energy, Inc.",
+    "sector": "Other",
+    "subsector": "Clean Energy / Nuclear SMR",
     "sub_subsector": ""
   }
 }

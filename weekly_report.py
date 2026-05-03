@@ -24,8 +24,11 @@ REPORT_ARCHIVE_PATTERNS = [
     "coverage_biopharma_*.html",
     "coverage_hc_svcs_medtech_*.html",
     "coverage_pa_other_*.html",
+    "coverage_other_*.html",
     "coverage_sp500_non_hc_*.html",
     "coverage_sp500_*.html",
+    "coverage_movers_*.html",
+    "coverage_movers_*.md",
 ]
 
 
@@ -69,15 +72,33 @@ def _step_archive_reports():
 
 
 def _step_performance():
-    """Generate the Excel and HTML performance reports."""
+    """Generate the Excel and HTML performance reports.
+
+    Runs with skip_email=True so the orchestrator owns delivery and can
+    bundle the movers HTML into a single email.
+    """
     from reporting import generate
 
-    generate.main(sample_mode=False)
+    generate.main(sample_mode=False, skip_email=True)
     return {}
 
 
+def _step_movers():
+    """Generate the movers report and post a Slack summary."""
+    from movers_runner import run as run_movers
+
+    result = run_movers(snapshot_date=TODAY, skip_news=False, skip_slack=False)
+    if result.get("error"):
+        return {"status": "skipped", "reason": result["error"]}
+    return {
+        "flagged": result["count"],
+        "html": result["html_path"],
+        "slack_posted": result["slack_posted"],
+    }
+
+
 def _step_email():
-    """Send performance reports via email."""
+    """Send performance reports via email. Includes the movers HTML when present."""
     from reporting.email import send_email_report
 
     gmail_addr = API_KEYS.get("GMAIL_ADDRESS")
@@ -85,6 +106,8 @@ def _step_email():
     if not gmail_addr or not gmail_pass:
         return {"status": "skipped", "reason": "no credentials"}
 
+    # Include both the existing coverage_*.html files and the movers HTML;
+    # movers is matched by the same coverage_*_{TODAY}.html glob now.
     html_files = glob.glob(os.path.join(REPORTS_DIR, f"coverage_*_{TODAY}.html"))
     if not html_files:
         return {"status": "skipped", "reason": "no HTML files found"}
@@ -157,22 +180,34 @@ def main(skip_email=False, dry_run=False, log_audit=True):
 
     # Step 3: Performance reports
     if dry_run:
-        logger.info("[3/4] Performance reports... SKIPPED (dry run)")
+        logger.info("[3/5] Performance reports... SKIPPED (dry run)")
         steps["performance"] = "skipped (dry run)"
     else:
-        logger.info("[3/4] Generating performance reports...")
+        logger.info("[3/5] Generating performance reports...")
         status, _ = run_step("performance", _step_performance)
         steps["performance"] = status
 
-    # Step 4: Email
+    # Step 4: Movers report (flag extreme weekly movers + Slack summary)
+    if dry_run:
+        logger.info("[4/5] Movers report... SKIPPED (dry run)")
+        steps["movers"] = "skipped (dry run)"
+    elif steps.get("performance", "").startswith("failed"):
+        logger.info("[4/5] Movers report... SKIPPED (performance step failed)")
+        steps["movers"] = "skipped: performance failed"
+    else:
+        logger.info("[4/5] Generating movers report...")
+        status, _ = run_step("movers", _step_movers)
+        steps["movers"] = status
+
+    # Step 5: Email
     if skip_email:
-        logger.info("[4/4] Email... SKIPPED")
+        logger.info("[5/5] Email... SKIPPED")
         steps["email"] = "skipped"
     elif dry_run:
-        logger.info("[4/4] Email... SKIPPED (dry run)")
+        logger.info("[5/5] Email... SKIPPED (dry run)")
         steps["email"] = "skipped (dry run)"
     else:
-        logger.info("[4/4] Sending email...")
+        logger.info("[5/5] Sending email...")
         status, _ = run_step("email", _step_email)
         steps["email"] = status
 
