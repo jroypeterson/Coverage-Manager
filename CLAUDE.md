@@ -242,5 +242,22 @@ Important comparison rules:
 - The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
 - Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
 
+## Health reporting
+
+Coverage Manager posts a v1 health heartbeat to Slack `#status-reports` at the end of every `weekly-build` run, per the workspace contract in `../HEALTH_REPORTING.md`. The heartbeat is **additional to** (not a replacement for) the existing project-specific Slack post that goes to `#stock-price-alerts`.
+
+- **Cadence**: weekly, Friday 8am local (Windows Task Scheduler running `run_weekly_coverage.bat`).
+- **Webhook**: read from env var `SLACK_WEBHOOK_STATUS_REPORTS`, falling back to a key of the same name in `.env`. If unset, the post is skipped and the payload is written to `.health/last_run.json` instead.
+- **Status mapping** (per HEALTH_REPORTING.md §4.2):
+  - Uncaught exception or `validation_passed=False` → `error` (universe broken; no usable downstream artifacts)
+  - Universe valid, some report-side step `failed:` or `blocked:` → `partial` (universe usable; report didn't fully ship)
+  - Clean run → `ok`
+- **Try/finally guarantee**: the heartbeat fires even if `weekly_universe.main` or `weekly_report.main` raises an uncaught exception. The original exception still propagates after the heartbeat is emitted.
+- **Reruns**: the spec uses `cycle` + `attempt`. For a manual rerun, set env var `HEALTH_ATTEMPT="2 (manual rerun after timeout)"` (or similar) before invoking `cli.py weekly-build`. Default is `"1"`.
+- **Standalone runs of `weekly-universe` or `weekly-report` do NOT emit a heartbeat in v1** — only the combined `weekly-build` wrapper does. The Friday cron uses `weekly-build`, so this is fine. If standalone runs become regular, lift the heartbeat into the sub-orchestrators.
+- **Dry runs do not post**: `--dry-run` skips both the project-specific Slack post and the health heartbeat.
+
+Implementation: `reporting/slack.py` (`format_health_v1_message`, `post_health_v1`) + `weekly_build.py` (`_build_health_payload`, `_emit_health_heartbeat`, try/finally in `main`). Tests: `tests/test_health_reporting.py`.
+
 ## Testing
 Run `python -m pytest tests/ -q` before committing. All tests must pass.

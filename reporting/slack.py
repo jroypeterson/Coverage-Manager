@@ -1,14 +1,31 @@
-"""Slack webhook integration for posting pipeline notifications."""
+"""Slack webhook integration for posting pipeline notifications.
+
+Two surfaces:
+  - `send_slack_notification` / `format_weekly_build_summary` / `format_performance_summary`
+    post project-specific output to `#stock-price-alerts` (the existing channel).
+  - `post_health_v1` / `format_health_v1_message` post the standardized health
+    heartbeat to `#status-reports` per the workspace HEALTH_REPORTING.md v1 spec.
+    The heartbeat is *additional* to project-specific output, not a replacement.
+"""
 
 import json
 import urllib.request
 import urllib.error
+from pathlib import Path
 
 from logging_utils import get_logger
 
 logger = get_logger("reporting.slack")
 
 SLACK_CHANNEL = "#stock-price-alerts"
+HEALTH_CHANNEL = "#status-reports"
+HEALTH_TAG = "health/v1"
+
+_STATUS_ICON = {
+    "ok": ":white_check_mark:",
+    "partial": ":warning:",
+    "error": ":x:",
+}
 
 
 def send_slack_notification(webhook_url, message):
@@ -87,3 +104,159 @@ def format_performance_summary(today_str, ticker_count, fund_count):
         "Reports emailed and saved to Dropbox.",
     ]
     return "\n".join(lines)
+
+
+# ── Health heartbeat (v1 spec, workspace-wide contract) ──────────────────────
+# See HEALTH_REPORTING.md at the workspace root for the full contract. Helpers
+# below implement the v1 message format and the §4.7 fallback (write payload
+# to a local file when the Slack POST fails).
+
+
+def _format_size(n_bytes):
+    """Return a short human-readable byte size (e.g. '412 KB', '1.4 MB')."""
+    if n_bytes is None:
+        return None
+    n = float(n_bytes)
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}".replace(".0 ", " ")
+        n /= 1024
+
+
+def format_health_v1_message(payload):
+    """Render a v1 health payload as a Slack mrkdwn message body.
+
+    Required payload keys: project, status, cycle, attempt, start_time_utc,
+    end_time_utc, next_expected, counters (list of strings).
+    Optional: artifacts (list of dicts with path / rows / bytes), warnings (list),
+    errors (list of strings), run_link, tag.
+
+    The format mirrors HEALTH_REPORTING.md §7. Status drives the emoji.
+    """
+    status = payload["status"]
+    if status not in _STATUS_ICON:
+        raise ValueError(f"status must be one of {list(_STATUS_ICON)}, got {status!r}")
+    icon = _STATUS_ICON[status]
+    tag = payload.get("tag", HEALTH_TAG)
+
+    start = payload["start_time_utc"]
+    end = payload["end_time_utc"]
+    # If end falls on the same calendar day as start, strip the redundant
+    # "YYYY-MM-DD " prefix off the end time. Matches HEALTH_REPORTING.md §7.
+    if " " in start and " " in end:
+        start_date_prefix = start.split(" ", 1)[0] + " "
+        if end.startswith(start_date_prefix):
+            end = end[len(start_date_prefix):]
+    duration = payload.get("duration")
+    duration_str = f" ({duration})" if duration else ""
+
+    lines = [
+        f"{icon} *{payload['project']} — {status}*  ·  {tag}",
+        f"cycle: {payload['cycle']}  ·  attempt: {payload['attempt']}",
+        f"{start} → {end} UTC{duration_str}",
+        f"next expected: {payload['next_expected']}",
+        "",
+    ]
+
+    counters = payload.get("counters") or []
+    if counters:
+        lines.append(f"*Counters:* {' · '.join(counters)}")
+
+    artifacts = payload.get("artifacts") or []
+    if artifacts:
+        lines.append("*Artifacts:*")
+        for a in artifacts:
+            parts = [a["path"]]
+            extras = []
+            if a.get("rows") is not None:
+                extras.append(f"{a['rows']} rows")
+            size_str = _format_size(a.get("bytes")) if a.get("bytes") is not None else None
+            if size_str:
+                extras.append(size_str)
+            if extras:
+                parts.append(f"({', '.join(extras)})")
+            lines.append(f"  • {' '.join(parts)}")
+
+    warnings = payload.get("warnings") or []
+    if warnings:
+        lines.append("")
+        lines.append("*Warnings:*")
+        for w in warnings:
+            lines.append(f"  • {w}")
+
+    errors = payload.get("errors") or []
+    if errors and status != "ok":
+        lines.append("")
+        lines.append("*Error:*")
+        lines.append("```")
+        for e in errors:
+            lines.append(e)
+        lines.append("```")
+
+    run_link = payload.get("run_link")
+    if run_link:
+        lines.append("")
+        lines.append(f"<{run_link}|run log>")
+
+    return "\n".join(lines)
+
+
+def post_health_v1(webhook_url, payload, fallback_path):
+    """Post a v1 health heartbeat to Slack with §4.7 fallback semantics.
+
+    On any non-success path (no webhook configured, network error, non-200
+    response), this function:
+      - writes the full payload as JSON to ``fallback_path``
+      - logs the full payload at WARNING so the scheduler stdout/log captures it
+      - returns a dict ``{"posted": False, "reason": "..."}``
+
+    On success, returns ``{"posted": True, "reason": None}``.
+
+    The caller is responsible for any "fail loudly" behavior (non-zero exit,
+    raised exception). This function does not raise — it returns a status dict
+    so the caller can decide whether a Slack-only failure should fail the run.
+
+    Args:
+        webhook_url: Slack incoming webhook URL for #status-reports. If falsy,
+            the post is skipped and the fallback file is written.
+        payload: dict matching the v1 contract (see format_health_v1_message).
+        fallback_path: Path-like target for the JSON fallback file.
+    """
+    fallback_path = Path(fallback_path)
+    message = format_health_v1_message(payload)
+    body = {"text": message, "channel": HEALTH_CHANNEL}
+
+    def _write_fallback(reason):
+        try:
+            fallback_path.parent.mkdir(parents=True, exist_ok=True)
+            fallback_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception as fe:
+            logger.error("Health fallback file write failed: %s", fe)
+        logger.warning("Health post failed (%s); payload follows:\n%s", reason, message)
+
+    if not webhook_url:
+        _write_fallback("no SLACK_WEBHOOK_STATUS_REPORTS configured")
+        return {"posted": False, "reason": "no webhook configured"}
+
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        webhook_url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if resp.status == 200:
+                logger.info("Health heartbeat posted to %s", HEALTH_CHANNEL)
+                return {"posted": True, "reason": None}
+            reason = f"slack returned status {resp.status}"
+            _write_fallback(reason)
+            return {"posted": False, "reason": reason}
+    except urllib.error.URLError as e:
+        reason = f"network error: {e}"
+        _write_fallback(reason)
+        return {"posted": False, "reason": reason}
+    except Exception as e:
+        reason = f"unexpected error: {e}"
+        _write_fallback(reason)
+        return {"posted": False, "reason": reason}
