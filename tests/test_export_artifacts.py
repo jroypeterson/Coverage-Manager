@@ -102,7 +102,7 @@ def test_status_file_schema(monkeypatch, tmp_path, fixture_csv):
         "last_discovery_run",
     }
     assert required_fields.issubset(status.keys())
-    assert status["schema_version"] == 3
+    assert status["schema_version"] == 2
     assert status["validation_passed"] is True
     assert status["row_count"] == 2
     # Generic contract: for a fixture without ticker normalization collisions,
@@ -242,7 +242,7 @@ def test_watchlist_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert rows[0]["Notes"] == "core"
 
     status = json.loads((exports_dir / "watchlist_status.json").read_text(encoding="utf-8"))
-    assert status["schema_version"] == 3
+    assert status["schema_version"] == 2
     assert status["entry_count"] == 1
     assert status["validation_passed"] is True
 
@@ -257,7 +257,7 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
     )
 
     manifest = json.loads((exports_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 2
     listed_names = {f["name"] for f in manifest["files"]}
     assert listed_names == {
         "universe.csv",

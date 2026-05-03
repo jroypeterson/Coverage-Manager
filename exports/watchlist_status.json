@@ -1,7 +1,7 @@
 {
-  "schema_version": 3,
+  "schema_version": 2,
   "dataset_version": "2026-05-03",
-  "generated_at": "2026-05-03T21:08:09Z",
+  "generated_at": "2026-05-03T22:13:52Z",
   "source_path": "data/watchlist.csv",
   "entry_count": 37,
   "validation_passed": true,

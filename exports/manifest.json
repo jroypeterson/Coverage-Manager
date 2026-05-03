@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "generated_at": "2026-05-03T21:08:09Z",
+  "schema_version": 2,
+  "generated_at": "2026-05-03T22:13:52Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -17,7 +17,7 @@
       "name": "universe_status.json",
       "purpose": "Versioned status + validation contract (read schema_version before consuming)",
       "format": "json",
-      "schema_version": 3
+      "schema_version": 2
     },
     {
       "name": "watchlist.csv",
@@ -33,7 +33,7 @@
       "name": "watchlist_status.json",
       "purpose": "Versioned status + validation contract for the watchlist (read schema_version first).",
       "format": "json",
-      "schema_version": 3
+      "schema_version": 2
     },
     {
       "name": "manifest.json",

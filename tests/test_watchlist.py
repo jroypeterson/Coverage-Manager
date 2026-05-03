@@ -176,6 +176,7 @@ def _fake_enriched_row(ticker):
         "YF Industry": "Specialty Business Services",
         "Sector (JP)": "Other",
         "Subsector (JP)": "",
+        "Core": "",
     }
 
 
