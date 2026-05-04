@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "dataset_version": "2026-05-03",
-  "generated_at": "2026-05-04T00:27:19Z",
+  "generated_at": "2026-05-04T01:40:32Z",
   "source_path": "data/positions_and_researching.csv",
-  "entry_count": 37,
+  "entry_count": 68,
   "portfolio_count": 26,
-  "researching_count": 11,
+  "researching_count": 42,
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": []

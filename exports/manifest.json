@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-05-03T22:13:52Z",
+  "generated_at": "2026-05-04T01:40:32Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -20,18 +20,39 @@
       "schema_version": 2
     },
     {
+      "name": "positions_and_researching.csv",
+      "purpose": "Positions and researching list joined with universe metadata \u2014 all coverage universe columns plus Position, Position Date, Buy Price, Sell Price, First Buy Date, Average Cost, Shares, Notes appended at the end.",
+      "format": "csv"
+    },
+    {
+      "name": "portfolio.json",
+      "purpose": "Position == 'Portfolio' rows only (names you own). {ticker: {position, position_date, buy_price, sell_price, first_buy_date, average_cost, shares, notes, name, sector, subsector, sub_subsector, <all universe columns...>}}.",
+      "format": "json"
+    },
+    {
+      "name": "researching.json",
+      "purpose": "Position == 'Researching' rows only (names you're building a thesis on). Same shape as portfolio.json.",
+      "format": "json"
+    },
+    {
+      "name": "positions_status.json",
+      "purpose": "Versioned status + validation contract for positions (read schema_version first).",
+      "format": "json",
+      "schema_version": 2
+    },
+    {
       "name": "watchlist.csv",
-      "purpose": "Personal watchlist joined with universe metadata \u2014 all coverage universe columns plus Buy Price, Target Price, Date Added, Notes appended at the end.",
+      "purpose": "DEPRECATED back-compat (one cycle): legacy watchlist shape derived from positions_and_researching.csv. Sell Price is mapped to Target Price. Use positions_and_researching.csv for new code.",
       "format": "csv"
     },
     {
       "name": "watchlist.json",
-      "purpose": "Watchlist entries joined with the full universe row: {ticker: {buy_price, target_price, date_added, notes, name, sector, subsector, sub_subsector, <all universe columns...>}}.",
+      "purpose": "DEPRECATED back-compat (one cycle): legacy watchlist JSON shape derived from positions_and_researching.csv. Use portfolio.json + researching.json for new code.",
       "format": "json"
     },
     {
       "name": "watchlist_status.json",
-      "purpose": "Versioned status + validation contract for the watchlist (read schema_version first).",
+      "purpose": "DEPRECATED back-compat (one cycle): mirrors positions_status.json with the legacy shape.",
       "format": "json",
       "schema_version": 2
     },
