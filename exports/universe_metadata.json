@@ -301,8 +301,8 @@
   },
   "8086": {
     "name": "Nipro Corporation",
-    "sector": "Biopharma",
-    "subsector": "",
+    "sector": "MedTech",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "9926": {
@@ -314,7 +314,7 @@
   "A": {
     "name": "Agilent Technologies, Inc.",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "AAPL": {
@@ -374,7 +374,7 @@
   "ABT": {
     "name": "Abbott Laboratories",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "ABUS": {
@@ -482,7 +482,7 @@
   "ADPT": {
     "name": "Adaptive Biotechnologies Corporation",
     "sector": "MedTech",
-    "subsector": "Life Sci Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "ADSK": {
@@ -530,7 +530,7 @@
   "AFX": {
     "name": "Carl Zeiss Meditec AG",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "AGEN": {
@@ -596,7 +596,7 @@
   "ALC": {
     "name": "Alcon Inc.",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "ALDX": {
@@ -824,7 +824,7 @@
   "AORT": {
     "name": "Artivion Inc",
     "sector": "MedTech",
-    "subsector": "Cardio",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "APGE": {
@@ -986,7 +986,7 @@
   "ATEC": {
     "name": "Alphatec Holdings, Inc.",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "LONA": {
@@ -1028,7 +1028,7 @@
   "ATRC": {
     "name": "AtriCure Inc",
     "sector": "MedTech",
-    "subsector": "Cardio",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "ATYR": {
@@ -1093,9 +1093,9 @@
   },
   "AVTR": {
     "name": "Avantor, Inc.",
-    "sector": "Life Science Tools",
-    "subsector": "Lab Products / Chemicals",
-    "sub_subsector": ""
+    "sector": "MedTech",
+    "subsector": "Life Science Tools",
+    "sub_subsector": "Lab Products / Chemicals"
   },
   "AVXL": {
     "name": "Anavex Life Sciences Corp",
@@ -1124,7 +1124,7 @@
   "AMBUSH": {
     "name": "Ambu A/S",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "BANB": {
@@ -1148,7 +1148,7 @@
   "BAX": {
     "name": "Baxter International Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "BAYN": {
@@ -1202,7 +1202,7 @@
   "BDX": {
     "name": "Becton Dickinson and Co",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "BEAM": {
@@ -1214,7 +1214,7 @@
   "BFLY": {
     "name": "Butterfly Network, Inc.",
     "sector": "MedTech",
-    "subsector": "HC Cap Equipment",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "BFRG": {
@@ -1268,7 +1268,7 @@
   "BIO": {
     "name": "Bio-Rad Laboratories, Inc. Class A Common Stock",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "BIOA": {
@@ -1316,7 +1316,7 @@
   "BLCO": {
     "name": "Bausch + Lomb Corporation",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "BLISSGVS": {
@@ -1394,7 +1394,7 @@
   "BRKR": {
     "name": "Bruker Corp",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "BRNS": {
@@ -1418,7 +1418,7 @@
   "BSX": {
     "name": "Boston Scientific Corp",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "BTAI": {
@@ -1724,7 +1724,7 @@
   "COO": {
     "name": "The Cooper Companies, Inc.",
     "sector": "MedTech",
-    "subsector": "Contact Lenses / Surgical",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "COR": {
@@ -2072,7 +2072,7 @@
   "DHR": {
     "name": "Danaher Corp",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "DHT-UN": {
@@ -2192,7 +2192,7 @@
   "DXCM": {
     "name": "DexCom, Inc.",
     "sector": "MedTech",
-    "subsector": "Diabetes Technology",
+    "subsector": "Diabetes",
     "sub_subsector": ""
   },
   "DYN": {
@@ -2258,7 +2258,7 @@
   "ELAN": {
     "name": "Elanco Animal Health Incorporated",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "ELDN": {
@@ -2288,7 +2288,7 @@
   "ENOV": {
     "name": "Enovis Corporation",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "ENSC": {
@@ -2396,7 +2396,7 @@
   "EW": {
     "name": "Edwards Lifesciences Corp",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "EXAS": {
@@ -2624,7 +2624,7 @@
   "GEHC": {
     "name": "GE HealthCare Technologies Inc.",
     "sector": "MedTech",
-    "subsector": "HC Cap Equipment",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "GELS": {
@@ -2654,7 +2654,7 @@
   "GETIB": {
     "name": "Getinge AB",
     "sector": "MedTech",
-    "subsector": "Cardio",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "GH": {
@@ -2678,7 +2678,7 @@
   "GKOS": {
     "name": "Glaukos Corporation",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "GLAND": {
@@ -2732,7 +2732,7 @@
   "GMED": {
     "name": "Globus Medical Inc",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "GMRE": {
@@ -2840,7 +2840,7 @@
   "HAE": {
     "name": "Haemonetics Corporation",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "HAPV3": {
@@ -2858,7 +2858,7 @@
   "HYPR": {
     "name": "Hyperfine Inc",
     "sector": "MedTech",
-    "subsector": "HC Cap Equipment",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "HCAT": {
@@ -2954,7 +2954,7 @@
   "7741": {
     "name": "Hoya Corporation",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "HR": {
@@ -3002,7 +3002,7 @@
   "IART": {
     "name": "Integra LifeSciences Holdings Corporation",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "IBIO": {
@@ -3038,7 +3038,7 @@
   "ICUI": {
     "name": "ICU Medical, Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "IDIA": {
@@ -3080,8 +3080,8 @@
   "ILMN": {
     "name": "Illumina, Inc.",
     "sector": "MedTech",
-    "subsector": "NextGen Sequencing",
-    "sub_subsector": ""
+    "subsector": "Diagnostics",
+    "sub_subsector": "NextGen Sequencing"
   },
   "NBP": {
     "name": "NovaBridge Biosciences",
@@ -3278,7 +3278,7 @@
   "IRTC": {
     "name": "iRhythm Holdings, Inc",
     "sector": "MedTech",
-    "subsector": "Cardio",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "IRWD": {
@@ -3290,13 +3290,13 @@
   "ISRG": {
     "name": "Intuitive Surgical Inc",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
-    "sub_subsector": ""
+    "subsector": "Surgery",
+    "sub_subsector": "Surgical Robotics"
   },
   "ITGR": {
     "name": "Integer Holdings Corporation",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "ITRM": {
@@ -3344,7 +3344,7 @@
   "JNJ": {
     "name": "Johnson & Johnson",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "JPM": {
@@ -3386,7 +3386,7 @@
   "KIDS": {
     "name": "OrthoPediatrics Corp.",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "KKR": {
@@ -3554,7 +3554,7 @@
   "LIVN": {
     "name": "LivaNova PLC",
     "sector": "MedTech",
-    "subsector": "Cardio",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "LLY": {
@@ -3572,8 +3572,8 @@
   "LONN": {
     "name": "Lonza Group AG",
     "sector": "MedTech",
-    "subsector": "Life Sci CDMO",
-    "sub_subsector": ""
+    "subsector": "Life Science Tools",
+    "sub_subsector": "CDMO"
   },
   "LPCN": {
     "name": "Lipocine Inc",
@@ -3674,7 +3674,7 @@
   "MASI": {
     "name": "Masimo Corporation",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "MAZE": {
@@ -3758,7 +3758,7 @@
   "MED": {
     "name": "Medartis Holding AG",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "MEDP": {
@@ -3824,13 +3824,13 @@
   "MMED": {
     "name": "MiniMed Group Inc",
     "sector": "MedTech",
-    "subsector": "Diabetes Technology",
+    "subsector": "Diabetes",
     "sub_subsector": ""
   },
   "MMSI": {
     "name": "Merit Medical Systems, Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "MNDY": {
@@ -3890,7 +3890,7 @@
   "MOVE": {
     "name": "Medacta Group SA",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "MPLT": {
@@ -3932,7 +3932,7 @@
   "MRVI": {
     "name": "Maravai LifeSciences Holdings, Inc.",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "MSFT": {
@@ -3944,7 +3944,7 @@
   "MTD": {
     "name": "Mettler-Toledo International Inc",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "MTNB": {
@@ -4112,7 +4112,7 @@
   "NNOX": {
     "name": "Nano-X Imaging Ltd.",
     "sector": "MedTech",
-    "subsector": "HC Cap Equipment",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "NNVC": {
@@ -4130,7 +4130,7 @@
   "NOVT": {
     "name": "Novanta Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "NOW": {
@@ -4268,7 +4268,7 @@
   "OFIX": {
     "name": "Orthofix Medical Inc.",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "OGEN": {
@@ -4316,7 +4316,7 @@
   "OMCL": {
     "name": "Omnicell, Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "OMDA": {
@@ -4352,8 +4352,8 @@
   "ONT": {
     "name": "Oxford Nanopore Technologies PLC",
     "sector": "MedTech",
-    "subsector": "NextGen Sequencing",
-    "sub_subsector": ""
+    "subsector": "Diagnostics",
+    "sub_subsector": "NextGen Sequencing"
   },
   "ONTF": {
     "name": "ON24 Inc",
@@ -4424,7 +4424,7 @@
   "OSSFF": {
     "name": "Embla Medical hf.",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "OSTX": {
@@ -4454,14 +4454,14 @@
   "7733": {
     "name": "Olympus Corporation",
     "sector": "MedTech",
-    "subsector": "Japan",
-    "sub_subsector": ""
+    "subsector": "Hospital Supply & Equipment",
+    "sub_subsector": "Endoscopy"
   },
   "PACB": {
     "name": "Pacific Biosciences of California, Inc.",
-    "sector": "Life Science Tools",
-    "subsector": "Genomics / Sequencing",
-    "sub_subsector": ""
+    "sector": "MedTech",
+    "subsector": "Life Science Tools",
+    "sub_subsector": "Genomics / Sequencing"
   },
   "PACS": {
     "name": "PACS Group Inc",
@@ -4538,8 +4538,8 @@
   "PEN": {
     "name": "Penumbra, Inc.",
     "sector": "MedTech",
-    "subsector": "Peripheral",
-    "sub_subsector": ""
+    "subsector": "Cardiovascular",
+    "sub_subsector": "Peripheral"
   },
   "PEPG": {
     "name": "PepGen Inc",
@@ -4622,7 +4622,7 @@
   "PLSE": {
     "name": "Pulse Biosciences Inc",
     "sector": "MedTech",
-    "subsector": "Other",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "PLX": {
@@ -4646,7 +4646,7 @@
   "PODD": {
     "name": "Insulet Corporation",
     "sector": "MedTech",
-    "subsector": "Diabetes Technology",
+    "subsector": "Diabetes",
     "sub_subsector": ""
   },
   "PPCB": {
@@ -5072,7 +5072,7 @@
   "RVTY": {
     "name": "Revvity, Inc.",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "RXRX": {
@@ -5084,7 +5084,7 @@
   "RXST": {
     "name": "RxSight, Inc.",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "RYTM": {
@@ -5222,13 +5222,13 @@
   "SFZS": {
     "name": "Siegfried Holding AG",
     "sector": "MedTech",
-    "subsector": "CDMO",
-    "sub_subsector": ""
+    "subsector": "Life Science Tools",
+    "sub_subsector": "CDMO"
   },
   "SGHT": {
     "name": "Sight Sciences, Inc.",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "SGMO": {
@@ -5252,19 +5252,19 @@
   "SHC": {
     "name": "Sotera Health Company",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "SHL": {
     "name": "Siemens Healthineers AG",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "SHMZF": {
     "name": "Shimadzu",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "SHOP": {
@@ -5276,7 +5276,7 @@
   "SIBN": {
     "name": "SI-BONE, Inc.",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "SIGA": {
@@ -5378,7 +5378,7 @@
   "SNN": {
     "name": "Smith & Nephew PLC",
     "sector": "MedTech",
-    "subsector": "Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "SNOA": {
@@ -5414,7 +5414,7 @@
   "SOLV": {
     "name": "Solventum Corporation",
     "sector": "MedTech",
-    "subsector": "Diversified",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "SOON": {
@@ -5486,13 +5486,13 @@
   "SRT": {
     "name": "Sartorius AG",
     "sector": "MedTech",
-    "subsector": "Bioprocessing",
-    "sub_subsector": ""
+    "subsector": "Life Science Tools",
+    "sub_subsector": "Bioprocessing"
   },
   "STAA": {
     "name": "STAAR Surgical Company",
     "sector": "MedTech",
-    "subsector": "Opthomalogy",
+    "subsector": "Ophthalmology",
     "sub_subsector": ""
   },
   "STAR": {
@@ -5504,7 +5504,7 @@
   "STE": {
     "name": "STERIS plc",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "STOK": {
@@ -5570,7 +5570,7 @@
   "SYK": {
     "name": "Stryker Corp",
     "sector": "MedTech",
-    "subsector": "LC MedTech",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "SYRE": {
@@ -5594,13 +5594,13 @@
   "7701": {
     "name": "Shimadzu Corporation",
     "sector": "MedTech",
-    "subsector": "Japan",
-    "sub_subsector": ""
+    "subsector": "Life Science Tools",
+    "sub_subsector": "Analytical Instruments"
   },
   "6869": {
     "name": "Sysmex Corporation",
     "sector": "MedTech",
-    "subsector": "Japan",
+    "subsector": "Diagnostics",
     "sub_subsector": ""
   },
   "TAK": {
@@ -5636,7 +5636,7 @@
   "TCMD": {
     "name": "Tactile Systems Technology Inc",
     "sector": "MedTech",
-    "subsector": "Other",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "TCRT": {
@@ -5666,7 +5666,7 @@
   "TECH": {
     "name": "Bio-Techne Corporation",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "TECX": {
@@ -5768,19 +5768,19 @@
   "TMDX": {
     "name": "TransMedics Group Inc",
     "sector": "MedTech",
-    "subsector": "Other",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "TMO": {
     "name": "Thermo Fisher Scientific Inc",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "TNDM": {
     "name": "Tandem Diabetes Care, Inc.",
     "sector": "MedTech",
-    "subsector": "Diabetes Technology",
+    "subsector": "Diabetes",
     "sub_subsector": ""
   },
   "TNG": {
@@ -5900,14 +5900,14 @@
   "TWST": {
     "name": "Twist Bioscience Corporation",
     "sector": "MedTech",
-    "subsector": "Life Sci Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "TXG": {
     "name": "10x Genomics, Inc.",
     "sector": "MedTech",
-    "subsector": "NextGen Sequencing",
-    "sub_subsector": ""
+    "subsector": "Diagnostics",
+    "sub_subsector": "NextGen Sequencing"
   },
   "TXMD": {
     "name": "TherapeuticsMD Inc",
@@ -5930,7 +5930,7 @@
   "4543": {
     "name": "Terumo Corporation",
     "sector": "MedTech",
-    "subsector": "Japan",
+    "subsector": "Cardiovascular",
     "sub_subsector": ""
   },
   "U": {
@@ -5948,7 +5948,7 @@
   "UFPT": {
     "name": "UFP Technologies, Inc.",
     "sector": "MedTech",
-    "subsector": "Hospital Supply",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "UHS": {
@@ -6026,7 +6026,7 @@
   "VCEL": {
     "name": "Vericel Corporation",
     "sector": "MedTech",
-    "subsector": "Spine/Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "VCNX": {
@@ -6122,7 +6122,7 @@
   "VREX": {
     "name": "Varex Imaging Corporation",
     "sector": "MedTech",
-    "subsector": "Hospital Capex Ex, Pumps, Supplies",
+    "subsector": "Hospital Supply & Equipment",
     "sub_subsector": ""
   },
   "VRTX": {
@@ -6194,7 +6194,7 @@
   "WAT": {
     "name": "Waters Corp",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "WAY": {
@@ -6314,7 +6314,7 @@
   "ZBH": {
     "name": "Zimmer Biomet Holdings, Inc",
     "sector": "MedTech",
-    "subsector": "Ortho",
+    "subsector": "Orthopedics",
     "sub_subsector": ""
   },
   "ZBIO": {
@@ -6410,8 +6410,8 @@
   "HTFL": {
     "name": "HeartFlow, Inc.",
     "sector": "MedTech",
-    "subsector": "Diagnostics / AI",
-    "sub_subsector": ""
+    "subsector": "Diagnostics",
+    "sub_subsector": "AI"
   },
   "BLLN": {
     "name": "BillionToOne, Inc.",
@@ -6422,14 +6422,14 @@
   "AZTA": {
     "name": "Azenta, Inc.",
     "sector": "MedTech",
-    "subsector": "Life Sci Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "RGEN": {
     "name": "Repligen Corporation",
     "sector": "MedTech",
-    "subsector": "Bioprocessing",
-    "sub_subsector": ""
+    "subsector": "Life Science Tools",
+    "sub_subsector": "Bioprocessing"
   },
   "STMN": {
     "name": "Straumann Holding AG",
@@ -6446,7 +6446,7 @@
   "NVCR": {
     "name": "Novocure Limited",
     "sector": "MedTech",
-    "subsector": "Other",
+    "subsector": "Diversified MedTech",
     "sub_subsector": ""
   },
   "ACCD": {
@@ -6536,7 +6536,7 @@
   "ALMR": {
     "name": "Alamar Biosciences, Inc.",
     "sector": "MedTech",
-    "subsector": "Tools",
+    "subsector": "Life Science Tools",
     "sub_subsector": ""
   },
   "KLRA": {
