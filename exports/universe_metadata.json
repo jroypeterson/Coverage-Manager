@@ -2,25 +2,25 @@
   "000100": {
     "name": "Yuhan Corporation",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "000661": {
     "name": "Changchun High-Tech Industry (Group) Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "000963": {
     "name": "Huadong Medicine Co., Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "002007": {
     "name": "Hualan Biological Engineering Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "008930": {
@@ -32,31 +32,31 @@
   "019170": {
     "name": "Shinpoong Pharmaceutical Co.,Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "068270": {
     "name": "Celltrion, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "1093": {
     "name": "CSPC Pharmaceutical Group Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "1801": {
     "name": "Innovent Biologics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "196170": {
     "name": "ALTEOGEN Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "1SXP": {
@@ -68,7 +68,7 @@
   "2070": {
     "name": "Saudi Pharmaceutical Industries and Medical Appliances Corporation",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "207940": {
@@ -80,7 +80,7 @@
   "2269": {
     "name": "WuXi Biologics (Cayman) Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "2359": {
@@ -98,7 +98,7 @@
   "300122": {
     "name": "Chongqing Zhifei Biological Products Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "300765": {
@@ -110,49 +110,49 @@
   "3320": {
     "name": "China Resources Pharmaceutical Group Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "3692": {
     "name": "Hansoh Pharmaceutical Group Company Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4015": {
     "name": "Jamjoom Pharmaceuticals Factory Company",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4016": {
     "name": "Middle East Pharmaceutical Industries Company",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4503": {
     "name": "Astellas Pharma Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4506": {
     "name": "Sumitomo Pharma Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4507": {
     "name": "Shionogi & Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4516": {
     "name": "Nippon Shinyaku Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4519": {
@@ -170,73 +170,73 @@
   "4528": {
     "name": "Ono Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4534": {
     "name": "Mochida Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4536": {
     "name": "Santen Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4547": {
     "name": "Kissei Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4552": {
     "name": "JCR Pharmaceuticals Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4553": {
     "name": "Towa Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4559": {
     "name": "Zeria Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4565": {
     "name": "Nxera Pharma Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "4568": {
     "name": "Daiichi Sankyo Company, Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4569": {
     "name": "KYORIN Pharmaceutical Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "4578": {
     "name": "OTSUKA HLDGS CO LTD",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "4587": {
     "name": "PeptiDream Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "4967": {
@@ -248,55 +248,55 @@
   "600085": {
     "name": "Beijing Tongrentang Co., Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "600161": {
     "name": "Beijing Tiantan Biological Products Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "600196": {
     "name": "Shanghai Fosun Pharmaceutical (Group) Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "600276": {
     "name": "JIangsu",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "6446": {
     "name": "PharmaEssentia Corporation",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "6472": {
     "name": "Bora Pharmaceuticals Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "688506": {
     "name": "Sichuan Biokin Pharmaceutical Co.,Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "688578": {
     "name": "Shanghai Allist Pharmaceuticals Co., Ltd.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "6919": {
     "name": "CALIWAY BIOPHARMACEUTICALS CO L",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "8086": {
@@ -308,7 +308,7 @@
   "9926": {
     "name": "Akeso, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "A": {
@@ -326,49 +326,49 @@
   "AARD": {
     "name": "Aardvark Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AARTIDRUGS": {
     "name": "Aarti Drugs Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ABBOTINDIA": {
     "name": "Abbott India Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ABBV": {
     "name": "AbbVie Common Stock",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "ABCL": {
     "name": "AbCellera Biologics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ABEO": {
     "name": "Abeona Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ABOS": {
     "name": "Acumen Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ABSI": {
     "name": "Absci Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ABT": {
@@ -380,19 +380,19 @@
   "ABUS": {
     "name": "Arbutus Biopharma Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACAD": {
     "name": "ACADIA Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACET": {
     "name": "Adicet Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACHC": {
@@ -404,31 +404,31 @@
   "ACHV": {
     "name": "Achieve Life Sciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACIU": {
     "name": "AC Immune SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACLX": {
     "name": "Arcellx Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACRS": {
     "name": "Aclaris Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACRV": {
     "name": "Acrivon Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACVA": {
@@ -440,7 +440,7 @@
   "ADAG": {
     "name": "Adagene Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ADAP": {
@@ -458,7 +458,7 @@
   "ADCT": {
     "name": "ADC Therapeutics SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ADI": {
@@ -470,13 +470,13 @@
   "ADIL": {
     "name": "Adial Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ADMA": {
     "name": "ADMA Biologics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ADPT": {
@@ -500,13 +500,13 @@
   "ADXN": {
     "name": "Addex Therapeutics Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AEON": {
     "name": "Aeon Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AFMD": {
@@ -524,7 +524,7 @@
   "AFT": {
     "name": "AFT Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AFX": {
@@ -536,13 +536,13 @@
   "AGEN": {
     "name": "Agenus Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AGIO": {
     "name": "Agios Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AGL": {
@@ -554,7 +554,7 @@
   "AGY": {
     "name": "Allergy Therapeutics plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AHCO": {
@@ -572,19 +572,19 @@
   "AIM": {
     "name": "AIM ImmunoTech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AKBA": {
     "name": "Akebia Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AKTS": {
     "name": "Aktis Oncology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALBT": {
@@ -602,19 +602,19 @@
   "ALDX": {
     "name": "Aldeyra Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALEC": {
     "name": "Alector Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALGEN": {
     "name": "genOway Soci\u00e9t\u00e9 anonyme",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALGN": {
@@ -632,19 +632,19 @@
   "ALK-B": {
     "name": "ALK-Abell\u00f3 A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALKEM": {
     "name": "Alkem Laboratories Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ALKS": {
     "name": "Alkermes Plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ALKT": {
@@ -656,67 +656,67 @@
   "ALLO": {
     "name": "Allogene Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALM": {
     "name": "Almirall, S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ALMS": {
     "name": "Alumis Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALNY": {
     "name": "Alnylam Pharmaceuticals, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALOPM": {
     "name": "Oncodesign Precision Medicine Soci\u00e9t\u00e9 anonyme",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALSEN": {
     "name": "Sensorion SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALT": {
     "name": "Altimmune Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ALVO": {
     "name": "Alvotech SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ALXO": {
     "name": "ALX Oncology Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AMGN": {
     "name": "Amgen Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "AMLX": {
     "name": "Amylyx Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AMN": {
@@ -734,13 +734,13 @@
   "AMPE": {
     "name": "Ampio Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AMPH": {
     "name": "Amphastar Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AMPL": {
@@ -752,13 +752,13 @@
   "AMRN": {
     "name": "Amarin Corporation PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AMRX": {
     "name": "Amneal Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AMWL": {
@@ -776,49 +776,49 @@
   "ANAB": {
     "name": "AnaptysBio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANIP": {
     "name": "ANI Pharmaceuticals Inc Common Stock",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ANIX": {
     "name": "Anixa Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANL": {
     "name": "Adlai Nortye Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANNX": {
     "name": "Annexon Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANRO": {
     "name": "Alto Neuroscience Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANTX": {
     "name": "AN2 Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ANVS": {
     "name": "Annovis Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AORT": {
@@ -830,37 +830,37 @@
   "APGE": {
     "name": "Apogee Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "APLLTD": {
     "name": "Alembic Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "APLS": {
     "name": "Apellis Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "APLT": {
     "name": "Applied Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "APM": {
     "name": "Aptorum Group Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "APN": {
     "name": "Aspen Pharmacare Holdings Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "APP": {
@@ -872,7 +872,7 @@
   "APRE": {
     "name": "Aprea Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "APTO": {
@@ -884,13 +884,13 @@
   "AQST": {
     "name": "Aquestive Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ARCT": {
     "name": "Arcturus Therapeutics Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARDT": {
@@ -902,7 +902,7 @@
   "ARDX": {
     "name": "Ardelyx Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARE": {
@@ -914,37 +914,37 @@
   "ARGX": {
     "name": "argenx SE - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARMP": {
     "name": "Armata Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARQT": {
     "name": "Arcutis Biotherapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARTV": {
     "name": "Artiva Biotherapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARVN": {
     "name": "Arvinas Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARWR": {
     "name": "Arrowhead Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ASAN": {
@@ -962,13 +962,13 @@
   "ASND": {
     "name": "Ascendis Pharma A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ASRT": {
     "name": "Assertio Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ASX": {
@@ -980,7 +980,7 @@
   "ATAI": {
     "name": "AtaiBeckley Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATEC": {
@@ -992,25 +992,25 @@
   "LONA": {
     "name": "LeonaBio Inc (fka Athira Pharma)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATNM": {
     "name": "Actinium Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATORX": {
     "name": "Alligator Bioscience AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATOS": {
     "name": "Atossa Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATR": {
@@ -1022,7 +1022,7 @@
   "ATRA": {
     "name": "Atara Biotherapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ATRC": {
@@ -1034,7 +1034,7 @@
   "ATYR": {
     "name": "aTyr Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AUNA": {
@@ -1046,19 +1046,19 @@
   "AUPH": {
     "name": "Aurinia Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AURA": {
     "name": "Aura Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AUTL": {
     "name": "Autolus Therapeutics PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AVAH": {
@@ -1070,25 +1070,25 @@
   "AVBP": {
     "name": "Arrivent Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AVCT": {
     "name": "Avacta Group Plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AVDL": {
     "name": "Avadel Pharmaceuticals PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AVIR": {
     "name": "Atea Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AVTR": {
@@ -1100,25 +1100,25 @@
   "AVXL": {
     "name": "Anavex Life Sciences Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AYTU": {
     "name": "Aytu Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "AZN": {
     "name": "AstraZeneca PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "AZTR": {
     "name": "Azitra Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "AMBUSH": {
@@ -1142,7 +1142,7 @@
   "BAVA": {
     "name": "Bavarian Nordic A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BAX": {
@@ -1154,13 +1154,13 @@
   "BAYN": {
     "name": "Bayer AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "BBIO": {
     "name": "BridgeBio Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BBNX": {
@@ -1172,31 +1172,31 @@
   "BCAB": {
     "name": "Bioatla Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BCAX": {
     "name": "Bicara Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BCLI": {
     "name": "Brainstorm Cell Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BCRX": {
     "name": "BioCryst Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BCYC": {
     "name": "Bicycle Therapeutics PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BDX": {
@@ -1208,7 +1208,7 @@
   "BEAM": {
     "name": "Beam Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BFLY": {
@@ -1226,19 +1226,19 @@
   "BFRI": {
     "name": "Biofrontera Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BHC": {
     "name": "Bausch Health Companies Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BHVN": {
     "name": "Biohaven Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BIAF": {
@@ -1250,7 +1250,7 @@
   "BIIB": {
     "name": "Biogen Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "BILL": {
@@ -1274,31 +1274,31 @@
   "BIOA": {
     "name": "BIOAGE Labs Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BIOA-B": {
     "name": "BioArctic AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BIOCON": {
     "name": "Biocon Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BION": {
     "name": "BB Biotech AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BIOR": {
     "name": "Biora Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BKD": {
@@ -1322,7 +1322,7 @@
   "BLISSGVS": {
     "name": "Bliss GVS Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BLND": {
@@ -1334,55 +1334,55 @@
   "BLRX": {
     "name": "BioLine RX Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BLTE": {
     "name": "Belite Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BMRN": {
     "name": "Biomarin Pharmaceutical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BMY": {
     "name": "Bristol-Myers Squibb Company",
     "sector": "Biopharma",
-    "subsector": "Large-Cap Pharma",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "BNTC": {
     "name": "Benitec Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BNTX": {
     "name": "BioNTech SE - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BOI": {
     "name": "Boiron SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BOLD": {
     "name": "Boundless Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BOT": {
     "name": "Botanix Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BOX": {
@@ -1400,7 +1400,7 @@
   "BRNS": {
     "name": "Barinthus Biotherapeutics PLC - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BRZE": {
@@ -1412,7 +1412,7 @@
   "BSLN": {
     "name": "Basilea Pharmaceutica AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "BSX": {
@@ -1424,7 +1424,7 @@
   "BTAI": {
     "name": "BioXcel Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "BTSG": {
@@ -1436,19 +1436,19 @@
   "BYSI": {
     "name": "Beyondspring Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "C43": {
     "name": "Cosmo Pharmaceuticals N.V.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "CABA": {
     "name": "Cabaletta Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CAH": {
@@ -1460,7 +1460,7 @@
   "CAI": {
     "name": "Caris Life Sciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CALA": {
@@ -1472,19 +1472,19 @@
   "CAMP": {
     "name": "CAMP4 Therapeutics Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CANF": {
     "name": "Can Fite Biopharma ADR Representing 300 Ord Shs",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CAPR": {
     "name": "Capricor Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CARA": {
@@ -1496,13 +1496,13 @@
   "CARM": {
     "name": "Carisma Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CASI": {
     "name": "CASI Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CAT": {
@@ -1520,19 +1520,19 @@
   "CCCC": {
     "name": "C4 Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CDXS": {
     "name": "Codexis Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CELU": {
     "name": "Celularity Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CERT": {
@@ -1550,13 +1550,13 @@
   "CGEM": {
     "name": "Cullinan Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CGON": {
     "name": "CG Oncology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CHCT": {
@@ -1580,7 +1580,7 @@
   "CHRS": {
     "name": "Coherus Oncology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CI": {
@@ -1598,31 +1598,31 @@
   "CING": {
     "name": "Cingulate Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CIPLA": {
     "name": "Cipla Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "CLDX": {
     "name": "Celldex Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CLLS": {
     "name": "Cellectis SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CLN": {
     "name": "Celon Pharma S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "CLOV": {
@@ -1640,13 +1640,13 @@
   "CLSD": {
     "name": "Clearside Biomedical, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CMPX": {
     "name": "Compass Therapeutics Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CNC": {
@@ -1670,25 +1670,25 @@
   "CNTA": {
     "name": "Centessa Pharmaceuticals PLC - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CNTX": {
     "name": "Context Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "COCP": {
     "name": "Cocrystal Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "COGT": {
     "name": "Cogent Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "COH": {
@@ -1706,7 +1706,7 @@
   "COLL": {
     "name": "Collegium Pharmaceutical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "COLOB": {
@@ -1736,13 +1736,13 @@
   "CORT": {
     "name": "Corcept Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "COYA": {
     "name": "Coya Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CP": {
@@ -1760,19 +1760,19 @@
   "CPRX": {
     "name": "Catalyst Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRBP": {
     "name": "Corbus Pharmaceuticals Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRIS": {
     "name": "Curis Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRL": {
@@ -1790,19 +1790,19 @@
   "CRMD": {
     "name": "CorMedix Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRNO-B": {
     "name": "Cereno Scientific AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "CRNX": {
     "name": "Crinetics Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CROX": {
@@ -1814,19 +1814,19 @@
   "CRSP": {
     "name": "Crispr Therapeutics AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRVO": {
     "name": "CervoMed Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRVS": {
     "name": "Corvus Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CRWD": {
@@ -1862,13 +1862,13 @@
   "CTMX": {
     "name": "CytomX Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CTNM": {
     "name": "Contineum Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CTRE": {
@@ -1886,31 +1886,31 @@
   "CTX": {
     "name": "Captor Therapeutics Spolka Akcyjna",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CTXR": {
     "name": "Citius Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CUE": {
     "name": "Cue Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CURN": {
     "name": "Curatis Holding AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "CUV": {
     "name": "Clinuvel Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CVAC": {
@@ -1922,13 +1922,13 @@
   "CVKD": {
     "name": "Cadrenal Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CVM": {
     "name": "CEL-SCI Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CVNA": {
@@ -1976,7 +1976,7 @@
   "CYCN": {
     "name": "Cyclerion Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CYH": {
@@ -1988,7 +1988,7 @@
   "CYTK": {
     "name": "Cytokinetics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CYTO": {
@@ -2006,13 +2006,13 @@
   "DARE": {
     "name": "Dare Bioscience Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DAWN": {
     "name": "Day One Biopharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DAY": {
@@ -2024,7 +2024,7 @@
   "DBVT": {
     "name": "DBV Technologies SA - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DBX": {
@@ -2048,7 +2048,7 @@
   "DERM": {
     "name": "Journey Medical Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "DGX": {
@@ -2078,7 +2078,7 @@
   "DHT-UN": {
     "name": "DRI Healthcare Trust",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "DIA": {
@@ -2090,19 +2090,19 @@
   "DIVISLAB": {
     "name": "Divi's Laboratories Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "DNA": {
     "name": "Ginkgo Bioworks Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DNLI": {
     "name": "Denali Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DOC": {
@@ -2144,13 +2144,13 @@
   "DRUG": {
     "name": "Bright Minds Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DSGN": {
     "name": "Design Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DSP": {
@@ -2168,7 +2168,7 @@
   "DTIL": {
     "name": "Precision BioSciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "DV": {
@@ -2186,7 +2186,7 @@
   "DVAX": {
     "name": "Dynavax Technologies Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "DXCM": {
@@ -2198,19 +2198,19 @@
   "DYN": {
     "name": "Dyne Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EAPI": {
     "name": "Euroapi S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "EBS": {
     "name": "Emergent Biosolutions Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ECOR": {
@@ -2222,19 +2222,19 @@
   "EDIT": {
     "name": "Editas Medicine Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EFTR": {
     "name": "eFFECTOR Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EGRX": {
     "name": "Eagle Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "EHAB": {
@@ -2252,7 +2252,7 @@
   "EIKN": {
     "name": "Eikon Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ELAN": {
@@ -2264,7 +2264,7 @@
   "ELDN": {
     "name": "Eledon Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ELV": {
@@ -2276,13 +2276,13 @@
   "ELVN": {
     "name": "Enliven Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ENGN": {
     "name": "enGene Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ENOV": {
@@ -2294,7 +2294,7 @@
   "ENSC": {
     "name": "Ensysce Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ENSG": {
@@ -2306,31 +2306,31 @@
   "ENTA": {
     "name": "Enanta Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ENTX": {
     "name": "Entera Bio Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EOLS": {
     "name": "Evolus Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "EQ": {
     "name": "Equillium Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ERAS": {
     "name": "Erasca Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ERF": {
@@ -2342,13 +2342,13 @@
   "ERNA": {
     "name": "Ernexa Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ESPR": {
     "name": "Esperion Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ESTA": {
@@ -2366,7 +2366,7 @@
   "EVFM": {
     "name": "Evofem Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EVH": {
@@ -2378,13 +2378,13 @@
   "EVMN": {
     "name": "Evommune Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EVO": {
     "name": "Evotec SE",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "EVOK": {
@@ -2408,7 +2408,7 @@
   "EXEL": {
     "name": "Exelixis Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EXFY": {
@@ -2420,49 +2420,49 @@
   "EXOZ": {
     "name": "eXoZymes Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "EYPT": {
     "name": "EyePoint Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FAE": {
     "name": "Faes Farma, S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "FAGR": {
     "name": "Fagron NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "FATE": {
     "name": "Fate Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FBIO": {
     "name": "Fortress Biotech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FDC": {
     "name": "FDC Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "FDMT": {
     "name": "4D Molecular Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FDX": {
@@ -2486,7 +2486,7 @@
   "FHTX": {
     "name": "Foghorn Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FICO": {
@@ -2528,7 +2528,7 @@
   "FOLD": {
     "name": "Amicus Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FRE": {
@@ -2564,25 +2564,25 @@
   "FULC": {
     "name": "Fulcrum Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FUM": {
     "name": "Futura Medical plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "FYB": {
     "name": "Formycon AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GALD": {
     "name": "Galderma Group AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "GALE": {
@@ -2594,13 +2594,13 @@
   "GALT": {
     "name": "Galectin Therapeutics Inc. Common Stock",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GBIO": {
     "name": "Generation Bio Co.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GBT": {
@@ -2618,7 +2618,7 @@
   "GDTC": {
     "name": "CytoMed Therapeutics Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GEHC": {
@@ -2630,7 +2630,7 @@
   "GELS": {
     "name": "Gelteq Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "GEN": {
@@ -2648,7 +2648,7 @@
   "GERN": {
     "name": "Geron Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GETIB": {
@@ -2666,13 +2666,13 @@
   "GHRS": {
     "name": "GH Research PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GILD": {
     "name": "Gilead Sciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "GKOS": {
@@ -2684,49 +2684,49 @@
   "GLAND": {
     "name": "Gland Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "GLENMARK": {
     "name": "Glenmark Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "GLMD": {
     "name": "Galmed Pharmaceuticals Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GLPG": {
     "name": "Galapagos NV - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GLSI": {
     "name": "Greenwich Lifesciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GLUE": {
     "name": "Monte Rosa Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "CBIO": {
     "name": "Crescent Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GMAB": {
     "name": "Genmab A/S - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GMED": {
@@ -2756,19 +2756,19 @@
   "GNLX": {
     "name": "Genelux Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GNPX": {
     "name": "Genprex Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GNTA": {
     "name": "Genenta Science SPA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GOOG": {
@@ -2780,13 +2780,13 @@
   "GOSS": {
     "name": "Gossamer Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GPCR": {
     "name": "Structure Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GRAL": {
@@ -2798,25 +2798,25 @@
   "GRANULES": {
     "name": "Granules India Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "GRCE": {
     "name": "Grace Therapeutics, Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "GRFS": {
     "name": "Grifols SA - ADR ADR Class B",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "GSK": {
     "name": "GSK plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "GTLB": {
@@ -2834,7 +2834,7 @@
   "GYRE": {
     "name": "Gyre Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HAE": {
@@ -2870,7 +2870,7 @@
   "HCM": {
     "name": "HUTCHMED (China) Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HCSG": {
@@ -2882,25 +2882,25 @@
   "HEPA": {
     "name": "Hepion Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HESTERBIO": {
     "name": "Hester Biosciences Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HIK": {
     "name": "Hikma Pharmaceuticals PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HIKAL": {
     "name": "Hikal Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HIMS": {
@@ -2912,7 +2912,7 @@
   "HLUN-B": {
     "name": "H. Lundbeck A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HNGE": {
@@ -2936,19 +2936,19 @@
   "HOOK": {
     "name": "Hookipa Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HOTH": {
     "name": "Hoth Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HOWL": {
     "name": "Werewolf Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "7741": {
@@ -2966,19 +2966,19 @@
   "HRMY": {
     "name": "Harmony Biosciences Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HROW": {
     "name": "Harrow Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "HRTX": {
     "name": "Heron Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "HSIC": {
@@ -3008,19 +3008,19 @@
   "IBIO": {
     "name": "Ibio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IBRX": {
     "name": "Immunitybio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IBT-B": {
     "name": "Infant Bacterial Therapeutics AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ICAD": {
@@ -3044,7 +3044,7 @@
   "IDIA": {
     "name": "Idorsia Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IDXX": {
@@ -3056,19 +3056,19 @@
   "IDYA": {
     "name": "Ideaya Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IFRX": {
     "name": "Inflarx NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMA": {
     "name": "ImageneBio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ILM1": {
@@ -3086,109 +3086,109 @@
   "NBP": {
     "name": "NovaBridge Biosciences",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMCR": {
     "name": "Immunocore Holdings PLC - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMMP": {
     "name": "Immutep Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMMX": {
     "name": "Immix Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMNM": {
     "name": "Immunome Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMNN": {
     "name": "Imunon Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMRX": {
     "name": "Immuneering Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMTX": {
     "name": "Immatics NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMU": {
     "name": "Imugene Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMUX": {
     "name": "Immunic Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IMVT": {
     "name": "Immunovant Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INBX": {
     "name": "Inhibrx Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INCR": {
     "name": "InterCure Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "INCY": {
     "name": "Incyte Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INDOCO": {
     "name": "Indoco Remedies Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "INDV": {
     "name": "Indivior Pharmaceuticals, Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "INKT": {
     "name": "Mink Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INMB": {
     "name": "INmune Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INMD": {
@@ -3200,13 +3200,13 @@
   "INO": {
     "name": "Inovio Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INSM": {
     "name": "Insmed Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INSP": {
@@ -3218,43 +3218,43 @@
   "INTS": {
     "name": "Intensity Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "INVA": {
     "name": "Innoviva Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IOBT": {
     "name": "IO Biotech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IONS": {
     "name": "Ionis Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IOVA": {
     "name": "Iovance Biotherapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IPCALAB": {
     "name": "Ipca Laboratories Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "IPHA": {
     "name": "Innate Pharma SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IPN": {
@@ -3272,7 +3272,7 @@
   "IRON": {
     "name": "Disc Medicine Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IRTC": {
@@ -3284,7 +3284,7 @@
   "IRWD": {
     "name": "Ironwood Pharmaceuticals, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ISRG": {
@@ -3302,43 +3302,43 @@
   "ITRM": {
     "name": "Iterum Therapeutics PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IVA": {
     "name": "Inventiva ADR Representing Ord Shs",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IVVD": {
     "name": "Invivyd Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "IXHL": {
     "name": "Incannex Healthcare Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "JAGX": {
     "name": "Jaguar Health Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "JANX": {
     "name": "Janux Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "JAZZ": {
     "name": "Jazz Pharmaceuticals PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "JNJ": {
@@ -3356,13 +3356,13 @@
   "JSPR": {
     "name": "Jasper Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "JUBLPHARMA": {
     "name": "Jubilant Pharmova Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "JULPHAR": {
@@ -3374,13 +3374,13 @@
   "KALA": {
     "name": "KALA BIO Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KALV": {
     "name": "Kalvista Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KIDS": {
@@ -3404,49 +3404,49 @@
   "KMDA": {
     "name": "Kamada Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "KNSA": {
     "name": "Kiniksa Pharmaceuticals Internationl PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "KOD": {
     "name": "Kodiak Sciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KPTI": {
     "name": "Karyopharm Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KROS": {
     "name": "Keros Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KRRO": {
     "name": "Korro Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KRYS": {
     "name": "Krystal Biotech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KURA": {
     "name": "Kura Oncology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KVYO": {
@@ -3458,31 +3458,31 @@
   "KYMR": {
     "name": "Kymera Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KYTX": {
     "name": "Kyverna Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "KZR": {
     "name": "Kezar Life Sciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LABB": {
     "name": "Genomma Lab Internacional, S.A.B. de C.V.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "LAURUSLABS": {
     "name": "Laurus Labs Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "LAW": {
@@ -3494,25 +3494,25 @@
   "LCTX": {
     "name": "Lineage Cell Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LEGN": {
     "name": "Legend Biotech Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LENZ": {
     "name": "Lenz Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LFCR": {
     "name": "Lifecore Biomedical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "LFST": {
@@ -3524,7 +3524,7 @@
   "LGVN": {
     "name": "Longeveron Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LH": {
@@ -3548,7 +3548,7 @@
   "LIPO": {
     "name": "Lipella Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LIVN": {
@@ -3560,7 +3560,7 @@
   "LLY": {
     "name": "Eli Lilly And Co",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "LNTH": {
@@ -3578,7 +3578,7 @@
   "LPCN": {
     "name": "Lipocine Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LPSN": {
@@ -3590,13 +3590,13 @@
   "LQDA": {
     "name": "Liquidia Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "LRMR": {
     "name": "Larimar Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LSB": {
@@ -3614,37 +3614,37 @@
   "LTRN": {
     "name": "Lantern Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LUPIN": {
     "name": "Lupin Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "LXEO": {
     "name": "Lexeo Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LXRX": {
     "name": "Lexicon Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LYEL": {
     "name": "Lyell Immunopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "LYRA": {
     "name": "Lyra Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MA": {
@@ -3656,19 +3656,19 @@
   "MAIA": {
     "name": "Maia Biotechnology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MANKIND": {
     "name": "Mankind Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "MARKSANS": {
     "name": "Marksans Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "MASI": {
@@ -3680,13 +3680,13 @@
   "MAZE": {
     "name": "Maze Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MBX": {
     "name": "MBX Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MCK": {
@@ -3704,7 +3704,7 @@
   "MCRB": {
     "name": "Seres Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MD": {
@@ -3728,7 +3728,7 @@
   "MDGL": {
     "name": "Madrigal Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MDLA": {
@@ -3752,7 +3752,7 @@
   "MDWD": {
     "name": "Mediwound Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MED": {
@@ -3770,7 +3770,7 @@
   "MESO": {
     "name": "Mesoblast Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "META": {
@@ -3782,7 +3782,7 @@
   "MGNX": {
     "name": "MacroGenics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MGRX": {
@@ -3794,31 +3794,31 @@
   "MGTX": {
     "name": "MeiraGTx Holdings PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MIRM": {
     "name": "Mirum Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MIST": {
     "name": "Milestone Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MLTX": {
     "name": "MoonLake Immunotherapeutics",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MLYS": {
     "name": "Mineralys Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MMED": {
@@ -3848,25 +3848,25 @@
   "MNKD": {
     "name": "MannKind Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MNMD": {
     "name": "Mind Medicine (MindMed) Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MNOV": {
     "name": "Medicinova Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MNPR": {
     "name": "Monopar Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MODV": {
@@ -3884,7 +3884,7 @@
   "MOLN": {
     "name": "Molecular Partners AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MOVE": {
@@ -3896,7 +3896,7 @@
   "MPLT": {
     "name": "MapLight Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MPW": {
@@ -3908,19 +3908,19 @@
   "MREO": {
     "name": "Mereo BioPharma Group plc - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MRK": {
     "name": "Merck & Co Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "MRNA": {
     "name": "Moderna Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MRSN": {
@@ -3950,7 +3950,7 @@
   "MTNB": {
     "name": "Matinas BioPharma Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "MXCT": {
@@ -3974,49 +3974,49 @@
   "NAMS": {
     "name": "NewAmsterdam Pharma Company NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NANEXA": {
     "name": "Nanexa AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "NANOFS": {
     "name": "Nanoform Finland Oyj",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NATCOPHARM": {
     "name": "NATCO Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "NAUT": {
     "name": "Nautilus Biotechnology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NBIX": {
     "name": "Neurocrine Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "NBTX": {
     "name": "Nanobiotix SA - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NCNA": {
     "name": "NuCana PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NCNO": {
@@ -4028,7 +4028,7 @@
   "NECLIFE": {
     "name": "Nectar Lifesciences Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "NEO": {
@@ -4040,7 +4040,7 @@
   "NERV": {
     "name": "Minerva Neurosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NET": {
@@ -4052,19 +4052,19 @@
   "NEU": {
     "name": "Neuren Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NEULANDLAB": {
     "name": "Neuland Laboratories Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "NEUP": {
     "name": "Neuphoria Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NFLX": {
@@ -4076,13 +4076,13 @@
   "NGEN": {
     "name": "NervGen Pharma Corp.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NGNE": {
     "name": "Neurogene Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NHI": {
@@ -4094,19 +4094,19 @@
   "NKTR": {
     "name": "Nektar Therapeutics",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NKTX": {
     "name": "Nkarta Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NMRA": {
     "name": "Neumora Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NNOX": {
@@ -4118,7 +4118,7 @@
   "NNVC": {
     "name": "NanoViricides, Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NOTV": {
@@ -4142,19 +4142,19 @@
   "NRIX": {
     "name": "Nurix Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NRXP": {
     "name": "NRX Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NTLA": {
     "name": "Intellia Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NTRA": {
@@ -4166,25 +4166,25 @@
   "NUVB": {
     "name": "Nuvation Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NUVL": {
     "name": "Nuvalent Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NVAX": {
     "name": "Novavax Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NVCT": {
     "name": "Nuvectis Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NVDA": {
@@ -4196,13 +4196,13 @@
   "NVO": {
     "name": "Novo Nordisk A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "NVS": {
     "name": "Novartis AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "NVST": {
@@ -4214,13 +4214,13 @@
   "NWRN": {
     "name": "Newron Pharmaceuticals S.p.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NYKD": {
     "name": "Nykode Therapeutics AS",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "NSIS-B": {
@@ -4232,37 +4232,37 @@
   "OABI": {
     "name": "OmniAb Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OBIO": {
     "name": "Orchestra Biomed Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OCEA": {
     "name": "Ocean Biomedical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OCGN": {
     "name": "Ocugen Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OCS": {
     "name": "Oculis Holding AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OCUL": {
     "name": "Ocular Therapeutix Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OFIX": {
@@ -4274,13 +4274,13 @@
   "OGEN": {
     "name": "Oragenics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OGN": {
     "name": "Organon & Co",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "OHI": {
@@ -4298,19 +4298,19 @@
   "OKUR": {
     "name": "Onkure Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OKYO": {
     "name": "OKYO Pharma Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OLMA": {
     "name": "Olema Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OMCL": {
@@ -4328,7 +4328,7 @@
   "OMER": {
     "name": "Omeros Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ACH": {
@@ -4340,13 +4340,13 @@
   "ONC": {
     "name": "BeOne Medicines AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ONCY": {
     "name": "Oncolytics Biotech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ONT": {
@@ -4382,25 +4382,25 @@
   "ORIC": {
     "name": "ORIC Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ORMP": {
     "name": "Oramed Pharmaceuticals, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ORNAV": {
     "name": "Orion Oyj",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "ORY": {
     "name": "Oryzon Genomics S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OS": {
@@ -4418,7 +4418,7 @@
   "OSE": {
     "name": "OSE Immunotherapeutics SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OSSFF": {
@@ -4430,25 +4430,25 @@
   "OSTX": {
     "name": "OS Therapies Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OTLK": {
     "name": "Outlook Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OVID": {
     "name": "Ovid Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "OXB": {
     "name": "Oxford Biomedica plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "7733": {
@@ -4484,7 +4484,7 @@
   "PASG": {
     "name": "Passage Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PAYC": {
@@ -4502,7 +4502,7 @@
   "PBYI": {
     "name": "Puma Biotechnology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PCOR": {
@@ -4520,7 +4520,7 @@
   "PCVX": {
     "name": "Vaxcyte Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PD": {
@@ -4532,7 +4532,7 @@
   "PDSB": {
     "name": "PDS Biotechnology Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PEN": {
@@ -4544,19 +4544,19 @@
   "PEPG": {
     "name": "PepGen Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PFE": {
     "name": "Pfizer Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "PGEN": {
     "name": "Precigen Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PGNY": {
@@ -4568,13 +4568,13 @@
   "PHAR": {
     "name": "Pharming Group N V ADS each representing 10 Ord Shs",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PHAT": {
     "name": "Phathom Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PHG": {
@@ -4586,19 +4586,19 @@
   "PHIO": {
     "name": "Phio Pharmaceuticals Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PHM": {
     "name": "Pharma Mar, S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PHN": {
     "name": "Pharmanutra S.p.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PHR": {
@@ -4610,13 +4610,13 @@
   "PHVS": {
     "name": "Pharvaris NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PLRX": {
     "name": "Pliant Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PLSE": {
@@ -4628,13 +4628,13 @@
   "PLX": {
     "name": "Protalix Biotherapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PMVP": {
     "name": "PMV Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PNTG": {
@@ -4652,25 +4652,25 @@
   "PPCB": {
     "name": "Propanc Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PPGN": {
     "name": "PolyPeptide Group AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PPLPHARMA": {
     "name": "Piramal Pharma Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PRAX": {
     "name": "Praxis Precision Medicines Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRCT": {
@@ -4682,49 +4682,49 @@
   "PRFX": {
     "name": "PRF Technologies Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PRGO": {
     "name": "Perrigo Company PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PRLD": {
     "name": "Prelude Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRME": {
     "name": "Prime Medicine Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PROK": {
     "name": "ProKidney Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRQR": {
     "name": "ProQR Therapeutics NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRTA": {
     "name": "Prothena Corporation PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRTC": {
     "name": "PureTech Health PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PRVA": {
@@ -4748,43 +4748,43 @@
   "PTCT": {
     "name": "PTC Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PTGX": {
     "name": "Protagonist Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PTN": {
     "name": "Palatin Technologies Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PTPI": {
     "name": "Petros Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "PULM": {
     "name": "Pulmatrix Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PXMD": {
     "name": "Kuvatris Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "PYXS": {
     "name": "Pyxis Oncology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "QDEL": {
@@ -4808,19 +4808,19 @@
   "QNCX": {
     "name": "Quince Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "QNRX": {
     "name": "Quoin Pharmaceuticals Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "QTTB": {
     "name": "Q32 Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "QTWO": {
@@ -4832,13 +4832,13 @@
   "QURE": {
     "name": "Uniqure NV",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RAC": {
     "name": "Racura Oncology Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RAMP": {
@@ -4850,25 +4850,25 @@
   "RANI": {
     "name": "Rani Therapeutics Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RAPP": {
     "name": "Rapport Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RAPT": {
     "name": "RAPT Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RARE": {
     "name": "Ultragenyx Pharmaceutical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RBLX": {
@@ -4880,13 +4880,13 @@
   "RCKT": {
     "name": "Rocket Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RDHL": {
     "name": "RedHill Biopharma Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RDNT": {
@@ -4904,19 +4904,19 @@
   "RDY": {
     "name": "Dr Reddy's Laboratories Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "REC": {
     "name": "Recordati Industria Chimica e Farmaceutica S.p.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "REGN": {
     "name": "Regeneron Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RENB": {
@@ -4928,7 +4928,7 @@
   "REPL": {
     "name": "Replimune Group Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RFL": {
@@ -4940,37 +4940,37 @@
   "RGC": {
     "name": "Regencell Bioscience Holdings Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RGNX": {
     "name": "Regenxbio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RIG2": {
     "name": "Gedeon Richter PLC",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RIGL": {
     "name": "Rigel Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RJF": {
     "name": "Laboratorio Reig Jofre, S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RLAY": {
     "name": "Relay Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RLF": {
@@ -4982,7 +4982,7 @@
   "RLMD": {
     "name": "Relmada Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RMD": {
@@ -4994,19 +4994,19 @@
   "RMTI": {
     "name": "Rockwell Medical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RNA": {
     "name": "Atrium Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RNAC": {
     "name": "Cartesian Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RNG": {
@@ -5018,25 +5018,25 @@
   "RNTX": {
     "name": "Rein Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ROG": {
     "name": "Roche",
     "sector": "Biopharma",
-    "subsector": "Large-Cap Pharma / Diagnostics",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "ROIV": {
     "name": "Roivant Sciences Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ROVI": {
     "name": "Laboratorios Farmaceuticos Rovi, S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RPD": {
@@ -5048,25 +5048,25 @@
   "RPGLIFE": {
     "name": "RPG Life Sciences Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "RPRX": {
     "name": "Royalty Pharma plc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RPTX": {
     "name": "Repare Therapeutics Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RVMD": {
     "name": "Revolution Medicines Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RVTY": {
@@ -5078,7 +5078,7 @@
   "RXRX": {
     "name": "Recursion Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RXST": {
@@ -5090,13 +5090,13 @@
   "RYTM": {
     "name": "Rhythm Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "RZLT": {
     "name": "Rezolute Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "S": {
@@ -5120,19 +5120,19 @@
   "SANA": {
     "name": "Sana Biotechnology Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SANN": {
     "name": "Santhera Pharmaceuticals Holding AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SANOFI": {
     "name": "Sanofi India Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SAP": {
@@ -5156,7 +5156,7 @@
   "SCLX": {
     "name": "Scilex Holding Co",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SCNX": {
@@ -5168,7 +5168,7 @@
   "SCYX": {
     "name": "SCYNEXIS Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SDGR": {
@@ -5198,25 +5198,25 @@
   "SEPN": {
     "name": "Septerna Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SEQUENT": {
     "name": "Viyash Scientific Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SER": {
     "name": "Serina Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SFZN": {
     "name": "Siegfried Holding AG",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SFZS": {
@@ -5234,13 +5234,13 @@
   "SGMO": {
     "name": "Sangamo Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SGMT": {
     "name": "Sagimet Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SGRY": {
@@ -5282,13 +5282,13 @@
   "SIGA": {
     "name": "SIGA Technologies Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SIGHT": {
     "name": "GenSight Biologics S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SILA": {
@@ -5300,43 +5300,43 @@
   "SION": {
     "name": "Sionna Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SKYE": {
     "name": "Skye Bioscience Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLDB": {
     "name": "Solid Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLGL": {
     "name": "Sol Gel Technologies Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLN": {
     "name": "Silence Therapeutics PLC - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLNO": {
     "name": "Soleno Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLS": {
     "name": "Sellas Life Sciences Group Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SLV": {
@@ -5348,7 +5348,7 @@
   "SMMT": {
     "name": "Summit Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SMWB": {
@@ -5366,13 +5366,13 @@
   "SNDX": {
     "name": "Syndax Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SNGX": {
     "name": "Soligenix, Inc. Common Stock",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SNN": {
@@ -5384,7 +5384,7 @@
   "SNOA": {
     "name": "Sonoma Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SNOW": {
@@ -5396,19 +5396,19 @@
   "SNTI": {
     "name": "Senti Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SNY": {
     "name": "Sanofi SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": ""
   },
   "SOBI": {
     "name": "Swedish Orphan Biovitrum AB (publ)",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SOLV": {
@@ -5426,7 +5426,7 @@
   "SPARC": {
     "name": "Sun Pharma Advanced Research Company Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SPGI": {
@@ -5444,19 +5444,19 @@
   "SPRB": {
     "name": "Spruce Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SPRO": {
     "name": "Spero Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SPRY": {
     "name": "ARS Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SPSC": {
@@ -5474,13 +5474,13 @@
   "SRPT": {
     "name": "Sarepta Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SRRK": {
     "name": "Scholar Rock Holding Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SRT": {
@@ -5498,7 +5498,7 @@
   "STAR": {
     "name": "Strides Pharma Science Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "STE": {
@@ -5510,13 +5510,13 @@
   "STOK": {
     "name": "Stoke Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "STRO": {
     "name": "Sutro Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "STRW": {
@@ -5528,7 +5528,7 @@
   "STTK": {
     "name": "Shattuck Labs Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "STVN": {
@@ -5546,25 +5546,25 @@
   "SUPN": {
     "name": "Supernus Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "SVE": {
     "name": "Synthaverse S.A.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SVRA": {
     "name": "Savara Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SYBX": {
     "name": "Synlogic Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SYK": {
@@ -5576,13 +5576,13 @@
   "SYRE": {
     "name": "Spyre Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SYRS": {
     "name": "Syros Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "SECARE": {
@@ -5606,7 +5606,7 @@
   "TAK": {
     "name": "Takeda Pharmaceutical Co Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TALK": {
@@ -5618,19 +5618,19 @@
   "TARA": {
     "name": "Protara Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TARS": {
     "name": "Tarsus Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TBPH": {
     "name": "Theravance Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TCMD": {
@@ -5642,13 +5642,13 @@
   "TCRT": {
     "name": "Alaunos Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TCRX": {
     "name": "Tscan Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TDOC": {
@@ -5672,13 +5672,13 @@
   "TECX": {
     "name": "Tectonic Therapeutic Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TELO": {
     "name": "Telomir Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TEM": {
@@ -5696,13 +5696,13 @@
   "TERN": {
     "name": "Terns Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TEVA": {
     "name": "Teva Pharmaceutical Industries Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TFX": {
@@ -5714,13 +5714,13 @@
   "TGTX": {
     "name": "TG Therapeutics Inc common stock",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "THAR": {
     "name": "Canton Strategic Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "THC": {
@@ -5732,7 +5732,7 @@
   "TIL": {
     "name": "Instil Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TLIS": {
@@ -5744,25 +5744,25 @@
   "TLPH": {
     "name": "Talphera Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TLRY": {
     "name": "Tilray Brands Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TLSA": {
     "name": "Tiziana Life Sciences Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TLX": {
     "name": "Telix Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TMDX": {
@@ -5786,31 +5786,31 @@
   "TNG": {
     "name": "Transgene SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TNGX": {
     "name": "Tango Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TNXP": {
     "name": "Tonix Pharmaceuticals Holding Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TNYA": {
     "name": "Tenaya Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TORNTPHARM": {
     "name": "Torrent Pharmaceuticals Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TPL": {
@@ -5822,7 +5822,7 @@
   "TPST": {
     "name": "Tempest Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TRAK": {
@@ -5834,25 +5834,25 @@
   "TRDA": {
     "name": "Entrada Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TRVI": {
     "name": "Trevi Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TRVN": {
     "name": "Trevena Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TSHA": {
     "name": "Taysha Gene Therapies Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TSLA": {
@@ -5870,7 +5870,7 @@
   "TTRX": {
     "name": "Turn Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TUB": {
@@ -5882,13 +5882,13 @@
   "TVGN": {
     "name": "Tevogen Bio Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TVTX": {
     "name": "Travere Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "TWLO": {
@@ -5912,7 +5912,7 @@
   "TXMD": {
     "name": "TherapeuticsMD Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "TYL": {
@@ -5924,7 +5924,7 @@
   "TYRA": {
     "name": "Tyra Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "4543": {
@@ -5966,7 +5966,7 @@
   "UPB": {
     "name": "Upstream Bio Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "UPLD": {
@@ -5984,7 +5984,7 @@
   "URGN": {
     "name": "Urogen Pharma Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "USPH": {
@@ -5996,7 +5996,7 @@
   "UTHR": {
     "name": "United Therapeutics Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "V": {
@@ -6008,19 +6008,19 @@
   "VALN": {
     "name": "Valneva SE",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VANI": {
     "name": "Vivani Medical Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VAXX": {
     "name": "Vaxxinity Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VCEL": {
@@ -6032,7 +6032,7 @@
   "VCNX": {
     "name": "Vaccinex Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VEEV": {
@@ -6044,43 +6044,43 @@
   "VERA": {
     "name": "Vera Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VERU": {
     "name": "Veru Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VETO": {
     "name": "Vetoquinol SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "VINC": {
     "name": "Vincerx Pharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VIRP": {
     "name": "Virbac SA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "VISTN": {
     "name": "Vistin Pharma ASA",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "VKTX": {
     "name": "Viking Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VLTO": {
@@ -6098,25 +6098,25 @@
   "VNDA": {
     "name": "Vanda Pharmaceuticals Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VOR": {
     "name": "Vor Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VRCA": {
     "name": "Verrica Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VRDN": {
     "name": "Viridian Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VREX": {
@@ -6128,13 +6128,13 @@
   "VRTX": {
     "name": "Vertex Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VSTM": {
     "name": "Verastem Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VTEX": {
@@ -6146,7 +6146,7 @@
   "VTGN": {
     "name": "Vistagen Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VTR": {
@@ -6158,37 +6158,37 @@
   "VTRS": {
     "name": "Viatris Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "VTVT": {
     "name": "vTv Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VTYX": {
     "name": "Ventyx Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VXRT": {
     "name": "Vaxart Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VYGR": {
     "name": "Voyager Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "VYNE": {
     "name": "Vyne Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "WAT": {
@@ -6218,7 +6218,7 @@
   "WHWK": {
     "name": "Whitehawk Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "WK": {
@@ -6242,55 +6242,55 @@
   "WVE": {
     "name": "Wave Life Sciences Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XBIO": {
     "name": "Xenetic Biosciences Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XBIT": {
     "name": "XBiotech Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XENE": {
     "name": "Xenon Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XERS": {
     "name": "Xeris Biopharma Holdings Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XFOR": {
     "name": "X4 Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XLO": {
     "name": "Xilio Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XNCR": {
     "name": "Xencor Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XOMA": {
     "name": "XOMA Royalty Corp",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "XRAY": {
@@ -6320,13 +6320,13 @@
   "ZBIO": {
     "name": "Zenas Biopharma Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZEAL": {
     "name": "Zealand Pharma A/S",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZEN": {
@@ -6344,7 +6344,7 @@
   "ZLAB": {
     "name": "Zai Lab Ltd - ADR",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZM": {
@@ -6356,7 +6356,7 @@
   "ZNTL": {
     "name": "Zentalis Pharmaceuticals Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZOM": {
@@ -6380,25 +6380,25 @@
   "ZURA": {
     "name": "Zura Bio Ltd",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZVRA": {
     "name": "Zevra Therapeutics Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ZYDUSLIFE": {
     "name": "Zydus Lifesciences Limited",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Specialty & Generic Pharma",
     "sub_subsector": ""
   },
   "ZYME": {
     "name": "Zymeworks Inc",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "JAN": {
@@ -6542,7 +6542,7 @@
   "KLRA": {
     "name": "Kailera Therapeutics, Inc.",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Biotech",
     "sub_subsector": ""
   },
   "ARXS": {

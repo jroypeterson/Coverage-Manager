@@ -565,7 +565,7 @@
     "notes": "",
     "name": "Eli Lilly And Co",
     "sector": "Biopharma",
-    "subsector": "",
+    "subsector": "Large Pharma",
     "sub_subsector": "",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
@@ -587,7 +587,7 @@
     "YF Sector": "Healthcare",
     "YF Industry": "Drug Manufacturers - General",
     "Sector (JP)": "Biopharma",
-    "Subsector (JP)": "",
+    "Subsector (JP)": "Large Pharma",
     "Sub-subsector (JP)": "",
     "Core": ""
   },
