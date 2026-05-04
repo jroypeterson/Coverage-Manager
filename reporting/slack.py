@@ -201,8 +201,55 @@ def format_health_v1_message(payload):
     return "\n".join(lines)
 
 
+_SLACK_SECTION_TEXT_MAX = 3000  # Slack hard limit on section.text.text length
+
+
+def _build_health_v1_blocks(message):
+    """Wrap the rendered mrkdwn message in Slack Block Kit blocks.
+
+    Plain `{"text": ...}` payloads render correctly only on webhooks whose
+    Slack-app config has mrkdwn parsing enabled. The earnings-agent app
+    webhook used for #status-reports treats `text` as literal, so emoji
+    shortcodes and `*bold*` show as raw characters. Block Kit `section`
+    blocks with `type: "mrkdwn"` always render formatting and emoji
+    shortcodes regardless of app config — so we send blocks for the rich
+    payload and keep `text` only as a fallback for notifications and old
+    clients that can't render blocks.
+
+    A single section's text is capped at 3000 chars. If we exceed it,
+    split into multiple section blocks at line boundaries.
+    """
+    blocks = []
+    if len(message) <= _SLACK_SECTION_TEXT_MAX:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": message}})
+        return blocks
+
+    chunks = []
+    current = []
+    current_len = 0
+    for line in message.splitlines(keepends=True):
+        if current_len + len(line) > _SLACK_SECTION_TEXT_MAX and current:
+            chunks.append("".join(current))
+            current = [line]
+            current_len = len(line)
+        else:
+            current.append(line)
+            current_len += len(line)
+    if current:
+        chunks.append("".join(current))
+
+    for chunk in chunks:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": chunk}})
+    return blocks
+
+
 def post_health_v1(webhook_url, payload, fallback_path):
     """Post a v1 health heartbeat to Slack with §4.7 fallback semantics.
+
+    Sends a Block Kit payload so mrkdwn (`*bold*`, `:emoji:`) renders
+    consistently regardless of the destination webhook's mrkdwn-parsing
+    config. Includes a plain `text` field as a fallback for notification
+    previews and clients that can't render blocks.
 
     On any non-success path (no webhook configured, network error, non-200
     response), this function:
@@ -224,7 +271,10 @@ def post_health_v1(webhook_url, payload, fallback_path):
     """
     fallback_path = Path(fallback_path)
     message = format_health_v1_message(payload)
-    body = {"text": message, "channel": HEALTH_CHANNEL}
+    body = {
+        "blocks": _build_health_v1_blocks(message),
+        "text": message,  # fallback for notifications + old clients
+    }
 
     def _write_fallback(reason):
         try:

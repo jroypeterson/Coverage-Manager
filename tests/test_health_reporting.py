@@ -157,6 +157,60 @@ def test_post_health_v1_success_does_not_write_fallback(tmp_path, monkeypatch):
     assert not fallback.exists()
 
 
+def test_post_health_v1_sends_block_kit_payload(tmp_path, monkeypatch):
+    """The wire payload must include `blocks` (Block Kit) so mrkdwn renders.
+
+    Regression test for the smoke-test bug where the earnings-agent webhook
+    was rendering :white_check_mark: and *bold* as literal text because we
+    sent only `{"text": ...}`. Section blocks with type=mrkdwn always render.
+    """
+    captured = {}
+    fallback = tmp_path / ".health" / "last_run.json"
+
+    class FakeResp:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(req, timeout=15):
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return FakeResp()
+
+    monkeypatch.setattr(slack_mod.urllib.request, "urlopen", fake_urlopen)
+
+    slack_mod.post_health_v1(
+        "https://hooks.slack.test/services/x", _base_payload(), fallback
+    )
+
+    body = captured["body"]
+    assert "blocks" in body, "must send Block Kit blocks for reliable rendering"
+    assert "text" in body, "must include text fallback for notifications"
+    # All blocks must be mrkdwn sections, not plain_text — that's what makes
+    # *bold* and :emoji: render in apps that don't auto-parse text fields.
+    assert all(b["type"] == "section" for b in body["blocks"])
+    assert all(b["text"]["type"] == "mrkdwn" for b in body["blocks"])
+    # The full message content is preserved across the block(s)
+    rebuilt = "".join(b["text"]["text"] for b in body["blocks"])
+    assert rebuilt == body["text"]
+
+
+def test_build_health_v1_blocks_splits_when_over_3000_chars():
+    """A single section's text is capped at 3000 chars by Slack. Long error
+    blocks must split into multiple sections rather than being truncated."""
+    long_line = "x" * 200 + "\n"
+    huge_message = long_line * 20  # ~4000 chars
+    blocks = slack_mod._build_health_v1_blocks(huge_message)
+    assert len(blocks) >= 2
+    for b in blocks:
+        assert len(b["text"]["text"]) <= slack_mod._SLACK_SECTION_TEXT_MAX
+    rebuilt = "".join(b["text"]["text"] for b in blocks)
+    assert rebuilt == huge_message
+
+
 # ── _build_health_payload — status mapping ───────────────────────────────────
 
 
