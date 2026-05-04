@@ -113,12 +113,23 @@ EXPECTED_COLUMNS = ["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsec
 # new row into the universe CSV. Kept in sync with the values actually used
 # in `data/coverage_universe_tickers.csv`'s `Sector (JP)` column.
 ALLOWED_SECTORS_JP = {
-    "Tech",
-    "SaaS",
-    "Fintech",
+    # HC-focused
     "Biopharma",
     "MedTech",
-    "Life Science Tools",
     "Healthcare Services",
-    "Other",
+    "Life Science Tools",
+    # Tech-adjacent
+    "Tech",
+    "SaaS",
+    # Non-HC sectors (added 2026-05-03 — split from "Other")
+    "Industrials",
+    "Financials",
+    "Consumer",
+    "Energy",
+    "Materials",
+    "Real Estate",
+    # Retained for back-compat (zero rows today; kept in ALLOWED so legacy
+    # callers like watchlist.add(--sector=...) don't reject these strings)
+    "Fintech",   # merged into Financials on 2026-05-03
+    "Other",     # all 46 reassigned to Industrials/Financials/Consumer/etc. on 2026-05-03
 }

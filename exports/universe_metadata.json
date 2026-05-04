@@ -91,7 +91,7 @@
   },
   "2715": {
     "name": "Estun Automation Co Ltd",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "Industrial Robotics / Automation",
     "sub_subsector": ""
   },
@@ -319,7 +319,7 @@
   },
   "AAPL": {
     "name": "Apple Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -433,7 +433,7 @@
   },
   "ACVA": {
     "name": "ACV Auctions Inc",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -463,7 +463,7 @@
   },
   "ADI": {
     "name": "Analog Devices Inc",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -517,7 +517,7 @@
   },
   "AFRM": {
     "name": "Affirm Holdings Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -769,7 +769,7 @@
   },
   "AMZN": {
     "name": "Amazon.com, Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1507,7 +1507,7 @@
   },
   "CAT": {
     "name": "Caterpillar Inc",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1591,7 +1591,7 @@
   },
   "CIGI": {
     "name": "Colliers International Group Inc",
-    "sector": "Other",
+    "sector": "Real Estate",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1657,7 +1657,7 @@
   },
   "CNI": {
     "name": "Canadian National Railway Co",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1699,7 +1699,7 @@
   },
   "COIN": {
     "name": "Coinbase Global Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1747,7 +1747,7 @@
   },
   "CP": {
     "name": "Canadian Pacific Kansas City Ltd",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1807,7 +1807,7 @@
   },
   "CROX": {
     "name": "Crocs Inc",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1831,7 +1831,7 @@
   },
   "CRWD": {
     "name": "CrowdStrike Holdings, Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1849,7 +1849,7 @@
   },
   "CSU": {
     "name": "Constellation Software Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -1933,7 +1933,7 @@
   },
   "CVNA": {
     "name": "Carvana Co",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -2029,7 +2029,7 @@
   },
   "DBX": {
     "name": "Dropbox, Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -2467,13 +2467,13 @@
   },
   "FDX": {
     "name": "FedEx Corp",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
   "FER": {
     "name": "Ferrovial SE",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -2491,7 +2491,7 @@
   },
   "FICO": {
     "name": "Fair Isaac Corp",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -2503,7 +2503,7 @@
   },
   "FIVE": {
     "name": "Five Below Inc",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -2929,7 +2929,7 @@
   },
   "HOOD": {
     "name": "Robinhood Markets Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3349,7 +3349,7 @@
   },
   "JPM": {
     "name": "JPMorgan Chase & Co",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3391,7 +3391,7 @@
   },
   "KKR": {
     "name": "KKR & Co Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3541,7 +3541,7 @@
   },
   "LIN": {
     "name": "Linde plc",
-    "sector": "Other",
+    "sector": "Materials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3649,7 +3649,7 @@
   },
   "MA": {
     "name": "Mastercard Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3697,7 +3697,7 @@
   },
   "MCO": {
     "name": "Moody's Corp",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -3715,7 +3715,7 @@
   },
   "MDA": {
     "name": "MDA Space Ltd",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "Space Tech / Instrumentation",
     "sub_subsector": ""
   },
@@ -3937,7 +3937,7 @@
   },
   "MSFT": {
     "name": "Microsoft Corporation",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -4069,7 +4069,7 @@
   },
   "NFLX": {
     "name": "Netflix Inc",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -4189,7 +4189,7 @@
   },
   "NVDA": {
     "name": "NVIDIA Corporation",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -4495,7 +4495,7 @@
   },
   "PAYP": {
     "name": "PayPay Corp",
-    "sector": "Fintech",
+    "sector": "Financials",
     "subsector": "Digital Payments",
     "sub_subsector": ""
   },
@@ -5041,7 +5041,7 @@
   },
   "RPD": {
     "name": "Rapid7, Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -5431,13 +5431,13 @@
   },
   "SPGI": {
     "name": "S&P Global Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
   "SPOT": {
     "name": "Spotify Technology SA",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -5815,7 +5815,7 @@
   },
   "TPL": {
     "name": "Texas Pacific Land Corp",
-    "sector": "Other",
+    "sector": "Energy",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -5857,7 +5857,7 @@
   },
   "TSLA": {
     "name": "Tesla, Inc.",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -5935,7 +5935,7 @@
   },
   "U": {
     "name": "Unity Software Inc",
-    "sector": "Other",
+    "sector": "Tech",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -5977,7 +5977,7 @@
   },
   "UPS": {
     "name": "United Parcel Service Inc",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6001,7 +6001,7 @@
   },
   "V": {
     "name": "Visa Inc",
-    "sector": "Other",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6085,7 +6085,7 @@
   },
   "VLTO": {
     "name": "Veralto Corp",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6229,7 +6229,7 @@
   },
   "WMT": {
     "name": "Walmart Inc",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6481,31 +6481,31 @@
   },
   "LULU": {
     "name": "Lululemon Athletica Inc.",
-    "sector": "Other",
+    "sector": "Consumer",
     "subsector": "",
     "sub_subsector": ""
   },
   "BE": {
     "name": "Bloom Energy Corporation",
-    "sector": "Other",
+    "sector": "Energy",
     "subsector": "",
     "sub_subsector": ""
   },
   "BRO": {
     "name": "Brown & Brown Inc.",
-    "sector": "Fintech",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
   "CPRT": {
     "name": "Copart Inc.",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
   "FI": {
     "name": "Fiserv Inc.",
-    "sector": "Fintech",
+    "sector": "Financials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6523,7 +6523,7 @@
   },
   "ULS": {
     "name": "UL Solutions Inc.",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "",
     "sub_subsector": ""
   },
@@ -6547,13 +6547,13 @@
   },
   "ARXS": {
     "name": "Arxis, Inc.",
-    "sector": "Other",
+    "sector": "Industrials",
     "subsector": "Aerospace & Defense Components",
     "sub_subsector": ""
   },
   "XE": {
     "name": "X-Energy, Inc.",
-    "sector": "Other",
+    "sector": "Energy",
     "subsector": "Clean Energy / Nuclear SMR",
     "sub_subsector": ""
   }
