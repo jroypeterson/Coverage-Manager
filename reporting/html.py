@@ -158,9 +158,9 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
             if val is not None and not pd.isna(val):
                 bg = get_html_color(val)
                 text_color = "#8B0000" if val < 0 else "#006400" if val > 0 else "#333"
-                cells.append(f'<td class="ret annual-col" style="background-color:{bg};color:{text_color}">{val:.1f}</td>')
+                cells.append(f'<td class="ret annual-col hidden" style="background-color:{bg};color:{text_color}">{val:.1f}</td>')
             else:
-                cells.append('<td class="ret annual-col na">-</td>')
+                cells.append('<td class="ret annual-col hidden na">-</td>')
         for col in html_fund_cols:
             val = row.get(col)
             needs_asterisk = False
@@ -200,7 +200,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
     html_info_display = [split_header(FUND_DISPLAY_NAMES.get(c, c)) for c in html_info_cols]
     info_headers = "".join(f"<th>{c}</th>" for c in html_info_display)
     period_headers = "".join(f'<th>{c}<br>%</th>' for c in PERIOD_COLS)
-    annual_headers = "".join(f'<th class="annual-col">{c}<br>%</th>' for c in ANNUAL_COLS)
+    annual_headers = "".join(f'<th class="annual-col hidden">{c}<br>%</th>' for c in ANNUAL_COLS)
     fund_display = []
     for c in html_fund_cols:
         name = split_header(FUND_DISPLAY_NAMES.get(c, c))
@@ -251,7 +251,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
             filter_cells_list.append("<th></th>")
     filter_cells = "".join(filter_cells_list)
     filter_cells += "".join("<th></th>" for _ in PERIOD_COLS)
-    filter_cells += "".join('<th class="annual-col"></th>' for _ in ANNUAL_COLS)
+    filter_cells += "".join('<th class="annual-col hidden"></th>' for _ in ANNUAL_COLS)
     filter_cells += "".join("<th></th>" for _ in html_fund_cols)
 
     timestamp = datetime.now().strftime("%B %d, %Y %H:%M")
@@ -325,7 +325,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
 <body>
 <h1>{report_title}</h1>
 <p class="timestamp">Generated: {timestamp}
-  <button class="toggle-annual" onclick="toggleAnnual()">Hide Annual Returns</button>
+  <button class="toggle-annual" onclick="toggleAnnual()">Show Annual Returns</button>
 </p>
 <p class="footnote">* Value reflects quarterly YoY growth (yfinance) rather than TTM YoY (Finnhub). TTM YoY data was not available for this ticker.</p>
 <div class="row-count" id="rowCount"></div>
