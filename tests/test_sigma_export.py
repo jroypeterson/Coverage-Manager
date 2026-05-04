@@ -108,20 +108,23 @@ def test_sigma_metadata_does_not_overwrite_existing_csv_ticker(tmp_path):
 def test_build_core_watchlist_payload_joins_universe_metadata(
     monkeypatch, tmp_path, fixture_csv,
 ):
-    """The payload must include buy/target/notes plus name/sector from the universe."""
-    from universe import watchlist as wl
+    """The legacy payload (back-compat shim) must include buy/target/notes
+    plus name/sector from the universe."""
+    from universe import positions as pos
 
-    wl_csv = tmp_path / "watchlist.csv"
-    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
-    wl.add(
-        "AAPL", buy_price=150, target_price=220, notes="core long",
-        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+    pos.add(
+        "AAPL", position="Portfolio", sell_price=220, notes="core long",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
     )
 
     payload = build_core_watchlist_payload(fixture_csv)
     assert set(payload.keys()) == {"AAPL"}
     entry = payload["AAPL"]
-    assert entry["buy_price"] == 150
+    # Sell Price -> Target Price in the legacy shape
     assert entry["target_price"] == 220
     assert entry["notes"] == "core long"
     assert entry["name"] == "Apple Inc"
@@ -129,17 +132,41 @@ def test_build_core_watchlist_payload_joins_universe_metadata(
     assert entry["subsector"] == "Hardware"
 
 
-def test_export_and_push_writes_both_files(monkeypatch, tmp_path, fixture_csv):
-    """export_and_push must write both ticker_metadata.json and core_watchlist.json
-    into the target dir. Git operations are stubbed."""
-    from universe import watchlist as wl
+def test_build_portfolio_payload_filters_to_portfolio_rows(
+    monkeypatch, tmp_path, fixture_csv,
+):
+    """build_portfolio_payload only includes Position == 'Portfolio'."""
+    from universe import positions as pos
+    from reporting.sigma_export import build_portfolio_payload, build_researching_payload
 
-    wl_csv = tmp_path / "watchlist.csv"
-    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
-    wl.add(
-        "MRNA", buy_price=40, target_price=100,
-        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
-    )
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    pos.add("AAPL", position="Portfolio", sell_price=220,
+            path=pos_csv, universe_csv_path=fixture_csv)
+    pos.add("MRNA", position="Researching", buy_price=40,
+            path=pos_csv, universe_csv_path=fixture_csv)
+
+    portfolio = build_portfolio_payload(fixture_csv)
+    researching = build_researching_payload(fixture_csv)
+    assert set(portfolio.keys()) == {"AAPL"}
+    assert set(researching.keys()) == {"MRNA"}
+    assert portfolio["AAPL"]["position"] == "Portfolio"
+    assert portfolio["AAPL"]["sell_price"] == 220
+    assert researching["MRNA"]["position"] == "Researching"
+    assert researching["MRNA"]["buy_price"] == 40
+
+
+def test_export_and_push_writes_all_four_files(monkeypatch, tmp_path, fixture_csv):
+    """export_and_push must write ticker_metadata.json + core_watchlist.json
+    + portfolio.json + researching.json. Git operations are stubbed."""
+    from universe import positions as pos
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+    pos.add("MRNA", position="Portfolio", sell_price=100,
+            path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11")
 
     target_dir = tmp_path / "sigma-alert"
     target_dir.mkdir()
@@ -149,8 +176,6 @@ def test_export_and_push_writes_both_files(monkeypatch, tmp_path, fixture_csv):
 
     def fake_git(cwd, *args):
         calls.append(args)
-        # `git diff --cached --quiet` returns 1 when there are staged changes.
-        # Return 1 here so export_and_push proceeds past the unchanged-check.
         if args[:3] == ("diff", "--cached", "--quiet"):
             return "", 1
         return "", 0
@@ -161,16 +186,27 @@ def test_export_and_push_writes_both_files(monkeypatch, tmp_path, fixture_csv):
 
     assert (target_dir / "ticker_metadata.json").exists()
     assert (target_dir / CORE_WATCHLIST_FILENAME).exists()
+    assert (target_dir / "portfolio.json").exists()
+    assert (target_dir / "researching.json").exists()
 
-    payload = json.loads((target_dir / CORE_WATCHLIST_FILENAME).read_text())
-    assert "MRNA" in payload
-    assert payload["MRNA"]["buy_price"] == 40
-    assert payload["MRNA"]["sector"] == "Biopharma"
+    portfolio_payload = json.loads((target_dir / "portfolio.json").read_text())
+    assert "MRNA" in portfolio_payload
+    assert portfolio_payload["MRNA"]["position"] == "Portfolio"
+    assert portfolio_payload["MRNA"]["sell_price"] == 100
+    assert portfolio_payload["MRNA"]["sector"] == "Biopharma"
 
-    # Confirm both files were `git add`-ed
+    researching_payload = json.loads((target_dir / "researching.json").read_text())
+    assert researching_payload == {}  # no Researching rows in this test
+
+    # Confirm all four files were `git add`-ed
     add_calls = [c for c in calls if c and c[0] == "add"]
     added_files = {c[1] for c in add_calls}
-    assert added_files == {"ticker_metadata.json", CORE_WATCHLIST_FILENAME}
+    assert added_files == {
+        "ticker_metadata.json", CORE_WATCHLIST_FILENAME,
+        "portfolio.json", "researching.json",
+    }
 
     assert result["status"] == "committed"
     assert result["watchlist_entries"] == 1
+    assert result["portfolio_entries"] == 1
+    assert result["researching_entries"] == 0

@@ -188,63 +188,89 @@ def test_normalization_collisions_are_surfaced(monkeypatch, tmp_path):
     assert "ROG" in status["collision_examples"]
 
 
-def test_watchlist_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
-    """The watchlist export step produces csv + json + status and joins with universe metadata."""
-    from universe import watchlist as wl
+def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
+    """The positions export step writes the new portfolio.json + researching.json
+    + positions_and_researching.csv + positions_status.json, plus back-compat
+    watchlist.csv/json/status.json (one cycle)."""
+    from universe import positions as pos
 
-    wl_csv = tmp_path / "watchlist.csv"
-    wl.add(
-        "AAPL", buy_price=150, target_price=220, notes="core",
-        path=wl_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    pos.add(
+        "AAPL", position="Portfolio", sell_price=220, notes="core long",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
+    )
+    pos.add(
+        "MRNA", position="Researching", buy_price=40, notes="watching",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-12",
     )
 
     exports_dir = tmp_path / "exports"
     monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
     monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
-    monkeypatch.setattr(wl, "WATCHLIST_PATH", wl_csv)
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    # The shim's WATCHLIST_PATH points to POSITIONS_PATH, so we need to refresh it
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
 
-    result = weekly_universe._step_export_watchlist()
+    result = weekly_universe._step_export_positions()
 
+    # New canonical artifacts
+    assert (exports_dir / "positions_and_researching.csv").exists()
+    assert (exports_dir / "portfolio.json").exists()
+    assert (exports_dir / "researching.json").exists()
+    assert (exports_dir / "positions_status.json").exists()
+
+    # Legacy back-compat artifacts
     assert (exports_dir / "watchlist.csv").exists()
     assert (exports_dir / "watchlist.json").exists()
     assert (exports_dir / "watchlist_status.json").exists()
-    assert result["entry_count"] == 1
+
+    assert result["entry_count"] == 2
+    assert result["portfolio_count"] == 1
+    assert result["researching_count"] == 1
     assert result["validation_passed"] is True
 
-    joined = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
-    assert joined["AAPL"]["buy_price"] == 150
-    assert joined["AAPL"]["target_price"] == 220
-    assert joined["AAPL"]["name"] == "Apple Inc"
-    assert joined["AAPL"]["sector"] == "Tech"
-    # Every universe column should be present under its raw header name too.
-    assert joined["AAPL"]["Company Name"] == "Apple Inc"
-    assert joined["AAPL"]["Exchange"] == "NASDAQ"
-    assert joined["AAPL"]["Sector (JP)"] == "Tech"
-    assert joined["AAPL"]["Subsector (JP)"] == "Hardware"
-    assert joined["AAPL"]["Currency"] == "USD"
+    # portfolio.json: Portfolio rows only
+    portfolio = json.loads((exports_dir / "portfolio.json").read_text(encoding="utf-8"))
+    assert "AAPL" in portfolio
+    assert "MRNA" not in portfolio
+    assert portfolio["AAPL"]["position"] == "Portfolio"
+    assert portfolio["AAPL"]["sell_price"] == 220
+    assert portfolio["AAPL"]["name"] == "Apple Inc"
 
-    # The CSV should carry all universe columns + the watchlist-unique
-    # columns (Buy Price, Target Price, Date Added, Notes) appended at the end.
-    with open(exports_dir / "watchlist.csv", newline="", encoding="utf-8") as f:
+    # researching.json: Researching rows only
+    researching = json.loads((exports_dir / "researching.json").read_text(encoding="utf-8"))
+    assert "MRNA" in researching
+    assert "AAPL" not in researching
+    assert researching["MRNA"]["position"] == "Researching"
+    assert researching["MRNA"]["buy_price"] == 40
+
+    # CSV: universe cols + position cols
+    with open(exports_dir / "positions_and_researching.csv", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         header = reader.fieldnames
         rows = list(reader)
     assert header[0] == "Ticker"
-    for col in ["Exchange", "Company Name", "Sector (JP)", "Subsector (JP)", "Currency"]:
-        assert col in header
-    assert header[-4:] == ["Buy Price", "Target Price", "Date Added", "Notes"]
-    assert len(rows) == 1
-    assert rows[0]["Ticker"] == "AAPL"
-    assert rows[0]["Company Name"] == "Apple Inc"
-    assert rows[0]["Buy Price"] == "150.0"
-    assert rows[0]["Target Price"] == "220.0"
-    assert rows[0]["Date Added"] == "2026-04-11"
-    assert rows[0]["Notes"] == "core"
+    assert header[-8:] == ["Position", "Position Date", "Buy Price", "Sell Price",
+                            "First Buy Date", "Average Cost", "Shares", "Notes"]
+    assert len(rows) == 2
+    aapl_row = next(r for r in rows if r["Ticker"] == "AAPL")
+    assert aapl_row["Position"] == "Portfolio"
+    assert aapl_row["Sell Price"] == "220.0"
 
-    status = json.loads((exports_dir / "watchlist_status.json").read_text(encoding="utf-8"))
+    # Status file
+    status = json.loads((exports_dir / "positions_status.json").read_text(encoding="utf-8"))
     assert status["schema_version"] == 2
-    assert status["entry_count"] == 1
+    assert status["entry_count"] == 2
+    assert status["portfolio_count"] == 1
+    assert status["researching_count"] == 1
     assert status["validation_passed"] is True
+
+    # Legacy back-compat: watchlist.json should have BOTH entries (union)
+    # with Sell Price mapped to Target Price
+    legacy = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
+    assert "AAPL" in legacy and "MRNA" in legacy
+    assert legacy["AAPL"]["target_price"] == 220  # was Sell Price
 
 
 def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
@@ -263,6 +289,10 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "universe.csv",
         "universe_metadata.json",
         "universe_status.json",
+        "positions_and_researching.csv",
+        "portfolio.json",
+        "researching.json",
+        "positions_status.json",
         "watchlist.csv",
         "watchlist.json",
         "watchlist_status.json",

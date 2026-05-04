@@ -67,11 +67,12 @@ python cli.py enrich                    # Identifier enrichment (Finnhub/FMP)
 python cli.py add-exchanges             # Populate Exchange column via yfinance
 python cli.py cache-clear               # Clear all cached external data
 python cli.py cache-clear --namespace fundamentals
-python cli.py watchlist add TICKER --buy 30 --target 75 --notes "..."  # Add to core watchlist
-python cli.py watchlist remove TICKER   # Remove from core watchlist
-python cli.py watchlist list            # Print the core watchlist
-python cli.py watchlist validate        # Validate (subset + required metadata)
-python cli.py watchlist-report          # Generate the Monday core watchlist report
+python cli.py positions add TICKER --position Portfolio --sell 75 --notes "..."     # Held position
+python cli.py positions add TICKER --position Researching --buy 30 --notes "..."    # Buy candidate
+python cli.py positions remove TICKER   # Remove from positions file
+python cli.py positions list            # Print all positions (Portfolio + Researching)
+python cli.py positions validate        # Validate (subset + Position enum + universe metadata)
+python cli.py watchlist-report          # Generate the Monday positions performance report (legacy name; covers both Portfolio and Researching)
 ```
 
 Add `--verbose` for debug logs:

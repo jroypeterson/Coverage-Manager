@@ -138,54 +138,51 @@ def build_parser():
     wr_parser.add_argument("--skip-email", action="store_true", help="Skip sending email.")
     wr_parser.add_argument("--dry-run", action="store_true", help="Validate and report only, no mutations.")
 
-    wl_parser = subparsers.add_parser(
-        "watchlist",
-        help="Manage the personal watchlist (subset of coverage universe).",
-    )
-    wl_sub = wl_parser.add_subparsers(dest="wl_command", required=True)
-
-    wl_add = wl_sub.add_parser("add", help="Add or update a ticker on the watchlist.")
-    wl_add.add_argument("ticker")
-    wl_add.add_argument("--buy", type=float, default=None, help="Buy price (local currency).")
-    wl_add.add_argument("--target", type=float, default=None, help="Target price (local currency).")
-    wl_add.add_argument("--notes", type=str, default="", help="Free-form notes.")
-    wl_add.add_argument(
-        "--sector",
-        type=str,
-        default=None,
+    pos_parser = subparsers.add_parser(
+        "positions",
         help=(
-            "Sector (JP) — required when the ticker isn't already in the "
-            "coverage universe. Passing this opts into auto-enriching a new "
-            "universe row via FMP/yfinance/OpenFIGI before adding to the "
-            "watchlist. Must match the user-curated taxonomy "
-            "(Tech, SaaS, Fintech, Biopharma, MedTech, Life Science Tools, "
-            "Healthcare Services, Other)."
+            "Manage the positions and researching list (data/positions_and_researching.csv) — "
+            "names the user owns (Portfolio) or is actively researching (Researching). "
+            "Replaces the older `watchlist` subcommand."
         ),
     )
-    wl_add.add_argument(
-        "--exchange",
-        type=str,
-        default=None,
+    pos_sub = pos_parser.add_subparsers(dest="pos_command", required=True)
+
+    pos_add = pos_sub.add_parser("add", help="Add or update a ticker.")
+    pos_add.add_argument("ticker")
+    pos_add.add_argument(
+        "--position",
+        choices=["Portfolio", "Researching"],
+        required=True,
+        help="Position state — Portfolio (you own this) or Researching (building thesis).",
+    )
+    pos_add.add_argument("--buy", type=float, default=None, help="Buy price target (entry).")
+    pos_add.add_argument("--sell", type=float, default=None, help="Sell price target (exit).")
+    pos_add.add_argument("--first-buy-date", type=str, default="", help="First buy date (ISO).")
+    pos_add.add_argument("--average-cost", type=float, default=None, help="Average cost basis.")
+    pos_add.add_argument("--shares", type=int, default=None, help="Shares held.")
+    pos_add.add_argument("--notes", type=str, default="", help="Free-form notes.")
+    pos_add.add_argument(
+        "--sector", type=str, default=None,
         help=(
-            "Optional exchange hint (e.g. NASDAQ, NYSE, LSE, TSE) for when "
-            "the data sources can't resolve it on their own. Only used when "
-            "--sector is passed and the ticker is being newly created."
+            "Sector (JP) — required when the ticker isn't already in the coverage "
+            "universe. Same auto-enrichment path as `watchlist add`."
         ),
     )
-    wl_add.add_argument(
-        "--dry-run",
-        action="store_true",
-        help=(
-            "Preview the watchlist entry and any new universe row that would "
-            "be written, without touching disk."
-        ),
+    pos_add.add_argument(
+        "--exchange", type=str, default=None,
+        help="Optional exchange hint for new universe rows.",
+    )
+    pos_add.add_argument(
+        "--dry-run", action="store_true",
+        help="Preview without writing.",
     )
 
-    wl_rm = wl_sub.add_parser("remove", help="Remove a ticker from the watchlist.")
-    wl_rm.add_argument("ticker")
+    pos_rm = pos_sub.add_parser("remove", help="Remove a ticker.")
+    pos_rm.add_argument("ticker")
 
-    wl_sub.add_parser("list", help="Print the current watchlist.")
-    wl_sub.add_parser("validate", help="Validate the watchlist (subset + price sanity).")
+    pos_sub.add_parser("list", help="Print all positions.")
+    pos_sub.add_parser("validate", help="Validate (subset + Position enum + universe metadata).")
 
     wlr_parser = subparsers.add_parser(
         "watchlist-report",
@@ -261,22 +258,26 @@ def main():
             skip_email=args.skip_email,
             dry_run=args.dry_run,
         )
-    elif args.command == "watchlist":
-        from universe import watchlist
+    elif args.command == "positions":
+        from universe import positions
 
-        if args.wl_command == "add":
+        if args.pos_command == "add":
             try:
-                result = watchlist.add(
+                result = positions.add(
                     args.ticker,
+                    position=args.position,
                     buy_price=args.buy,
-                    target_price=args.target,
+                    sell_price=args.sell,
+                    first_buy_date=args.first_buy_date,
+                    average_cost=args.average_cost,
+                    shares=args.shares,
                     notes=args.notes,
                     create_if_missing=bool(args.sector),
                     sector_jp=args.sector,
                     exchange_hint=args.exchange,
                     dry_run=args.dry_run,
                 )
-            except watchlist.WatchlistError as e:
+            except positions.PositionsError as e:
                 print(f"Error: {e}")
                 raise SystemExit(1)
             if args.dry_run:
@@ -287,29 +288,32 @@ def main():
                         if v:
                             print(f"  {k}: {v}")
                     print()
-                print(f"Would add watchlist entry: {result['watchlist_entry']}")
+                print(f"Would add positions entry: {result['positions_entry']}")
             else:
                 print(f"Added/updated: {result}")
-        elif args.wl_command == "remove":
-            removed = watchlist.remove(args.ticker)
+        elif args.pos_command == "remove":
+            removed = positions.remove(args.ticker)
             if removed:
                 print(f"Removed {args.ticker}")
             else:
-                print(f"{args.ticker} was not on the watchlist")
+                print(f"{args.ticker} was not in the positions file")
                 raise SystemExit(1)
-        elif args.wl_command == "list":
-            entries = watchlist.load()
+        elif args.pos_command == "list":
+            entries = positions.load()
             if not entries:
-                print("(watchlist is empty)")
+                print("(positions file is empty)")
             else:
-                print(f"{'Ticker':<12}{'Buy':>10}{'Target':>10}  {'Added':<12} Notes")
+                print(f"{'Ticker':<10}{'Position':<14}{'Buy':>10}{'Sell':>10}  {'Date':<12} Notes")
                 for e in entries:
                     buy = "" if e["Buy Price"] is None else f"{e['Buy Price']:g}"
-                    tgt = "" if e["Target Price"] is None else f"{e['Target Price']:g}"
-                    print(f"{e['Ticker']:<12}{buy:>10}{tgt:>10}  {e['Date Added']:<12} {e['Notes']}")
-        elif args.wl_command == "validate":
-            entries = watchlist.load()
-            errors, warnings = watchlist.validate(entries)
+                    sell = "" if e["Sell Price"] is None else f"{e['Sell Price']:g}"
+                    print(f"{e['Ticker']:<10}{e['Position']:<14}{buy:>10}{sell:>10}  {e['Position Date']:<12} {e['Notes']}")
+                portfolio_n = sum(1 for e in entries if e["Position"] == "Portfolio")
+                researching_n = sum(1 for e in entries if e["Position"] == "Researching")
+                print(f"\nTotal: {len(entries)} ({portfolio_n} Portfolio, {researching_n} Researching)")
+        elif args.pos_command == "validate":
+            entries = positions.load()
+            errors, warnings = positions.validate(entries)
             for w in warnings:
                 print(f"WARN: {w}")
             for err in errors:

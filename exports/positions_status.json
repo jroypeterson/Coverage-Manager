@@ -4,6 +4,8 @@
   "generated_at": "2026-05-04T00:27:19Z",
   "source_path": "data/positions_and_researching.csv",
   "entry_count": 37,
+  "portfolio_count": 26,
+  "researching_count": 11,
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": []

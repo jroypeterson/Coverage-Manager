@@ -201,27 +201,61 @@ def _step_export_artifacts(validation_result):
                 "schema_version": EXPORTS_SCHEMA_VERSION,
             },
             {
+                "name": "positions_and_researching.csv",
+                "purpose": (
+                    "Positions and researching list joined with universe "
+                    "metadata — all coverage universe columns plus Position, "
+                    "Position Date, Buy Price, Sell Price, First Buy Date, "
+                    "Average Cost, Shares, Notes appended at the end."
+                ),
+                "format": "csv",
+            },
+            {
+                "name": "portfolio.json",
+                "purpose": (
+                    "Position == 'Portfolio' rows only (names you own). "
+                    "{ticker: {position, position_date, buy_price, sell_price, "
+                    "first_buy_date, average_cost, shares, notes, name, "
+                    "sector, subsector, sub_subsector, <all universe columns...>}}."
+                ),
+                "format": "json",
+            },
+            {
+                "name": "researching.json",
+                "purpose": (
+                    "Position == 'Researching' rows only (names you're "
+                    "building a thesis on). Same shape as portfolio.json."
+                ),
+                "format": "json",
+            },
+            {
+                "name": "positions_status.json",
+                "purpose": "Versioned status + validation contract for positions (read schema_version first).",
+                "format": "json",
+                "schema_version": EXPORTS_SCHEMA_VERSION,
+            },
+            {
                 "name": "watchlist.csv",
                 "purpose": (
-                    "Personal watchlist joined with universe metadata — all "
-                    "coverage universe columns plus Buy Price, Target Price, "
-                    "Date Added, Notes appended at the end."
+                    "DEPRECATED back-compat (one cycle): legacy watchlist "
+                    "shape derived from positions_and_researching.csv. "
+                    "Sell Price is mapped to Target Price. Use "
+                    "positions_and_researching.csv for new code."
                 ),
                 "format": "csv",
             },
             {
                 "name": "watchlist.json",
                 "purpose": (
-                    "Watchlist entries joined with the full universe row: "
-                    "{ticker: {buy_price, target_price, date_added, notes, "
-                    "name, sector, subsector, sub_subsector, "
-                    "<all universe columns...>}}."
+                    "DEPRECATED back-compat (one cycle): legacy watchlist "
+                    "JSON shape derived from positions_and_researching.csv. "
+                    "Use portfolio.json + researching.json for new code."
                 ),
                 "format": "json",
             },
             {
                 "name": "watchlist_status.json",
-                "purpose": "Versioned status + validation contract for the watchlist (read schema_version first).",
+                "purpose": "DEPRECATED back-compat (one cycle): mirrors positions_status.json with the legacy shape.",
                 "format": "json",
                 "schema_version": EXPORTS_SCHEMA_VERSION,
             },
@@ -252,55 +286,155 @@ def _step_export_artifacts(validation_result):
     }
 
 
-def _step_export_watchlist():
-    """Publish the watchlist as a standalone artifact under `exports/`.
+def _step_export_positions():
+    """Publish the positions+researching list as standalone artifacts under `exports/`.
 
-    Writes three files alongside the universe artifacts:
-      - watchlist.csv           — personal watchlist joined with the full
-                                  universe row: all universe columns plus the
-                                  watchlist-unique fields (Buy Price, Target
-                                  Price, Date Added, Notes) appended
-      - watchlist.json          — {ticker: {buy_price, target_price, date_added,
-                                  notes, name, sector, subsector, <all
-                                  universe columns...>}} joined for one-stop
-                                  downstream read
-      - watchlist_status.json   — versioned status + validation contract
+    Writes the new (canonical) artifacts:
+      - positions_and_researching.csv  — full join: every universe column
+                                          followed by Position-related fields
+      - portfolio.json                  — {ticker: {...}} for Position=Portfolio
+                                          rows only (rich legacy keys + raw
+                                          universe columns)
+      - researching.json                — {ticker: {...}} for Position=Researching
+                                          rows only
+      - positions_status.json           — versioned status + validation contract
 
-    Kept separate from `universe_status.json` so consumers that don't care about
-    the watchlist aren't forced to parse it, and so its schema can evolve
-    independently. The source `data/watchlist.csv` stays a thin 5-column
-    hand-editable file; the join happens here at export time so the published
-    artifact carries every label a consumer might want without bloating the
-    file the user edits.
+    And keeps writing the legacy back-compat artifacts for one cycle so
+    sibling consumers (sigma-alert, earnings_agent, analyst-days) continue
+    working until they migrate:
+      - watchlist.csv                   — derived from positions; legacy 5-col
+                                          schema (Sell Price -> Target Price)
+      - watchlist.json                  — same shape as before; auto-derived
+      - watchlist_status.json           — same shape as before
+
+    Source of truth is `data/positions_and_researching.csv`. The legacy
+    `data/watchlist.csv` source file was deleted in Phase B (2026-05-03);
+    the legacy exports are built from positions and dropped in a follow-up
+    once consumers migrate.
     """
-    from universe import watchlist as wl
+    from universe import positions as pos
+    from universe import watchlist as wl  # back-compat shim
     from universe.artifacts import build_universe_metadata
 
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    entries = wl.load(wl.WATCHLIST_PATH)
-    errors, warnings = wl.validate(entries, universe_csv_path=CSV_PATH)
-    for w in warnings:
-        logger.info("  watchlist WARN: %s", w)
-    for e in errors:
-        logger.warning("  watchlist ERROR: %s", e)
+
+    # Source: positions module reads data/positions_and_researching.csv
+    pos_entries = pos.load(pos.POSITIONS_PATH)
+    pos_errors, pos_warnings = pos.validate(pos_entries, universe_csv_path=CSV_PATH)
+    for w in pos_warnings:
+        logger.info("  positions WARN: %s", w)
+    for e in pos_errors:
+        logger.warning("  positions ERROR: %s", e)
 
     # Read universe rows + header so the export mirrors whatever columns the
     # coverage universe currently carries (auto-tracks schema changes there).
-    universe_rows = wl._load_universe_rows(CSV_PATH)
+    universe_rows = pos._load_universe_rows(CSV_PATH)
     with open(CSV_PATH, newline="", encoding="utf-8") as f:
         universe_fieldnames = list(csv.DictReader(f).fieldnames or [])
 
-    watchlist_unique_cols = [c for c in wl.WATCHLIST_COLUMNS if c != "Ticker"]
-    csv_fieldnames = universe_fieldnames + [
-        c for c in watchlist_unique_cols if c not in universe_fieldnames
-    ]
+    metadata = build_universe_metadata(CSV_PATH)
 
-    # 1. CSV — universe columns first, then watchlist-unique columns appended
-    csv_out = EXPORTS_DIR / "watchlist.csv"
-    with open(csv_out, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=csv_fieldnames, extrasaction="ignore")
+    def _rel(p):
+        try:
+            return str(Path(p).relative_to(SCRIPT_DIR)).replace("\\", "/")
+        except ValueError:
+            return str(p).replace("\\", "/")
+
+    # ── NEW: positions_and_researching.csv ──────────────────────────────────
+    pos_unique_cols = [c for c in pos.POSITIONS_COLUMNS if c != "Ticker"]
+    pos_csv_fieldnames = universe_fieldnames + [
+        c for c in pos_unique_cols if c not in universe_fieldnames
+    ]
+    pos_csv_out = EXPORTS_DIR / "positions_and_researching.csv"
+    with open(pos_csv_out, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=pos_csv_fieldnames, extrasaction="ignore")
         writer.writeheader()
-        for e in sorted(entries, key=lambda x: x["Ticker"].upper()):
+        for e in sorted(pos_entries, key=lambda x: x["Ticker"].upper()):
+            t = e["Ticker"]
+            row = dict(universe_rows.get(t, {}))
+            row["Ticker"] = t
+            for col in pos_unique_cols:
+                v = e.get(col)
+                row[col] = "" if v is None else v
+            writer.writerow(row)
+
+    # ── NEW: portfolio.json + researching.json ──────────────────────────────
+    def _build_position_json(entries_subset):
+        out = {}
+        for e in entries_subset:
+            t = e["Ticker"]
+            meta_key = t.split()[0].split(".")[0].upper()
+            meta = metadata.get(meta_key, {})
+            row = universe_rows.get(t, {})
+            entry = {
+                "position": e.get("Position", ""),
+                "position_date": e.get("Position Date", ""),
+                "buy_price": e.get("Buy Price"),
+                "sell_price": e.get("Sell Price"),
+                "first_buy_date": e.get("First Buy Date", ""),
+                "average_cost": e.get("Average Cost"),
+                "shares": e.get("Shares"),
+                "notes": e.get("Notes", ""),
+                "name": meta.get("name", ""),
+                "sector": meta.get("sector", ""),
+                "subsector": meta.get("subsector", ""),
+                "sub_subsector": meta.get("sub_subsector", ""),
+            }
+            for col in universe_fieldnames:
+                if col == "Ticker":
+                    continue
+                entry[col] = row.get(col, "")
+            out[t] = entry
+        return out
+
+    portfolio_entries = pos.filter_by_position(pos_entries, "Portfolio")
+    researching_entries = pos.filter_by_position(pos_entries, "Researching")
+    portfolio_json_out = EXPORTS_DIR / "portfolio.json"
+    researching_json_out = EXPORTS_DIR / "researching.json"
+    portfolio_json_out.write_text(
+        json.dumps(_build_position_json(portfolio_entries), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    researching_json_out.write_text(
+        json.dumps(_build_position_json(researching_entries), indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # ── NEW: positions_status.json ──────────────────────────────────────────
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        source_path = str(pos.POSITIONS_PATH.relative_to(SCRIPT_DIR)).replace("\\", "/")
+    except ValueError:
+        source_path = str(pos.POSITIONS_PATH).replace("\\", "/")
+    pos_status = {
+        "schema_version": EXPORTS_SCHEMA_VERSION,
+        "dataset_version": TODAY,
+        "generated_at": generated_at,
+        "source_path": source_path,
+        "entry_count": len(pos_entries),
+        "portfolio_count": len(portfolio_entries),
+        "researching_count": len(researching_entries),
+        "validation_passed": len(pos_errors) == 0,
+        "validation_errors": list(pos_errors),
+        "validation_warnings": list(pos_warnings),
+    }
+    pos_status_out = EXPORTS_DIR / "positions_status.json"
+    pos_status_out.write_text(json.dumps(pos_status, indent=2) + "\n", encoding="utf-8")
+
+    # ── BACK-COMPAT (one cycle): watchlist.csv / .json / _status.json ───────
+    # Derived from positions via the universe.watchlist shim, which projects
+    # the new schema down to the legacy 5-col shape (Sell Price -> Target).
+    legacy_entries = wl.load(wl.WATCHLIST_PATH)  # via shim
+    legacy_errors, legacy_warnings = wl.validate(legacy_entries, universe_csv_path=CSV_PATH)
+    legacy_unique_cols = [c for c in wl.WATCHLIST_COLUMNS if c != "Ticker"]
+    legacy_csv_fieldnames = universe_fieldnames + [
+        c for c in legacy_unique_cols if c not in universe_fieldnames
+    ]
+    legacy_csv_out = EXPORTS_DIR / "watchlist.csv"
+    with open(legacy_csv_out, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=legacy_csv_fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for e in sorted(legacy_entries, key=lambda x: x["Ticker"].upper()):
             t = e["Ticker"]
             row = dict(universe_rows.get(t, {}))
             row["Ticker"] = t
@@ -309,13 +443,8 @@ def _step_export_watchlist():
             row["Date Added"] = e.get("Date Added", "")
             row["Notes"] = e.get("Notes", "")
             writer.writerow(row)
-
-    # 2. Joined JSON — keep the legacy flat keys (buy_price/name/sector/...)
-    # for back-compat, then layer on every raw universe column so new
-    # consumers can read any label from the coverage universe.
-    metadata = build_universe_metadata(CSV_PATH)
-    joined = {}
-    for e in entries:
+    legacy_joined = {}
+    for e in legacy_entries:
         t = e["Ticker"]
         meta_key = t.split()[0].split(".")[0].upper()
         meta = metadata.get(meta_key, {})
@@ -333,40 +462,41 @@ def _step_export_watchlist():
             if col == "Ticker":
                 continue
             entry[col] = row.get(col, "")
-        joined[t] = entry
-    json_out = EXPORTS_DIR / "watchlist.json"
-    json_out.write_text(json.dumps(joined, indent=2) + "\n", encoding="utf-8")
-
-    # 3. Status file
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    try:
-        source_path = str(wl.WATCHLIST_PATH.relative_to(SCRIPT_DIR)).replace("\\", "/")
-    except ValueError:
-        source_path = str(wl.WATCHLIST_PATH).replace("\\", "/")
-    status = {
+        legacy_joined[t] = entry
+    legacy_json_out = EXPORTS_DIR / "watchlist.json"
+    legacy_json_out.write_text(json.dumps(legacy_joined, indent=2) + "\n", encoding="utf-8")
+    legacy_status = {
         "schema_version": EXPORTS_SCHEMA_VERSION,
         "dataset_version": TODAY,
         "generated_at": generated_at,
-        "source_path": source_path,
-        "entry_count": len(entries),
-        "validation_passed": len(errors) == 0,
-        "validation_errors": list(errors),
-        "validation_warnings": list(warnings),
+        "source_path": source_path,  # points at positions_and_researching now
+        "entry_count": len(legacy_entries),
+        "validation_passed": len(legacy_errors) == 0,
+        "validation_errors": list(legacy_errors),
+        "validation_warnings": list(legacy_warnings),
     }
-    status_out = EXPORTS_DIR / "watchlist_status.json"
-    status_out.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
-
-    def _rel(p):
-        try:
-            return str(Path(p).relative_to(SCRIPT_DIR)).replace("\\", "/")
-        except ValueError:
-            return str(p).replace("\\", "/")
+    legacy_status_out = EXPORTS_DIR / "watchlist_status.json"
+    legacy_status_out.write_text(json.dumps(legacy_status, indent=2) + "\n", encoding="utf-8")
 
     return {
-        "artifacts": [_rel(csv_out), _rel(json_out), _rel(status_out)],
-        "entry_count": len(entries),
-        "validation_passed": len(errors) == 0,
+        "artifacts": [
+            _rel(pos_csv_out),
+            _rel(portfolio_json_out),
+            _rel(researching_json_out),
+            _rel(pos_status_out),
+            _rel(legacy_csv_out),
+            _rel(legacy_json_out),
+            _rel(legacy_status_out),
+        ],
+        "entry_count": len(pos_entries),
+        "portfolio_count": len(portfolio_entries),
+        "researching_count": len(researching_entries),
+        "validation_passed": len(pos_errors) == 0,
     }
+
+
+# Back-compat alias — `weekly_build` and tests reference the old name.
+_step_export_watchlist = _step_export_positions
 
 
 def _step_sigma_export():

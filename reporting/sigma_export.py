@@ -26,7 +26,13 @@ METADATA_FILENAME = "ticker_metadata.json"
 # screener can surface watchlist hits in its own section of the Slack
 # digest. Schema mirrors exports/watchlist.json — ticker-keyed, with
 # buy/target/notes joined against universe metadata.
+#
+# DEPRECATED 2026-05-03: kept for one cycle of back-compat while sigma-alert
+# migrates to portfolio.json + researching.json. Will be removed in a
+# follow-up after sigma-alert's screener consumes the new files.
 CORE_WATCHLIST_FILENAME = "core_watchlist.json"
+PORTFOLIO_FILENAME = "portfolio.json"
+RESEARCHING_FILENAME = "researching.json"
 # Sigma-alert's EOD screener writes this file when it finds watchlist tickers
 # that are missing from ticker_metadata.json (or have a blank name). It's the
 # only way the screener — running in CI with no access to the Coverage Manager
@@ -85,13 +91,13 @@ def build_sigma_metadata(csv_path):
 
 
 def build_core_watchlist_payload(csv_path):
-    """Return the {ticker: {...}} dict to write into sigma-alert.
+    """DEPRECATED — back-compat wrapper. Returns the union of portfolio +
+    researching, in the legacy watchlist shape (Sell Price -> Target Price).
 
-    Uses the same join logic as `weekly_universe._step_export_watchlist` so the
-    two files stay in sync: each entry has buy/target/notes from the personal
-    watchlist CSV plus name/sector/subsector from the universe CSV.
+    Use `build_portfolio_payload` and `build_researching_payload` for new code.
+    Will be removed once sigma-alert's screener migrates to the new files.
     """
-    from universe import watchlist as wl
+    from universe import watchlist as wl  # back-compat shim
 
     entries = wl.load(wl.WATCHLIST_PATH)
     metadata = build_universe_metadata(csv_path)
@@ -111,6 +117,50 @@ def build_core_watchlist_payload(csv_path):
             "sub_subsector": meta.get("sub_subsector", ""),
         }
     return out
+
+
+def _build_position_payload(csv_path, position_value):
+    """Return the {ticker: {...}} dict for one Position state.
+
+    Filters `data/positions_and_researching.csv` by Position == position_value
+    and joins with universe metadata. Used for both portfolio.json and
+    researching.json pushed to sigma-alert.
+    """
+    from universe import positions
+
+    entries = positions.load(positions.POSITIONS_PATH)
+    filtered = positions.filter_by_position(entries, position_value)
+    metadata = build_universe_metadata(csv_path)
+    out = {}
+    for e in filtered:
+        t = e["Ticker"]
+        meta_key = t.split()[0].split(".")[0].upper()
+        meta = metadata.get(meta_key, {})
+        out[t] = {
+            "position": e.get("Position", ""),
+            "position_date": e.get("Position Date", ""),
+            "buy_price": e.get("Buy Price"),
+            "sell_price": e.get("Sell Price"),
+            "first_buy_date": e.get("First Buy Date", ""),
+            "average_cost": e.get("Average Cost"),
+            "shares": e.get("Shares"),
+            "notes": e.get("Notes", ""),
+            "name": meta.get("name", ""),
+            "sector": meta.get("sector", ""),
+            "subsector": meta.get("subsector", ""),
+            "sub_subsector": meta.get("sub_subsector", ""),
+        }
+    return out
+
+
+def build_portfolio_payload(csv_path):
+    """{ticker: {...}} for Position=='Portfolio' rows. Pushed to sigma-alert."""
+    return _build_position_payload(csv_path, "Portfolio")
+
+
+def build_researching_payload(csv_path):
+    """{ticker: {...}} for Position=='Researching' rows. Pushed to sigma-alert."""
+    return _build_position_payload(csv_path, "Researching")
 
 
 def read_missing_metadata_flag(target_dir=SIGMA_ALERT_DIR):
@@ -187,15 +237,24 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
         )
 
     metadata = build_sigma_metadata(csv_path)
-    watchlist_payload = build_core_watchlist_payload(csv_path)
+    watchlist_payload = build_core_watchlist_payload(csv_path)  # back-compat (one cycle)
+    portfolio_payload = build_portfolio_payload(csv_path)
+    researching_payload = build_researching_payload(csv_path)
 
     files = {
         METADATA_FILENAME: json.dumps(metadata, indent=2) + "\n",
         CORE_WATCHLIST_FILENAME: json.dumps(watchlist_payload, indent=2) + "\n",
+        PORTFOLIO_FILENAME: json.dumps(portfolio_payload, indent=2) + "\n",
+        RESEARCHING_FILENAME: json.dumps(researching_payload, indent=2) + "\n",
     }
 
     def _result(**fields):
-        out = {"tickers": len(metadata), "watchlist_entries": len(watchlist_payload)}
+        out = {
+            "tickers": len(metadata),
+            "watchlist_entries": len(watchlist_payload),
+            "portfolio_entries": len(portfolio_payload),
+            "researching_entries": len(researching_payload),
+        }
         if flagged_tickers:
             out["missing_metadata"] = flagged_tickers
         out.update(fields)
@@ -228,7 +287,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
 
     _, rc = _git(
         target_dir, "commit", "-m",
-        "Sync ticker metadata + core watchlist from Coverage Manager",
+        "Sync ticker metadata + portfolio/researching from Coverage Manager",
     )
     if rc != 0:
         return _result(status="failed", reason="git commit failed")
