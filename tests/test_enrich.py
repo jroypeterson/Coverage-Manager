@@ -52,6 +52,19 @@ def test_isin_sentinel_values_rejected():
     assert validate_isin_for_row(None, row) is None
 
 
+def test_isin_adr_accepts_either_listing_or_hq_prefix():
+    # Swiss biotech listed on NASDAQ as an ADR (e.g., CRSP). The underlying
+    # ISIN starts with CH; the validator must accept either the HQ prefix
+    # (CH for the Swiss issuer) or the Listing prefix (US for the ADR).
+    row = {"Country (Listing)": "United States", "Country (HQ)": "Switzerland"}
+    assert validate_isin_for_row("CH0334081137", row, "CRSP") == "CH0334081137"
+    # Some ADRs use a US-CUSIP-derived ISIN — also valid via the listing
+    # branch.
+    assert validate_isin_for_row("US45258B1098", row, "IMCR") == "US45258B1098"
+    # A wholly foreign ISIN that matches neither country is still rejected.
+    assert validate_isin_for_row("PLCRTCH00017", row, "RPRX") is None
+
+
 # ── validate_sector_jp ───────────────────────────────────────────────────────
 
 
@@ -232,3 +245,62 @@ def test_enrich_single_ticker_rejects_wrong_country_isin_from_yfinance():
     assert row["ISIN"] == ""
     assert row["Company Name"] == "Fiserv Inc."
     assert row["Exchange"] == "NYSE"
+
+
+def test_enrich_single_ticker_rejects_wrong_country_isin_from_fmp():
+    """FMP can also return a wrong-issuer ISIN for recycled tickers
+    (e.g., a Polish ISIN landing on US-listed Royalty Pharma). The FMP
+    write must go through the same validator as yfinance — otherwise
+    foreign-prefix garbage silently lands in the universe CSV."""
+    def fmp_with_bad_isin(ticker):
+        return {
+            "symbol": ticker,
+            "companyName": "Royalty Pharma plc",
+            "isin": "PLCRTCH00017",  # Polish ISIN — wrong issuer
+            "exchange": "NASDAQ",
+            "currency": "USD",
+            "country": "United States",
+        }
+
+    class FakeYFTicker:
+        isin = "-"
+        info = {}
+
+    with patch("universe.enrich._fetch_fmp_profile", side_effect=fmp_with_bad_isin), \
+         patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
+         patch("universe.enrich.fetch_sec_cik_map", return_value={"RPRX": "1802768"}), \
+         patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
+        row = enrich_single_ticker("RPRX", sector_jp="Biopharma")
+
+    assert row["ISIN"] == ""
+    assert row["Company Name"] == "Royalty Pharma plc"
+    assert row["Country (Listing)"] == "United States"
+
+
+def test_enrich_single_ticker_accepts_adr_isin_from_fmp():
+    """ADR scenario: FMP returns the underlying foreign ISIN (e.g., CH for
+    a Swiss issuer listed on NASDAQ). The validator must accept it via the
+    Country (HQ) branch even though Country (Listing) is the US."""
+    def fmp_adr(ticker):
+        return {
+            "symbol": ticker,
+            "companyName": "CRISPR Therapeutics AG",
+            "isin": "CH0334081137",
+            "exchange": "NASDAQ",
+            "currency": "USD",
+            "country": "Switzerland",
+        }
+
+    class FakeYFTicker:
+        isin = "-"
+        info = {}
+
+    with patch("universe.enrich._fetch_fmp_profile", side_effect=fmp_adr), \
+         patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
+         patch("universe.enrich.fetch_sec_cik_map", return_value={"CRSP": "1674416"}), \
+         patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
+        row = enrich_single_ticker("CRSP", sector_jp="Biopharma")
+
+    assert row["ISIN"] == "CH0334081137"
+    assert row["Country (HQ)"] == "Switzerland"
+    assert row["Country (Listing)"] == "United States"

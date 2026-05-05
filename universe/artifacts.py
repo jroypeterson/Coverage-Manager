@@ -64,7 +64,10 @@ def build_universe_metadata_with_stats(csv_path):
     collisions = 0
     collision_examples = []
 
-    with open(csv_path, newline="", encoding="utf-8") as f:
+    # utf-8-sig tolerates an accidental BOM on the source CSV; without it,
+    # a BOM would prefix the first header (﻿Ticker) and silently
+    # produce empty metadata for every row.
+    with open(csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
             rows_seen += 1

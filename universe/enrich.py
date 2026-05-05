@@ -51,10 +51,18 @@ def validate_isin_for_row(isin, row, ticker=""):
     """Return `isin` if its 2-letter country prefix matches the row's listing
     country (or HQ as fallback), else `None`. Logs a warning on mismatch.
 
-    yfinance occasionally returns a wrong-country ISIN for rebranded tickers
-    — observed with the new "FI" ticker for Fiserv, which returned a Swiss
-    ISIN after the FISV→FI rebrand. This guard rejects such mismatches so
-    they don't silently land in the universe CSV.
+    yfinance and FMP occasionally return a wrong-country ISIN for rebranded
+    or recycled tickers — observed with the "FI" ticker for Fiserv (Swiss
+    ISIN after the FISV→FI rebrand) and with several biotech tickers that
+    were recycled to unrelated foreign issuers. This guard rejects such
+    mismatches so they don't silently land in the universe CSV.
+
+    The ISIN is accepted if its 2-letter prefix matches the country prefix
+    of EITHER `Country (HQ)` or `Country (Listing)`. ADRs need this looser
+    rule because the underlying foreign ISIN (e.g., CH for a Swiss issuer
+    listed on NASDAQ) is the canonical one, even though the listing country
+    is the US. ADR-specific US-CUSIP ISINs (e.g., US-prefixed) also remain
+    valid via the listing-country branch.
 
     Behavior when the row has no country info or the country isn't in
     `COUNTRY_TO_ISIN_PREFIX`: no check is applied, the ISIN is accepted.
@@ -64,20 +72,20 @@ def validate_isin_for_row(isin, row, ticker=""):
     s = str(isin).strip()
     if not s or s == "-" or "error" in s.lower():
         return None
-    expected_prefix = None
-    checked_country = ""
-    for country_field in ("Country (Listing)", "Country (HQ)"):
+    expected_prefixes = set()
+    checked_countries = []
+    for country_field in ("Country (HQ)", "Country (Listing)"):
         country = str(row.get(country_field, "") or "").strip()
         if country and country in COUNTRY_TO_ISIN_PREFIX:
-            expected_prefix = COUNTRY_TO_ISIN_PREFIX[country]
-            checked_country = country
-            break
+            expected_prefixes.add(COUNTRY_TO_ISIN_PREFIX[country])
+            checked_countries.append(country)
     isin_prefix = s[:2].upper()
-    if expected_prefix and isin_prefix != expected_prefix:
+    if expected_prefixes and isin_prefix not in expected_prefixes:
         logger.warning(
-            "ISIN mismatch for %s: got %s (prefix %s) but row is listed in "
-            "%s (expected prefix %s) — rejecting",
-            ticker or "?", s, isin_prefix, checked_country, expected_prefix,
+            "ISIN mismatch for %s: got %s (prefix %s) but row's countries "
+            "are %s (expected one of %s) — rejecting",
+            ticker or "?", s, isin_prefix, checked_countries,
+            sorted(expected_prefixes),
         )
         return None
     return s
@@ -215,11 +223,14 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
     sources_used = []
 
     # ── 1. FMP /stable/profile ───────────────────────────────────────────
+    fmp_isin_candidate = ""
     fmp = _fetch_fmp_profile(ticker)
     if fmp:
         sources_used.append("fmp")
         row["Company Name"] = str(fmp.get("companyName", "") or "").strip()
-        row["ISIN"] = str(fmp.get("isin", "") or "").strip()
+        # Defer ISIN write until Country fields are populated so the same
+        # validate_isin_for_row guard used for yfinance can run here too.
+        fmp_isin_candidate = str(fmp.get("isin", "") or "").strip()
         cik = str(fmp.get("cik", "") or "").strip().lstrip("0")
         if cik:
             row["CIK"] = cik
@@ -248,6 +259,14 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
         row["Country (Listing)"] = row["Country (HQ)"]
     if row["Country (Listing)"]:
         row["Country (ISO)"] = COUNTRY_TO_ISO.get(row["Country (Listing)"], "")
+
+    # Validate FMP's ISIN now that Country fields are populated. Mirrors
+    # the same guard applied to yfinance's ISIN below — protects against
+    # FMP returning a wrong-issuer ISIN on a recycled ticker.
+    if fmp_isin_candidate:
+        checked = validate_isin_for_row(fmp_isin_candidate, row, ticker=ticker)
+        if checked:
+            row["ISIN"] = checked
 
     # ── 3. yfinance fallback for empty fields ────────────────────────────
     needs_yf = not all(row[c] for c in ("Company Name", "Currency", "ISIN", "Year Listed"))

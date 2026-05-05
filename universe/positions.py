@@ -59,7 +59,8 @@ REQUIRED_METADATA_FIELDS = ("Company Name", "Sector (JP)", "Currency", "Exchange
 def _load_universe_rows(universe_csv_path=CSV_PATH):
     """Return a {ticker: row_dict} map for the coverage universe CSV."""
     rows = {}
-    with open(universe_csv_path, newline="", encoding="utf-8") as f:
+    # utf-8-sig tolerates an accidental BOM on the source CSV.
+    with open(universe_csv_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
             t = (row.get("Ticker") or "").strip()
