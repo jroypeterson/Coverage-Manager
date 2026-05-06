@@ -39,10 +39,14 @@ def build_universe_metadata(csv_path):
 
     Args:
         csv_path: Path to a coverage universe CSV (must have columns
-            'Ticker', 'Company Name', 'Sector (JP)', 'Subsector (JP)').
+            'Ticker', 'Company Name', 'Sector (JP)', 'Subsector (JP)',
+            'Sub-subsector (JP)', 'Core').
 
     Returns:
-        Dict keyed by normalized ticker (exchange suffix stripped).
+        Dict keyed by normalized ticker (exchange suffix stripped). Each value
+        has fields: name, sector, subsector, sub_subsector, core. The `core`
+        field is the raw value of the `Core` column ("Y" for analytically-
+        covered names, blank otherwise).
     """
     metadata, _ = build_universe_metadata_with_stats(csv_path)
     return metadata
@@ -83,6 +87,7 @@ def build_universe_metadata_with_stats(csv_path):
                 "sector": row.get("Sector (JP)", "").strip(),
                 "subsector": row.get("Subsector (JP)", "").strip(),
                 "sub_subsector": row.get("Sub-subsector (JP)", "").strip(),
+                "core": row.get("Core", "").strip(),
             }
             rows_kept += 1
 

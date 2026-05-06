@@ -192,6 +192,22 @@ def build_parser():
     wlr_parser.add_argument("--skip-slack", action="store_true", help="Skip Slack post.")
     wlr_parser.add_argument("--dry-run", action="store_true", help="Build report but do not email/post.")
 
+    sx_parser = subparsers.add_parser(
+        "sigma-export",
+        help=(
+            "Push ticker_metadata.json, portfolio.json, researching.json, and "
+            "core_watchlist.json from the current Coverage Manager universe "
+            "into the sibling sigma-alert clone (commits + pushes if changed). "
+            "Useful to refresh sigma-alert immediately after a taxonomy or "
+            "data change without waiting for the Friday weekly-universe cron."
+        ),
+    )
+    sx_parser.add_argument(
+        "--no-push",
+        action="store_true",
+        help="Write + commit locally in the sigma-alert clone but skip the push to origin.",
+    )
+
     cache_parser = subparsers.add_parser(
         "cache-clear",
         help="Clear cached external data.",
@@ -328,6 +344,20 @@ def main():
             skip_slack=args.skip_slack,
             dry_run=args.dry_run,
         )
+    elif args.command == "sigma-export":
+        from config import CSV_PATH
+        from reporting.sigma_export import export_and_push
+
+        result = export_and_push(CSV_PATH, push=not args.no_push)
+        status = result.get("status", "unknown")
+        print(f"sigma-export: {status}")
+        for k, v in result.items():
+            if k == "status":
+                continue
+            print(f"  {k}: {v}")
+        # Exit non-zero on failure so it's a useful command for scripts
+        if status.startswith("failed") or status == "committed_not_pushed":
+            raise SystemExit(2)
     elif args.command == "cache-clear":
         from cache import cache_clear, cache_stats
 

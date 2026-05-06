@@ -24,7 +24,7 @@ from pipeline_utils import collect_non_successes, run_step
 logger = get_logger("weekly_universe")
 
 EXPORTS_DIR = SCRIPT_DIR / "exports"
-EXPORTS_SCHEMA_VERSION = 2
+EXPORTS_SCHEMA_VERSION = 3
 
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",
@@ -379,6 +379,7 @@ def _step_export_positions():
                 "sector": meta.get("sector", ""),
                 "subsector": meta.get("subsector", ""),
                 "sub_subsector": meta.get("sub_subsector", ""),
+                "core": meta.get("core", ""),
             }
             for col in universe_fieldnames:
                 if col == "Ticker":

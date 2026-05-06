@@ -18,7 +18,8 @@ def fixture_csv(tmp_path):
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["Ticker", "Exchange", "Company Name", "Sector (JP)", "Subsector (JP)", "Currency"],
+            fieldnames=["Ticker", "Exchange", "Company Name", "Sector (JP)",
+                        "Subsector (JP)", "Currency", "Core"],
         )
         writer.writeheader()
         writer.writerow(
@@ -29,6 +30,7 @@ def fixture_csv(tmp_path):
                 "Sector (JP)": "Tech",
                 "Subsector (JP)": "Hardware",
                 "Currency": "USD",
+                "Core": "Y",
             }
         )
         writer.writerow(
@@ -39,6 +41,7 @@ def fixture_csv(tmp_path):
                 "Sector (JP)": "Biopharma",
                 "Subsector (JP)": "Biotech",
                 "Currency": "USD",
+                "Core": "",
             }
         )
     return csv_path
@@ -102,7 +105,7 @@ def test_status_file_schema(monkeypatch, tmp_path, fixture_csv):
         "last_discovery_run",
     }
     assert required_fields.issubset(status.keys())
-    assert status["schema_version"] == 2
+    assert status["schema_version"] == 3
     assert status["validation_passed"] is True
     assert status["row_count"] == 2
     # Generic contract: for a fixture without ticker normalization collisions,
@@ -134,6 +137,23 @@ def test_metadata_matches_generic_builder(monkeypatch, tmp_path, fixture_csv):
     assert on_disk == expected
     # Lock in: must be exactly the CSV tickers, nothing else.
     assert set(on_disk.keys()) == {"AAPL", "MRNA"}
+
+
+def test_metadata_includes_core_field(monkeypatch, tmp_path, fixture_csv):
+    """Schema v3: universe_metadata.json entries must include the `core` field
+    so downstream consumers (sigma-alert 1σ filter, forensic_triage, etc.) can
+    read it without falling back to the raw CSV."""
+    exports_dir = tmp_path / "exports"
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
+
+    weekly_universe._step_export_artifacts(
+        {"rows": 2, "errors": [], "warnings": [], "passed": True}
+    )
+
+    metadata = json.loads((exports_dir / "universe_metadata.json").read_text(encoding="utf-8"))
+    assert metadata["AAPL"]["core"] == "Y"
+    assert metadata["MRNA"]["core"] == ""
 
 
 def test_metadata_excludes_sigma_alert_etfs(monkeypatch, tmp_path, fixture_csv):
@@ -260,7 +280,7 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
 
     # Status file
     status = json.loads((exports_dir / "positions_status.json").read_text(encoding="utf-8"))
-    assert status["schema_version"] == 2
+    assert status["schema_version"] == 3
     assert status["entry_count"] == 2
     assert status["portfolio_count"] == 1
     assert status["researching_count"] == 1
@@ -283,7 +303,7 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
     )
 
     manifest = json.loads((exports_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     listed_names = {f["name"] for f in manifest["files"]}
     assert listed_names == {
         "universe.csv",

@@ -149,6 +149,7 @@ def _build_position_payload(csv_path, position_value):
             "sector": meta.get("sector", ""),
             "subsector": meta.get("subsector", ""),
             "sub_subsector": meta.get("sub_subsector", ""),
+            "core": meta.get("core", ""),
         }
     return out
 
