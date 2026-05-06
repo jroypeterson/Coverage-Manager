@@ -184,7 +184,7 @@ COUNTRY_TO_ISO = {
     "Sweden": "SWE", "Denmark": "DNK", "Finland": "FIN",
     "Norway": "NOR", "Poland": "POL", "Mexico": "MEX",
     "South Africa": "ZAF", "Saudi Arabia": "SAU",
-    "United Arab Emirates": "ARE",
+    "United Arab Emirates": "ARE", "Luxembourg": "LUX",
 }
 
 # Country full name → ISO 3166-1 alpha-2 (the prefix an ISIN uses).
@@ -201,7 +201,7 @@ COUNTRY_TO_ISIN_PREFIX = {
     "Sweden": "SE", "Denmark": "DK", "Finland": "FI",
     "Norway": "NO", "Poland": "PL", "Mexico": "MX",
     "South Africa": "ZA", "Saudi Arabia": "SA",
-    "United Arab Emirates": "AE",
+    "United Arab Emirates": "AE", "Luxembourg": "LU",
 }
 
 # ── Functions ───────────────────────────────────────────────────────────────
