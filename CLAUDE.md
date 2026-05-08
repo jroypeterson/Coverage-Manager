@@ -24,14 +24,14 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `data/coverage_universe_tickers.csv` — Master coverage universe
 - `data/positions_and_researching.csv` — Positions and research list (subset of universe). Replaces `data/watchlist.csv` (deleted 2026-05-03). Schema: `Ticker, Position, Position Date, Buy Price, Sell Price, First Buy Date, Average Cost, Shares, Notes`. `Position` is one of `Portfolio` (you own this — full or starter) or `Researching` (building a thesis to buy). Managed via `universe/positions.py` and the `positions` CLI subcommand. Published to `exports/positions_and_researching.csv`, `exports/portfolio.json`, `exports/researching.json` (and back-compat `exports/watchlist*.{csv,json}` for one cycle).
 - `data/delisted_tickers.csv` — Hand-managed archive of tickers that have been acquired/de-listed. Captures last-known sector + market cap so the data isn't lost when a row is removed from the active universe. Append manually after confirming a `delisted_check` flag is real. Schema: `Ticker, Company Name, Sector (JP), Subsector (JP), Sub-subsector (JP), Country (HQ), Exchange, ISIN, Currency, Last Mkt Cap (USD), Last Price, Last Data Date, Delisted Date, Reason, Notes, Date Recorded`. Supersedes the legacy `reports/delisted_tickers.xlsx` (which is gitignored and was migrated into this CSV on 2026-04-27).
-- `providers/` — External data sources (yfinance, Finnhub, FMP, AlphaVantage, FX)
-- `reporting/` — Report generation (Excel, HTML, email, Slack, sigma_export)
+- `providers/` — External data sources (yfinance, Finnhub, FMP, AlphaVantage, FX). `providers/fmp_history.py` is a separate FMP-only fetcher for 5-year P/E and EV/S history used by the Phase 1 historical valuation enrichment (see "Historical valuation columns" below).
+- `reporting/` — Report generation (Excel, HTML, email, Slack, sigma_export). `reporting/history_stats.py` holds None-safe avg/stdev/min/max/vs-avg helpers for the Phase 1 history columns.
 - `universe/` — CSV validation, enrichment, cleanup
 - `discovery/` — Candidate discovery pipeline
 - `exports/` — **Published artifact contract for downstream projects (committed to git)**
 - `reports/` — Generated reports (gitignored)
 - `reports/samples/` — Sample/preview reports
-- `cache/` — Cached API data (gitignored)
+- `cache/` — Cached API data (gitignored). Namespaces: `prices/`, `fundamentals/`, `fx/`, `news/`, `perf/`, `identity/`, and `key_metrics_history/` (30-day TTL — annual P/E + EV/S series for the Phase 1 historical valuation columns)
 
 ## Exports — published artifact contract
 
@@ -221,6 +221,46 @@ The check is **non-gating** — it never blocks the report or the published arti
 2. Appends an entry to `data/delisted_tickers.csv` with the last-known sector + market cap (the `Last Mkt Cap (USD)` / `Last Price` can be pulled from the most recent `cache/fundamentals/yf_<TICKER>.json` before clearing it)
 
 The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at least one flag is raised.
+
+## Historical valuation columns (Phase 1)
+
+The weekly performance report includes 13 trailing-valuation columns appended after the existing FUND_COLS, populated only for the **Phase 1 universe** = `Position == "Portfolio"` ∪ `Position == "Researching"` from `data/positions_and_researching.csv` (read from `exports/portfolio.json` + `exports/researching.json` at report time). Tickers outside Phase 1 render as `N/A`.
+
+### Columns (in order)
+
+| Column | Source | Format |
+|---|---|---|
+| P/E (TTM) | FMP `/stable/ratios-ttm` `priceToEarningsRatioTTM` | float, 1dp |
+| P/E 5Y Avg | mean of FMP `/stable/ratios?period=annual&limit=5` `priceToEarningsRatio` | float, 1dp |
+| P/E 5Y +1σ | avg + sample stdev (n-1) | float, 1dp |
+| P/E 5Y -1σ | avg − sample stdev | float, 1dp |
+| P/E 5Y Min / Max | min/max of the 5Y series | float, 1dp |
+| P/E vs 5Y Avg | (TTM − avg) / avg × 100 | percent; **red = premium, green = discount** (inverted vs return colors) |
+| EV/S 5Y Avg / +1σ / -1σ / Min / Max | from FMP `/stable/key-metrics?period=annual` `evToSales` | float, 1dp |
+| EV/S vs 5Y Avg | (existing TTM `EV/S` column − avg) / avg × 100 | percent; same red/green semantics |
+
+### Why a new "P/E (TTM)" column
+
+The pre-existing "Fwd P/E" column is **inconsistent** across providers:
+- yfinance puts `forwardPE` (NTM, forward) → label "Fwd P/E (NTM)" is correct
+- FMP puts `priceToEarningsRatioTTM` (trailing) → label is wrong for FMP-sourced rows
+
+Comparing forward to a 5-year trailing average is apples-to-oranges, so the Phase 1 feature adds a separate "P/E (TTM)" column populated **always from FMP** regardless of which provider was primary. EV/S TTM is consistent across providers (yfinance `enterpriseToRevenue` and FMP `priceToSalesRatioTTM` are both trailing), so no new EV/S TTM column was needed.
+
+### Caching
+
+- Namespace: `cache/key_metrics_history/<TICKER>.json`
+- TTL: 30 days (annual fundamentals change slowly; weekly re-fetches would be wasteful)
+- Schema: `{pe_ttm, pe_history[5], evs_history[5], record_dates[5]}` — most-recent-first, padded with None to length 5
+
+### Performance
+
+Cold cache: ~3 FMP calls per Phase 1 ticker (annual ratios + annual key-metrics + ratios-ttm). Phase 1 has ~50–100 tickers, so ~150–300 calls at 300/min = 30–60 sec one-time, then 30-day-cached.
+
+### Phase 2 (deferred)
+
+- HTML report rendering (`reporting/html.py` iterates `FUND_COLS`, doesn't include `HIST_COLS`)
+- Expand to full universe / Core flag once formatting is validated
 
 ## Movers report
 

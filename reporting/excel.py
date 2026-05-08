@@ -7,6 +7,7 @@ from openpyxl.utils import get_column_letter
 from reporting.calcs import (
     RETURN_COLS, PERIOD_COLS, ANNUAL_COLS, FUND_COLS, VAL_COLS,
     FUND_PCT_COLS, FUND_MONEY_COLS, FUND_DISPLAY_NAMES,
+    HIST_COLS, HIST_RATIO_COLS, HIST_VS_AVG_COLS,
     get_color, format_mkt_cap, format_price,
 )
 
@@ -26,6 +27,7 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
     )
     fund_header_fill = PatternFill(start_color="1A5276", end_color="1A5276", fill_type="solid")
     val_header_fill = PatternFill(start_color="1A5276", end_color="1A5276", fill_type="solid")
+    hist_header_fill = PatternFill(start_color="34495E", end_color="34495E", fill_type="solid")
     etf_info_fill = PatternFill(start_color="D6DEE5", end_color="D6DEE5", fill_type="solid")
     etf_font_bold = Font(bold=True, size=9)
     etf_top_border = Border(
@@ -35,13 +37,15 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
         bottom=Side(style="thin", color="D0D0D0"),
     )
 
-    all_cols = info_cols + RETURN_COLS + FUND_COLS
+    all_cols = info_cols + RETURN_COLS + FUND_COLS + HIST_COLS
 
     # Write headers
     for col_idx, col_name in enumerate(all_cols, 1):
         display_name = FUND_DISPLAY_NAMES.get(col_name, col_name)
         cell = ws.cell(row=1, column=col_idx, value=display_name)
-        if col_name in FUND_COLS:
+        if col_name in HIST_COLS:
+            cell.fill = hist_header_fill
+        elif col_name in FUND_COLS:
             cell.fill = fund_header_fill
         elif col_name in VAL_COLS:
             cell.fill = val_header_fill
@@ -53,6 +57,7 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
 
     # Write data
     val_and_fund_cols = set(FUND_COLS + VAL_COLS)
+    hist_col_set = set(HIST_COLS)
     prev_was_etf = False
     for row_idx, (_, row) in enumerate(df.iterrows(), 2):
         is_etf = row.get("_is_etf", False)
@@ -60,7 +65,37 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
         prev_was_etf = is_etf
         for col_idx, col_name in enumerate(all_cols, 1):
             val = row.get(col_name)
-            if col_name in RETURN_COLS:
+            if col_name in hist_col_set:
+                if val is None or (hasattr(val, "__float__") and pd.isna(val)):
+                    cell = ws.cell(row=row_idx, column=col_idx, value="N/A")
+                    cell.font = Font(color="999999", size=9)
+                elif col_name in HIST_VS_AVG_COLS:
+                    try:
+                        num_val = float(val)
+                        cell = ws.cell(row=row_idx, column=col_idx, value=round(num_val, 1))
+                        cell.number_format = '0.0"%"'
+                        # Premium (positive) = red (expensive); discount (negative) = green (cheap).
+                        # Invert get_color by flipping the sign.
+                        hex_color = get_color(-num_val)
+                        cell.fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+                        if num_val > 0:
+                            cell.font = Font(color="8B0000", size=9)
+                        elif num_val < 0:
+                            cell.font = Font(color="006400", size=9)
+                        else:
+                            cell.font = Font(size=9)
+                    except (TypeError, ValueError):
+                        cell = ws.cell(row=row_idx, column=col_idx, value=str(val))
+                        cell.font = Font(size=9)
+                else:
+                    # Plain ratio (avg, +1σ, -1σ, min, max) — 1 decimal, no color
+                    try:
+                        cell = ws.cell(row=row_idx, column=col_idx, value=round(float(val), 1))
+                        cell.number_format = '0.0'
+                    except (TypeError, ValueError):
+                        cell = ws.cell(row=row_idx, column=col_idx, value=str(val))
+                    cell.font = Font(size=9)
+            elif col_name in RETURN_COLS:
                 if val is not None and not pd.isna(val):
                     cell = ws.cell(row=row_idx, column=col_idx, value=round(val, 1))
                     cell.number_format = '0.0"%"'
@@ -159,6 +194,9 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
     fund_start = ret_start + len(RETURN_COLS)
     for i in range(len(FUND_COLS)):
         ws.column_dimensions[get_column_letter(fund_start + i)].width = 10
+    hist_start = fund_start + len(FUND_COLS)
+    for i in range(len(HIST_COLS)):
+        ws.column_dimensions[get_column_letter(hist_start + i)].width = 11
 
     # Freeze panes
     freeze_col = get_column_letter(3 + len(VAL_COLS))

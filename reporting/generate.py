@@ -24,11 +24,13 @@ from ticker_utils import normalize_ticker
 from logging_utils import configure_logging, get_logger
 
 from reporting.calcs import (
-    FUND_COLS, VAL_COLS,
+    FUND_COLS, VAL_COLS, HIST_COLS,
     compute_returns, build_result_row,
 )
+from reporting.history_stats import stats_from_series
 from providers.wikipedia_provider import fetch_sp500_tickers
 from providers.fmp_provider import fetch_historical_prices as try_fmp_historical
+from providers.fmp_history import fetch_history_parallel
 from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import batch_download_prices
 from providers.provider_chain import fetch_all_fundamentals
@@ -46,6 +48,69 @@ OUTPUT_XLSX = REPORTS_DIR / f"coverage_performance_{TODAY}.xlsx"
 OUTPUT_HTML = REPORTS_DIR / f"coverage_performance_{TODAY}.html"
 
 # ── Helper functions ───────────────────────────────────────────────────────
+
+
+def _load_phase1_tickers():
+    """Read Portfolio ∪ Researching ticker set from exports.
+
+    Phase 1 of the historical-valuation feature only enriches these names.
+    Returns an empty set if the export files are missing — the caller treats
+    that as "skip enrichment" and leaves the columns blank.
+    """
+    from pathlib import Path
+    exports_dir = Path(__file__).resolve().parent.parent / "exports"
+    tickers = set()
+    for fname in ("portfolio.json", "researching.json"):
+        path = exports_dir / fname
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            tickers.update(data.keys())
+        except Exception as e:
+            logger.warning("Failed to read %s for history universe: %s", fname, e)
+    return tickers
+
+
+def _hist_columns_from_payload(payload):
+    """Convert a fetch_history result dict into the 13 history columns.
+
+    Returns a dict with keys matching `HIST_COLS`. Any field that can't be
+    computed (insufficient data) is set to None — the Excel writer renders
+    those as N/A.
+    """
+    pe_ttm = payload.get("pe_ttm")
+    pe_history = payload.get("pe_history") or []
+    evs_history = payload.get("evs_history") or []
+
+    pe_stats = stats_from_series(pe_history, current=pe_ttm)
+    # For EV/S vs-avg we use the same 5Y annual history; the "current" comparison
+    # is left to the existing EV/S (TTM) column populated by the provider chain.
+    # Pass current=None here — the row-injection step below fills vs_avg_pct
+    # using the live TTM EV/S value once we know it.
+    evs_stats = stats_from_series(evs_history, current=None)
+
+    return {
+        "P/E (TTM)": pe_ttm,
+        "P/E 5Y Avg": pe_stats["avg"],
+        "P/E 5Y +1σ": pe_stats["plus_1sd"],
+        "P/E 5Y -1σ": pe_stats["minus_1sd"],
+        "P/E 5Y Min": pe_stats["min"],
+        "P/E 5Y Max": pe_stats["max"],
+        "P/E vs 5Y Avg": pe_stats["vs_avg_pct"],
+        "EV/S 5Y Avg": evs_stats["avg"],
+        "EV/S 5Y +1σ": evs_stats["plus_1sd"],
+        "EV/S 5Y -1σ": evs_stats["minus_1sd"],
+        "EV/S 5Y Min": evs_stats["min"],
+        "EV/S 5Y Max": evs_stats["max"],
+        "EV/S vs 5Y Avg": None,  # filled later once TTM EV/S is in scope
+    }
+
+
+def _evs_vs_avg_pct(current_evs, evs_history):
+    """Compute (current TTM EV/S - 5Y avg) / 5Y avg * 100. None-safe."""
+    stats = stats_from_series(evs_history, current=current_evs)
+    return stats["vs_avg_pct"]
 
 
 def classify_sector_group(row):
@@ -251,6 +316,27 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     health_data = build_ticker_health_data(df_unique, yf_tickers, ticker_map, all_results, all_fundamentals)
     logger.info("Ticker health: %s issues found", health_data["total_issues"])
 
+    # Fetch 5-year P/E and EV/S history for Phase 1 universe (Portfolio ∪ Researching).
+    # Cached 30 days; cold-cache cost is ~3 FMP calls per ticker × ~50 tickers = trivial.
+    # Runs in sample mode too — useful for verifying the new columns format correctly
+    # when a sample ticker overlaps with Portfolio/Researching.
+    phase1_universe = _load_phase1_tickers()
+    history_data = {}
+    if phase1_universe:
+        fmp_key_for_history = API_KEYS.get("FMP_API_KEY")
+        if fmp_key_for_history:
+            t0 = time.monotonic()
+            logger.info("Fetching 5Y history for %s Phase 1 tickers...", len(phase1_universe))
+            history_data = fetch_history_parallel(
+                sorted(phase1_universe), fmp_key_for_history,
+                max_workers=10, use_cache=use_cache,
+            )
+            covered = sum(1 for h in history_data.values() if h.get("pe_ttm") is not None or any(h.get("pe_history") or []))
+            step_timings.append(("history", time.monotonic() - t0, f"{covered}/{len(phase1_universe)} tickers"))
+            logger.info("History loaded for %s/%s Phase 1 tickers", covered, len(phase1_universe))
+        else:
+            logger.info("Skipping 5Y history fetch — FMP_API_KEY not set")
+
     # Calculate returns
     results = []
     for row in df_unique.to_dict("records"):
@@ -276,6 +362,20 @@ def main(sample_mode=False, refresh=False, skip_email=False):
             currency=all_currencies.get(yf_t, ""),
             core=str(row.get("Core", "")).strip(),
         )
+
+        # Phase 1 historical valuation enrichment. Tickers outside the universe
+        # get explicit None for every HIST_COLS key so DataFrame construction
+        # doesn't drop the columns when no row has values.
+        hist_payload = history_data.get(orig_ticker)
+        if hist_payload:
+            hist_cols = _hist_columns_from_payload(hist_payload)
+            # Fill EV/S vs 5Y Avg from the live TTM EV/S in `fund`
+            current_evs = fund.get("EV/S")
+            hist_cols["EV/S vs 5Y Avg"] = _evs_vs_avg_pct(current_evs, hist_payload.get("evs_history") or [])
+            result_row.update(hist_cols)
+        else:
+            result_row.update({col: None for col in HIST_COLS})
+
         results.append(result_row)
 
     result_df = pd.DataFrame(results)

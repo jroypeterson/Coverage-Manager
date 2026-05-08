@@ -22,6 +22,26 @@ FUND_PCT_COLS = {"Gross Mgn", "Op Mgn", "ROE", "Rev Grw", "EPS Grw"}
 FUND_RATIO_COLS = {"Fwd P/E", "EV/EBITDA", "EV/S", "PEG"}
 FUND_MONEY_COLS = {"Mkt Cap", "Enterprise Value", "Net Debt"}
 
+# ── Historical valuation columns (Phase 1: Portfolio ∪ Researching only) ──
+# 5-year stats per ratio. P/E uses live TTM as the "current" value (FMP-sourced
+# in `providers/fmp_history.py` to dodge the yfinance/FMP "Fwd P/E" inconsistency
+# — yfinance puts NTM in that column, FMP puts TTM). EV/S uses the existing
+# "EV/S" TTM column (consistent across providers).
+HIST_PE_COLS = [
+    "P/E (TTM)", "P/E 5Y Avg", "P/E 5Y +1σ", "P/E 5Y -1σ",
+    "P/E 5Y Min", "P/E 5Y Max", "P/E vs 5Y Avg",
+]
+HIST_EVS_COLS = [
+    "EV/S 5Y Avg", "EV/S 5Y +1σ", "EV/S 5Y -1σ",
+    "EV/S 5Y Min", "EV/S 5Y Max", "EV/S vs 5Y Avg",
+]
+HIST_COLS = HIST_PE_COLS + HIST_EVS_COLS
+HIST_RATIO_COLS = {
+    "P/E (TTM)", "P/E 5Y Avg", "P/E 5Y +1σ", "P/E 5Y -1σ", "P/E 5Y Min", "P/E 5Y Max",
+    "EV/S 5Y Avg", "EV/S 5Y +1σ", "EV/S 5Y -1σ", "EV/S 5Y Min", "EV/S 5Y Max",
+}
+HIST_VS_AVG_COLS = {"P/E vs 5Y Avg", "EV/S vs 5Y Avg"}  # premium (+) / discount (-) %
+
 FUND_DISPLAY_NAMES = {
     "Mkt Cap": "Mkt Cap (USD $B)",
     "Enterprise Value": "EV (USD $B)",
