@@ -142,7 +142,9 @@ def build_parser():
         "positions",
         help=(
             "Manage the positions and researching list (data/positions_and_researching.csv) — "
-            "names the user owns (Portfolio) or is actively researching (Researching). "
+            "names the user owns (Portfolio), is actively researching (Researching), "
+            "passively follows (Following for Interest), or is trigger-ready on "
+            "either side (Ready to Buy / Ready to Short). "
             "Replaces the older `watchlist` subcommand."
         ),
     )
@@ -152,9 +154,18 @@ def build_parser():
     pos_add.add_argument("ticker")
     pos_add.add_argument(
         "--position",
-        choices=["Portfolio", "Researching"],
+        choices=[
+            "Portfolio", "Researching", "Following for Interest",
+            "Ready to Buy", "Ready to Short",
+        ],
         required=True,
-        help="Position state — Portfolio (you own this) or Researching (building thesis).",
+        help=(
+            "Position state — Portfolio (held), Researching (thesis-building), "
+            "Following for Interest (passive earnings/signal tracking, no intent "
+            "to trade), Ready to Buy (long thesis done, waiting for entry "
+            "trigger), or Ready to Short (short thesis done, waiting for entry "
+            "trigger)."
+        ),
     )
     pos_add.add_argument("--buy", type=float, default=None, help="Buy price target (entry).")
     pos_add.add_argument("--sell", type=float, default=None, help="Sell price target (exit).")
@@ -319,14 +330,17 @@ def main():
             if not entries:
                 print("(positions file is empty)")
             else:
-                print(f"{'Ticker':<10}{'Position':<14}{'Buy':>10}{'Sell':>10}  {'Date':<12} Notes")
+                print(f"{'Ticker':<10}{'Position':<16}{'Buy':>10}{'Sell':>10}  {'Date':<12} Notes")
                 for e in entries:
                     buy = "" if e["Buy Price"] is None else f"{e['Buy Price']:g}"
                     sell = "" if e["Sell Price"] is None else f"{e['Sell Price']:g}"
-                    print(f"{e['Ticker']:<10}{e['Position']:<14}{buy:>10}{sell:>10}  {e['Position Date']:<12} {e['Notes']}")
-                portfolio_n = sum(1 for e in entries if e["Position"] == "Portfolio")
-                researching_n = sum(1 for e in entries if e["Position"] == "Researching")
-                print(f"\nTotal: {len(entries)} ({portfolio_n} Portfolio, {researching_n} Researching)")
+                    print(f"{e['Ticker']:<10}{e['Position']:<16}{buy:>10}{sell:>10}  {e['Position Date']:<12} {e['Notes']}")
+                counts = {
+                    name: sum(1 for e in entries if e["Position"] == name)
+                    for name in positions.POSITION_VALUES_ORDERED
+                }
+                summary = ", ".join(f"{n} {name}" for name, n in counts.items())
+                print(f"\nTotal: {len(entries)} ({summary})")
         elif args.pos_command == "validate":
             entries = positions.load()
             errors, warnings = positions.validate(entries)

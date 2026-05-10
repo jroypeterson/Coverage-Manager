@@ -57,6 +57,7 @@ FUND_DISPLAY_NAMES = {
     "ROE": "ROE (TTM)",
     "Rev Grw": "Rev Grw (TTM YoY)",
     "EPS Grw": "EPS Grw (TTM YoY)",
+    "Core": "Core Coverage",
 }
 
 # ── Currency formatting ───────────────────────────────────────────────────

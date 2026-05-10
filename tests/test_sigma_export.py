@@ -156,9 +156,10 @@ def test_build_portfolio_payload_filters_to_portfolio_rows(
     assert researching["MRNA"]["buy_price"] == 40
 
 
-def test_export_and_push_writes_all_four_files(monkeypatch, tmp_path, fixture_csv):
+def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_csv):
     """export_and_push must write ticker_metadata.json + core_watchlist.json
-    + portfolio.json + researching.json. Git operations are stubbed."""
+    + portfolio.json + researching.json + following_for_interest.json +
+    ready_to_buy.json + ready_to_short.json. Git operations are stubbed."""
     from universe import positions as pos
 
     pos_csv = tmp_path / "positions_and_researching.csv"
@@ -167,6 +168,8 @@ def test_export_and_push_writes_all_four_files(monkeypatch, tmp_path, fixture_cs
     monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
     pos.add("MRNA", position="Portfolio", sell_price=100,
             path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11")
+    pos.add("AAPL", position="Ready to Buy", buy_price=180,
+            path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08")
 
     target_dir = tmp_path / "sigma-alert"
     target_dir.mkdir()
@@ -188,6 +191,9 @@ def test_export_and_push_writes_all_four_files(monkeypatch, tmp_path, fixture_cs
     assert (target_dir / CORE_WATCHLIST_FILENAME).exists()
     assert (target_dir / "portfolio.json").exists()
     assert (target_dir / "researching.json").exists()
+    assert (target_dir / "following_for_interest.json").exists()
+    assert (target_dir / "ready_to_buy.json").exists()
+    assert (target_dir / "ready_to_short.json").exists()
 
     portfolio_payload = json.loads((target_dir / "portfolio.json").read_text())
     assert "MRNA" in portfolio_payload
@@ -198,15 +204,31 @@ def test_export_and_push_writes_all_four_files(monkeypatch, tmp_path, fixture_cs
     researching_payload = json.loads((target_dir / "researching.json").read_text())
     assert researching_payload == {}  # no Researching rows in this test
 
-    # Confirm all four files were `git add`-ed
+    following_payload = json.loads((target_dir / "following_for_interest.json").read_text())
+    assert following_payload == {}  # no Following-for-Interest rows
+
+    rtb_payload = json.loads((target_dir / "ready_to_buy.json").read_text())
+    assert "AAPL" in rtb_payload
+    assert rtb_payload["AAPL"]["position"] == "Ready to Buy"
+    assert rtb_payload["AAPL"]["buy_price"] == 180
+
+    rts_payload = json.loads((target_dir / "ready_to_short.json").read_text())
+    assert rts_payload == {}  # no Ready-to-Short rows
+
+    # Confirm all seven files were `git add`-ed
     add_calls = [c for c in calls if c and c[0] == "add"]
     added_files = {c[1] for c in add_calls}
     assert added_files == {
         "ticker_metadata.json", CORE_WATCHLIST_FILENAME,
         "portfolio.json", "researching.json",
+        "following_for_interest.json",
+        "ready_to_buy.json", "ready_to_short.json",
     }
 
     assert result["status"] == "committed"
     assert result["watchlist_entries"] == 1
     assert result["portfolio_entries"] == 1
     assert result["researching_entries"] == 0
+    assert result["following_for_interest_entries"] == 0
+    assert result["ready_to_buy_entries"] == 1
+    assert result["ready_to_short_entries"] == 0

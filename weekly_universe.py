@@ -229,6 +229,33 @@ def _step_export_artifacts(validation_result):
                 "format": "json",
             },
             {
+                "name": "following_for_interest.json",
+                "purpose": (
+                    "Position == 'Following for Interest' rows only "
+                    "(passive earnings/signal tracking; no intent to "
+                    "trade). Same shape as portfolio.json."
+                ),
+                "format": "json",
+            },
+            {
+                "name": "ready_to_buy.json",
+                "purpose": (
+                    "Position == 'Ready to Buy' rows only (long thesis "
+                    "complete; waiting for entry trigger). Same shape as "
+                    "portfolio.json."
+                ),
+                "format": "json",
+            },
+            {
+                "name": "ready_to_short.json",
+                "purpose": (
+                    "Position == 'Ready to Short' rows only (short thesis "
+                    "complete; waiting for entry trigger). Same shape as "
+                    "portfolio.json."
+                ),
+                "format": "json",
+            },
+            {
                 "name": "positions_status.json",
                 "purpose": "Versioned status + validation contract for positions (read schema_version first).",
                 "format": "json",
@@ -297,6 +324,15 @@ def _step_export_positions():
                                           universe columns)
       - researching.json                — {ticker: {...}} for Position=Researching
                                           rows only
+      - following_for_interest.json     — {ticker: {...}} for Position=
+                                          'Following for Interest' rows
+                                          (passive tracking; no intent to trade)
+      - ready_to_buy.json               — {ticker: {...}} for Position=
+                                          'Ready to Buy' rows (long thesis
+                                          complete; waiting for entry trigger)
+      - ready_to_short.json             — {ticker: {...}} for Position=
+                                          'Ready to Short' rows (short thesis
+                                          complete; waiting for entry trigger)
       - positions_status.json           — versioned status + validation contract
 
     And keeps writing the legacy back-compat artifacts for one cycle so
@@ -390,14 +426,32 @@ def _step_export_positions():
 
     portfolio_entries = pos.filter_by_position(pos_entries, "Portfolio")
     researching_entries = pos.filter_by_position(pos_entries, "Researching")
+    following_entries = pos.filter_by_position(pos_entries, "Following for Interest")
+    ready_to_buy_entries = pos.filter_by_position(pos_entries, "Ready to Buy")
+    ready_to_short_entries = pos.filter_by_position(pos_entries, "Ready to Short")
     portfolio_json_out = EXPORTS_DIR / "portfolio.json"
     researching_json_out = EXPORTS_DIR / "researching.json"
+    following_json_out = EXPORTS_DIR / "following_for_interest.json"
+    ready_to_buy_json_out = EXPORTS_DIR / "ready_to_buy.json"
+    ready_to_short_json_out = EXPORTS_DIR / "ready_to_short.json"
     portfolio_json_out.write_text(
         json.dumps(_build_position_json(portfolio_entries), indent=2) + "\n",
         encoding="utf-8",
     )
     researching_json_out.write_text(
         json.dumps(_build_position_json(researching_entries), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    following_json_out.write_text(
+        json.dumps(_build_position_json(following_entries), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ready_to_buy_json_out.write_text(
+        json.dumps(_build_position_json(ready_to_buy_entries), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    ready_to_short_json_out.write_text(
+        json.dumps(_build_position_json(ready_to_short_entries), indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -415,6 +469,9 @@ def _step_export_positions():
         "entry_count": len(pos_entries),
         "portfolio_count": len(portfolio_entries),
         "researching_count": len(researching_entries),
+        "following_for_interest_count": len(following_entries),
+        "ready_to_buy_count": len(ready_to_buy_entries),
+        "ready_to_short_count": len(ready_to_short_entries),
         "validation_passed": len(pos_errors) == 0,
         "validation_errors": list(pos_errors),
         "validation_warnings": list(pos_warnings),
@@ -484,6 +541,9 @@ def _step_export_positions():
             _rel(pos_csv_out),
             _rel(portfolio_json_out),
             _rel(researching_json_out),
+            _rel(following_json_out),
+            _rel(ready_to_buy_json_out),
+            _rel(ready_to_short_json_out),
             _rel(pos_status_out),
             _rel(legacy_csv_out),
             _rel(legacy_json_out),
@@ -492,6 +552,9 @@ def _step_export_positions():
         "entry_count": len(pos_entries),
         "portfolio_count": len(portfolio_entries),
         "researching_count": len(researching_entries),
+        "following_for_interest_count": len(following_entries),
+        "ready_to_buy_count": len(ready_to_buy_entries),
+        "ready_to_short_count": len(ready_to_short_entries),
         "validation_passed": len(pos_errors) == 0,
     }
 

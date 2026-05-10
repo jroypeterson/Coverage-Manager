@@ -51,16 +51,27 @@ OUTPUT_HTML = REPORTS_DIR / f"coverage_performance_{TODAY}.html"
 
 
 def _load_phase1_tickers():
-    """Read Portfolio ∪ Researching ticker set from exports.
+    """Read all five-state position tickers from exports.
 
-    Phase 1 of the historical-valuation feature only enriches these names.
+    Phase 1 of the historical-valuation feature enriches every name with a
+    personal trading-state relationship: Portfolio, Researching, Following
+    for Interest, Ready to Buy, Ready to Short. Following-for-Interest names
+    are included because earnings-season context benefits from the same
+    historical-valuation columns the other states rely on.
+
     Returns an empty set if the export files are missing — the caller treats
     that as "skip enrichment" and leaves the columns blank.
     """
     from pathlib import Path
     exports_dir = Path(__file__).resolve().parent.parent / "exports"
     tickers = set()
-    for fname in ("portfolio.json", "researching.json"):
+    for fname in (
+        "portfolio.json",
+        "researching.json",
+        "following_for_interest.json",
+        "ready_to_buy.json",
+        "ready_to_short.json",
+    ):
         path = exports_dir / fname
         if not path.exists():
             continue
@@ -316,10 +327,12 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     health_data = build_ticker_health_data(df_unique, yf_tickers, ticker_map, all_results, all_fundamentals)
     logger.info("Ticker health: %s issues found", health_data["total_issues"])
 
-    # Fetch 5-year P/E and EV/S history for Phase 1 universe (Portfolio ∪ Researching).
-    # Cached 30 days; cold-cache cost is ~3 FMP calls per ticker × ~50 tickers = trivial.
+    # Fetch 5-year P/E and EV/S history for Phase 1 universe (all five
+    # position states: Portfolio ∪ Researching ∪ Following for Interest ∪
+    # Ready to Buy ∪ Ready to Short).
+    # Cached 30 days; cold-cache cost is ~3 FMP calls per ticker × ~50–100 tickers = trivial.
     # Runs in sample mode too — useful for verifying the new columns format correctly
-    # when a sample ticker overlaps with Portfolio/Researching.
+    # when a sample ticker overlaps with Phase 1.
     phase1_universe = _load_phase1_tickers()
     history_data = {}
     if phase1_universe:

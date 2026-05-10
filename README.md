@@ -67,12 +67,15 @@ python cli.py enrich                    # Identifier enrichment (Finnhub/FMP)
 python cli.py add-exchanges             # Populate Exchange column via yfinance
 python cli.py cache-clear               # Clear all cached external data
 python cli.py cache-clear --namespace fundamentals
-python cli.py positions add TICKER --position Portfolio --sell 75 --notes "..."     # Held position
-python cli.py positions add TICKER --position Researching --buy 30 --notes "..."    # Buy candidate
+python cli.py positions add TICKER --position Portfolio --sell 75 --notes "..."                 # Held position
+python cli.py positions add TICKER --position Researching --buy 30 --notes "..."                # Building thesis to buy
+python cli.py positions add TICKER --position "Following for Interest" --notes "..."            # Passive earnings tracking; no intent to trade
+python cli.py positions add TICKER --position "Ready to Buy" --buy 25 --notes "..."             # Long thesis done; waiting for entry trigger
+python cli.py positions add TICKER --position "Ready to Short" --sell 600 --notes "..."         # Short thesis done; waiting for entry trigger
 python cli.py positions remove TICKER   # Remove from positions file
-python cli.py positions list            # Print all positions (Portfolio + Researching)
+python cli.py positions list            # Print all positions (all five states)
 python cli.py positions validate        # Validate (subset + Position enum + universe metadata)
-python cli.py watchlist-report          # Generate the Monday positions performance report (legacy name; covers both Portfolio and Researching)
+python cli.py watchlist-report          # Generate the Monday positions performance report (legacy name; covers Portfolio + Researching)
 ```
 
 Add `--verbose` for debug logs:

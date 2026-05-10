@@ -50,8 +50,19 @@ def _to_watchlist_shape(entry):
     }
 
 
+_LEGACY_WATCHLIST_STATES = {"Portfolio", "Researching"}
+
+
 def load(path=None):
     """Load positions and return them as legacy watchlist-shape dicts.
+
+    Filters to Position ∈ {Portfolio, Researching} to preserve the historical
+    contract — when the legacy watchlist file existed it covered exactly
+    those two states. Newer states (`Ready to Buy`, `Ready to Short`) are
+    excluded here so existing consumers of `exports/watchlist.json` and the
+    `core_watchlist.json` push to sigma-alert don't silently grow their
+    universe. Migrate to `portfolio.json` / `researching.json` /
+    `ready_to_buy.json` / `ready_to_short.json` for the new states.
 
     The `path` argument is accepted for back-compat but ignored — the shim
     always reads from `positions.POSITIONS_PATH`. Callers that pass a path
@@ -64,7 +75,11 @@ def load(path=None):
             path, positions.POSITIONS_PATH,
         )
     raw = positions.load(positions.POSITIONS_PATH)
-    return [_to_watchlist_shape(e) for e in raw]
+    return [
+        _to_watchlist_shape(e)
+        for e in raw
+        if e.get("Position") in _LEGACY_WATCHLIST_STATES
+    ]
 
 
 def validate(entries, universe_csv_path=None):

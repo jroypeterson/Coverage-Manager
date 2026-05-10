@@ -1,25 +1,46 @@
-"""Positions and research — names the user owns or is actively researching.
+"""Positions and research — names the user owns, is researching, or is
+ready to act on.
 
 Replaces the older `universe/watchlist.py` module. The source file
 `data/positions_and_researching.csv` records every ticker with a personal
-trading-state relationship (held in portfolio, or actively researching with
-intent to buy). It is NOT mixed into `data/coverage_universe_tickers.csv`
-because the universe is a shared canonical artifact consumed by sibling
-projects; position state is personal.
+trading-state relationship (held in portfolio, actively researching,
+or trigger-ready for entry on either side). It is NOT mixed into
+`data/coverage_universe_tickers.csv` because the universe is a shared
+canonical artifact consumed by sibling projects; position state is personal.
 
 Schema (`data/positions_and_researching.csv`):
     Ticker, Position, Position Date, Buy Price, Sell Price,
     First Buy Date, Average Cost, Shares, Notes
 
 Position values:
-    "Portfolio"   — names you own (any size, full or starter)
-    "Researching" — names you're building a thesis to buy but don't yet hold
+    "Portfolio"              — names you own (any size, full or starter)
+    "Researching"            — names you're building a thesis to buy but
+                                don't yet hold (active thesis work)
+    "Following for Interest" — names you track for earnings / industry
+                                signal but have no intent to trade
+                                (passive tracking; no thesis work)
+    "Ready to Buy"           — long thesis complete; waiting for the entry
+                                trigger (typically a price level on Buy Price)
+    "Ready to Short"         — short thesis complete; waiting for the entry
+                                trigger (typically a price level on Sell Price,
+                                since short entry is at the high and cover
+                                is at the low)
 
 Rules:
   - Every ticker must exist in the coverage universe (strict subset).
-  - Position must be one of the two enum values (case-sensitive).
-  - Buy Price (entry target) is most useful for Researching rows.
-  - Sell Price (exit target) is most useful for Portfolio rows.
+  - Position must be one of the five enum values (case-sensitive).
+  - Buy Price semantics:
+      * Portfolio              — historical/avg entry reference (often blank)
+      * Researching            — forward entry target
+      * Following for Interest — informational only (typically blank)
+      * Ready to Buy           — entry trigger (the level you're waiting on)
+      * Ready to Short         — cover/exit target (low side of the short)
+  - Sell Price semantics:
+      * Portfolio              — exit target (sell-side trigger)
+      * Researching            — exit target once held
+      * Following for Interest — informational only (typically blank)
+      * Ready to Buy           — exit target once held
+      * Ready to Short         — short-entry trigger (the level you're waiting on)
   - First Buy Date / Average Cost / Shares will eventually be auto-populated
     from broker integration (IBKR / Fidelity); empty today.
   - Notes is free-form.
@@ -46,7 +67,17 @@ POSITIONS_COLUMNS = [
     "First Buy Date", "Average Cost", "Shares",
     "Notes",
 ]
-ALLOWED_POSITION_VALUES = {"Portfolio", "Researching"}
+ALLOWED_POSITION_VALUES = {
+    "Portfolio", "Researching", "Following for Interest",
+    "Ready to Buy", "Ready to Short",
+}
+
+# Ordered list used wherever stable iteration order matters (CLI summary,
+# manifest, exports). Mirrors the five states above.
+POSITION_VALUES_ORDERED = [
+    "Portfolio", "Researching", "Following for Interest",
+    "Ready to Buy", "Ready to Short",
+]
 
 
 class PositionsError(Exception):

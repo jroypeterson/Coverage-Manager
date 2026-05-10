@@ -33,6 +33,15 @@ METADATA_FILENAME = "ticker_metadata.json"
 CORE_WATCHLIST_FILENAME = "core_watchlist.json"
 PORTFOLIO_FILENAME = "portfolio.json"
 RESEARCHING_FILENAME = "researching.json"
+# Passive-tracking list: names you follow for earnings/industry signal but
+# have no intent to trade. Pushed for completeness; sigma-alert may render
+# these in a separate Slack subcategory in the future.
+FOLLOWING_FOR_INTEREST_FILENAME = "following_for_interest.json"
+# Trigger-ready lists: thesis is done, waiting for an entry-price level. These
+# are pushed to sigma-alert so the future price-target alerter (deferred —
+# routes to the `#portfolio` Slack channel) can read the trigger levels.
+READY_TO_BUY_FILENAME = "ready_to_buy.json"
+READY_TO_SHORT_FILENAME = "ready_to_short.json"
 # Sigma-alert's EOD screener writes this file when it finds watchlist tickers
 # that are missing from ticker_metadata.json (or have a blank name). It's the
 # only way the screener — running in CI with no access to the Coverage Manager
@@ -164,6 +173,22 @@ def build_researching_payload(csv_path):
     return _build_position_payload(csv_path, "Researching")
 
 
+def build_following_for_interest_payload(csv_path):
+    """{ticker: {...}} for Position=='Following for Interest' rows.
+    Pushed to sigma-alert for passive-tracking display purposes."""
+    return _build_position_payload(csv_path, "Following for Interest")
+
+
+def build_ready_to_buy_payload(csv_path):
+    """{ticker: {...}} for Position=='Ready to Buy' rows. Pushed to sigma-alert."""
+    return _build_position_payload(csv_path, "Ready to Buy")
+
+
+def build_ready_to_short_payload(csv_path):
+    """{ticker: {...}} for Position=='Ready to Short' rows. Pushed to sigma-alert."""
+    return _build_position_payload(csv_path, "Ready to Short")
+
+
 def read_missing_metadata_flag(target_dir=SIGMA_ALERT_DIR):
     """Read the sigma-alert flag file listing tickers missing from metadata.
 
@@ -241,12 +266,18 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
     watchlist_payload = build_core_watchlist_payload(csv_path)  # back-compat (one cycle)
     portfolio_payload = build_portfolio_payload(csv_path)
     researching_payload = build_researching_payload(csv_path)
+    following_payload = build_following_for_interest_payload(csv_path)
+    ready_to_buy_payload = build_ready_to_buy_payload(csv_path)
+    ready_to_short_payload = build_ready_to_short_payload(csv_path)
 
     files = {
         METADATA_FILENAME: json.dumps(metadata, indent=2) + "\n",
         CORE_WATCHLIST_FILENAME: json.dumps(watchlist_payload, indent=2) + "\n",
         PORTFOLIO_FILENAME: json.dumps(portfolio_payload, indent=2) + "\n",
         RESEARCHING_FILENAME: json.dumps(researching_payload, indent=2) + "\n",
+        FOLLOWING_FOR_INTEREST_FILENAME: json.dumps(following_payload, indent=2) + "\n",
+        READY_TO_BUY_FILENAME: json.dumps(ready_to_buy_payload, indent=2) + "\n",
+        READY_TO_SHORT_FILENAME: json.dumps(ready_to_short_payload, indent=2) + "\n",
     }
 
     def _result(**fields):
@@ -255,6 +286,9 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
             "watchlist_entries": len(watchlist_payload),
             "portfolio_entries": len(portfolio_payload),
             "researching_entries": len(researching_payload),
+            "following_for_interest_entries": len(following_payload),
+            "ready_to_buy_entries": len(ready_to_buy_payload),
+            "ready_to_short_entries": len(ready_to_short_payload),
         }
         if flagged_tickers:
             out["missing_metadata"] = flagged_tickers
@@ -288,7 +322,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
 
     _, rc = _git(
         target_dir, "commit", "-m",
-        "Sync ticker metadata + portfolio/researching from Coverage Manager",
+        "Sync ticker metadata + position lists from Coverage Manager",
     )
     if rc != 0:
         return _result(status="failed", reason="git commit failed")

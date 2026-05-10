@@ -164,6 +164,72 @@ def test_filter_by_position(fake_universe, pos_path):
     assert {e["Ticker"] for e in researching} == {"WELL"}
 
 
+# ── trigger-ready states ────────────────────────────────────────────────────
+
+
+def test_add_ready_to_buy_roundtrip(fake_universe, pos_path):
+    """Ready to Buy: long thesis done, waiting for buy-trigger price."""
+    pos.add("INSM", position="Ready to Buy", buy_price=25.0, notes="enter on dip",
+            path=pos_path, universe_csv_path=fake_universe, today="2026-05-08")
+    e = pos.load(pos_path)[0]
+    assert e["Position"] == "Ready to Buy"
+    assert e["Buy Price"] == 25.0
+    assert e["Notes"] == "enter on dip"
+
+
+def test_add_ready_to_short_roundtrip(fake_universe, pos_path):
+    """Ready to Short: short thesis done, waiting for sell-trigger price
+    (entry-on-the-high, cover-on-the-low semantics)."""
+    pos.add("ISRG", position="Ready to Short", sell_price=600.0, notes="short the bounce",
+            path=pos_path, universe_csv_path=fake_universe, today="2026-05-08")
+    e = pos.load(pos_path)[0]
+    assert e["Position"] == "Ready to Short"
+    assert e["Sell Price"] == 600.0
+
+
+def test_filter_by_position_includes_ready_states(fake_universe, pos_path):
+    pos.add("INSM", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("ISRG", position="Ready to Buy", buy_price=400, path=pos_path, universe_csv_path=fake_universe)
+    pos.add("WELL", position="Ready to Short", sell_price=200, path=pos_path, universe_csv_path=fake_universe)
+    entries = pos.load(pos_path)
+    assert {e["Ticker"] for e in pos.filter_by_position(entries, "Ready to Buy")} == {"ISRG"}
+    assert {e["Ticker"] for e in pos.filter_by_position(entries, "Ready to Short")} == {"WELL"}
+
+
+def test_add_following_for_interest_roundtrip(fake_universe, pos_path):
+    """Following for Interest: passive earnings/signal tracking, no intent
+    to trade. Buy/Sell Price are informational and typically blank."""
+    pos.add("ISRG", position="Following for Interest", notes="bellwether",
+            path=pos_path, universe_csv_path=fake_universe, today="2026-05-10")
+    e = pos.load(pos_path)[0]
+    assert e["Position"] == "Following for Interest"
+    assert e["Buy Price"] is None
+    assert e["Sell Price"] is None
+    assert e["Notes"] == "bellwether"
+
+
+def test_validate_accepts_all_five_position_values(fake_universe, pos_path):
+    entries = [
+        {"Ticker": "INSM", "Position": "Portfolio", "Position Date": "2026-04-11",
+         "Buy Price": None, "Sell Price": None, "First Buy Date": "",
+         "Average Cost": None, "Shares": None, "Notes": ""},
+        {"Ticker": "ISRG", "Position": "Researching", "Position Date": "2026-04-11",
+         "Buy Price": None, "Sell Price": None, "First Buy Date": "",
+         "Average Cost": None, "Shares": None, "Notes": ""},
+        {"Ticker": "WELL", "Position": "Following for Interest", "Position Date": "2026-05-10",
+         "Buy Price": None, "Sell Price": None, "First Buy Date": "",
+         "Average Cost": None, "Shares": None, "Notes": ""},
+    ]
+    errors, _ = pos.validate(entries, universe_csv_path=fake_universe)
+    assert errors == []
+
+
+def test_position_values_ordered_constant():
+    """The ordered constant must list every allowed value exactly once."""
+    assert set(pos.POSITION_VALUES_ORDERED) == pos.ALLOWED_POSITION_VALUES
+    assert len(pos.POSITION_VALUES_ORDERED) == len(pos.ALLOWED_POSITION_VALUES)
+
+
 # ── new-ticker auto-enrichment escape hatch (mirrors test_watchlist) ────────
 
 

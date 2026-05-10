@@ -210,8 +210,9 @@ def test_normalization_collisions_are_surfaced(monkeypatch, tmp_path):
 
 def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     """The positions export step writes the new portfolio.json + researching.json
-    + positions_and_researching.csv + positions_status.json, plus back-compat
-    watchlist.csv/json/status.json (one cycle)."""
+    + ready_to_buy.json + ready_to_short.json + positions_and_researching.csv
+    + positions_status.json, plus back-compat watchlist.csv/json/status.json
+    (one cycle)."""
     from universe import positions as pos
 
     pos_csv = tmp_path / "positions_and_researching.csv"
@@ -238,6 +239,9 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert (exports_dir / "positions_and_researching.csv").exists()
     assert (exports_dir / "portfolio.json").exists()
     assert (exports_dir / "researching.json").exists()
+    assert (exports_dir / "following_for_interest.json").exists()
+    assert (exports_dir / "ready_to_buy.json").exists()
+    assert (exports_dir / "ready_to_short.json").exists()
     assert (exports_dir / "positions_status.json").exists()
 
     # Legacy back-compat artifacts
@@ -248,6 +252,9 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert result["entry_count"] == 2
     assert result["portfolio_count"] == 1
     assert result["researching_count"] == 1
+    assert result["following_for_interest_count"] == 0
+    assert result["ready_to_buy_count"] == 0
+    assert result["ready_to_short_count"] == 0
     assert result["validation_passed"] is True
 
     # portfolio.json: Portfolio rows only
@@ -264,6 +271,11 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert "AAPL" not in researching
     assert researching["MRNA"]["position"] == "Researching"
     assert researching["MRNA"]["buy_price"] == 40
+
+    # Empty trigger-ready and following files in this fixture
+    assert json.loads((exports_dir / "following_for_interest.json").read_text(encoding="utf-8")) == {}
+    assert json.loads((exports_dir / "ready_to_buy.json").read_text(encoding="utf-8")) == {}
+    assert json.loads((exports_dir / "ready_to_short.json").read_text(encoding="utf-8")) == {}
 
     # CSV: universe cols + position cols
     with open(exports_dir / "positions_and_researching.csv", newline="", encoding="utf-8") as f:
@@ -284,6 +296,9 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert status["entry_count"] == 2
     assert status["portfolio_count"] == 1
     assert status["researching_count"] == 1
+    assert status["following_for_interest_count"] == 0
+    assert status["ready_to_buy_count"] == 0
+    assert status["ready_to_short_count"] == 0
     assert status["validation_passed"] is True
 
     # Legacy back-compat: watchlist.json should have BOTH entries (union)
@@ -291,6 +306,86 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     legacy = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
     assert "AAPL" in legacy and "MRNA" in legacy
     assert legacy["AAPL"]["target_price"] == 220  # was Sell Price
+
+
+def test_positions_export_routes_following_for_interest(monkeypatch, tmp_path, fixture_csv):
+    """Following for Interest rows must land in following_for_interest.json
+    and not pollute portfolio.json / researching.json / the ready-to-* files."""
+    from universe import positions as pos
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    pos.add(
+        "MRNA", position="Following for Interest", notes="track earnings",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-10",
+    )
+
+    exports_dir = tmp_path / "exports"
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+
+    result = weekly_universe._step_export_positions()
+    assert result["following_for_interest_count"] == 1
+    assert result["portfolio_count"] == 0
+    assert result["researching_count"] == 0
+
+    following = json.loads((exports_dir / "following_for_interest.json").read_text(encoding="utf-8"))
+    assert "MRNA" in following
+    assert following["MRNA"]["position"] == "Following for Interest"
+
+    # Cross-check: doesn't leak elsewhere.
+    assert json.loads((exports_dir / "portfolio.json").read_text(encoding="utf-8")) == {}
+    assert json.loads((exports_dir / "researching.json").read_text(encoding="utf-8")) == {}
+    assert json.loads((exports_dir / "ready_to_buy.json").read_text(encoding="utf-8")) == {}
+    assert json.loads((exports_dir / "ready_to_short.json").read_text(encoding="utf-8")) == {}
+
+    # Legacy back-compat: must NOT include Following-for-Interest rows.
+    legacy = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
+    assert legacy == {}
+
+
+def test_positions_export_routes_ready_states(monkeypatch, tmp_path, fixture_csv):
+    """Ready to Buy and Ready to Short rows must land in their own JSON files
+    and not pollute portfolio.json / researching.json."""
+    from universe import positions as pos
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    # AAPL → Ready to Buy with a buy-trigger level; MRNA → Ready to Short
+    # with a sell-trigger level (short entry is at the high).
+    pos.add(
+        "AAPL", position="Ready to Buy", buy_price=180, notes="enter on dip",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08",
+    )
+    pos.add(
+        "MRNA", position="Ready to Short", sell_price=120, notes="short the bounce",
+        path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08",
+    )
+
+    exports_dir = tmp_path / "exports"
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+
+    result = weekly_universe._step_export_positions()
+    assert result["portfolio_count"] == 0
+    assert result["researching_count"] == 0
+    assert result["ready_to_buy_count"] == 1
+    assert result["ready_to_short_count"] == 1
+
+    rtb = json.loads((exports_dir / "ready_to_buy.json").read_text(encoding="utf-8"))
+    rts = json.loads((exports_dir / "ready_to_short.json").read_text(encoding="utf-8"))
+    assert "AAPL" in rtb and rtb["AAPL"]["buy_price"] == 180
+    assert "MRNA" in rts and rts["MRNA"]["sell_price"] == 120
+
+    # Cross-check: rtb/rts entries do NOT leak into portfolio/researching.
+    portfolio = json.loads((exports_dir / "portfolio.json").read_text(encoding="utf-8"))
+    researching = json.loads((exports_dir / "researching.json").read_text(encoding="utf-8"))
+    assert portfolio == {}
+    assert researching == {}
 
 
 def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
@@ -312,6 +407,9 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "positions_and_researching.csv",
         "portfolio.json",
         "researching.json",
+        "following_for_interest.json",
+        "ready_to_buy.json",
+        "ready_to_short.json",
         "positions_status.json",
         "watchlist.csv",
         "watchlist.json",
