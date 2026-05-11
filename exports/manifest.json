@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "generated_at": "2026-05-05T21:47:03Z",
+  "schema_version": 3,
+  "generated_at": "2026-05-11T14:34:02Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -17,7 +17,7 @@
       "name": "universe_status.json",
       "purpose": "Versioned status + validation contract (read schema_version before consuming)",
       "format": "json",
-      "schema_version": 2
+      "schema_version": 3
     },
     {
       "name": "positions_and_researching.csv",
@@ -35,10 +35,25 @@
       "format": "json"
     },
     {
+      "name": "following_for_interest.json",
+      "purpose": "Position == 'Following for Interest' rows only (passive earnings/signal tracking; no intent to trade). Same shape as portfolio.json.",
+      "format": "json"
+    },
+    {
+      "name": "ready_to_buy.json",
+      "purpose": "Position == 'Ready to Buy' rows only (long thesis complete; waiting for entry trigger). Same shape as portfolio.json.",
+      "format": "json"
+    },
+    {
+      "name": "ready_to_short.json",
+      "purpose": "Position == 'Ready to Short' rows only (short thesis complete; waiting for entry trigger). Same shape as portfolio.json.",
+      "format": "json"
+    },
+    {
       "name": "positions_status.json",
       "purpose": "Versioned status + validation contract for positions (read schema_version first).",
       "format": "json",
-      "schema_version": 2
+      "schema_version": 3
     },
     {
       "name": "watchlist.csv",
@@ -54,7 +69,7 @@
       "name": "watchlist_status.json",
       "purpose": "DEPRECATED back-compat (one cycle): mirrors positions_status.json with the legacy shape.",
       "format": "json",
-      "schema_version": 2
+      "schema_version": 3
     },
     {
       "name": "manifest.json",

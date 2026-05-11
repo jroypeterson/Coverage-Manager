@@ -1,11 +1,14 @@
 {
-  "schema_version": 2,
-  "dataset_version": "2026-05-03",
-  "generated_at": "2026-05-04T02:49:47Z",
+  "schema_version": 3,
+  "dataset_version": "2026-05-11",
+  "generated_at": "2026-05-11T14:34:02Z",
   "source_path": "data/positions_and_researching.csv",
   "entry_count": 68,
   "portfolio_count": 26,
-  "researching_count": 42,
+  "researching_count": 31,
+  "following_for_interest_count": 8,
+  "ready_to_buy_count": 3,
+  "ready_to_short_count": 0,
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": []
