@@ -1094,3 +1094,8 @@ ALMR,NASDAQ,NGM,NasdaqGM,Primary,,2026,,BBG012FD22W7,BBG012FD22W7,BBG012FD22X6,2
 KLRA,NASDAQ,NGM,NasdaqGM,Primary,,2026,,BBG01Q3NQQJ1,BBG01Q3NQQJ1,BBG01Q3NQQK9,2096997,"Kailera Therapeutics, Inc.",United States,United States,USA,USD,www.kailera.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 ARXS,NASDAQ,,,Primary,,2026,US04339D1054,,,,2093536,"Arxis, Inc.",United States,United States,USA,USD,https://www.arxis.com,Industrials,Aerospace & Defense,Industrials,Aerospace & Defense Components,,
 XE,NASDAQ,NMS,NASDAQ Global Select,Primary,,2026,US98386P1021,,,,2088896,"X-Energy, Inc.",United States,United States,USA,USD,https://www.x-energy.com,Industrials,Specialty Industrial Machinery,Energy,Clean Energy / Nuclear SMR,,
+CBRS,NASDAQ,NMS,NasdaqGS,Primary,,2026,US15675D1037,,,,,Cerebras Systems Inc.,United States,United States,USA,USD,https://www.cerebras.ai,Technology,Semiconductors,Tech,,AI Hardware,
+MOBI,NASDAQ,NMS,NasdaqGS,Primary,,2026,US60705V1035,,,,,"Mobia Medical, Inc.",United States,United States,USA,USD,https://www.mobia.com,Healthcare,Medical Devices,MedTech,Neuromodulation,Stroke Recovery,
+HAWK,NYSE,NYQ,NYSE,Primary,,2026,US4202011056,,,,,"HawkEye 360, Inc.",United States,United States,USA,USD,https://www.he360.com,Industrials,Aerospace & Defense,Industrials,Space Tech / Instrumentation,RF SIGINT,
+FDXF,NYSE,NYQ,NYSE,Primary,,2026,,,,,,FedEx Freight Corporation,United States,United States,USA,USD,https://www.fedex.com/en-us/freight.html,Industrials,Trucking,Industrials,,LTL,
+FRVO,NASDAQ,NMS,NasdaqGS,Primary,,2026,US31556C1062,,,,,Fervo Energy Co.,United States,United States,USA,USD,http://www.fervoenergy.com,Utilities,Regulated Electric,Energy,Clean Energy / Geothermal,,
