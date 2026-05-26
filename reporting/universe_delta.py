@@ -5,22 +5,36 @@ during the run (additions, removals, sector reclassifications, position state
 transitions, ISIN fills), and the final state — into a single Block Kit Slack
 message posted to #coverage. Replaces the prior weekly performance-report email.
 
-Baseline strategy: the orchestrator calls `capture_baseline_shas()` at the
-top of `weekly_universe.main()`, before any mutation step runs. That SHA is
-then threaded into the post-step, where `load_universe_snapshot(sha)` uses
-`git show <sha>:<rel>` to read the pre-mutation file content. Working tree is
-read by passing `commit_sha=None`. This is calendar-independent and survives
-manual mid-week commits.
+Baseline strategy (2-tier):
+
+  1. PREFERRED: end-of-previous-run snapshot files at
+       .coverage/last_run_universe.csv
+       .coverage/last_run_positions.csv
+     written unconditionally at the end of each post-step, regardless of
+     whether the Slack post itself succeeded. This is the source of truth for
+     "what the universe looked like last time we ran." Independent of git, so
+     uncommitted manual edits between weekly runs are correctly reported in
+     the next week's delta.
+
+  2. FALLBACK: git HEAD at run start. Used only on the very first run after
+     this snapshot mechanism shipped, or if the snapshot file was deleted.
+     When this path runs, `capture_baseline_shas()` also detects whether the
+     working tree was dirty for the universe/positions CSVs and threads a
+     caveat into the message so the user knows the diff may include
+     pre-existing local edits.
 
 Pure functions (`compute_universe_delta`, `format_universe_delta_slack`) take
-DataFrames in and return data structures / strings — tests don't need git.
+DataFrames in and return data structures / strings — tests don't need git or
+real files.
 """
 
 import json
+import shutil
 import subprocess
 import urllib.error
 import urllib.request
 from collections import defaultdict
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -34,6 +48,8 @@ logger = get_logger("reporting.universe_delta")
 
 COVERAGE_CHANNEL = "#coverage"
 FALLBACK_DIR = SCRIPT_DIR / ".coverage"
+SNAPSHOT_UNIVERSE_PATH = FALLBACK_DIR / "last_run_universe.csv"
+SNAPSHOT_POSITIONS_PATH = FALLBACK_DIR / "last_run_positions.csv"
 
 # Only column changes in this set produce "Modified" rows. CIK, FIGI variants,
 # Exchange Code, Currency are operational hygiene fields and would create noise
@@ -96,21 +112,49 @@ def _git_show(commit_sha, rel_path):
     return _git_run(["show", f"{commit_sha}:{rel_path}"])
 
 
+def _git_dirty_paths(rel_paths):
+    """Return the subset of `rel_paths` that show uncommitted changes.
+
+    Uses `git status --porcelain -- <paths>`. Empty list when clean or when
+    git is unavailable.
+    """
+    if not rel_paths:
+        return []
+    args = ["status", "--porcelain", "--"] + list(rel_paths)
+    out = _git_run(args)
+    if not out:
+        return []
+    dirty = []
+    for line in out.splitlines():
+        # Porcelain format: "XY path" — first two chars are status codes
+        if len(line) > 3:
+            path = line[3:].strip().strip('"')
+            dirty.append(path)
+    return dirty
+
+
 def capture_baseline_shas():
-    """Capture the current git HEAD SHA at run start, before any mutation.
+    """Capture the current git HEAD SHA + dirty-path state at run start.
 
-    Called from the top of `weekly_universe.main()`. Both the universe and
-    positions CSVs are tracked under the same commit, so one SHA is enough.
-
-    Returns a dict with the SHA, the resolved commit date (for display), and
-    the standard rel-paths used for later diffing.
+    Called from the top of `weekly_universe.main()`, BEFORE any mutation step.
+    The SHA is used as a fallback baseline when the snapshot files in
+    `.coverage/` are missing (first run after this mechanism shipped).
+    `dirty_paths` flags whether the universe/positions CSVs have uncommitted
+    changes — only relevant when the git fallback is taken, where pre-existing
+    dirty edits would otherwise appear as "this run's" deltas.
     """
     sha = _git_head_sha()
+    rel_paths = [
+        "data/coverage_universe_tickers.csv",
+        "data/positions_and_researching.csv",
+    ]
+    dirty = _git_dirty_paths(rel_paths)
     return {
         "head_sha": sha,
         "head_date": _git_commit_date(sha),
-        "universe_rel": "data/coverage_universe_tickers.csv",
-        "positions_rel": "data/positions_and_researching.csv",
+        "universe_rel": rel_paths[0],
+        "positions_rel": rel_paths[1],
+        "dirty_paths": dirty,
     }
 
 
@@ -126,8 +170,10 @@ def _read_csv_text(text):
 def load_universe_snapshot(commit_sha=None, baseline=None):
     """Load the universe CSV from working tree (commit_sha=None) or a commit.
 
-    Returns None if the file wasn't tracked at the given commit (e.g. very
-    first weekly run with no prior history).
+    Used for working-tree reads in the post-step. Baseline reads should go
+    through `load_baseline_universe` instead (which prefers snapshot files).
+
+    Returns None if the file wasn't tracked at the given commit.
     """
     if commit_sha is None:
         return pd.read_csv(CSV_PATH, encoding="utf-8-sig")
@@ -145,6 +191,85 @@ def load_positions_snapshot(commit_sha=None, baseline=None):
     rel = (baseline or {}).get("positions_rel", "data/positions_and_researching.csv")
     text = _git_show(commit_sha, rel)
     return _read_csv_text(text)
+
+
+def load_baseline_universe(snapshot_path=None, commit_sha=None, baseline=None):
+    """Load the baseline universe DataFrame for the diff.
+
+    Tier 1: end-of-previous-run snapshot file (preferred).
+    Tier 2: git HEAD at run start (bootstrap fallback).
+    Returns None if neither is available — caller renders "baseline unavailable".
+    """
+    snapshot_path = Path(snapshot_path or SNAPSHOT_UNIVERSE_PATH)
+    if snapshot_path.exists():
+        return pd.read_csv(snapshot_path, encoding="utf-8-sig")
+    if commit_sha:
+        return load_universe_snapshot(commit_sha=commit_sha, baseline=baseline)
+    return None
+
+
+def load_baseline_positions(snapshot_path=None, commit_sha=None, baseline=None):
+    """Same shape as load_baseline_universe for positions_and_researching.csv."""
+    snapshot_path = Path(snapshot_path or SNAPSHOT_POSITIONS_PATH)
+    if snapshot_path.exists():
+        return pd.read_csv(snapshot_path, encoding="utf-8-sig")
+    if commit_sha:
+        return load_positions_snapshot(commit_sha=commit_sha, baseline=baseline)
+    return None
+
+
+def write_run_snapshot(fallback_dir=None):
+    """Snapshot the current working tree to `.coverage/last_run_*.csv`.
+
+    Called at the end of `_step_universe_delta_slack`, AFTER the Slack post
+    attempt. The snapshot represents "end of this run's state" and becomes
+    next week's baseline. Written even if the Slack post failed — Slack
+    success/failure is orthogonal to what the universe state actually is.
+
+    Returns the list of snapshot file paths written.
+    """
+    fallback_dir = Path(fallback_dir or FALLBACK_DIR)
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    universe_out = fallback_dir / "last_run_universe.csv"
+    shutil.copyfile(CSV_PATH, universe_out)
+    written.append(universe_out)
+    if POSITIONS_PATH.exists():
+        positions_out = fallback_dir / "last_run_positions.csv"
+        shutil.copyfile(POSITIONS_PATH, positions_out)
+        written.append(positions_out)
+    return written
+
+
+def write_delta_json(delta, fallback_dir=None, reason=None):
+    """Always write the delta payload to .coverage/, regardless of Slack outcome.
+
+    Two files:
+      - universe_delta_{TODAY}.json   (timestamped, historical)
+      - last_universe_delta.json      (stable, always overwritten)
+
+    Both files include `reason` (None on the normal pre-post write; set to a
+    failure description on the post-failure overwrite from `post_universe_delta`).
+    """
+    fallback_dir = Path(fallback_dir or FALLBACK_DIR)
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    payload = {"reason": reason, "today": delta.get("today"), "delta": delta}
+    text = json.dumps(payload, indent=2, default=str)
+    timestamped = fallback_dir / f"universe_delta_{delta.get('today', TODAY)}.json"
+    stable = fallback_dir / "last_universe_delta.json"
+    timestamped.write_text(text, encoding="utf-8")
+    stable.write_text(text, encoding="utf-8")
+    return [timestamped, stable]
+
+
+def snapshot_mtime_date(snapshot_path=None):
+    """Return the YYYY-MM-DD mtime of the snapshot file, or None if absent."""
+    snapshot_path = Path(snapshot_path or SNAPSHOT_UNIVERSE_PATH)
+    if not snapshot_path.exists():
+        return None
+    return datetime.fromtimestamp(
+        snapshot_path.stat().st_mtime, tz=timezone.utc
+    ).strftime("%Y-%m-%d")
 
 
 # ── Diff computation ─────────────────────────────────────────────────────────
@@ -198,15 +323,26 @@ def compute_universe_delta(
     delisted_df=None,
     baseline_sha=None,
     baseline_date=None,
+    baseline_source=None,
+    baseline_label=None,
+    baseline_caveat=None,
 ):
     """Compute a flat delta structure between two universe snapshots.
 
     Pure — no I/O, no git. Tests pass fixture DataFrames directly.
 
+    Args:
+        baseline_source: "snapshot" | "git" | "none" — which tier produced
+            the before-state. Drives the Before-block header in the formatter.
+        baseline_label: Human-readable baseline descriptor (e.g.,
+            "end of previous run · 2026-05-22" or "commit @ abc1234, 2026-05-22").
+        baseline_caveat: Optional warning string shown right after the header
+            in the Slack message (e.g., "working tree was dirty at run start").
+
     Returns a dict with: added, removed, modified (flat: one row per
     ticker × field), position_changes, before_stats, after_stats,
     before_position_counts, after_position_counts, baseline_sha,
-    baseline_date, today.
+    baseline_date, baseline_source, baseline_label, baseline_caveat, today.
     """
     if after_universe_df is None:
         after_universe_df = pd.DataFrame(columns=["Ticker"])
@@ -292,6 +428,9 @@ def compute_universe_delta(
         "after_position_counts": _stats_for_positions(after_positions_df),
         "baseline_sha": baseline_sha,
         "baseline_date": baseline_date,
+        "baseline_source": baseline_source,
+        "baseline_label": baseline_label,
+        "baseline_caveat": baseline_caveat,
         "today": TODAY,
     }
 
@@ -359,17 +498,23 @@ def _format_stats_block(label, header_suffix, universe_stats, position_counts,
 def format_universe_delta_slack(delta):
     """Render the full delta as Slack mrkdwn (returned as a single string).
 
-    Section order (top-down): header → After → Before → Delta sections.
-    After leads because the current state is what the reader cares about first;
-    Before is for context; the per-ticker delta sections follow for drill-down.
+    Section order (top-down): header → caveat (if any) → After → Before → Delta.
+    Current-state-first chosen for glanceability; Before is context; Delta is
+    drill-down. See CLAUDE.md "Weekly universe delta -> Slack #coverage" for
+    rationale.
+
     The wire-payload helper `_split_into_section_blocks` chunks it if needed.
     """
-    baseline_sha = delta.get("baseline_sha")
-    baseline_date = delta.get("baseline_date")
-    sha_disp = baseline_sha[:7] if baseline_sha else None
+    baseline_source = delta.get("baseline_source")
+    baseline_label = delta.get("baseline_label")
+    baseline_caveat = delta.get("baseline_caveat")
     today = delta.get("today", "")
 
     parts = [f":open_file_folder: *Coverage Universe — Weekly Update — {today}*"]
+
+    # Caveat (only when present) — e.g. dirty working tree at run start.
+    if baseline_caveat:
+        parts.append(f":warning: _{baseline_caveat}_")
 
     # 1) After — current state up top.
     after_total = delta["after_stats"].get("total", 0)
@@ -382,11 +527,19 @@ def format_universe_delta_slack(delta):
         )
     )
 
-    # 2) Before — last-week context next.
-    if baseline_sha:
-        before_header = f" (committed state @ {sha_disp}, {baseline_date or 'previous commit'})"
+    # 2) Before — last-run context next.
+    if baseline_source == "none" or (baseline_source is None and baseline_label is None):
+        before_header = " (baseline unavailable — first run after snapshot mechanism shipped, or snapshot missing and no git history)"
+    elif baseline_label:
+        before_header = f" ({baseline_label})"
     else:
-        before_header = " (baseline unavailable — no prior commit found)"
+        # legacy / tests passing only baseline_sha + baseline_date
+        baseline_sha = delta.get("baseline_sha")
+        baseline_date = delta.get("baseline_date")
+        if baseline_sha:
+            before_header = f" (committed state @ {baseline_sha[:7]}, {baseline_date or 'previous commit'})"
+        else:
+            before_header = ""
     parts.append(
         _format_stats_block(
             "Before", before_header,

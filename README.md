@@ -1,17 +1,18 @@
 # Coverage Manager
 
-Script-driven tooling for maintaining a coverage universe CSV, discovering new tickers, and generating weekly performance reports that are emailed and posted to Slack.
+Script-driven tooling for maintaining a coverage universe CSV, discovering new tickers, and generating weekly artifacts + Slack updates summarizing what changed.
 
 ## What It Does
 
 - Maintains the master coverage universe at `data/coverage_universe_tickers.csv`
 - Cleans, deduplicates, validates, and enriches identifiers
 - Discovers new candidate tickers via an external Claude prompt and a staging workflow
-- **Publishes a versioned, generic artifact contract under `exports/`** for downstream projects (forensic_triage, biotech_triage, idea_generation, 13F analyzer, sigma-alert) to consume
+- **Publishes a versioned, generic artifact contract under `exports/`** (schema v3) for downstream projects (forensic_triage, biotech_triage, idea_generation, 13F analyzer, sigma-alert, earnings_agent, analyst-days, sa-monitor, catalyst_watch) to consume
 - Generates Excel and HTML performance reports segmented by `Sector (JP)` / `Subsector (JP)`
-- Emails reports via Gmail and posts a summary to Slack `#stock-price-alerts`
+- **Posts a weekly After/Before/Delta summary to Slack `#coverage`** (`SLACK_WEBHOOK_COVERAGE`). The Friday email transport is currently off (`EMAIL_ENABLED = False` in `config.py`); revisit 2026-06-29.
+- Posts a movers summary to `#stock-price-alerts` and a workspace-standard health heartbeat to `#status-reports`
 - Orchestrates the whole thing as a `weekly-build` pipeline scheduled for Friday 8am, with separable `weekly-universe` and `weekly-report` subcommands for finer control
-- Maintains a **core watchlist** (subset of the universe with buy/target prices + notes) with its own weekly Monday report, published artifact, and sigma-alert integration
+- Tracks positions and research candidates in `data/positions_and_researching.csv` across five `Position` states (Portfolio / Researching / Following for Interest / Ready to Buy / Ready to Short); per-state JSON artifacts published to `exports/` for sigma-alert + earnings_agent consumption
 
 ## Prerequisites
 
@@ -35,18 +36,25 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in this folder for API-backed enrichment, email, and Slack delivery:
+Create a `.env` file in this folder for API-backed enrichment and Slack delivery:
 
 ```env
 FINNHUB_API_KEY=...
 FMP_API_KEY=...
 ALPHAVANTAGE_API_KEY=...
+EDGAR_IDENTITY="Your Name your@email"
+# Slack — three independent channels, three independent webhooks
+SLACK_WEBHOOK_URL=...                   # #stock-price-alerts (movers + legacy summary)
+SLACK_WEBHOOK_COVERAGE=...              # #coverage (weekly After/Before/Delta)
+SLACK_WEBHOOK_STATUS_REPORTS=...        # #status-reports (workspace health heartbeat)
+# Email — currently disabled via EMAIL_ENABLED=False in config.py
 GMAIL_ADDRESS=...
 GMAIL_APP_PASSWORD=...
-SLACK_WEBHOOK_URL=...
 ```
 
-Alpha Vantage is used as a fallback fundamentals provider when Finnhub/FMP do not return data. Slack posting is skipped silently if `SLACK_WEBHOOK_URL` is not set.
+Alpha Vantage is used as a fallback fundamentals provider when Finnhub/FMP do not return data. Slack posts are non-gating: if a webhook is unset, the project-specific channel post is skipped or written to a local fallback file (the `#coverage` post writes `.coverage/last_universe_delta.json`).
+
+**Email transport (currently off).** `config.EMAIL_ENABLED = False` disables the weekly performance-report email; the `#coverage` Slack post replaces it. Each reporting transport (email, Slack `#coverage`, Slack `#stock-price-alerts`, Slack `#status-reports`) is enabled/disabled independently. Flip `EMAIL_ENABLED = True` to re-enable email — no other code changes required. Revisit comment: `# REVISIT EMAIL REPORTING: 2026-06-29`.
 
 ## Usage
 
@@ -96,12 +104,15 @@ The weekly pipeline is split into two independently-runnable orchestrators with 
 4. **export-artifacts** — writes the published artifact contract under `exports/` (see Exports section below)
 5. **sigma-export** — writes `ticker_metadata.json` into the sibling `../sigma-alert/` clone and commits/pushes only that file. The screener loads it at startup so Slack alerts can show company names and sector tags. See `reporting/sigma_export.py`
 
-**`weekly-report`** — reporting half (validate read-only → archive → performance → email):
+**`weekly-report`** — reporting half (validate read-only → archive → performance → movers → email):
 
 1. **validate** — read-only validation, informational only; gating belongs in the wrapper
 2. **archive** — moves prior dated performance reports into `reports/old reports/`
 3. **performance** — generates Excel + HTML reports
-4. **email** — sends HTML reports via Gmail
+4. **movers** — flags extreme weekly movers and posts a top-N summary to `#stock-price-alerts`
+5. **email** — sends HTML reports via Gmail. **Currently disabled** (`EMAIL_ENABLED = False` in `config.py`); the step reports `skipped: EMAIL_ENABLED=False`. Revisit 2026-06-29.
+
+**Universe delta -> Slack `#coverage`** — post-step inside `weekly-universe`, runs after `discovery`, `delisted_check`, `export_artifacts`, `export_watchlist`, and `sigma_export`. Posts one Block Kit message to `#coverage` summarizing **After (current state) → Before (last-run context) → Delta (Added / Removed / Modified / Position changes)**. Baseline is a 2-tier snapshot mechanism (`.coverage/last_run_*.csv` preferred; git HEAD fallback with a dirty-tree caveat). Slack failures raise so the health heartbeat reports `partial`. See `CLAUDE.md` "Weekly universe delta -> Slack #coverage" for the full contract.
 
 **`weekly-build`** — wrapper that runs `weekly-universe`, gates `weekly-report` on `validation_passed` (overridable with `--force`), merges results, posts a Slack summary to `#stock-price-alerts`, and writes a parent audit row. This is the entry point used by the Friday scheduled task; the CLI surface and `run_weekly_coverage.bat` are unchanged.
 
@@ -124,14 +135,19 @@ Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never
 | File | Purpose |
 |------|---------|
 | `exports/universe.csv` | Snapshot of `data/coverage_universe_tickers.csv` |
-| `exports/universe_metadata.json` | `{TICKER: {name, sector, subsector}}` derived only from CSV rows |
+| `exports/universe_metadata.json` | `{TICKER: {name, sector, subsector, sub_subsector, core}}` derived only from CSV rows |
 | `exports/universe_status.json` | Versioned status + validation contract; **always read `schema_version` first** |
-| `exports/watchlist.csv` | Core watchlist joined with the full universe row — every universe column followed by `Buy Price`, `Target Price`, `Date Added`, `Notes`. Source `data/watchlist.csv` stays a thin 5-col hand-edit file; join happens at export time. |
-| `exports/watchlist.json` | `{TICKER: {...}}` with legacy flat keys (`buy_price`, `target_price`, `date_added`, `notes`, `name`, `sector`, `subsector`) **plus** every raw universe column under its original header name (e.g. `"Company Name"`, `"ISIN"`, `"Sector (JP)"`). Legacy keys preserved for back-compat. |
-| `exports/watchlist_status.json` | Versioned status + validation contract for the watchlist (separate schema) |
+| `exports/positions_and_researching.csv` | Positions+researching list joined with universe metadata — every universe column followed by `Position`, `Position Date`, `Buy Price`, `Sell Price`, `First Buy Date`, `Average Cost`, `Shares`, `Notes`. |
+| `exports/portfolio.json` | `{TICKER: {...}}` for `Position == "Portfolio"` rows only (names you own). |
+| `exports/researching.json` | Same shape, `Position == "Researching"` rows only (active thesis work). |
+| `exports/following_for_interest.json` | Same shape, `Position == "Following for Interest"` rows only (passive tracking). |
+| `exports/ready_to_buy.json` | Same shape, `Position == "Ready to Buy"` rows only (long thesis done; waiting for entry). |
+| `exports/ready_to_short.json` | Same shape, `Position == "Ready to Short"` rows only (short thesis done; waiting for entry). |
+| `exports/positions_status.json` | Versioned status + validation contract for positions (separate schema). |
+| `exports/watchlist.{csv,json,_status.json}` | **DEPRECATED** back-compat (one cycle), filtered to `Portfolio ∪ Researching` only. New code should use the five state-specific JSONs. |
 | `exports/manifest.json` | Directory of files in `exports/` with their purpose |
 
-`universe_status.json` (schema v2) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. Invariant: `ticker_count + normalization_collisions == row_count`.
+`universe_status.json` (schema **v3**) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. v3 added the `core` field to per-ticker metadata. Invariant: `ticker_count + normalization_collisions == row_count`.
 
 Read pattern for downstream projects:
 
@@ -141,7 +157,7 @@ from pathlib import Path
 
 CM_EXPORTS = Path("../Coverage Manager/exports")
 status = json.loads((CM_EXPORTS / "universe_status.json").read_text())
-assert status["schema_version"] == 2, "Coverage Manager exports schema changed"
+assert status["schema_version"] == 3, "Coverage Manager exports schema changed"
 if not status["validation_passed"]:
     raise RuntimeError(f"Universe failed validation: {status['validation_errors']}")
 metadata = json.loads((CM_EXPORTS / "universe_metadata.json").read_text())
@@ -245,17 +261,29 @@ Coverage Manager/
 ├── tests/                       # pytest suite
 ├── data/
 │   ├── coverage_universe_tickers.csv
-│   └── watchlist.csv             # Core watchlist (buy/target/notes)
+│   ├── positions_and_researching.csv  # Positions + research candidates (5 Position states)
+│   └── delisted_tickers.csv     # Archive: acquired / delisted / recycled rows
 ├── exports/                     # Published artifact contract (committed)
 │   ├── universe.csv
-│   ├── universe_metadata.json
+│   ├── universe_metadata.json   # schema v3 (adds `core` field)
 │   ├── universe_status.json
-│   ├── watchlist.csv
-│   ├── watchlist.json
-│   ├── watchlist_status.json
+│   ├── positions_and_researching.csv
+│   ├── portfolio.json
+│   ├── researching.json
+│   ├── following_for_interest.json
+│   ├── ready_to_buy.json
+│   ├── ready_to_short.json
+│   ├── positions_status.json
+│   ├── watchlist.{csv,json,_status.json}  # DEPRECATED back-compat
 │   └── manifest.json
 ├── backups/                     # Timestamped CSV backups
 ├── cache/                       # Cached API data (gitignored)
+├── .coverage/                   # Snapshot files + delta JSON (gitignored)
+│   ├── last_run_universe.csv    # End of previous run; baseline for next run's diff
+│   ├── last_run_positions.csv
+│   ├── last_universe_delta.json # Most recent delta payload (stable filename)
+│   └── universe_delta_YYYY-MM-DD.json  # Historical delta payloads
+├── .health/                     # Health heartbeat fallback (gitignored)
 ├── reports/                     # Generated reports (gitignored)
 │   ├── old reports/             # Archived previous runs
 │   └── samples/                 # Sample previews

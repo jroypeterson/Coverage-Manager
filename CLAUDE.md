@@ -350,14 +350,22 @@ Important comparison rules:
 
 ## Weekly universe delta -> Slack #coverage
 
-Each `weekly-universe` (and therefore `weekly-build`) run posts a single message to Slack `#coverage` summarizing what changed in the coverage universe this week, in three blocks: **Before** (universe state at the baseline commit), **Delta** (added / removed / modified / position changes), **After** (current state).
+Each `weekly-universe` (and therefore `weekly-build`) run posts a single message to Slack `#coverage` summarizing what changed in the coverage universe this week. **Section order: header → optional caveat → After (current state) → Before (last-run context) → Delta (Added / Removed / Modified / Position changes).** Current-state-first is deliberate — the user reads the After block to ground themselves, then scrolls for context. The audit trail is still complete in all three sections.
 
-- **Webhook**: read from `SLACK_WEBHOOK_COVERAGE` (env var, else key in `.env`). If unset, the message is written to `.coverage/last_universe_delta.json` (plus a timestamped `universe_delta_YYYY-MM-DD.json` for history) and the step reports `skipped: no webhook configured`. Non-gating — the universe CSV update is the real product.
-- **Baseline strategy**: `reporting.universe_delta.capture_baseline_shas()` runs at the **top of `weekly_universe.main()` before any mutation step**. It captures the current git HEAD SHA. The post-step reads pre-mutation snapshots via `git show <sha>:<path>` and post-mutation snapshots from the working tree. Calendar-independent; survives manual mid-week commits.
+- **Webhook**: `SLACK_WEBHOOK_COVERAGE`, resolved via `os.environ.get(...) or API_KEYS.get(...)` (real env var first, then `.env`). Mirrors the health-heartbeat pattern.
+- **Baseline strategy (2-tier)**:
+  1. **Snapshot files** (preferred): `.coverage/last_run_universe.csv` + `.coverage/last_run_positions.csv`, written at the end of every post-step *regardless of Slack outcome*. Next week's baseline reads from these. Independent of git — manual uncommitted edits between weekly runs are correctly captured in the next week's delta.
+  2. **Git HEAD** (bootstrap fallback): only used when the snapshot files are missing (first run after this mechanism shipped, or snapshots manually deleted). When the git fallback is taken AND the working tree was dirty at run start, a caveat appears at the top of the Slack message so the user knows pre-existing local edits may appear in the diff.
 - **Sequencing**: the post-step runs **after** `discovery`, `delisted_check`, `export_artifacts`, `export_watchlist`, and `sigma_export` so the diff captures every change made during the run and the totals quoted in the Slack post match what downstream consumers will read from `exports/`.
+- **Lifecycle inside the post-step** (in order):
+  1. Compute delta from baseline vs working tree.
+  2. Write delta JSON to `.coverage/{last_universe_delta.json, universe_delta_YYYY-MM-DD.json}` — ALWAYS, regardless of Slack outcome. The position-change overflow message ("see fallback file") relies on this file always existing.
+  3. Post to Slack `#coverage`.
+  4. Write the run snapshot to `.coverage/last_run_*.csv` — ALWAYS. Next week's baseline must reflect this run's actual end state, independent of Slack success.
+  5. If the Slack post failed, raise `RuntimeError`. `pipeline_utils.run_step` records `failed: ...`, `collect_non_successes` catches it, and the health heartbeat reports `partial`. Non-gating — the universe CSV update is the real product.
 - **Modified-field filter**: only changes in `Sector (JP)`, `Subsector (JP)`, `Sub-subsector (JP)`, `Core`, `Country (HQ)`, and ISIN (blank → non-blank only) appear in the "Modified" section. CIK / FIGI / Exchange Code / Currency are operational hygiene and excluded by design.
 - **Position changes**: enumerated by ticker, bounded at 20 entries with an overflow indicator; full list is always in the fallback JSON.
-- **Empty week**: still posts, with `_No changes this week._` between Before and After blocks.
+- **Empty week**: still posts, with `_No changes this week._` between the After and Delta sections.
 
 Module: `reporting/universe_delta.py`. Tests: `tests/test_universe_delta.py`.
 

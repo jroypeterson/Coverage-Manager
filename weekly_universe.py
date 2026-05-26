@@ -590,32 +590,70 @@ def _step_delisted_check():
 def _step_universe_delta_slack(baseline):
     """Post a weekly before/delta/after universe summary to Slack #coverage.
 
-    Reads pre-mutation snapshots from the baseline SHA captured at the top of
-    main(), reads post-mutation snapshots from the working tree, computes the
-    delta, and posts to #coverage. On any failure (no webhook, network, etc.)
-    the full delta is written to .coverage/last_universe_delta.json plus a
-    timestamped copy for history. Non-gating — the universe CSV update is the
-    real product; the Slack post is reporting on it.
+    Baseline tiers (universe_delta.load_baseline_*):
+      1. `.coverage/last_run_*.csv` — end-of-previous-run snapshot (preferred).
+      2. git HEAD captured at run start — bootstrap fallback. If git baseline
+         is used AND the working tree was dirty at run start, a caveat appears
+         in the Slack message header so the user knows the diff may include
+         pre-existing local edits.
+
+    Lifecycle in order:
+      1. Compute delta from baseline vs working tree.
+      2. Write delta JSON to .coverage/ (ALWAYS, regardless of Slack outcome).
+      3. Post to Slack #coverage.
+      4. Write run snapshot to .coverage/ (ALWAYS — represents this run's end
+         state; becomes next week's baseline regardless of Slack success).
+      5. Raise on Slack failure so the step status becomes `failed: ...` and
+         `collect_non_successes` flags `#status-reports` as `partial`.
     """
+    import os
+    import pandas as pd
+
     from config import API_KEYS
     from reporting.universe_delta import (
+        SNAPSHOT_UNIVERSE_PATH,
         compute_universe_delta,
+        load_baseline_universe,
+        load_baseline_positions,
         load_universe_snapshot,
         load_positions_snapshot,
         post_universe_delta,
+        snapshot_mtime_date,
+        write_delta_json,
+        write_run_snapshot,
     )
 
-    head_sha = baseline.get("head_sha") if baseline else None
+    head_sha = (baseline or {}).get("head_sha")
+    head_date = (baseline or {}).get("head_date")
+    dirty_paths = (baseline or {}).get("dirty_paths", []) or []
 
-    before_universe = load_universe_snapshot(commit_sha=head_sha, baseline=baseline) if head_sha else None
+    # Tier 1 vs Tier 2 detection: presence of snapshot file decides.
+    using_snapshot = SNAPSHOT_UNIVERSE_PATH.exists()
+    if using_snapshot:
+        baseline_source = "snapshot"
+        snap_date = snapshot_mtime_date(SNAPSHOT_UNIVERSE_PATH) or "previous run"
+        baseline_label = f"end of previous run · {snap_date}"
+        baseline_caveat = None
+    elif head_sha:
+        baseline_source = "git"
+        baseline_label = f"commit @ {head_sha[:7]}, {head_date or 'previous commit'} (no snapshot found — bootstrap fallback)"
+        baseline_caveat = (
+            "Working tree was dirty at run start — pre-existing local edits "
+            "may appear in this delta. Future runs will use snapshot baselines."
+        ) if dirty_paths else None
+    else:
+        baseline_source = "none"
+        baseline_label = None
+        baseline_caveat = None
+
+    before_universe = load_baseline_universe(commit_sha=head_sha, baseline=baseline)
+    before_positions = load_baseline_positions(commit_sha=head_sha, baseline=baseline)
     after_universe = load_universe_snapshot(commit_sha=None)
-    before_positions = load_positions_snapshot(commit_sha=head_sha, baseline=baseline) if head_sha else None
     after_positions = load_positions_snapshot(commit_sha=None)
 
     delisted_path = DATA_DIR / "delisted_tickers.csv"
     delisted_df = None
     if delisted_path.exists():
-        import pandas as pd
         delisted_df = pd.read_csv(delisted_path, encoding="utf-8-sig")
 
     delta = compute_universe_delta(
@@ -625,21 +663,43 @@ def _step_universe_delta_slack(baseline):
         after_positions_df=after_positions,
         delisted_df=delisted_df,
         baseline_sha=head_sha,
-        baseline_date=(baseline or {}).get("head_date"),
+        baseline_date=head_date,
+        baseline_source=baseline_source,
+        baseline_label=baseline_label,
+        baseline_caveat=baseline_caveat,
     )
 
-    webhook = API_KEYS.get("SLACK_WEBHOOK_COVERAGE")
-    result = post_universe_delta(webhook, delta)
+    # ALWAYS persist the delta JSON before posting. Position-change overflow
+    # ("see fallback file") relies on this — the file must exist whether or
+    # not the Slack post succeeds.
+    write_delta_json(delta)
+
+    # Webhook resolution: real OS env first, then .env via API_KEYS. Mirrors
+    # the health-heartbeat pattern.
+    webhook = os.environ.get("SLACK_WEBHOOK_COVERAGE") or API_KEYS.get("SLACK_WEBHOOK_COVERAGE")
+    post_result = post_universe_delta(webhook, delta)
+
+    # ALWAYS write the run snapshot — Slack success/failure is orthogonal to
+    # what the universe state actually is. Next week's baseline must reflect
+    # this run's actual end state.
+    write_run_snapshot()
+
+    if not post_result["posted"]:
+        # Raise so pipeline_utils.run_step marks this step `failed: ...` and
+        # collect_non_successes flags the health heartbeat as `partial`.
+        # Non-gating — the universe CSV + exports + sigma push already ran.
+        raise RuntimeError(f"Slack post failed: {post_result['reason']}")
 
     return {
-        "posted": result["posted"],
-        "reason": result["reason"],
+        "posted": True,
+        "reason": None,
         "added": len(delta["added"]),
         "removed": len(delta["removed"]),
         "modified": len({m["ticker"] for m in delta["modified"]}),
         "position_changes": len(delta["position_changes"]),
         "before_total": delta["before_stats"]["total"],
         "after_total": delta["after_stats"]["total"],
+        "baseline_source": baseline_source,
     }
 
 
@@ -837,6 +897,9 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
     # Runs AFTER discovery/delisted_check/exports/sigma_export so the diff
     # captures every change in the universe state this run, and the totals
     # quoted in the Slack post match what downstream consumers will read.
+    # On Slack-post failure the step raises so run_step records `failed: ...`,
+    # which collect_non_successes catches and the health heartbeat reports as
+    # `partial`. Non-gating — the universe CSV update is the real product.
     if dry_run:
         logger.info("[post] Universe delta Slack... SKIPPED (dry run)")
         steps["universe_delta_slack"] = "skipped (dry run)"
@@ -844,14 +907,14 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         logger.info("[post] Posting universe delta to Slack #coverage...")
         status, ud_result = run_step("universe_delta_slack", _step_universe_delta_slack, baseline)
         if ud_result:
-            if ud_result["posted"]:
-                steps["universe_delta_slack"] = (
-                    f"posted (+{ud_result['added']}/-{ud_result['removed']}, "
-                    f"{ud_result['modified']} modified, {ud_result['position_changes']} pos)"
-                )
-            else:
-                steps["universe_delta_slack"] = f"skipped: {ud_result['reason']}"
+            # Success path — ud_result is only returned on posted=True
+            steps["universe_delta_slack"] = (
+                f"posted [{ud_result['baseline_source']}] "
+                f"(+{ud_result['added']}/-{ud_result['removed']}, "
+                f"{ud_result['modified']} modified, {ud_result['position_changes']} pos)"
+            )
         else:
+            # Step raised — status starts with "failed: ..."
             steps["universe_delta_slack"] = status
 
     # Summary

@@ -73,6 +73,13 @@ def main():
         },
         "baseline_sha": "3b975ef0000000000000000000000000",
         "baseline_date": "2026-05-22",
+        # New v2 fields — snapshot-source semantics + dirty-tree caveat slot.
+        # For the smoke test we simulate the normal happy path: snapshot baseline,
+        # no caveat. To preview the dirty-tree warning, set baseline_caveat to
+        # a non-empty string.
+        "baseline_source": "snapshot",
+        "baseline_label": "end of previous run · 2026-05-22",
+        "baseline_caveat": None,
         # Header explicitly marks this as a smoke test so the message can't be
         # mistaken for a real Friday post.
         "today": "SMOKE TEST (delete this) — 2026-05-26",

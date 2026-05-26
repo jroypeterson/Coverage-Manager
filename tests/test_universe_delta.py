@@ -3,10 +3,13 @@
 Covers:
   - capture_baseline_shas captured before mutation (orchestration-level)
   - compute_universe_delta: additions, removals (with delisted lookup),
-    modifications (grouped per ticker in formatter), position changes
-  - format_universe_delta_slack: grouping, capping, empty-week
+    modifications (grouped per ticker in formatter), position changes,
+    baseline caveat threading
+  - format_universe_delta_slack: grouping, capping, empty-week, caveat
   - _split_into_section_blocks: 3000-char limit
   - post_universe_delta: fallback files (timestamped + last) on no-webhook + network errors
+  - 2-tier baseline: load_baseline_* prefers snapshot file, falls back to git
+  - write_delta_json + write_run_snapshot: end-of-run persistence
 """
 
 import json
@@ -340,6 +343,7 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
         return {
             "posted": True, "reason": None, "added": 0, "removed": 0,
             "modified": 0, "position_changes": 0, "before_total": 1, "after_total": 1,
+            "baseline_source": "snapshot",
         }
 
     from reporting import universe_delta as ud_mod
@@ -367,3 +371,303 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
     sigma_idx = call_order.index("sigma_export")
     delta_idx = call_order.index("universe_delta_slack")
     assert delta_idx > sigma_idx
+
+
+# ── 2-tier baseline: snapshot preferred, git fallback ────────────────────────
+
+
+def test_capture_baseline_shas_includes_dirty_paths(monkeypatch):
+    """capture_baseline_shas runs `git status --porcelain` and includes any
+    dirty universe/positions paths in the returned dict. Only matters when the
+    git baseline is used (snapshot absent), but the detection is unconditional."""
+
+    def fake_git_run(args, timeout=10):
+        if args[:2] == ["rev-parse", "HEAD"]:
+            return "abc1234567890\n"
+        if args[:2] == ["show", "-s"]:
+            return "2026-05-22\n"
+        if args[0] == "status":
+            return " M data/coverage_universe_tickers.csv\n M data/positions_and_researching.csv\n"
+        return None
+
+    monkeypatch.setattr(ud, "_git_run", fake_git_run)
+    baseline = ud.capture_baseline_shas()
+
+    assert baseline["head_sha"] == "abc1234567890"
+    assert baseline["head_date"] == "2026-05-22"
+    assert "data/coverage_universe_tickers.csv" in baseline["dirty_paths"]
+    assert "data/positions_and_researching.csv" in baseline["dirty_paths"]
+
+
+def test_capture_baseline_shas_no_dirty_paths_when_clean(monkeypatch):
+    def fake_git_run(args, timeout=10):
+        if args[:2] == ["rev-parse", "HEAD"]:
+            return "abc1234567890\n"
+        if args[:2] == ["show", "-s"]:
+            return "2026-05-22\n"
+        if args[0] == "status":
+            return ""  # clean
+        return None
+
+    monkeypatch.setattr(ud, "_git_run", fake_git_run)
+    baseline = ud.capture_baseline_shas()
+    assert baseline["dirty_paths"] == []
+
+
+def test_load_baseline_universe_prefers_snapshot_over_git(tmp_path, monkeypatch):
+    """When `.coverage/last_run_universe.csv` exists, it wins over any git SHA."""
+    snapshot = tmp_path / "last_run_universe.csv"
+    _universe_df([
+        {"Ticker": "FROM_SNAPSHOT", "Company Name": "From Snapshot"},
+    ]).to_csv(snapshot, index=False)
+
+    # Make git_show return a different value so we know which path was taken
+    def fake_git_show(commit_sha, rel_path):
+        return "Ticker,Company Name\nFROM_GIT,From Git\n"
+    monkeypatch.setattr(ud, "_git_show", fake_git_show)
+
+    df = ud.load_baseline_universe(snapshot_path=snapshot, commit_sha="deadbeef")
+    assert list(df["Ticker"]) == ["FROM_SNAPSHOT"]
+
+
+def test_load_baseline_universe_falls_back_to_git_when_no_snapshot(tmp_path, monkeypatch):
+    """No snapshot → git is consulted via load_universe_snapshot/git_show."""
+    nonexistent = tmp_path / "nope.csv"
+
+    def fake_git_show(commit_sha, rel_path):
+        return "Ticker,Company Name\nFROM_GIT,From Git\n"
+    monkeypatch.setattr(ud, "_git_show", fake_git_show)
+
+    df = ud.load_baseline_universe(snapshot_path=nonexistent, commit_sha="deadbeef")
+    assert list(df["Ticker"]) == ["FROM_GIT"]
+
+
+def test_load_baseline_universe_returns_none_when_neither_available(tmp_path):
+    """No snapshot, no commit_sha → returns None for the baseline-unavailable path."""
+    nonexistent = tmp_path / "nope.csv"
+    assert ud.load_baseline_universe(snapshot_path=nonexistent, commit_sha=None) is None
+
+
+# ── Caveat threading: dirty git baseline shows :warning: in message ──────────
+
+
+def test_compute_delta_carries_caveat_through_to_format(monkeypatch):
+    """The dirty-tree caveat string survives compute → format and renders as a
+    :warning: line directly under the header."""
+    before = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple"}])
+    after = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple"}])
+
+    delta = ud.compute_universe_delta(
+        before, after,
+        baseline_source="git",
+        baseline_label="commit @ abc1234, 2026-05-22 (no snapshot found — bootstrap fallback)",
+        baseline_caveat="Working tree was dirty at run start — pre-existing local edits may appear in this delta.",
+    )
+
+    assert delta["baseline_caveat"]
+    msg = ud.format_universe_delta_slack(delta)
+    assert ":warning:" in msg
+    assert "dirty at run start" in msg
+
+
+def test_format_no_caveat_when_absent():
+    """No caveat → no :warning: line."""
+    before = _universe_df([{"Ticker": "AAPL"}])
+    after = _universe_df([{"Ticker": "AAPL"}])
+    delta = ud.compute_universe_delta(before, after, baseline_source="snapshot")
+    msg = ud.format_universe_delta_slack(delta)
+    assert ":warning:" not in msg
+
+
+def test_format_uses_baseline_label_when_provided():
+    """baseline_label is rendered verbatim in the Before-block header."""
+    before = _universe_df([{"Ticker": "AAPL"}])
+    after = _universe_df([{"Ticker": "AAPL"}])
+    delta = ud.compute_universe_delta(
+        before, after,
+        baseline_source="snapshot",
+        baseline_label="end of previous run · 2026-05-22",
+    )
+    msg = ud.format_universe_delta_slack(delta)
+    assert "end of previous run · 2026-05-22" in msg
+
+
+def test_format_renders_baseline_unavailable_when_source_none():
+    """baseline_source='none' produces the bootstrap-not-yet message."""
+    df = _universe_df([{"Ticker": "AAPL"}])
+    delta = ud.compute_universe_delta(df, df, baseline_source="none")
+    msg = ud.format_universe_delta_slack(delta)
+    assert "baseline unavailable" in msg
+
+
+# ── write_delta_json / write_run_snapshot ────────────────────────────────────
+
+
+def test_write_delta_json_writes_both_files_unconditionally(tmp_path):
+    """write_delta_json is now the canonical place — always called before Slack
+    post fires, not only on failure. Both timestamped + stable files written."""
+    delta = _minimal_delta(today="2026-05-29")
+    paths = ud.write_delta_json(delta, fallback_dir=tmp_path)
+
+    timestamped = tmp_path / "universe_delta_2026-05-29.json"
+    stable = tmp_path / "last_universe_delta.json"
+    assert timestamped.exists()
+    assert stable.exists()
+    assert set(paths) == {timestamped, stable}
+
+    payload = json.loads(stable.read_text(encoding="utf-8"))
+    assert payload["today"] == "2026-05-29"
+    assert payload["reason"] is None
+    assert payload["delta"]["baseline_sha"] == "abc1234567"
+
+
+def test_write_delta_json_reason_field_appears_when_set(tmp_path):
+    delta = _minimal_delta()
+    ud.write_delta_json(delta, fallback_dir=tmp_path, reason="slack returned 500")
+    payload = json.loads((tmp_path / "last_universe_delta.json").read_text(encoding="utf-8"))
+    assert payload["reason"] == "slack returned 500"
+
+
+def test_write_run_snapshot_copies_working_tree_to_fallback_dir(tmp_path, monkeypatch):
+    """write_run_snapshot copies both CSVs (when present) to .coverage/."""
+    # Fake working-tree files
+    fake_universe = tmp_path / "data" / "coverage_universe_tickers.csv"
+    fake_positions = tmp_path / "data" / "positions_and_researching.csv"
+    fake_universe.parent.mkdir(parents=True)
+    fake_universe.write_text("Ticker,Company Name\nAAPL,Apple\n", encoding="utf-8")
+    fake_positions.write_text("Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+
+    monkeypatch.setattr(ud, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(ud, "POSITIONS_PATH", fake_positions)
+
+    out_dir = tmp_path / ".coverage"
+    written = ud.write_run_snapshot(fallback_dir=out_dir)
+
+    universe_out = out_dir / "last_run_universe.csv"
+    positions_out = out_dir / "last_run_positions.csv"
+    assert universe_out.exists()
+    assert positions_out.exists()
+    assert "AAPL,Apple" in universe_out.read_text(encoding="utf-8")
+    assert "AAPL,Portfolio" in positions_out.read_text(encoding="utf-8")
+    assert set(written) == {universe_out, positions_out}
+
+
+def test_write_run_snapshot_skips_positions_when_absent(tmp_path, monkeypatch):
+    fake_universe = tmp_path / "data" / "coverage_universe_tickers.csv"
+    fake_universe.parent.mkdir(parents=True)
+    fake_universe.write_text("Ticker,Company Name\nAAPL,Apple\n", encoding="utf-8")
+
+    nonexistent_positions = tmp_path / "data" / "missing.csv"
+    monkeypatch.setattr(ud, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(ud, "POSITIONS_PATH", nonexistent_positions)
+
+    out_dir = tmp_path / ".coverage"
+    written = ud.write_run_snapshot(fallback_dir=out_dir)
+
+    assert (out_dir / "last_run_universe.csv").exists()
+    assert not (out_dir / "last_run_positions.csv").exists()
+    assert len(written) == 1
+
+
+def test_snapshot_mtime_date_returns_iso_string(tmp_path):
+    snap = tmp_path / "last_run_universe.csv"
+    snap.write_text("Ticker\nX\n", encoding="utf-8")
+    date_str = ud.snapshot_mtime_date(snapshot_path=snap)
+    # YYYY-MM-DD shape
+    assert len(date_str) == 10
+    assert date_str.count("-") == 2
+
+
+def test_snapshot_mtime_date_returns_none_when_absent(tmp_path):
+    assert ud.snapshot_mtime_date(snapshot_path=tmp_path / "nope.csv") is None
+
+
+# ── Step-level: Slack failure raises so health goes partial ─────────────────
+
+
+def test_step_raises_runtime_error_on_slack_post_failure(monkeypatch, tmp_path):
+    """When post_universe_delta returns posted=False, _step_universe_delta_slack
+    must raise so pipeline_utils.run_step records `failed: ...` and
+    collect_non_successes flags the health heartbeat as partial."""
+    import weekly_universe
+
+    # Build a working-tree universe CSV the step can read
+    fake_universe = tmp_path / "coverage_universe_tickers.csv"
+    _universe_df([{"Ticker": "AAPL", "Company Name": "Apple"}]).to_csv(fake_universe, index=False)
+    fake_positions = tmp_path / "positions_and_researching.csv"
+    fake_positions.write_text("Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    fake_coverage_dir = tmp_path / ".coverage"
+
+    # Patch the module-level paths the step + universe_delta use
+    monkeypatch.setattr(ud, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(ud, "POSITIONS_PATH", fake_positions)
+    monkeypatch.setattr(ud, "FALLBACK_DIR", fake_coverage_dir)
+    monkeypatch.setattr(ud, "SNAPSHOT_UNIVERSE_PATH", fake_coverage_dir / "last_run_universe.csv")
+    monkeypatch.setattr(ud, "SNAPSHOT_POSITIONS_PATH", fake_coverage_dir / "last_run_positions.csv")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
+
+    # Force Slack post to fail
+    monkeypatch.setattr(
+        ud, "post_universe_delta",
+        lambda webhook, delta, fallback_dir=None: {"posted": False, "reason": "slack returned 500"},
+    )
+
+    baseline = {
+        "head_sha": None, "head_date": None,
+        "universe_rel": "data/coverage_universe_tickers.csv",
+        "positions_rel": "data/positions_and_researching.csv",
+        "dirty_paths": [],
+    }
+
+    with pytest.raises(RuntimeError, match="Slack post failed"):
+        weekly_universe._step_universe_delta_slack(baseline)
+
+    # Both side-effects must still have happened before the raise
+    assert (fake_coverage_dir / "last_universe_delta.json").exists()
+    assert (fake_coverage_dir / "last_run_universe.csv").exists()
+
+
+def test_step_uses_os_environ_first_then_api_keys(monkeypatch, tmp_path):
+    """Webhook is resolved via os.environ first; .env API_KEYS is the fallback."""
+    import os
+    import weekly_universe
+
+    fake_universe = tmp_path / "coverage_universe_tickers.csv"
+    _universe_df([{"Ticker": "AAPL", "Company Name": "Apple"}]).to_csv(fake_universe, index=False)
+    fake_positions = tmp_path / "positions_and_researching.csv"
+    fake_positions.write_text("Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    fake_coverage_dir = tmp_path / ".coverage"
+
+    monkeypatch.setattr(ud, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(ud, "POSITIONS_PATH", fake_positions)
+    monkeypatch.setattr(ud, "FALLBACK_DIR", fake_coverage_dir)
+    monkeypatch.setattr(ud, "SNAPSHOT_UNIVERSE_PATH", fake_coverage_dir / "last_run_universe.csv")
+    monkeypatch.setattr(ud, "SNAPSHOT_POSITIONS_PATH", fake_coverage_dir / "last_run_positions.csv")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
+
+    captured = {}
+    def fake_post(webhook, delta, fallback_dir=None):
+        captured["webhook"] = webhook
+        return {"posted": True, "reason": None}
+    monkeypatch.setattr(ud, "post_universe_delta", fake_post)
+
+    monkeypatch.setenv("SLACK_WEBHOOK_COVERAGE", "FROM_OS_ENV")
+    import config
+    monkeypatch.setitem(config.API_KEYS, "SLACK_WEBHOOK_COVERAGE", "FROM_DOTENV")
+
+    baseline = {
+        "head_sha": None, "head_date": None,
+        "universe_rel": "data/coverage_universe_tickers.csv",
+        "positions_rel": "data/positions_and_researching.csv",
+        "dirty_paths": [],
+    }
+    weekly_universe._step_universe_delta_slack(baseline)
+
+    assert captured["webhook"] == "FROM_OS_ENV"
+
+    # And with no OS env, falls back to .env
+    monkeypatch.delenv("SLACK_WEBHOOK_COVERAGE")
+    weekly_universe._step_universe_delta_slack(baseline)
+    assert captured["webhook"] == "FROM_DOTENV"
