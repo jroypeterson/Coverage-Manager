@@ -587,6 +587,62 @@ def _step_delisted_check():
     }
 
 
+def _step_universe_delta_slack(baseline):
+    """Post a weekly before/delta/after universe summary to Slack #coverage.
+
+    Reads pre-mutation snapshots from the baseline SHA captured at the top of
+    main(), reads post-mutation snapshots from the working tree, computes the
+    delta, and posts to #coverage. On any failure (no webhook, network, etc.)
+    the full delta is written to .coverage/last_universe_delta.json plus a
+    timestamped copy for history. Non-gating — the universe CSV update is the
+    real product; the Slack post is reporting on it.
+    """
+    from config import API_KEYS
+    from reporting.universe_delta import (
+        compute_universe_delta,
+        load_universe_snapshot,
+        load_positions_snapshot,
+        post_universe_delta,
+    )
+
+    head_sha = baseline.get("head_sha") if baseline else None
+
+    before_universe = load_universe_snapshot(commit_sha=head_sha, baseline=baseline) if head_sha else None
+    after_universe = load_universe_snapshot(commit_sha=None)
+    before_positions = load_positions_snapshot(commit_sha=head_sha, baseline=baseline) if head_sha else None
+    after_positions = load_positions_snapshot(commit_sha=None)
+
+    delisted_path = DATA_DIR / "delisted_tickers.csv"
+    delisted_df = None
+    if delisted_path.exists():
+        import pandas as pd
+        delisted_df = pd.read_csv(delisted_path, encoding="utf-8-sig")
+
+    delta = compute_universe_delta(
+        before_universe_df=before_universe,
+        after_universe_df=after_universe,
+        before_positions_df=before_positions,
+        after_positions_df=after_positions,
+        delisted_df=delisted_df,
+        baseline_sha=head_sha,
+        baseline_date=(baseline or {}).get("head_date"),
+    )
+
+    webhook = API_KEYS.get("SLACK_WEBHOOK_COVERAGE")
+    result = post_universe_delta(webhook, delta)
+
+    return {
+        "posted": result["posted"],
+        "reason": result["reason"],
+        "added": len(delta["added"]),
+        "removed": len(delta["removed"]),
+        "modified": len({m["ticker"] for m in delta["modified"]}),
+        "position_changes": len(delta["position_changes"]),
+        "before_total": delta["before_stats"]["total"],
+        "after_total": delta["after_stats"]["total"],
+    }
+
+
 # ── Result helper ────────────────────────────────────────────────────────────
 
 
@@ -628,6 +684,26 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
     steps = {}
     artifacts = []
     validation_passed = False
+
+    # Step 0: Capture baseline git SHA BEFORE any mutation step runs.
+    # The post-step (universe_delta_slack) diffs this committed state against
+    # the working tree at the end of the run to produce the #coverage post.
+    # Calendar-independent and survives manual mid-week commits.
+    baseline = None
+    if not dry_run:
+        try:
+            from reporting.universe_delta import capture_baseline_shas
+            baseline = capture_baseline_shas()
+            if baseline.get("head_sha"):
+                logger.info(
+                    "Baseline universe SHA: %s (%s)",
+                    baseline["head_sha"][:7],
+                    baseline.get("head_date") or "unknown date",
+                )
+            else:
+                logger.warning("No baseline SHA available — Slack delta will mark baseline as unavailable")
+        except Exception as e:
+            logger.warning("Failed to capture baseline SHA: %s", e)
 
     # Step 1: Validate
     logger.info("[1/6] Validating coverage universe...")
@@ -756,6 +832,27 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 steps["sigma_export"] = status
         else:
             steps["sigma_export"] = status
+
+    # Post-step: Weekly universe delta -> Slack #coverage
+    # Runs AFTER discovery/delisted_check/exports/sigma_export so the diff
+    # captures every change in the universe state this run, and the totals
+    # quoted in the Slack post match what downstream consumers will read.
+    if dry_run:
+        logger.info("[post] Universe delta Slack... SKIPPED (dry run)")
+        steps["universe_delta_slack"] = "skipped (dry run)"
+    else:
+        logger.info("[post] Posting universe delta to Slack #coverage...")
+        status, ud_result = run_step("universe_delta_slack", _step_universe_delta_slack, baseline)
+        if ud_result:
+            if ud_result["posted"]:
+                steps["universe_delta_slack"] = (
+                    f"posted (+{ud_result['added']}/-{ud_result['removed']}, "
+                    f"{ud_result['modified']} modified, {ud_result['position_changes']} pos)"
+                )
+            else:
+                steps["universe_delta_slack"] = f"skipped: {ud_result['reason']}"
+        else:
+            steps["universe_delta_slack"] = status
 
     # Summary
     logger.info("")

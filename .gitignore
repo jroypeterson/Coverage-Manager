@@ -13,3 +13,4 @@ backups/
 .pytest_cache/
 run_log.csv
 .health/
+.coverage/

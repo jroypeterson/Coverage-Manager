@@ -201,12 +201,19 @@ def main(skip_email=False, dry_run=False, log_audit=True):
         steps["movers"] = status
 
     # Step 5: Email
+    # Reporting transport flag — when EMAIL_ENABLED=False the email path is a
+    # no-op regardless of caller. Slack (#coverage) carries the weekly update
+    # for now; flip the flag in config.py to re-enable email.
+    import config
     if skip_email:
         logger.info("[5/5] Email... SKIPPED")
         steps["email"] = "skipped"
     elif dry_run:
         logger.info("[5/5] Email... SKIPPED (dry run)")
         steps["email"] = "skipped (dry run)"
+    elif not config.EMAIL_ENABLED:
+        logger.info("[5/5] Email... SKIPPED (EMAIL_ENABLED=False)")
+        steps["email"] = "skipped: EMAIL_ENABLED=False"
     else:
         logger.info("[5/5] Sending email...")
         status, _ = run_step("email", _step_email)

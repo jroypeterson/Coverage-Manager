@@ -98,6 +98,14 @@ MOVERS_MAX_FLAGGED = int(os.environ.get("MOVERS_MAX_FLAGGED", "30"))
 # Anthropic model used for the per-ticker "why" summary. Haiku is fast & cheap.
 MOVERS_LLM_MODEL = os.environ.get("MOVERS_LLM_MODEL", "claude-haiku-4-5")
 
+# ── Reporting transports ─────────────────────────────────────────────────────
+# Each weekly transport can be enabled/disabled independently. The weekly
+# universe Slack post (#coverage) is on by default; email is currently off
+# while the Slack post is on probation. To re-enable email, flip this to True
+# (no other code changes required).
+EMAIL_ENABLED = False
+# REVISIT EMAIL REPORTING: 2026-06-29
+
 # ── Sample mode ──────────────────────────────────────────────────────────────
 
 SAMPLE_TICKERS = ["ISRG", "BLLN", "HTFL", "JAN", "WELL", "NTRA"]

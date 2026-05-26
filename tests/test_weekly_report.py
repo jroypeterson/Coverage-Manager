@@ -63,3 +63,48 @@ def test_main_no_force_parameter():
 
     sig = inspect.signature(weekly_report.main)
     assert "force" not in sig.parameters
+
+
+def test_email_step_skipped_when_email_disabled(monkeypatch, fixture_csv):
+    """When config.EMAIL_ENABLED=False the email step must be skipped without
+    invoking _step_email — the kill-switch is a normal operational flag, not a
+    temporary state. Flip the flag back to re-enable; no other code changes."""
+    import config
+
+    monkeypatch.setattr(config, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(config, "EMAIL_ENABLED", False)
+
+    # Fail loudly if _step_email is invoked despite the flag being off
+    def boom():
+        raise AssertionError("_step_email must not run when EMAIL_ENABLED=False")
+    monkeypatch.setattr(weekly_report, "_step_email", boom)
+
+    # Run with dry_run=False so the email branch is actually exercised; patch
+    # the upstream report-producing steps to no-op so we don't need real data.
+    monkeypatch.setattr(weekly_report, "_step_archive_reports", lambda: {"moved": 0, "pruned": 0})
+    monkeypatch.setattr(weekly_report, "_step_performance", lambda: {"ticker_count": 1, "fund_count": 1})
+    monkeypatch.setattr(weekly_report, "_step_movers", lambda: {
+        "flagged": 0, "html": None, "slack_posted": False,
+    })
+
+    result = weekly_report.main(dry_run=False, log_audit=False)
+
+    assert "EMAIL_ENABLED=False" in result["steps"]["email"]
+    assert result["non_successes"] == []
+
+
+def test_email_step_skipped_when_email_enabled_but_skip_email_flag(monkeypatch, fixture_csv):
+    """skip_email=True overrides regardless of EMAIL_ENABLED."""
+    import config
+
+    monkeypatch.setattr(config, "CSV_PATH", fixture_csv)
+    monkeypatch.setattr(config, "EMAIL_ENABLED", True)
+
+    monkeypatch.setattr(weekly_report, "_step_archive_reports", lambda: {"moved": 0, "pruned": 0})
+    monkeypatch.setattr(weekly_report, "_step_performance", lambda: {"ticker_count": 1, "fund_count": 1})
+    monkeypatch.setattr(weekly_report, "_step_movers", lambda: {
+        "flagged": 0, "html": None, "slack_posted": False,
+    })
+
+    result = weekly_report.main(skip_email=True, dry_run=False, log_audit=False)
+    assert result["steps"]["email"] == "skipped"

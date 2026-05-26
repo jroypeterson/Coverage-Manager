@@ -348,6 +348,23 @@ Important comparison rules:
 - The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
 - Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
 
+## Weekly universe delta -> Slack #coverage
+
+Each `weekly-universe` (and therefore `weekly-build`) run posts a single message to Slack `#coverage` summarizing what changed in the coverage universe this week, in three blocks: **Before** (universe state at the baseline commit), **Delta** (added / removed / modified / position changes), **After** (current state).
+
+- **Webhook**: read from `SLACK_WEBHOOK_COVERAGE` (env var, else key in `.env`). If unset, the message is written to `.coverage/last_universe_delta.json` (plus a timestamped `universe_delta_YYYY-MM-DD.json` for history) and the step reports `skipped: no webhook configured`. Non-gating — the universe CSV update is the real product.
+- **Baseline strategy**: `reporting.universe_delta.capture_baseline_shas()` runs at the **top of `weekly_universe.main()` before any mutation step**. It captures the current git HEAD SHA. The post-step reads pre-mutation snapshots via `git show <sha>:<path>` and post-mutation snapshots from the working tree. Calendar-independent; survives manual mid-week commits.
+- **Sequencing**: the post-step runs **after** `discovery`, `delisted_check`, `export_artifacts`, `export_watchlist`, and `sigma_export` so the diff captures every change made during the run and the totals quoted in the Slack post match what downstream consumers will read from `exports/`.
+- **Modified-field filter**: only changes in `Sector (JP)`, `Subsector (JP)`, `Sub-subsector (JP)`, `Core`, `Country (HQ)`, and ISIN (blank → non-blank only) appear in the "Modified" section. CIK / FIGI / Exchange Code / Currency are operational hygiene and excluded by design.
+- **Position changes**: enumerated by ticker, bounded at 20 entries with an overflow indicator; full list is always in the fallback JSON.
+- **Empty week**: still posts, with `_No changes this week._` between Before and After blocks.
+
+Module: `reporting/universe_delta.py`. Tests: `tests/test_universe_delta.py`.
+
+## Email transport (currently OFF)
+
+`config.EMAIL_ENABLED = False` disables the weekly performance-report email; the Slack #coverage post replaces it. Email is **not** deleted — flip `EMAIL_ENABLED = True` in `config.py` to re-enable, no other code changes required. Each reporting transport (email, Slack #coverage, Slack #stock-price-alerts movers, #status-reports health) is enabled/disabled independently. Revisit date: 2026-06-29 (comment in `config.py`).
+
 ## Health reporting
 
 Coverage Manager posts a v1 health heartbeat to Slack `#status-reports` at the end of every `weekly-build` run, per the workspace contract in `../HEALTH_REPORTING.md`. The heartbeat is **additional to** (not a replacement for) the existing project-specific Slack post that goes to `#stock-price-alerts`.

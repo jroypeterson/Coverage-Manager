@@ -66,6 +66,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "export_artifacts",
         "export_watchlist",
         "sigma_export",
+        "universe_delta_slack",
     }
     assert result["steps"]["validate"] == "ok"
     assert result["steps"]["discovery"] == "skipped"
@@ -75,6 +76,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     assert "skipped" in result["steps"]["export_artifacts"]
     assert "skipped" in result["steps"]["export_watchlist"]
     assert "skipped" in result["steps"]["sigma_export"]
+    assert "skipped" in result["steps"]["universe_delta_slack"]
 
     assert result["non_successes"] == []
 
