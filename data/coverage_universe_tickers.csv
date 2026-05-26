@@ -1099,3 +1099,6 @@ MOBI,NASDAQ,NMS,NasdaqGS,Primary,,2026,US60705V1035,,,,,"Mobia Medical, Inc.",Un
 HAWK,NYSE,NYQ,NYSE,Primary,,2026,US4202011056,,,,,"HawkEye 360, Inc.",United States,United States,USA,USD,https://www.he360.com,Industrials,Aerospace & Defense,Industrials,Space Tech / Instrumentation,RF SIGINT,
 FDXF,NYSE,NYQ,NYSE,Primary,,2026,,,,,,FedEx Freight Corporation,United States,United States,USA,USD,https://www.fedex.com/en-us/freight.html,Industrials,Trucking,Industrials,,LTL,
 FRVO,NASDAQ,NMS,NasdaqGS,Primary,,2026,US31556C1062,,,,,Fervo Energy Co.,United States,United States,USA,USD,http://www.fervoenergy.com,Utilities,Regulated Electric,Energy,Clean Energy / Geothermal,,
+OCTV,NASDAQ,NMS,NasdaqGS,Primary,"Nasdaq Stockholm (OCTV SDB)",2026,IE0003YHD8K8,,,,,Octave Intelligence plc,Sweden,United States,SWE,USD,https://www.octave.com,Technology,Software - Application,SaaS,Industrial / Design SaaS,EHS / CAD / ALI,
+GMRS,NYSE,NYQ,NYSE,Primary,,2026,US38013D1063,,,,,GMR Solutions Inc.,United States,United States,USA,USD,https://www.gmr.net,Healthcare,Medical Care Facilities,Healthcare Services,Emergency Medical Services,Patient Transport,
+BXDC,NYSE,NYQ,NYSE,Primary,,2026,,,,,,Blackstone Digital Infrastructure Trust Inc.,United States,United States,USA,USD,https://www.blackstone.com,Real Estate,REIT - Specialty,Real Estate,Data Center REIT,Hyperscale,
