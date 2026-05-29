@@ -1102,3 +1102,6 @@ FRVO,NASDAQ,NMS,NasdaqGS,Primary,,2026,US31556C1062,,,,,Fervo Energy Co.,United 
 OCTV,NASDAQ,NMS,NasdaqGS,Primary,"Nasdaq Stockholm (OCTV SDB)",2026,IE0003YHD8K8,,,,,Octave Intelligence plc,Sweden,United States,SWE,USD,https://www.octave.com,Technology,Software - Application,SaaS,Industrial / Design SaaS,EHS / CAD / ALI,
 GMRS,NYSE,NYQ,NYSE,Primary,,2026,US38013D1063,,,,,GMR Solutions Inc.,United States,United States,USA,USD,https://www.gmr.net,Healthcare,Medical Care Facilities,Healthcare Services,Emergency Medical Services,Patient Transport,
 BXDC,NYSE,NYQ,NYSE,Primary,,2026,,,,,,Blackstone Digital Infrastructure Trust Inc.,United States,United States,USA,USD,https://www.blackstone.com,Real Estate,REIT - Specialty,Real Estate,Data Center REIT,Hyperscale,
+SPCX,NASDAQ,NMS,NasdaqGS,Primary,,2026,,,,,,Space Exploration Technologies Corp.,United States,United States,USA,USD,https://www.spacex.com,Industrials,Aerospace & Defense,Tech,Aerospace & Space,,
+INIO,NASDAQ,NMS,NasdaqGS,Primary,,2026,,,,,,INNIO Group,Austria,United States,AUT,USD,https://www.innio.com,Industrials,Specialty Industrial Machinery,Energy,Power Generation / Gas Engines,,
+QNT,NASDAQ,NMS,NasdaqGS,Primary,,2026,,,,,,Quantinuum Inc.,United States,United States,USA,USD,https://www.quantinuum.com,Technology,Computer Hardware,Tech,Quantum Computing,,
