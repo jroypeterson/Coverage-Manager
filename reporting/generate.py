@@ -217,6 +217,22 @@ def _fmt_duration(seconds):
     return f"{h}h {m}m {s}s"
 
 
+def email_skip_reason(sample_mode, skip_email, email_enabled):
+    """Return why the email step should be skipped, or None to send.
+
+    Centralizes the gating so the standalone `cli.py performance` path honors
+    the same rules as the orchestrator: sample runs and orchestrator-owned
+    delivery (skip_email) are skipped, and EMAIL_ENABLED is the master switch.
+    """
+    if sample_mode:
+        return "sample mode"
+    if skip_email:
+        return "skip_email"
+    if not email_enabled:
+        return "EMAIL_ENABLED=False"
+    return None
+
+
 def main(sample_mode=False, refresh=False, skip_email=False):
     """Generate performance reports.
 
@@ -563,12 +579,15 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     run_step("html", _generate_html)
 
     # ============ EMAIL REPORT ============
-    if sample_mode:
-        logger.info("Skipping email (sample mode)")
-        step_results["email"] = "skipped"
-    elif skip_email:
-        logger.info("Skipping email (skip_email=True; orchestrator owns delivery)")
-        step_results["email"] = "skipped"
+    # EMAIL_ENABLED is the master transport switch (config.py). Honor it here so
+    # the standalone `cli.py performance` command behaves the same as the
+    # orchestrator paths — otherwise a manual run emails even when the flag is
+    # off. Referenced via the module so tests can monkeypatch config.EMAIL_ENABLED.
+    import config
+    skip_reason = email_skip_reason(sample_mode, skip_email, config.EMAIL_ENABLED)
+    if skip_reason is not None:
+        logger.info("Skipping email (%s)", skip_reason)
+        step_results["email"] = "skipped" if skip_reason in ("sample mode", "skip_email") else f"skipped: {skip_reason}"
     else:
         gmail_addr = API_KEYS.get("GMAIL_ADDRESS")
         gmail_pass = API_KEYS.get("GMAIL_APP_PASSWORD")

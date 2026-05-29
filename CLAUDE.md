@@ -373,6 +373,8 @@ Module: `reporting/universe_delta.py`. Tests: `tests/test_universe_delta.py`.
 
 `config.EMAIL_ENABLED = False` disables the weekly performance-report email; the Slack #coverage post replaces it. Email is **not** deleted — flip `EMAIL_ENABLED = True` in `config.py` to re-enable, no other code changes required. Each reporting transport (email, Slack #coverage, Slack #stock-price-alerts movers, #status-reports health) is enabled/disabled independently. Revisit date: 2026-06-29 (comment in `config.py`).
 
+`EMAIL_ENABLED` is honored by **both** the orchestrator (`weekly_report` / `weekly_build`) **and** the standalone `cli.py performance` command. The standalone path gates via `reporting/generate.email_skip_reason()` (added 2026-05-29). Before that fix, `cli.py performance` emailed unconditionally whenever Gmail creds were set — bypassing the flag — which caused surprise/duplicate sends. Each `cli.py performance` run still produces at most one email; re-running it for the same date with `EMAIL_ENABLED=True` sends again (see memory `project_perf_command_emails_regardless_of_flag`).
+
 ## Health reporting
 
 Coverage Manager posts a v1 health heartbeat to Slack `#status-reports` at the end of every `weekly-build` run, per the workspace contract in `../HEALTH_REPORTING.md`. The heartbeat is **additional to** (not a replacement for) the existing project-specific Slack post that goes to `#stock-price-alerts`.
