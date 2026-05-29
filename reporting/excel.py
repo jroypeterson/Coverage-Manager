@@ -1,8 +1,25 @@
 """Excel report generation for performance reports."""
 
+import re
+
 import pandas as pd
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+# openpyxl forbids these characters in worksheet titles and caps length at 31.
+_INVALID_SHEET_CHARS = re.compile(r"[\\/*?:\[\]]")
+
+
+def excel_safe_title(name):
+    """Return a worksheet-title-safe version of ``name``.
+
+    Segment tab names (e.g. ``"Following: Non-HC"``) may contain characters
+    openpyxl rejects in a sheet title (``\\ / * ? : [ ]``) or exceed the 31-char
+    limit. The segment key is unchanged everywhere else — only the Excel tab
+    label is sanitized here.
+    """
+    safe = _INVALID_SHEET_CHARS.sub("-", str(name)).strip()
+    return safe[:31] or "Sheet"
 
 from reporting.calcs import (
     RETURN_COLS, PERIOD_COLS, ANNUAL_COLS, FUND_COLS, VAL_COLS,
@@ -14,7 +31,7 @@ from reporting.calcs import (
 
 def write_excel_sheet(wb, sheet_name, df, info_cols):
     """Write a formatted Excel sheet for a given segment DataFrame."""
-    ws = wb.create_sheet(title=sheet_name)
+    ws = wb.create_sheet(title=excel_safe_title(sheet_name))
 
     header_fill = PatternFill(start_color="2C3E50", end_color="2C3E50", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=10)
