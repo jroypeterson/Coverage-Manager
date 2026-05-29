@@ -54,7 +54,7 @@ GMAIL_APP_PASSWORD=...
 
 Alpha Vantage is used as a fallback fundamentals provider when Finnhub/FMP do not return data. Slack posts are non-gating: if a webhook is unset, the project-specific channel post is skipped or written to a local fallback file (the `#coverage` post writes `.coverage/last_universe_delta.json`).
 
-**Email transport (currently off).** `config.EMAIL_ENABLED = False` disables the weekly performance-report email; the `#coverage` Slack post replaces it. Each reporting transport (email, Slack `#coverage`, Slack `#stock-price-alerts`, Slack `#status-reports`) is enabled/disabled independently. Flip `EMAIL_ENABLED = True` to re-enable email — no other code changes required. Revisit comment: `# REVISIT EMAIL REPORTING: 2026-06-29`.
+**Email transport (currently off).** `config.EMAIL_ENABLED = False` disables the performance-report email; the `#coverage` Slack post replaces it. The flag is honored by **both** the `weekly-report`/`weekly-build` orchestrators **and** the standalone `cli.py performance` command (gated via `reporting/generate.email_skip_reason()`), so no path emails while it is off. Each reporting transport (email, Slack `#coverage`, Slack `#stock-price-alerts`, Slack `#status-reports`) is enabled/disabled independently. Flip `EMAIL_ENABLED = True` to re-enable email — no other code changes required; note that each `cli.py performance` run then sends one email, so avoid re-running it for the same date. Revisit comment: `# REVISIT EMAIL REPORTING: 2026-06-29`.
 
 ## Usage
 
