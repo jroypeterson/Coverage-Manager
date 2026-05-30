@@ -344,3 +344,24 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 12. For each recommended company, use web search to research and generate a full company background briefing following the Full Company Background Report template above. Compile all briefings into a single file and save as Coverage Manager/reports/company_backgrounds_YYYY-MM-DD.md.
 13. Ask me which additions (if any) I want to add to the CSV.
 14. For any I approve, append them to Coverage Manager/data/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file.
+15. **Publish the regenerated exports (see "Publish exports" below) — do this EVERY run, even in a quiet week with zero additions.**
+
+## Publish exports (required every run)
+
+Discovery (steps 1-14) only edits `data/coverage_universe_tickers.csv`. That is **not** the published interface — downstream projects (earnings_agent, sigma-alert, idea_generation, forensic_triage, 13F analyzer) read the regenerated artifacts in `Coverage Manager/exports/`, and earnings_agent's watchdog raises a Slack staleness alert if `exports/manifest.json` is more than **7 days** old. So the universe CSV growing without an export regeneration leaves consumers stale even though the CSV is current.
+
+**Run this every week, unconditionally** — whether or not any tickers were added this run, so the manifest timestamp stays fresh inside the 7-day window:
+
+1. From `Coverage Manager/`, run:
+   ```
+   python cli.py weekly-universe --skip-discovery
+   ```
+   This regenerates `exports/*` + `manifest.json` from the current CSV, pushes the sigma-alert `ticker_metadata.json`, and posts the universe delta to Slack `#coverage`. `--skip-discovery` is correct because steps 1-14 already did the discovery. It does **not** re-fetch fundamentals, so it runs in a few minutes.
+2. Confirm the summary line reads `Weekly universe completed successfully`. If any step shows `failed:`, surface the failure — do not silently continue.
+3. Commit and push the regenerated exports so GitHub consumers get them (the `git add -A` in `run_weekly_coverage.bat` also covers this, but commit here too so it is not left to the batch tail):
+   ```
+   git add exports/ data/coverage_universe_tickers.csv
+   git commit -m "Weekly publish: regenerate exports (YYYY-MM-DD)"
+   git push origin master
+   ```
+   If `git commit` reports nothing to commit, that is fine — it means exports were already current.
