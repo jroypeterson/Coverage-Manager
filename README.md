@@ -1,4 +1,11 @@
 # Coverage Manager
+> The workspace data hub — maintains the ~1,095-ticker coverage universe, discovers new tickers, and publishes the versioned `exports/` artifact contract (schema v3) that downstream projects consume.
+
+- **Status:** live
+- **Runtime/trigger:** Windows Task Scheduler (Friday 08:00 ET via `run_weekly_coverage.bat`) · or `python cli.py …` on-demand
+- **Reads:** `data/coverage_universe_tickers.csv` · yfinance / FMP / Finnhub / Alpha Vantage · SEC EDGAR (discovery)
+- **Writes:** `exports/` published artifacts (schema v3) · `reports/` HTML/Excel/CSV · Slack `#coverage` (weekly delta), `#stock-price-alerts` (movers), `#status-reports` (health)
+- **Run:** `python cli.py weekly-build --skip-discovery`  ·  **Entry points:** `cli.py`, `weekly_build.py`, `weekly_universe.py`, `weekly_report.py`
 
 Script-driven tooling for maintaining a coverage universe CSV, discovering new tickers, and generating weekly artifacts + Slack updates summarizing what changed.
 
