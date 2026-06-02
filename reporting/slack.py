@@ -9,6 +9,8 @@ Two surfaces:
 """
 
 import json
+import os
+import time
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -16,6 +18,44 @@ from pathlib import Path
 from logging_utils import get_logger
 
 logger = get_logger("reporting.slack")
+
+# Network-blip retry. A Windows scheduled task that missed its trigger (laptop
+# asleep) and catches up on wake via StartWhenAvailable can fire the instant the
+# machine wakes — before WiFi/DNS is up — so the first Slack POST dies with
+# `getaddrinfo failed` / URLError. Retry-with-backoff rides through it; DNS-on-
+# wake typically clears within 10-30s. See workspace CONVENTIONS §3 and the
+# scheduled_jobs_monitor reference impl. (2026-06-01.)
+_RETRY_BACKOFF = (5, 15, 30)  # seconds to wait BEFORE retry attempts 2..N
+
+
+def _retry_sleep(seconds):
+    # Skip the wall-clock wait under pytest (which sets PYTEST_CURRENT_TEST) so
+    # the network-error tests don't sleep through the full backoff.
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    time.sleep(seconds)
+
+
+def urlopen_with_retry(req, *, timeout=15, attempts=4, label="slack post"):
+    """``urllib.request.urlopen`` with backoff retry on transient network errors.
+
+    Re-raises the last ``URLError`` if every attempt fails, so existing callers
+    keep their fallback/return-False behavior on a genuine outage — this only
+    adds resilience to momentary blips (notably DNS-not-ready on wake). Calls
+    ``urllib.request.urlopen`` by name so test monkeypatches still intercept it.
+    """
+    last = None
+    for i in range(attempts):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.URLError as e:
+            last = e
+            if i < attempts - 1:
+                delay = _RETRY_BACKOFF[min(i, len(_RETRY_BACKOFF) - 1)]
+                logger.warning("%s attempt %d/%d failed (%s); retrying in %ds",
+                               label, i + 1, attempts, e, delay)
+                _retry_sleep(delay)
+    raise last
 
 SLACK_CHANNEL = "#stock-price-alerts"
 HEALTH_CHANNEL = "#status-reports"
@@ -40,7 +80,7 @@ def send_slack_notification(webhook_url, message):
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15, label="Slack notification") as resp:
             if resp.status == 200:
                 logger.info("Slack notification sent to %s", SLACK_CHANNEL)
                 return True
@@ -295,7 +335,7 @@ def post_health_v1(webhook_url, payload, fallback_path):
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15, label="Health heartbeat") as resp:
             if resp.status == 200:
                 logger.info("Health heartbeat posted to %s", HEALTH_CHANNEL)
                 return {"posted": True, "reason": None}

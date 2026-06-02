@@ -42,6 +42,7 @@ import pandas as pd
 
 from config import CSV_PATH, SCRIPT_DIR, TODAY
 from logging_utils import get_logger
+from reporting.slack import urlopen_with_retry
 from universe.positions import POSITIONS_PATH
 
 logger = get_logger("reporting.universe_delta")
@@ -655,7 +656,7 @@ def post_universe_delta(webhook_url, delta, fallback_dir=None):
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_with_retry(req, timeout=15, label="Universe delta") as resp:
             if resp.status == 200:
                 logger.info("Universe delta posted to %s", COVERAGE_CHANNEL)
                 return {"posted": True, "reason": None}
