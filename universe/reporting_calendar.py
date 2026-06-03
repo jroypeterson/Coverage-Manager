@@ -234,7 +234,6 @@ def build_record(ticker: str, *, sec_labels: dict[str, list], finnhub_events: li
     fh_count = anchor_count(ninjas_dates, anchor)
 
     rows = []
-    agree_count = disagree = 0
     fye_month = None
     lags = []
     for rd in sorted([d for d in ninjas_dates if d <= today_iso], reverse=True):
@@ -245,11 +244,6 @@ def build_record(ticker: str, *, sec_labels: dict[str, list], finnhub_events: li
             continue
         eps = eps_by_date.get(rd)
         sec_fh_agree = bool(sec_lbl and fh_lbl and sec_lbl == fh_lbl)
-        if sec_lbl and fh_lbl:
-            if sec_fh_agree:
-                agree_count += 1
-            else:
-                disagree += 1
         label_sources = ([s for s, v in (("sec_xbrl", sec_lbl), ("finnhub", fh_lbl)) if v])
         # US-filer gate: SEC and Finnhub must agree, the quarter actually reported,
         # and it's a 10-Q quarter (sec_lbl present ⇒ Q1–Q3, never Q4/FY).
@@ -267,10 +261,18 @@ def build_record(ticker: str, *, sec_labels: dict[str, list], finnhub_events: li
 
     rows = rows[:RECENT_QUARTERS_KEPT]
     monotonic = _is_monotonic(rows)
-    # A ticker whose SEC↔Finnhub labels have historically agreed (and never
-    # disagreed) is "Finnhub-trusted" — only then may a not-yet-filed next_expected
-    # (which SEC cannot corroborate) be gating-eligible.
-    finnhub_trusted = agree_count >= 2 and disagree == 0 and filer_type == "us_gaap"
+    # "Finnhub-trusted" gates whether a not-yet-filed next_expected (which SEC can't
+    # corroborate) may be gating-eligible. Scope the check to the RECENT window (the
+    # kept quarters), NOT all ~50 quarters of history: a single ancient SEC
+    # restatement or stale API-Ninjas date should not permanently disqualify a name
+    # whose current labeling is clean. Trust = enough recent SEC↔Finnhub agreements
+    # and no recent disagreement.
+    recent_both = [r for r in rows if set(r["label_sources"]) >= {"sec_xbrl", "finnhub"}]
+    recent_agree = sum(1 for r in recent_both if r["sec_finnhub_agree"])
+    recent_disagree = len(recent_both) - recent_agree
+    finnhub_trusted = (
+        filer_type == "us_gaap" and recent_agree >= 2 and recent_disagree == 0
+    )
 
     next_expected = None
     if future:
