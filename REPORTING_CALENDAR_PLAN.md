@@ -1,9 +1,11 @@
 # Plan & Goals — Coverage Manager Reporting-Calendar Enrichment (workstream #8)
 
-**Status:** REVISED v4 — 3rd review incorporated; **design locked, A0/A0.1 gate
-PASSED** (2026-06-02). Algorithm validated 225/225 vs independent SEC labels (§14).
-SEC-into-A1 decision made (US-filer `gating_eligible` = SEC↔Finnhub agreement).
-**A1 (build the export) is unblocked pending the user's go.**
+**Status:** ✅ **A1 SHIPPED 2026-06-02** (commit `12c8450`). v4 design implemented:
+`universe/reporting_calendar.py` + `_step_export_reporting_calendar` (weekly step
+[5c/6]) → `exports/reporting_calendar.json` (+ `_status.json`), own `schema_version`
+1. First artifact: 280 tickers (Positions∪Core), 221 US filers, 212 gating-eligible.
+329 CM tests pass; 15 new offline tests vs frozen fixtures. **Phase B (transcripts
+consumes it) + Phase C (earnings_agent) remain.** History below for the record.
 **Author:** Claude (session 2026-06-02). **Owning project:** Coverage Manager.
 **Reviewers:** a second code-aware AI (review folded in) + the user.
 
@@ -427,7 +429,7 @@ it runs after `manifest.json` exists. (Confirmed there is no exhaustive
    **before** writing one line of export code. This is the project's make-or-break
    step; treat its correctness bar as stricter than normal.
 
-**Phase A1 — CM enrichment + export (only after A0 passes):**
+**Phase A1 — CM enrichment + export (✅ SHIPPED 2026-06-02, commit `12c8450`):**
 1. `universe/reporting_calendar.py` — pure builder: `build_reporting_calendar(
    tickers) -> dict`, emitting per-row `confidence` + `gating_eligible` and
    per-ticker source freshness/error. Composes **API Ninjas (date sequence) +
