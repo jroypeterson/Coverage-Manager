@@ -65,6 +65,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "delisted_check",
         "export_artifacts",
         "export_watchlist",
+        "export_reporting_calendar",
         "sigma_export",
         "universe_delta_slack",
     }

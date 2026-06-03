@@ -331,6 +331,10 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
             "validation_passed": True,
         }
 
+    def fake_step_export_reporting_calendar():
+        call_order.append("export_reporting_calendar")
+        return {"artifacts": [], "ticker_count": 1, "gating_eligible_count": 0}
+
     def fake_step_sigma_export():
         call_order.append("sigma_export")
         return {"status": "unchanged", "tickers": 1}
@@ -355,6 +359,7 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
     monkeypatch.setattr(weekly_universe, "_step_export_artifacts", fake_step_export_artifacts)
     monkeypatch.setattr(weekly_universe, "_step_export_positions", fake_step_export_positions)
     monkeypatch.setattr(weekly_universe, "_step_export_watchlist", fake_step_export_positions)
+    monkeypatch.setattr(weekly_universe, "_step_export_reporting_calendar", fake_step_export_reporting_calendar)
     monkeypatch.setattr(weekly_universe, "_step_sigma_export", fake_step_sigma_export)
     monkeypatch.setattr(weekly_universe, "_step_universe_delta_slack", fake_step_delta_slack)
 

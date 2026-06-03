@@ -414,5 +414,7 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "watchlist.csv",
         "watchlist.json",
         "watchlist_status.json",
+        "reporting_calendar.json",
+        "reporting_calendar_status.json",
         "manifest.json",
     }

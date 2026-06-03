@@ -152,6 +152,7 @@ Use `pipeline_utils.collect_non_successes(steps)` for any rollup logic — never
 | `exports/ready_to_short.json` | Same shape, `Position == "Ready to Short"` rows only (short thesis done; waiting for entry). |
 | `exports/positions_status.json` | Versioned status + validation contract for positions (separate schema). |
 | `exports/watchlist.{csv,json,_status.json}` | **DEPRECATED** back-compat (one cycle), filtered to `Portfolio ∪ Researching` only. New code should use the five state-specific JSONs. |
+| `exports/reporting_calendar.{json,_status.json}` | **(NEW)** Per-ticker fiscal `(year, quarter)` → report-date map for Positions ∪ Core, with a per-row `gating_eligible` flag (US filers: `true` only when SEC XBRL label ↔ Finnhub count agree; foreign/Q4 default `false`). Own `schema_version`. Built by `universe/reporting_calendar.py`; consumers (transcripts gating, earnings_agent dates) gate only on `gating_eligible`. See `REPORTING_CALENDAR_PLAN.md`. |
 | `exports/manifest.json` | Directory of files in `exports/` with their purpose |
 
 `universe_status.json` (schema **v3**) includes `row_count`, `ticker_count`, `normalization_collisions`, `collision_examples`, `validation_passed`, `validation_errors`, `validation_warnings`, and `last_discovery_run`. v3 added the `core` field to per-ticker metadata. Invariant: `ticker_count + normalization_collisions == row_count`.

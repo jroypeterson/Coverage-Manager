@@ -25,6 +25,9 @@ logger = get_logger("weekly_universe")
 
 EXPORTS_DIR = SCRIPT_DIR / "exports"
 EXPORTS_SCHEMA_VERSION = 3
+# The reporting-calendar export versions independently of the universe/positions
+# schemas (decoupled so calendar changes never force a bump on pinned consumers).
+REPORTING_CALENDAR_SCHEMA_VERSION = 1
 
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",
@@ -285,6 +288,25 @@ def _step_export_artifacts(validation_result):
                 "purpose": "DEPRECATED back-compat (one cycle): mirrors positions_status.json with the legacy shape.",
                 "format": "json",
                 "schema_version": EXPORTS_SCHEMA_VERSION,
+            },
+            {
+                "name": "reporting_calendar.json",
+                "purpose": (
+                    "Per-ticker fiscal (year, quarter) -> report-date map for "
+                    "Positions union Core. Each recent_quarters row + next_expected "
+                    "carries gating_eligible: for US filers true only when the SEC "
+                    "XBRL fiscal label and the Finnhub-anchored count agree (foreign/"
+                    "ADR and Q4 default false). Consumers (transcripts fetch-gating, "
+                    "earnings_agent date verification) gate ONLY on gating_eligible."
+                ),
+                "format": "json",
+                "schema_version": REPORTING_CALENDAR_SCHEMA_VERSION,
+            },
+            {
+                "name": "reporting_calendar_status.json",
+                "purpose": "Versioned status for the reporting calendar (read schema_version first).",
+                "format": "json",
+                "schema_version": REPORTING_CALENDAR_SCHEMA_VERSION,
             },
             {
                 "name": "manifest.json",
@@ -561,6 +583,69 @@ def _step_export_positions():
 
 # Back-compat alias — `weekly_build` and tests reference the old name.
 _step_export_watchlist = _step_export_positions
+
+
+def _positions_union_core():
+    """Resolve the reporting-calendar universe = Positions ∪ Core, read from the
+    just-written exports (universe_metadata core=='Y' + the five Position files)."""
+    tickers = set()
+    meta_path = EXPORTS_DIR / "universe_metadata.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            tickers |= {t for t, v in meta.items() if (v or {}).get("core") == "Y"}
+        except Exception as e:
+            logger.warning("reporting_calendar: could not read universe_metadata.json: %s", e)
+    for fn in ("portfolio.json", "researching.json", "following_for_interest.json",
+               "ready_to_buy.json", "ready_to_short.json"):
+        p = EXPORTS_DIR / fn
+        if p.exists():
+            try:
+                tickers |= set(json.loads(p.read_text(encoding="utf-8")).keys())
+            except Exception as e:
+                logger.warning("reporting_calendar: could not read %s: %s", fn, e)
+    return sorted(t for t in tickers if t)
+
+
+def _step_export_reporting_calendar():
+    """Write exports/reporting_calendar.json + reporting_calendar_status.json.
+
+    Per-ticker fiscal (year,quarter) → report-date map for Positions ∪ Core, with
+    the SEC↔Finnhub `gating_eligible` contract (see universe/reporting_calendar.py).
+    Non-gating: a failure here is `failed:`-tagged by run_step and surfaces as a
+    `partial` health heartbeat; the universe + other exports still ship.
+    """
+    from universe.reporting_calendar import build_reporting_calendar
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    tickers = _positions_union_core()
+    calendar, status_meta = build_reporting_calendar(tickers)
+
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cal_path = EXPORTS_DIR / "reporting_calendar.json"
+    cal_path.write_text(json.dumps(calendar, indent=2) + "\n", encoding="utf-8")
+
+    status = {
+        "schema_version": REPORTING_CALENDAR_SCHEMA_VERSION,
+        "dataset_version": TODAY,
+        "generated_at": generated_at,
+        "universe": "positions_union_core",
+        **status_meta,
+    }
+    status_path = EXPORTS_DIR / "reporting_calendar_status.json"
+    status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
+
+    def _rel(p):
+        try:
+            return str(Path(p).relative_to(SCRIPT_DIR)).replace("\\", "/")
+        except ValueError:
+            return str(p).replace("\\", "/")
+
+    return {
+        "artifacts": [_rel(cal_path), _rel(status_path)],
+        "ticker_count": status_meta["ticker_count"],
+        "gating_eligible_count": status_meta["gating_eligible_count"],
+    }
 
 
 def _step_sigma_export():
@@ -861,6 +946,23 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 "  Wrote watchlist (%d entries, validation_passed=%s)",
                 wl_result["entry_count"],
                 wl_result["validation_passed"],
+            )
+
+    # Step 5c: Reporting-calendar export (fiscal-period -> report-date map).
+    # Non-gating; runs after the universe + positions exports exist (it reads them
+    # to resolve Positions ∪ Core) and before sigma_export.
+    if dry_run:
+        logger.info("[5c/6] Export reporting-calendar... SKIPPED (dry run)")
+        steps["export_reporting_calendar"] = "skipped (dry run)"
+    else:
+        logger.info("[5c/6] Writing reporting-calendar artifact to exports/...")
+        status, rc_result = run_step("export_reporting_calendar", _step_export_reporting_calendar)
+        steps["export_reporting_calendar"] = status
+        if rc_result:
+            artifacts.extend(rc_result["artifacts"])
+            logger.info(
+                "  Wrote reporting-calendar (%d tickers, %d gating-eligible)",
+                rc_result["ticker_count"], rc_result["gating_eligible_count"],
             )
 
     # Step 6: Sigma-alert metadata export
