@@ -11962,8 +11962,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-06-04",
+      "fiscal_quarter": 3,
+      "report_date": "2026-08-25",
       "source": "finnhub",
       "gating_eligible": true
     }

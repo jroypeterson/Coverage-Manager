@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "generated_at": "2026-05-30T02:53:55Z",
+  "generated_at": "2026-06-05T12:17:06Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -70,6 +70,18 @@
       "purpose": "DEPRECATED back-compat (one cycle): mirrors positions_status.json with the legacy shape.",
       "format": "json",
       "schema_version": 3
+    },
+    {
+      "name": "reporting_calendar.json",
+      "purpose": "Per-ticker fiscal (year, quarter) -> report-date map for Positions union Core. Each recent_quarters row + next_expected carries gating_eligible: for US filers true only when the SEC XBRL fiscal label and the Finnhub-anchored count agree (foreign/ADR and Q4 default false). Consumers (transcripts fetch-gating, earnings_agent date verification) gate ONLY on gating_eligible.",
+      "format": "json",
+      "schema_version": 1
+    },
+    {
+      "name": "reporting_calendar_status.json",
+      "purpose": "Versioned status for the reporting calendar (read schema_version first).",
+      "format": "json",
+      "schema_version": 1
     },
     {
       "name": "manifest.json",
