@@ -1,10 +1,10 @@
 {
   "schema_version": 3,
-  "dataset_version": "2026-06-05",
-  "generated_at": "2026-06-05T12:17:06Z",
+  "dataset_version": "2026-06-12",
+  "generated_at": "2026-06-12T20:40:08Z",
   "source_path": "data/coverage_universe_tickers.csv",
-  "row_count": 1106,
-  "ticker_count": 1104,
+  "row_count": 1112,
+  "ticker_count": 1110,
   "normalization_collisions": 2,
   "collision_examples": [
     "ROG",
