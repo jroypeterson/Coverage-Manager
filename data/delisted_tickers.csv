@@ -25,3 +25,7 @@ LPTX,Leap Therapeutics (now Cypherpunk),Biopharma,,,United States,NASDAQ,,USD,,,
 PRTG,Portage Biotech (now ATON),Biopharma,,,United States,NASDAQ,,USD,,,,2025-09,Pivoted,"Renamed to ATON, TON blockchain treasury",2026-04-27
 ONVO,Organovo (now VivoSim Labs),Biopharma,,,United States,NASDAQ,,USD,,,,2025-04,Pivoted,"Renamed to VivoSim Labs (VIVS), pivoted away from bioprinting",2026-04-27
 PINC,Premier Inc,Healthcare Services,Other,,United States,NASDAQ,US74051N1028,USD,2336662016,28.26,2026-04-25,,Acquired and de-listed,"Last metrics from yfinance cache may reflect stale data; ticker is now reused by Purpose Multi-Asset Income ETF",2026-04-27
+
+EXAS,Exact Sciences Corporation,MedTech,Diagnostics,,United States,NASDAQ,,USD,,105.00,2026-03-20,2026-03,Acquired,"Acquired by Abbott for $105.00/sh cash (~$21B); delisted from Nasdaq 2026-03-23",2026-06-13
+HOLX,"Hologic, Inc.",MedTech,Diagnostics,,United States,NASDAQ,US4364401012,USD,,76.00,2026-04-07,2026-04,Acquired,"Taken private by Blackstone/TPG at $76.00/sh cash + up to $3.00 CVR; delisted 2026-04-07",2026-06-13
+ACCD,"Accolade, Inc.",Healthcare Services,Benefits,,United States,NASDAQ,US00437E1029,USD,,7.03,2025-04-08,2025-04,Acquired,"Acquired by Transcarent (~$7.03/sh, ~$621M); delisted 2025-04-08",2026-06-13

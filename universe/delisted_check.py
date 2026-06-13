@@ -6,6 +6,16 @@ universe-recorded `Company Name`. A meaningful mismatch suggests the ticker
 has been recycled (e.g. an operating company was acquired/de-listed and the
 symbol is now used by an ETF or another issuer).
 
+In addition to the `.info` identity probe, a **price-recency probe** checks
+whether yfinance still serves recent daily bars for the ticker. This is the
+reliable tell for a clean acquisition/take-private: Yahoo keeps the stale
+`.info` metadata (longName etc.) populated for months after a name stops
+trading, so the identity probe alone misses these — but the price feed goes
+empty immediately. A ticker with a populated `.info` and zero recent bars is
+flagged `no recent price data (likely delisted/renamed)`. This is what would
+have caught EXAS (Abbott, 2026-03), HOLX (Blackstone/TPG, 2026-04), and the
+MPW→MPT / GMRE→XRN rebrands instead of letting them linger in the universe.
+
 Output:
   - `reports/delisted_check_{date}.csv`  — flagged rows with reason
   - `reports/delisted_check_{date}.md`   — human-readable summary
@@ -28,7 +38,10 @@ from ticker_utils import normalize_company_for_comparison, normalize_ticker
 
 logger = get_logger("delisted_check")
 
-IDENTITY_CACHE_NS = "identity"
+# v2: added price-recency fields (last_close_date / price_probe_ran / price_stale).
+# Bumping the namespace ignores pre-v2 entries so the price probe activates on
+# the next run instead of waiting up to a TTL for old caches to roll over.
+IDENTITY_CACHE_NS = "identity_v2"
 IDENTITY_CACHE_TTL_HOURS = 24.0 * 7  # weekly refresh is enough
 
 # quoteType values from yfinance that should never appear in the equity universe
@@ -37,11 +50,52 @@ NON_EQUITY_QUOTE_TYPES = {"ETF", "MUTUALFUND", "INDEX", "CURRENCY", "CRYPTOCURRE
 # Below this normalized-name similarity score, flag as a likely mismatch
 NAME_SIMILARITY_THRESHOLD = 0.55
 
+# A live ticker always has a daily bar within the last few trading sessions.
+# If yfinance serves no bar within this many calendar days, treat the price
+# feed as dead (acquired / taken private / renamed). 10 days clears a normal
+# long weekend / holiday cluster with margin while still catching a stop in
+# trading promptly on the weekly cadence.
+PRICE_STALE_DAYS = 10
+
+
+def _probe_recent_price(yf_obj):
+    """Return (probe_ran: bool, last_close_date: str|"") for a yfinance Ticker.
+
+    Pulls ~1 month of daily bars and reports the most recent bar date. A clean
+    acquisition/take-private leaves `.info` stale but kills the price feed, so
+    an empty/old result here is the reliable delisted signal.
+
+    `probe_ran` is False ONLY when the history pull itself raised (transient
+    network / rate-limit error) so the caller can avoid false-flagging on an
+    infrastructure blip vs. a genuinely dead feed (empty result with no error).
+    `raise_errors=True` is essential: yfinance otherwise swallows 429s/network
+    errors and returns an empty frame, which would masquerade as a dead feed.
+    """
+    try:
+        hist = yf_obj.history(period="1mo", auto_adjust=True, raise_errors=True)
+    except Exception:
+        return False, ""  # transient — do NOT treat as delisted
+    try:
+        if hist is None or hist.empty or "Close" not in hist:
+            return True, ""  # ran cleanly, genuinely no bars → dead feed
+        closes = hist["Close"].dropna()
+        if closes.empty:
+            return True, ""
+        return True, closes.index[-1].date().isoformat()
+    except Exception:
+        return True, ""
+
 
 def _fetch_identity(yf_ticker, use_cache=True):
-    """Fetch quoteType + longName/shortName for a single ticker from yfinance.
+    """Fetch identity + price-recency probe for a single ticker from yfinance.
 
-    Returns dict with {quoteType, longName, shortName} or {} on failure.
+    Returns dict with {quoteType, longName, shortName, last_close_date,
+    price_probe_ran, price_stale} or {} on a total failure.
+
+    Staleness is decided HERE, at probe time, and frozen into `price_stale` —
+    not recomputed at classify time. The identity cache (7-day TTL) would
+    otherwise let a cached `last_close_date` "age into" staleness and falsely
+    flag a live ticker that was fresh when probed.
     """
     if use_cache:
         cached = cache_get(IDENTITY_CACHE_NS, yf_ticker, IDENTITY_CACHE_TTL_HOURS)
@@ -51,13 +105,21 @@ def _fetch_identity(yf_ticker, use_cache=True):
     try:
         import yfinance as yf
 
-        info = yf.Ticker(yf_ticker).info or {}
+        yf_obj = yf.Ticker(yf_ticker)
+        info = yf_obj.info or {}
+        price_probe_ran, last_close_date = _probe_recent_price(yf_obj)
         identity = {
             "quoteType": info.get("quoteType") or "",
             "longName": info.get("longName") or "",
             "shortName": info.get("shortName") or "",
+            "last_close_date": last_close_date,
+            "price_probe_ran": price_probe_ran,
+            # frozen-at-probe-time decision (avoids the cache-aging trap)
+            "price_stale": bool(price_probe_ran and _price_is_stale(last_close_date)),
         }
-        if use_cache:
+        # Do NOT cache a transient probe failure — let the next run retry it
+        # rather than disabling the price check for this ticker for a full TTL.
+        if use_cache and price_probe_ran:
             cache_set(IDENTITY_CACHE_NS, yf_ticker, identity)
         return identity
     except Exception as e:
@@ -91,13 +153,32 @@ def _name_similarity(recorded_name, yf_long, yf_short):
     return best
 
 
+def _price_is_stale(last_close_date, today=None):
+    """True when last_close_date is older than PRICE_STALE_DAYS (or missing)."""
+    if not last_close_date:
+        return True
+    try:
+        last = date.fromisoformat(last_close_date)
+    except (ValueError, TypeError):
+        return True
+    today = today or date.today()
+    return (today - last).days > PRICE_STALE_DAYS
+
+
 def _classify(row, identity):
     """Return (flagged: bool, reason: str) for a single ticker.
 
-    No identity data => 'no yfinance data' (likely delisted).
-    Non-equity quoteType => 'recycled to {ETF|MUTUALFUND|...}'.
-    Low name similarity => 'name mismatch (recorded vs yfinance)'.
+    No identity data        => 'no yfinance data' (likely delisted).
+    Price feed gone stale    => 'no recent price data' (likely delisted/renamed).
+    Non-equity quoteType     => 'recycled to {ETF|MUTUALFUND|...}'.
+    Low name similarity      => 'name mismatch (recorded vs yfinance)'.
     Otherwise unflagged.
+
+    The price-recency rule sits above the name-similarity rule because a clean
+    acquisition keeps `.info` (and thus the name match) intact for months; the
+    dead price feed is the earlier, more reliable signal. `price_stale` is the
+    decision frozen at probe time (see `_fetch_identity`), so a stale read is
+    never an artifact of cache age.
     """
     quote_type = (identity.get("quoteType") or "").upper()
     long_name = identity.get("longName") or ""
@@ -106,6 +187,13 @@ def _classify(row, identity):
 
     if not identity or (not quote_type and not long_name and not short_name):
         return True, "no yfinance data (likely delisted)"
+
+    if identity.get("price_stale"):
+        last_seen = identity.get("last_close_date") or "never"
+        return True, (
+            f"no recent price data (likely delisted/renamed, or extended halt); "
+            f"last bar={last_seen}"
+        )
 
     if quote_type in NON_EQUITY_QUOTE_TYPES:
         return True, f"ticker recycled to non-equity instrument ({quote_type})"
@@ -124,13 +212,20 @@ def _classify(row, identity):
     return False, ""
 
 
-def check_universe(csv_path=None, max_workers=10, use_cache=True):
+def check_universe(csv_path=None, max_workers=6, use_cache=True):
     """Run the delisted/recycled check across the full universe CSV.
 
     Returns dict with keys:
       - flagged: list of dicts with ticker/recorded_name/quoteType/yf_name/reason
       - checked: total tickers checked
       - missing_data: count of tickers yfinance returned nothing for
+      - price_probe_failures: count of tickers whose price probe raised (the
+        price-recency rule was skipped for them; a high count means a Yahoo
+        rate-limit/outage, not a delisting wave)
+
+    max_workers defaults to 6 (down from 10): the run now pulls 1mo of history
+    per ticker in addition to `.info`, and Yahoo rate-limits bursty traffic —
+    a 429 storm would degrade the probe (failures are skipped, not false-flagged).
     """
     csv_path = csv_path or CSV_PATH
     df = pd.read_csv(csv_path)
@@ -164,6 +259,7 @@ def check_universe(csv_path=None, max_workers=10, use_cache=True):
 
     flagged = []
     missing_data = 0
+    price_probe_failures = 0
     for row, yf_t in pairs:
         identity = identities.get(yf_t, {})
         if not identity or (
@@ -172,6 +268,9 @@ def check_universe(csv_path=None, max_workers=10, use_cache=True):
             and not identity.get("shortName")
         ):
             missing_data += 1
+        # identity present but the price probe raised → rule skipped for it
+        if identity and not identity.get("price_probe_ran", True):
+            price_probe_failures += 1
         is_flagged, reason = _classify(row, identity)
         if is_flagged:
             flagged.append({
@@ -181,6 +280,7 @@ def check_universe(csv_path=None, max_workers=10, use_cache=True):
                 "yf_long_name": identity.get("longName", ""),
                 "yf_short_name": identity.get("shortName", ""),
                 "quote_type": identity.get("quoteType", ""),
+                "last_close_date": identity.get("last_close_date", ""),
                 "sector_jp": row.get("Sector (JP)", ""),
                 "subsector_jp": row.get("Subsector (JP)", ""),
                 "reason": reason,
@@ -192,6 +292,7 @@ def check_universe(csv_path=None, max_workers=10, use_cache=True):
         "checked": len(pairs),
         "flagged": flagged,
         "missing_data": missing_data,
+        "price_probe_failures": price_probe_failures,
     }
 
 
@@ -209,7 +310,7 @@ def write_report(result, reports_dir=None, run_date=None):
 
     fieldnames = [
         "ticker", "yf_ticker", "recorded_name", "yf_long_name", "yf_short_name",
-        "quote_type", "sector_jp", "subsector_jp", "reason",
+        "quote_type", "last_close_date", "sector_jp", "subsector_jp", "reason",
     ]
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -223,15 +324,22 @@ def write_report(result, reports_dir=None, run_date=None):
     lines.append(f"- Checked: {result['checked']} tickers")
     lines.append(f"- Flagged: {len(result['flagged'])}")
     lines.append(f"- No yfinance data: {result['missing_data']}")
+    probe_fail = result.get("price_probe_failures", 0)
+    if probe_fail:
+        lines.append(
+            f"- :warning: Price probe failed (rule skipped): {probe_fail} "
+            f"— transient Yahoo errors, not delistings; re-run if high"
+        )
     lines.append("")
     if result["flagged"]:
-        lines.append("| Ticker | Recorded Name | yfinance Name | quoteType | Reason |")
-        lines.append("|--------|---------------|---------------|-----------|--------|")
+        lines.append("| Ticker | Recorded Name | yfinance Name | quoteType | Last Bar | Reason |")
+        lines.append("|--------|---------------|---------------|-----------|----------|--------|")
         for row in result["flagged"]:
             yf_name = row["yf_long_name"] or row["yf_short_name"]
+            last_bar = row.get("last_close_date") or "—"
             lines.append(
                 f"| {row['ticker']} | {row['recorded_name']} | {yf_name} | "
-                f"{row['quote_type']} | {row['reason']} |"
+                f"{row['quote_type']} | {last_bar} | {row['reason']} |"
             )
     else:
         lines.append("_No flagged tickers — universe identity matches yfinance._")
@@ -252,8 +360,9 @@ def main(use_cache=True):
     result = check_universe(use_cache=use_cache)
     paths = write_report(result)
     logger.info(
-        "Delisted check: %d/%d flagged (missing data: %d)",
+        "Delisted check: %d/%d flagged (missing data: %d, price-probe failures: %d)",
         len(result["flagged"]), result["checked"], result["missing_data"],
+        result.get("price_probe_failures", 0),
     )
     logger.info("  CSV: %s", paths["csv_path"])
     logger.info("  MD:  %s", paths["md_path"])

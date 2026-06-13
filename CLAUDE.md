@@ -219,9 +219,10 @@ PROVIDER_PRIORITY (config.py, env-overridable)
 
 `python cli.py check-delisted` probes yfinance for each universe ticker (via a lightweight `Ticker.info` pull, results cached for 7 days under `cache/identity/`) and flags rows that look delisted, acquired, or recycled to a non-equity instrument.
 
-Flag rules:
+Flag rules (evaluated in this order):
+- yfinance returns nothing (`.info` empty) → likely delisted
+- **no recent price data** → likely delisted/renamed (or an extended halt). A price-recency probe pulls ~1mo of daily bars; if the most recent bar is older than `PRICE_STALE_DAYS` (10) the price feed is treated as dead. This is the reliable tell for a **clean acquisition / take-private**: Yahoo keeps the stale `.info` metadata (longName etc.) populated for months, so the `.info`-empty and name-similarity rules miss these — but the price feed goes empty immediately. Added 2026-06-13 after EXAS (Abbott), HOLX (Blackstone/TPG), and the MPW→MPT / GMRE→XRN rebrands lingered in the universe for months. Robustness: the probe uses `history(raise_errors=True)` so a transient 429/network error becomes a *skipped* probe (counted as `price_probe_failures`, surfaced in the report) rather than a false "delisted" flag; the stale/not-stale decision is **frozen at probe time** into the cached `price_stale` field so a cached `last_close_date` can't "age into" staleness within the 7-day identity-cache TTL.
 - `quoteType` is `ETF`, `MUTUALFUND`, `INDEX`, `CURRENCY`, or `CRYPTOCURRENCY` → ticker has been recycled
-- yfinance returns nothing → likely delisted
 - Normalized fuzzy similarity between the universe `Company Name` and yfinance `longName`/`shortName` falls below 0.55 → ticker may have been recycled to a different issuer
 
 Outputs (in `reports/`, archived weekly):
