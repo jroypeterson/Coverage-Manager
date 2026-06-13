@@ -25,12 +25,13 @@ from logging_utils import configure_logging, get_logger
 
 from reporting.calcs import (
     FUND_COLS, VAL_COLS, HIST_COLS,
-    compute_returns, build_result_row,
+    compute_returns, build_result_row, forward_2yr_eps_growth_pct,
 )
 from reporting.history_stats import stats_from_series
 from providers.wikipedia_provider import fetch_sp500_tickers
 from providers.fmp_provider import fetch_historical_prices as try_fmp_historical
 from providers.fmp_history import fetch_history_parallel
+from providers.fmp_estimates import fetch_estimates_parallel
 from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import batch_download_prices
 from providers.provider_chain import fetch_all_fundamentals
@@ -46,6 +47,7 @@ logger = get_logger("generate_performance")
 
 OUTPUT_XLSX = REPORTS_DIR / f"coverage_performance_{TODAY}.xlsx"
 OUTPUT_HTML = REPORTS_DIR / f"coverage_performance_{TODAY}.html"
+OUTPUT_PE_GROWTH_PNG = REPORTS_DIR / f"coverage_pe_vs_growth_{TODAY}.png"
 
 # ── Helper functions ───────────────────────────────────────────────────────
 
@@ -366,6 +368,25 @@ def main(sample_mode=False, refresh=False, skip_email=False):
         else:
             logger.info("Skipping 5Y history fetch — FMP_API_KEY not set")
 
+    # Forward annual EPS estimates for the same Phase 1 universe — drives the
+    # P/E vs forward-2yr-growth scatter. FMP-only, 30-day cached (same scope +
+    # cadence rationale as the 5Y history above).
+    estimates_data = {}
+    if phase1_universe:
+        fmp_key_for_est = API_KEYS.get("FMP_API_KEY")
+        if fmp_key_for_est:
+            t0 = time.monotonic()
+            logger.info("Fetching forward EPS estimates for %s Phase 1 tickers...", len(phase1_universe))
+            estimates_data = fetch_estimates_parallel(
+                sorted(phase1_universe), fmp_key_for_est,
+                max_workers=10, use_cache=use_cache,
+            )
+            est_covered = sum(1 for rows in estimates_data.values() if rows)
+            step_timings.append(("estimates", time.monotonic() - t0, f"{est_covered}/{len(phase1_universe)} tickers"))
+            logger.info("Estimates loaded for %s/%s Phase 1 tickers", est_covered, len(phase1_universe))
+        else:
+            logger.info("Skipping forward-estimates fetch — FMP_API_KEY not set")
+
     # Calculate returns
     results = []
     for row in df_unique.to_dict("records"):
@@ -441,6 +462,32 @@ def main(sample_mode=False, refresh=False, skip_email=False):
             step_results[name] = f"failed: {e}"
             step_timings.append((name, time.monotonic() - t0, f"failed: {e}"))
             return None
+
+    # ============ P/E vs FORWARD-2YR-GROWTH SCATTER (Phase 1) ============
+    # P/E (TTM, FMP-consistent) vs annualized forward 2-year EPS-growth, for the
+    # positions/research set. S&P 500 is intentionally excluded — that tab is
+    # built price-only (no fundamentals) to keep the run fast, so it has no P/E.
+    def _generate_pe_growth_chart():
+        from reporting.charts import render_pe_growth_scatter
+        today = datetime.now().date()
+        phase1 = phase1_universe or set()
+        rows = []
+        for rec in result_df.to_dict("records"):
+            t = rec.get("Ticker")
+            if t not in phase1:
+                continue
+            pe = rec.get("P/E (TTM)")
+            growth = forward_2yr_eps_growth_pct(estimates_data.get(t), today)
+            if pe is None or growth is None:
+                continue
+            rows.append({
+                "ticker": t, "pe": pe, "growth": growth,
+                "sector": rec.get("Sector (JP)"), "mkt_cap": rec.get("Mkt Cap"),
+            })
+        n = render_pe_growth_scatter(rows, OUTPUT_PE_GROWTH_PNG)
+        logger.info("P/E-vs-growth scatter plotted %s/%s Phase 1 names", n, len(phase1))
+
+    run_step("pe_growth_chart", _generate_pe_growth_chart)
 
     # ============ S&P 500 ============
     sp500_result_df = None
@@ -600,6 +647,9 @@ def main(sample_mode=False, refresh=False, skip_email=False):
                 if additions_pattern.exists():
                     extra_attachments.append(additions_pattern)
                     body_lines.append(_build_additions_summary(additions_pattern))
+                # Attach the P/E-vs-growth scatter PNG if it rendered this run.
+                if OUTPUT_PE_GROWTH_PNG.exists():
+                    extra_attachments.append(OUTPUT_PE_GROWTH_PNG)
                 # Pick up the movers HTML if it was generated this run.
                 movers_html = REPORTS_DIR / f"coverage_movers_{TODAY}.html"
                 if movers_html.exists() and movers_html not in html_paths:

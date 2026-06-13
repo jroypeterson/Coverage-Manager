@@ -60,6 +60,45 @@ FUND_DISPLAY_NAMES = {
     "Core": "Core Coverage",
 }
 
+# ── Forward EPS growth (for the P/E vs growth scatter) ─────────────────────
+
+
+def forward_2yr_eps_growth_pct(records, today):
+    """Annualized 2-year forward EPS-growth CAGR from FMP analyst-estimates.
+
+    `records` is the raw `/stable/analyst-estimates?period=annual` list, each
+    item a dict with at least `date` (ISO yyyy-mm-dd) and `epsAvg`. `today` is a
+    `datetime.date`.
+
+    Defines the current forward fiscal year (FY0) as the first estimate whose
+    fiscal year-end is on/after `today`, and FY+2 as the estimate two fiscal
+    years later (index FY0+2 in the forward-sorted list — robust to off-calendar
+    fiscal years). Returns `(eps_FY+2 / eps_FY0) ** (1/2) - 1`, in percent, or
+    None when there aren't ≥3 forward years or either EPS is missing/non-positive
+    (a CAGR through zero/negative EPS is undefined).
+    """
+    forward = []
+    for r in records or []:
+        d = r.get("date")
+        eps = r.get("epsAvg")
+        if not d or eps is None:
+            continue
+        try:
+            fy_end = date.fromisoformat(str(d)[:10])
+        except ValueError:
+            continue
+        if fy_end >= today:
+            forward.append((fy_end, float(eps)))
+    forward.sort(key=lambda x: x[0])
+    if len(forward) < 3:
+        return None
+    eps0 = forward[0][1]
+    eps2 = forward[2][1]
+    if eps0 is None or eps2 is None or eps0 <= 0 or eps2 <= 0:
+        return None
+    return ((eps2 / eps0) ** 0.5 - 1) * 100
+
+
 # ── Currency formatting ───────────────────────────────────────────────────
 
 CURRENCY_SYMBOLS = {

@@ -275,6 +275,16 @@ Cold cache: ~3 FMP calls per Phase 1 ticker (annual ratios + annual key-metrics 
 - HTML report rendering (`reporting/html.py` iterates `FUND_COLS`, doesn't include `HIST_COLS`)
 - Expand to full universe / Core flag once formatting is validated
 
+## P/E vs forward-2yr-EPS-growth scatter (Phase 1)
+
+The performance run renders a scatter of **P/E (TTM)** (y) vs **annualized forward 2-year EPS growth** (x) for the Phase 1 set (positions ∪ research), written to `reports/coverage_pe_vs_growth_<date>.png` and attached to the performance email. Built as `run_step("pe_growth_chart")` in `reporting/generate.py` after `result_df`.
+
+- **Y-axis = P/E (TTM)** — reuses the FMP-sourced `P/E (TTM)` HIST column (currency-consistent), NOT the provider-inconsistent `Fwd P/E`.
+- **X-axis = forward 2yr EPS-growth CAGR** — new data source `providers/fmp_estimates.py` (`/stable/analyst-estimates?period=annual`, verified on the FMP **Starter** tier 2026-06-13; legacy `/api/v3` 403s). Phase-1-scoped, 30-day cache (`cache/analyst_estimates/`), parallel fetch — same scope/cadence rationale as `fmp_history.py`. The CAGR math is the pure, unit-tested `reporting/calcs.forward_2yr_eps_growth_pct(records, today)`: FY0 = first estimate with fiscal year-end ≥ today, FY+2 = two fiscal years later, `(eps_FY+2/eps_FY0)**0.5 - 1`; returns None for <3 forward years or non-positive EPS (CAGR through zero/negative is undefined — those names just drop off the chart).
+- **Rendering** is thin/side-effect-only in `reporting/charts.py` (matplotlib Agg, added to `requirements.txt`): dots sized by market cap, colored by Sector (JP), labeled with ticker, median guide-lines marking the cheap/expensive × low/high-growth quadrants.
+- **S&P 500 is intentionally excluded** — the benchmark tab is built price-only (no fundamentals, no P/E) to keep the run fast; a 500-name fundamentals pull is the expensive path the architecture avoids. Portfolio/Phase-1 only.
+- Internal report artifact only — does **not** touch the `exports/` contract. Tests: `tests/test_pe_growth_chart.py`.
+
 ## Movers report
 
 `python cli.py movers` flags tickers in the coverage universe with extreme weekly performance and pulls a "why" summary for each. The report consumes the performance snapshot pickle written by `cli.py performance` (under `cache/perf/perf_df_<date>.pkl`) — it does **not** re-fetch prices.
