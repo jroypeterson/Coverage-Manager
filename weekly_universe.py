@@ -34,6 +34,8 @@ UNIVERSE_ARCHIVE_PATTERNS = [
     "company_backgrounds_*.md",
     "delisted_check_*.md",
     "delisted_check_*.csv",
+    "ticker_change_check_*.md",
+    "ticker_change_check_*.csv",
 ]
 
 
@@ -672,6 +674,25 @@ def _step_delisted_check():
     }
 
 
+def _step_ticker_change_check():
+    """Discover ticker changes (renames) + SEC deregistrations via the stable
+    CIK->ticker map. Companion to _step_delisted_check (price-feed based).
+
+    Non-gating: only writes a report; never raises and never blocks downstream.
+    """
+    from universe import ticker_change_check
+
+    result = ticker_change_check.check_ticker_changes()
+    paths = ticker_change_check.write_report(result)
+    return {
+        "checked": result["checked"],
+        "changes": len(result["changes"]),
+        "deregistered": len(result["deregistered"]),
+        "sec_fetched_ok": result["sec_fetched_ok"],
+        "report": paths["md_path"],
+    }
+
+
 def _step_universe_delta_slack(baseline):
     """Post a weekly before/delta/after universe summary to Slack #coverage.
 
@@ -913,6 +934,31 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 )
         else:
             steps["delisted_check"] = status
+
+    # Step 4b: Ticker-change / deregistration discovery (SEC CIK->ticker map).
+    # Complements delisted_check: it surfaces the NEW symbol for a renamed
+    # company so the row can be remapped rather than just removed. Non-gating.
+    if dry_run:
+        logger.info("[4b/6] Ticker-change check... SKIPPED (dry run)")
+        steps["ticker_change_check"] = "skipped (dry run)"
+    else:
+        logger.info("[4b/6] Checking universe for ticker changes / deregistrations...")
+        status, tc_result = run_step("ticker_change_check", _step_ticker_change_check)
+        if tc_result:
+            if not tc_result["sec_fetched_ok"]:
+                steps["ticker_change_check"] = "SEC data unavailable — not checked"
+            else:
+                steps["ticker_change_check"] = (
+                    f"{tc_result['changes']} mismatch, {tc_result['deregistered']} "
+                    f"deregistered of {tc_result['checked']}"
+                )
+                if tc_result["changes"] or tc_result["deregistered"]:
+                    logger.warning(
+                        "  %d ticker-mismatch + %d deregistration candidate(s) — see %s",
+                        tc_result["changes"], tc_result["deregistered"], tc_result["report"],
+                    )
+        else:
+            steps["ticker_change_check"] = status
 
     # Step 5: Export artifacts (the new published contract)
     if dry_run:

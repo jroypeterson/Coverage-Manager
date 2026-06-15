@@ -33,6 +33,21 @@ def build_parser():
         help="Bypass the identity cache and refetch from yfinance.",
     )
 
+    tc_parser = subparsers.add_parser(
+        "check-ticker-changes",
+        help=(
+            "Use SEC EDGAR's stable CIK->ticker map to discover universe rows "
+            "whose ticker has CHANGED (rename) or whose CIK is no longer listed "
+            "(possible deregistration). Surfaces the NEW symbol so a renamed "
+            "row can be remapped instead of removed."
+        ),
+    )
+    tc_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass the SEC ticker-map cache and refetch from sec.gov.",
+    )
+
     perf_parser = subparsers.add_parser(
         "performance",
         help="Generate the Excel and HTML performance reports.",
@@ -260,6 +275,12 @@ def main():
 
         result = delisted_check.main(use_cache=not args.no_cache)
         raise SystemExit(0 if not result["flagged"] else 2)
+    elif args.command == "check-ticker-changes":
+        from universe import ticker_change_check
+
+        result = ticker_change_check.main(use_cache=not args.no_cache)
+        flagged = len(result["changes"]) + len(result["deregistered"])
+        raise SystemExit(0 if (result["sec_fetched_ok"] and not flagged) else 2)
     elif args.command == "weekly-build":
         import weekly_build
 

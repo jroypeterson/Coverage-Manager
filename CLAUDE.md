@@ -235,6 +235,20 @@ The check is **non-gating** — it never blocks the report or the published arti
 
 The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at least one flag is raised.
 
+## Ticker-change / deregistration discovery
+
+`python cli.py check-ticker-changes` is the **companion** to `check-delisted`. Where the delisted check answers *"is this ticker dead?"* (yfinance price feed), this answers *"what symbol does SEC now have for this company?"* — so a renamed name can be **remapped** to the new symbol instead of just removed (the MPW→MPT / GMRE→XRN case).
+
+**Discovery path:** SEC EDGAR's bulk `company_tickers.json` (same file `enrich.py` uses). A company's **CIK is stable across a ticker change** — only the symbol moves. The module builds the reverse map `CIK → {current ticker(s), title}` and, for each universe row with a CIK:
+- SEC's ticker for that CIK differs from the universe ticker → a **mismatch** (candidate change), reported with SEC's symbol(s) + title.
+- CIK absent from the file entirely → **possible deregistration** (cross-check `delisted_check`).
+
+**Why it's a review list, not an auto-fix:** SEC's structured ticker data can *lag* a real-world rebrand — it still lists the retired `FISV` long after Fiserv moved to `FI`, on **both** the bulk file and the per-CIK submissions endpoint — and yfinance can't disambiguate either (Yahoo aliases the retired symbol to the live one). There is no automated authority that reliably says which symbol is current, so the check surfaces the mismatch with full context and a human decides direction. A best-effort per-CIK **`formerNames`** lookup (SEC submissions, only for the few mismatch candidates) flags entities that legally renamed — a strong "real change" tell (e.g. `GALAPAGOS NV → Lakefront`, GLPG→LKFT). A matching SEC title with empty former-names leans toward SEC-file lag (leave the row as-is).
+
+**Scope:** only rows with a CIK; mismatch detection gated to plain US-style symbols (`ABT`, `BRK.B`) so a cross-listed row tracking the foreign line (`DIA.MI`) isn't flagged as "changed to the US ADR." The SEC bulk map is cached 24h (`cache/sec_company_tickers/`).
+
+Outputs (in `reports/`, archived weekly): `ticker_change_check_YYYY-MM-DD.{csv,md}`. Non-gating. Runs as step `[4b/6]` of `weekly-universe` (right after `delisted_check`). CLI exit code is `2` when any mismatch or deregistration is flagged. Module: `universe/ticker_change_check.py`; tests: `tests/test_ticker_change_check.py`.
+
 ## Historical valuation columns (Phase 1)
 
 The weekly performance report includes 13 trailing-valuation columns appended after the existing FUND_COLS, populated only for the **Phase 1 universe** = every name with a personal trading-state relationship: `Position ∈ {Portfolio, Researching, Following for Interest, Ready to Buy, Ready to Short}` from `data/positions_and_researching.csv` (read from `exports/portfolio.json` + `exports/researching.json` + `exports/following_for_interest.json` + `exports/ready_to_buy.json` + `exports/ready_to_short.json` at report time). Trigger-ready states are included because they already carry a completed thesis; Following-for-Interest is included because earnings-season context benefits from the same historical-valuation columns. Tickers outside Phase 1 render as `N/A`.
