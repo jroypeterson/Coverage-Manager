@@ -249,6 +249,29 @@ The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when a
 
 Outputs (in `reports/`, archived weekly): `ticker_change_check_YYYY-MM-DD.{csv,md}`. Non-gating. Runs as step `[4b/6]` of `weekly-universe` (right after `delisted_check`). CLI exit code is `2` when any mismatch or deregistration is flagged. Module: `universe/ticker_change_check.py`; tests: `tests/test_ticker_change_check.py`.
 
+## LEI (Legal Entity Identifier) backfill
+
+`python cli.py backfill-lei [--no-cache] [--limit N]` fills the universe's **`LEI`**
+column (just after `CIK`) from **GLEIF**'s free API (`api.gleif.org`, no key),
+keyed by **ISIN**. The LEI (ISO 17442) is the official cross-provider *entity*
+identifier — complements the ISIN/FIGI *security* IDs already carried — so the
+ticker list can be joined to any LEI-keyed regulator/provider dataset.
+
+- Only rows with an ISIN and a blank LEI are looked up; results (including
+  authoritative "no LEI" answers) cached 90 days under `cache/lei/` → reruns are
+  cheap and only chase still-missing rows. Foreign names (no CIK) still get an LEI
+  here since ISIN is global.
+- **Coverage ceiling ~46%** (337/731 ISIN rows as of 2026-06-16): GLEIF's
+  ISIN→LEI *mapping* is issuer-contributed and incomplete even for US names (the
+  entities all have LEIs; the ISIN link just isn't published). A confirmed rerun
+  showed the misses are real gaps, not rate-limit transients. **To lift coverage**
+  (deferred): add a GLEIF entity-*name* search fallback for the misses (carries
+  name-match false-positive risk, so gate it carefully).
+- Non-gating, additive: writes the CSV column (also surfaced in `exports/universe.csv`
+  via the snapshot); `universe_metadata.json` is unchanged (no schema bump).
+  Module `universe/lei_backfill.py`; tests `tests/test_lei_backfill.py`. Not yet
+  wired into the weekly pipeline — run on demand (or add as a weekly step later).
+
 ## Historical valuation columns (Phase 1)
 
 The weekly performance report includes 13 trailing-valuation columns appended after the existing FUND_COLS, populated only for the **Phase 1 universe** = every name with a personal trading-state relationship: `Position ∈ {Portfolio, Researching, Following for Interest, Ready to Buy, Ready to Short}` from `data/positions_and_researching.csv` (read from `exports/portfolio.json` + `exports/researching.json` + `exports/following_for_interest.json` + `exports/ready_to_buy.json` + `exports/ready_to_short.json` at report time). Trigger-ready states are included because they already carry a completed thesis; Following-for-Interest is included because earnings-season context benefits from the same historical-valuation columns. Tickers outside Phase 1 render as `N/A`.

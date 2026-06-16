@@ -48,6 +48,23 @@ def build_parser():
         help="Bypass the SEC ticker-map cache and refetch from sec.gov.",
     )
 
+    lei_parser = subparsers.add_parser(
+        "backfill-lei",
+        help=(
+            "Fill the LEI (Legal Entity Identifier) column from GLEIF, keyed by "
+            "ISIN — the official cross-provider entity ID. Only looks up rows "
+            "with an ISIN and no LEI; results cached 90 days."
+        ),
+    )
+    lei_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the LEI cache and refetch from GLEIF.",
+    )
+    lei_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Only look up the first N missing rows (for a test pass).",
+    )
+
     perf_parser = subparsers.add_parser(
         "performance",
         help="Generate the Excel and HTML performance reports.",
@@ -281,6 +298,10 @@ def main():
         result = ticker_change_check.main(use_cache=not args.no_cache)
         flagged = len(result["changes"]) + len(result["deregistered"])
         raise SystemExit(0 if (result["sec_fetched_ok"] and not flagged) else 2)
+    elif args.command == "backfill-lei":
+        from universe import lei_backfill
+
+        lei_backfill.main(use_cache=not args.no_cache, limit=args.limit)
     elif args.command == "weekly-build":
         import weekly_build
 
