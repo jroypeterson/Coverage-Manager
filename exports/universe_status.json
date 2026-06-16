@@ -1,10 +1,10 @@
 {
   "schema_version": 3,
-  "dataset_version": "2026-06-12",
-  "generated_at": "2026-06-13T02:07:41Z",
+  "dataset_version": "2026-06-15",
+  "generated_at": "2026-06-16T01:06:40Z",
   "source_path": "data/coverage_universe_tickers.csv",
-  "row_count": 1109,
-  "ticker_count": 1107,
+  "row_count": 1095,
+  "ticker_count": 1093,
   "normalization_collisions": 2,
   "collision_examples": [
     "ROG",
@@ -14,7 +14,7 @@
   "validation_errors": [],
   "validation_warnings": [
     "3 possible duplicate company name(s) (normalized): ['siegfried holding', 'shimadzu', 'vericel']",
-    "195 ticker(s) missing Subsector (JP) value"
+    "191 ticker(s) missing Subsector (JP) value"
   ],
   "last_discovery_run": null
 }
