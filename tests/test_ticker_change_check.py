@@ -41,8 +41,12 @@ _FAKE_SEC = {
     # CIK 9999999 intentionally absent -> deregistered
 }
 
-# former-names stub: never hit the network in tests.
-_NO_FORMER = lambda cik: []
+# submissions stubs: never hit the network in tests.
+_SUBS_EMPTY = lambda cik: {"former_names": [], "tickers": [], "last_form": "", "last_date": ""}
+_SUBS_DELISTED = lambda cik: {"former_names": [], "tickers": [], "last_form": "15-12G",
+                              "last_date": "2026-03-27"}
+_SUBS_ACTIVE = lambda cik: {"former_names": [], "tickers": ["CFLT"], "last_form": "10-Q",
+                            "last_date": "2026-05-01"}
 
 
 def _patch_sec(monkeypatch, cik_map=_FAKE_SEC, ok=True):
@@ -54,7 +58,7 @@ def test_detects_ticker_mismatch(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["MPW", "1287865", "Medical Properties Trust", "Healthcare Services", "HC Real Estate"],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["sec_fetched_ok"] is True
     assert len(res["changes"]) == 1
     r = res["changes"][0]
@@ -71,8 +75,10 @@ def test_entity_renamed_flag_from_former_names(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["MPW", "1287865", "Medical Properties Trust", "Healthcare Services", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
-                                   former_names_fetcher=lambda cik: ["OLDCO INC"])
+    res = tcc.check_ticker_changes(
+        csv_path=csv, use_cache=False,
+        submissions_fetcher=lambda cik: {"former_names": ["OLDCO INC"], "tickers": [],
+                                         "last_form": "", "last_date": ""})
     assert res["changes"][0]["entity_renamed"] is True
     assert res["changes"][0]["former_names"] == "OLDCO INC"
 
@@ -82,7 +88,7 @@ def test_no_flag_when_ticker_matches(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["UNH", "731766", "UnitedHealth Group Inc", "Healthcare Services", "Managed Care"],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["changes"] == []
     assert res["deregistered"] == []
 
@@ -93,19 +99,48 @@ def test_share_class_member_not_flagged(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["GOOG", "1652044", "Alphabet Inc", "Tech", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["changes"] == []
 
 
-def test_deregistered_when_cik_absent(monkeypatch, tmp_path):
+def test_deregistered_confirmed_when_submissions_has_no_ticker(monkeypatch, tmp_path):
     _patch_sec(monkeypatch)
     csv = _write_universe(tmp_path, [
         ["ZZZZ", "9999999", "Gone Corp", "Biopharma", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_DELISTED)
     assert len(res["deregistered"]) == 1
     assert res["deregistered"][0]["ticker"] == "ZZZZ"
+    assert res["deregistered"][0]["last_form"] == "15-12G"
     assert res["changes"] == []
+    assert res["active_omissions"] == 0
+
+
+def test_form15_overrides_lagging_ticker(monkeypatch, tmp_path):
+    """A filed Form 15 deregisters even when submissions `tickers` still lists
+    the symbol (the field lags Form 15) — the SEMR/EHAB/ONTF post-acquisition case."""
+    _patch_sec(monkeypatch)
+    csv = _write_universe(tmp_path, [
+        ["SEMR", "1831840", "Semrush Holdings", "SaaS", ""],
+    ])
+    res = tcc.check_ticker_changes(
+        csv_path=csv, use_cache=False,
+        submissions_fetcher=lambda cik: {"former_names": [], "tickers": ["SEMR"],
+                                         "last_form": "15-12B", "last_date": "2026-05-08"})
+    assert len(res["deregistered"]) == 1
+    assert res["active_omissions"] == 0
+
+
+def test_bulk_omission_dropped_when_submissions_still_active(monkeypatch, tmp_path):
+    """CIK absent from the bulk file but submissions shows a live ticker -> active
+    bulk-omission, NOT a deregistration (the ACLX/ATAI false-positive class)."""
+    _patch_sec(monkeypatch)
+    csv = _write_universe(tmp_path, [
+        ["ACLX", "1786205", "Arcellx Inc", "Biopharma", ""],
+    ])
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_ACTIVE)
+    assert res["deregistered"] == []
+    assert res["active_omissions"] == 1
 
 
 def test_blank_cik_skipped(monkeypatch, tmp_path):
@@ -113,7 +148,7 @@ def test_blank_cik_skipped(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["000100.KS", "", "Yuhan Corporation", "Biopharma", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["checked"] == 0
     assert res["changes"] == [] and res["deregistered"] == []
 
@@ -126,7 +161,7 @@ def test_foreign_suffixed_ticker_not_flagged(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["DIA.MI", "111", "Some Cross-Listed Co", "Tech", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["changes"] == []         # foreign-suffixed -> mismatch check skipped
     assert res["deregistered"] == []    # CIK present, so not deregistered either
     assert res["checked"] == 1
@@ -137,7 +172,7 @@ def test_sec_unavailable_sets_flag(monkeypatch, tmp_path):
     csv = _write_universe(tmp_path, [
         ["MPW", "1287865", "Medical Properties Trust", "Healthcare Services", ""],
     ])
-    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, former_names_fetcher=_NO_FORMER)
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False, submissions_fetcher=_SUBS_EMPTY)
     assert res["sec_fetched_ok"] is False
     assert res["changes"] == [] and res["deregistered"] == []
     assert res["checked"] == 0

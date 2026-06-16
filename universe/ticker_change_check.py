@@ -126,22 +126,39 @@ def load_sec_cik_map(use_cache=True):
     return cik_map, True
 
 
-def _default_former_names(cik):
-    """Best-effort SEC per-CIK submissions lookup -> list of former company names.
+def _default_submissions(cik):
+    """Best-effort SEC per-CIK submissions lookup. Returns a dict:
+        {former_names: [str], tickers: [str], last_form: str, last_date: str}
+    or {} on any error (best-effort, never raises).
 
-    Authoritative signal that an entity legally renamed (a strong "real ticker
-    change" tell). Only called for the few mismatch candidates, so the extra SEC
-    calls are negligible. Returns [] on any error (best-effort, never raises).
+    This per-CIK endpoint exists for EVERY filer and is authoritative where the
+    bulk `company_tickers.json` is not — that bulk file is an incomplete curated
+    list (~10k tickers) that omits many active names AND many that just delisted.
+    `tickers` here is the entity's CURRENT registered ticker(s): empty ⇒ no live
+    listing (delisted/acquired); non-empty ⇒ still active (the bulk file simply
+    omitted it). `formerNames` confirms a legal rename. `last_form` of `15-…`
+    (Form 15) is the smoking gun for a filed deregistration.
     """
     try:
         url = SEC_SUBMISSIONS_URL.format(cik=int(cik))
         resp = requests.get(url, headers={"User-Agent": _EDGAR_UA}, timeout=20)
         if resp.status_code != 200:
-            return []
-        former = resp.json().get("formerNames", []) or []
-        return [str(f.get("name", "")).strip() for f in former if f.get("name")]
+            return {}
+        j = resp.json()
+        former = [str(f.get("name", "")).strip()
+                  for f in (j.get("formerNames") or []) if f.get("name")]
+        tickers = [str(t).strip() for t in (j.get("tickers") or []) if str(t).strip()]
+        recent = (j.get("filings") or {}).get("recent") or {}
+        forms = recent.get("form") or []
+        dates = recent.get("filingDate") or []
+        return {
+            "former_names": former,
+            "tickers": tickers,
+            "last_form": forms[0] if forms else "",
+            "last_date": dates[0] if dates else "",
+        }
     except Exception:
-        return []
+        return {}
 
 
 def _coerce_cik(raw):
@@ -156,21 +173,32 @@ def _coerce_cik(raw):
         return None
 
 
-def check_ticker_changes(csv_path=None, use_cache=True, former_names_fetcher=None):
+def check_ticker_changes(csv_path=None, use_cache=True, submissions_fetcher=None):
     """Scan the universe for ticker mismatches (candidate renames) + SEC
     deregistrations.
 
-    `former_names_fetcher`: injectable callable(cik)->[names] for the best-effort
-    reorg signal; defaults to a SEC-submissions lookup. Pass a stub in tests.
+    `submissions_fetcher`: injectable callable(cik)->dict (see `_default_submissions`)
+    for the authoritative per-CIK confirmation; defaults to the SEC-submissions
+    lookup. Pass a stub in tests.
+
+    Deregistration is **confirmed**, not guessed: a CIK absent from the bulk
+    `company_tickers.json` is only a *candidate* (that file omits many active
+    names), so we confirm each against the per-CIK submissions `tickers` — empty
+    ⇒ real delisting/deregistration; non-empty ⇒ active bulk-omission (dropped,
+    counted as `active_omissions`). This removed the false positives (active names
+    like ACLX/ATAI/KZR) while keeping real ones (CFLT→IBM, APLS→Biogen, FOLD→BioMarin).
 
     Returns dict:
-      - checked:        rows with a CIK that were examined
-      - sec_cik_count:  size of the SEC CIK map
-      - sec_fetched_ok: whether SEC data was available (False => unreliable)
-      - changes:        mismatch candidates for human review — each
-                        {ticker, sec_tickers, cik, recorded_name, sec_title,
-                         former_names, entity_renamed (bool), sector_jp, subsector_jp}
-      - deregistered:   list of {ticker, cik, recorded_name, sector_jp, subsector_jp}
+      - checked:         rows with a CIK that were examined
+      - sec_cik_count:   size of the SEC CIK map
+      - sec_fetched_ok:  whether SEC data was available (False => unreliable)
+      - changes:         rename candidates for review — each {ticker, sec_tickers,
+                         cik, recorded_name, sec_title, former_names,
+                         entity_renamed, sector_jp, subsector_jp}
+      - deregistered:    confirmed delistings — each {ticker, cik, recorded_name,
+                         last_form, last_date, sector_jp, subsector_jp}
+      - active_omissions: count of bulk-absent CIKs that submissions confirms are
+                         still active (dropped from deregistered)
     """
     csv_path = csv_path or CSV_PATH
     df = pd.read_csv(csv_path, dtype=str).fillna("")
@@ -179,11 +207,12 @@ def check_ticker_changes(csv_path=None, use_cache=True, former_names_fetcher=Non
     if not fetched_ok:
         return {
             "checked": 0, "sec_cik_count": 0, "sec_fetched_ok": False,
-            "changes": [], "deregistered": [],
+            "changes": [], "deregistered": [], "active_omissions": 0,
         }
 
-    fetch_former = former_names_fetcher or _default_former_names
+    fetch_subs = submissions_fetcher or _default_submissions
     changes, deregistered = [], []
+    active_omissions = 0
     checked = 0
     for row in df.to_dict(orient="records"):
         cik = _coerce_cik(row.get("CIK"))
@@ -196,12 +225,21 @@ def check_ticker_changes(csv_path=None, use_cache=True, former_names_fetcher=Non
 
         entry = cik_map.get(cik)
         if entry is None:
-            # SEC has no current ticker for this CIK -> likely deregistered. A
-            # very recent listing not yet indexed can also land here, so the
-            # report frames it as "verify".
+            # Candidate deregistration — CONFIRM via the authoritative per-CIK
+            # submissions endpoint (the bulk file omits many active names).
+            subs = fetch_subs(cik) or {}
+            # A filed Form 15 (15-12B/12G/15D) is a deregistration even when the
+            # submissions `tickers` field still lists the symbol (it lags the
+            # Form 15 by weeks — e.g. SEMR/EHAB/ONTF post-acquisition).
+            is_form15 = str(subs.get("last_form", "")).upper().startswith("15-")
+            if subs.get("tickers") and not is_form15:
+                active_omissions += 1   # still has a live ticker -> bulk omission
+                continue
             deregistered.append({
                 "ticker": ticker, "cik": cik,
                 "recorded_name": row.get("Company Name", ""),
+                "last_form": subs.get("last_form", ""),
+                "last_date": subs.get("last_date", ""),
                 "sector_jp": row.get("Sector (JP)", ""),
                 "subsector_jp": row.get("Subsector (JP)", ""),
             })
@@ -212,7 +250,7 @@ def check_ticker_changes(csv_path=None, use_cache=True, former_names_fetcher=Non
             continue
         sec_norm = {_norm_symbol(t) for t in entry["tickers"]}
         if _norm_symbol(ticker) not in sec_norm:
-            former = fetch_former(cik)
+            former = (fetch_subs(cik) or {}).get("former_names", [])
             changes.append({
                 "ticker": ticker,
                 "sec_tickers": ", ".join(entry["tickers"]),
@@ -233,6 +271,7 @@ def check_ticker_changes(csv_path=None, use_cache=True, former_names_fetcher=Non
         "sec_fetched_ok": True,
         "changes": changes,
         "deregistered": deregistered,
+        "active_omissions": active_omissions,
     }
 
 
@@ -247,7 +286,7 @@ def write_report(result, reports_dir=None, run_date=None):
 
     fieldnames = ["type", "ticker", "sec_tickers", "cik", "recorded_name",
                   "sec_title", "former_names", "entity_renamed",
-                  "sector_jp", "subsector_jp"]
+                  "last_form", "last_date", "sector_jp", "subsector_jp"]
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -266,7 +305,10 @@ def write_report(result, reports_dir=None, run_date=None):
     lines.append(f"- Checked: {result['checked']} universe rows with a CIK "
                  f"(against {result['sec_cik_count']} SEC CIKs)")
     lines.append(f"- Ticker mismatches (candidate changes — review): {len(result['changes'])}")
-    lines.append(f"- Deregistered (CIK absent from SEC ticker file): {len(result['deregistered'])}")
+    lines.append(f"- Deregistered / delisted (submissions-confirmed, no live ticker): {len(result['deregistered'])}")
+    if result.get("active_omissions"):
+        lines.append(f"- (Dropped {result['active_omissions']} bulk-file omission(s) that submissions "
+                     f"confirms are still active — not flagged.)")
     lines.append("")
 
     if result["changes"]:
@@ -290,15 +332,18 @@ def write_report(result, reports_dir=None, run_date=None):
         lines.append("")
 
     if result["deregistered"]:
-        lines.append("## :warning: Possible deregistrations — verify (CIK no longer in SEC ticker file)")
+        lines.append("## :warning: Deregistered / delisted — confirm & move to delisted_tickers.csv")
         lines.append("")
-        lines.append("_A very recently-listed name not yet indexed by SEC can also appear here — "
-                     "cross-check `delisted_check` (a name flagged by both is high-confidence gone)._")
+        lines.append("_SEC's per-CIK submissions endpoint shows **no current registered ticker** for these "
+                     "(authoritative — survives the bulk file's omissions). A `last form` of `15-12G`/`15-15D` "
+                     "is a filed Form 15 (deregistration); an old last-filing date corroborates a wind-down. "
+                     "Confirm, then remove the row and append to `data/delisted_tickers.csv` with last-known data._")
         lines.append("")
-        lines.append("| Ticker | CIK | Recorded Name | Sector |")
-        lines.append("|--------|-----|---------------|--------|")
+        lines.append("| Ticker | CIK | Recorded Name | Last SEC Filing | Sector |")
+        lines.append("|--------|-----|---------------|-----------------|--------|")
         for r in result["deregistered"]:
-            lines.append(f"| {r['ticker']} | {r['cik']} | {r['recorded_name']} | {r['sector_jp']} |")
+            lf = f"{r.get('last_form','')}@{r.get('last_date','')}".strip("@") or "—"
+            lines.append(f"| {r['ticker']} | {r['cik']} | {r['recorded_name']} | {lf} | {r['sector_jp']} |")
         lines.append("")
 
     if not result["changes"] and not result["deregistered"]:
@@ -318,8 +363,9 @@ def main(use_cache=True):
         logger.warning("Ticker-change check: SEC data unavailable — no check performed.")
         return result
     logger.info(
-        "Ticker-change check: %d mismatch(es), %d deregistered (of %d CIK rows)",
-        len(result["changes"]), len(result["deregistered"]), result["checked"],
+        "Ticker-change check: %d mismatch(es), %d deregistered, %d active-omission(s) dropped (of %d CIK rows)",
+        len(result["changes"]), len(result["deregistered"]),
+        result.get("active_omissions", 0), result["checked"],
     )
     for r in result["changes"]:
         tell = " [entity renamed]" if r["entity_renamed"] else ""
