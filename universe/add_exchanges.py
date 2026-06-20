@@ -4,7 +4,7 @@ from datetime import date
 import warnings
 import time
 
-from ticker_utils import CSV_PATH, get_exchange_from_suffix, normalize_exchange
+from ticker_utils import CSV_PATH, get_exchange_from_suffix, normalize_exchange, read_universe_csv
 from logging_utils import configure_logging, get_logger, log_exception
 
 warnings.filterwarnings("ignore")
@@ -38,7 +38,7 @@ def lookup_us_exchanges(tickers):
 def main():
     configure_logging()
     logger.info("Reading CSV...")
-    df = pd.read_csv(CSV_PATH)
+    df = read_universe_csv(CSV_PATH)
     logger.info("Total rows: %s", len(df))
 
     # Determine which tickers need yfinance lookup

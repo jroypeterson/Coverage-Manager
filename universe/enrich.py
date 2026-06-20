@@ -16,7 +16,7 @@ from ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
     COUNTRY_TO_ISIN_PREFIX,
-    normalize_company_for_comparison, backup_csv,
+    normalize_company_for_comparison, backup_csv, read_universe_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
 from providers.fmp_provider import fetch_profile as _fmp_fetch_profile
@@ -753,7 +753,7 @@ def main():
 
     # Step 2: Load CSV
     print("\n2. Loading CSV...")
-    df = pd.read_csv(CSV_PATH)
+    df = read_universe_csv(CSV_PATH)
     print(f"   {len(df)} rows, columns: {list(df.columns)}")
 
     # Step 3: Fetch SEC CIK (single bulk download, fast)

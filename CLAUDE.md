@@ -442,5 +442,21 @@ Coverage Manager posts a v1 health heartbeat to Slack `#status-reports` at the e
 
 Implementation: `reporting/slack.py` (`format_health_v1_message`, `post_health_v1`) + `weekly_build.py` (`_build_health_payload`, `_emit_health_heartbeat`, try/finally in `main`). Tests: `tests/test_health_reporting.py`.
 
+## Universe CSV I/O — float-safe loader (2026-06-20)
+
+Any code that reads `data/coverage_universe_tickers.csv` **and writes the whole file back**
+MUST load it via `ticker_utils.read_universe_csv()` (`pd.read_csv(path, dtype=str,
+keep_default_na=False)`), never a bare `pd.read_csv`. A bare read infers integer ID columns that
+contain blank cells — `CIK` and `Year Listed` — as float64 (`1125376` → `1125376.0`), and the
+subsequent `df.to_csv` persists the `.0` suffix. A `.0` CIK breaks the SEC/EDGAR lookups that
+consume the column (`ticker_change_check`, `enrich`) and corrupts the **published**
+`exports/universe.csv`. The full-file pandas writers all use the safe loader now:
+`universe/add_exchanges.py`, `universe/cleanup.py`, `universe/enrich.py` (main), and
+`discovery/candidates.py:commit_staged_candidates` (the weekly vector — float-ifies on any week
+that commits an approved candidate); `lei_backfill.py` was already safe. Read-only readers
+(`validation.py`, `weekly_universe._step_validate`, reporting/*) may stay bare. `_step_export_artifacts`
+copies the master to exports via `shutil.copyfile` (faithful), so protecting the source writers
+protects the export. Regression: `tests/test_universe_csv_roundtrip.py`. See `feedback_published_artifacts`.
+
 ## Testing
 Run `python -m pytest tests/ -q` before committing. All tests must pass.

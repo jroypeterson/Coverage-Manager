@@ -207,6 +207,21 @@ COUNTRY_TO_ISIN_PREFIX = {
 # ── Functions ───────────────────────────────────────────────────────────────
 
 
+def read_universe_csv(path=CSV_PATH):
+    """Load the coverage-universe CSV with every column as a string and blanks as "".
+
+    Any module that reads the universe CSV and writes the WHOLE file back must use
+    this loader. A bare ``pd.read_csv`` infers integer ID columns that contain blank
+    cells (notably ``CIK`` and ``Year Listed``) as float64 (``1125376`` -> ``1125376.0``),
+    and the subsequent full ``df.to_csv`` then persists the ``.0`` suffix. A ``.0`` CIK
+    breaks the SEC/EDGAR lookups that consume the column and corrupts the published
+    ``exports/universe.csv`` snapshot. ``dtype=str`` + ``keep_default_na=False`` keeps
+    every value verbatim so a load->save round-trip is byte-stable. Mirrors the existing
+    safe reads in ``lei_backfill.py`` and ``ticker_change_check.py``.
+    """
+    return pd.read_csv(path, dtype=str, keep_default_na=False)
+
+
 def backup_csv(path):
     """Create a timestamped backup of the CSV in the backups subfolder."""
     backup_dir = os.path.join(os.path.dirname(path), "backups")

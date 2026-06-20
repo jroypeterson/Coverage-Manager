@@ -14,7 +14,7 @@ import os
 from ticker_utils import (
     CSV_PATH, SUFFIX_TO_EXCHANGE, SPACE_SUFFIX_TO_EXCHANGE,
     EXCHANGE_NORMALIZE, get_exchange_from_suffix, normalize_exchange,
-    normalize_company_for_comparison, backup_csv,
+    normalize_company_for_comparison, backup_csv, read_universe_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
 
@@ -259,7 +259,7 @@ def main():
 
     # Step 2: Load and dedup
     print("\n2. Deduplicating tickers...")
-    df = pd.read_csv(CSV_PATH)
+    df = read_universe_csv(CSV_PATH)
 
     # Drop orphaned unnamed columns (e.g. from trailing commas)
     unnamed = [c for c in df.columns if c.startswith("Unnamed:")]

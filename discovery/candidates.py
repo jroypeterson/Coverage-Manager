@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 
 from config import CSV_PATH, DATA_DIR, TODAY
-from ticker_utils import normalize_company_for_comparison
+from ticker_utils import normalize_company_for_comparison, read_universe_csv
 from audit import log_change
 from logging_utils import get_logger
 
@@ -221,7 +221,7 @@ def commit_staged_candidates(staging_path, csv_path=None):
         logger.info("No approved candidates to commit")
         return 0
 
-    df = pd.read_csv(csv_path)
+    df = read_universe_csv(csv_path)
     existing_tickers = set(df["Ticker"].dropna().astype(str).str.strip().str.upper())
 
     added = 0
