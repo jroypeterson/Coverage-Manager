@@ -320,7 +320,7 @@ CVKD,NASDAQ,NCM,NasdaqCM,Primary,,2023,US1276362076,BBG019STRT20,BBG019STRT20,BB
 CVM,NYSE,ASE,NYSE American,Primary,,,,BBG000H5G6L5,BBG000H5G6L5,BBG001SBRBG1,725363,,CEL-SCI Corp,United States,United States,USA,USD,https://cel-sci.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 CVNA,NYSE,NYQ,NYSE,Primary,,2017,US1468691027,BBG00GCTWDJ3,BBG00GCTWDJ3,BBG00GCTWF71,1690820,5493003WEAK2PJ5WS063,Carvana Co,United States,United States,USA,USD,https://www.carvana.com,Consumer Cyclical,Auto & Truck Dealerships,Consumer,,,Y
 CVS,NYSE,NYQ,NYSE,Primary,,,US1266501006,BBG000BGRY34,BBG000BGRY34,BBG001S5QBD8,64803,549300EJG376EN5NQE29,CVS Health Corp,United States,United States,USA,USD,https://www.cvshealth.com,Healthcare,Healthcare Plans,Healthcare Services,Mgd Care,,Y
-CVSG,LSE,,,,,,,BBG000PZMZR3,BBG000PZMZR3,BBG001SRKMN1,,,CVS Group Plc,United Kingdom,United Kingdom,GBR,GBP,,,,Healthcare Services,Animal Health,,Y
+CVSG.L,LSE,,,,,,,BBG000PZMZR3,BBG000PZMZR3,BBG001SRKMN1,,,CVS Group Plc,United Kingdom,United Kingdom,GBR,GBP,,,,Healthcare Services,Animal Health,,Y
 CVT,NZX,,,,,,US1266771039,BBG000C53858,BBG000C537V1,BBG001SF28W8,,,Comvita Ltd,New Zealand,New Zealand,NZL,NZD,,,,SaaS,,,
 CXM,NYSE,NYQ,NYSE,Primary,,2021,US85208T1079,BBG0043NCD05,BBG0043NCD05,BBG0043NCD14,1569345,,Sprinklr Inc,United States,United States,USA,USD,https://www.sprinklr.com,Technology,Software - Application,SaaS,,,
 CYBN,NYSE,,,,,,CA23256X1006,,,,,,Cybin Inc,Canada,United States,CAN,USD,,,,Biopharma,,,
@@ -857,8 +857,7 @@ SEM,NYSE,NYQ,NYSE,Primary,,2009,,BBG000QCHMH9,BBG000QCHMH9,BBG001SMLRT4,1320414,
 SEPN,NASDAQ,NGM,NasdaqGM,Primary,,2024,US81734D1046,BBG014WY1V28,BBG014WY1V28,BBG014WY1VC7,1984086,,Septerna Inc,United States,United States,USA,USD,https://septerna.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 SEQUENT.NS,NSE,NSI,,Primary,,2016,,,,,,,Viyash Scientific Limited,India,India,IND,INR,https://www.sequent.in,Healthcare,Drug Manufacturers - Specialty & Generic,Biopharma,Specialty & Generic Pharma,,
 SER,NYSE,ASE,NYSE American,Primary,,2018,US81751A1088,BBG00HCXQ7B0,BBG00HCXQ7B0,BBG00HCXQ7C9,1708599,5493005PJ4B0GQ36ED85,Serina Therapeutics Inc,United States,United States,USA,USD,https://serinatherapeutics.com,Healthcare,Biotechnology,Biopharma,Biotech,,
-SFZN.SW,SIX,EBS,Swiss,Primary,SFZS sW,,,BBG000BC8YB5,BBG000BC8YB5,BBG001S69G53,,,Siegfried Holding AG,Switzerland,Switzerland,CHE,CHF,https://www.siegfried.ch,Healthcare,Drug Manufacturers - Specialty & Generic,Biopharma,Specialty & Generic Pharma,,
-SFZS sW,SIX,,,,SFZN.SW,,,,,,,,Siegfried Holding AG,Switzerland,Switzerland,CHE,CHF,,,,MedTech,Life Science Tools,CDMO,Y
+SFZN.SW,SIX,EBS,Swiss,Primary,,,,BBG000BC8YB5,BBG000BC8YB5,BBG001S69G53,,,Siegfried Holding AG,Switzerland,Switzerland,CHE,CHF,https://www.siegfried.ch,Healthcare,Drug Manufacturers - Specialty & Generic,MedTech,Life Science Tools,CDMO,Y
 SGHT,NASDAQ,NMS,NasdaqGS,Primary,,2021,US82657M1053,BBG006BZHZC7,BBG006BZHZC7,BBG006BZHZD6,1531177,,"Sight Sciences, Inc.",United States,United States,USA,USD,https://www.sightsciences.com,Healthcare,Medical Devices,MedTech,Ophthalmology,,Y
 SGMO,NASDAQ,NCM,NasdaqCM,Primary,,,US8006771062,BBG000BHYT80,BBG000BHYT80,BBG001S95JZ2,1001233,2549006WMRKRC4G32Z67,Sangamo Therapeutics Inc,United States,United States,USA,USD,https://www.sangamo.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 SGMT,NASDAQ,NGM,NasdaqGM,Primary,,2023,,BBG0020584Y9,BBG0020584Y9,BBG0020584Z8,1400118,,Sagimet Biosciences Inc,United States,United States,USA,USD,https://www.sagimet.com,Healthcare,Biotechnology,Biopharma,Biotech,,
