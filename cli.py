@@ -65,6 +65,32 @@ def build_parser():
         help="Only look up the first N missing rows (for a test pass).",
     )
 
+    ipo_parser = subparsers.add_parser(
+        "ipo-backfill",
+        help=(
+            "Fill the IPO Date + estimated 90/180-day lockup columns from "
+            "Renaissance Capital, keyed by CIK/ticker. A metered verifier — FREE "
+            "tier is 120 calls/MONTH, so it only looks up rows with a blank IPO "
+            "Date, caches forever, and stops when the monthly budget is reached."
+        ),
+    )
+    ipo_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the IPO cache and refetch from Renaissance.",
+    )
+    ipo_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Only look up the first N eligible rows (recommended — conserves the monthly quota). Recent IPOs go first.",
+    )
+    ipo_parser.add_argument(
+        "--min-year", type=int, default=None,
+        help="Skip rows listed before this year (e.g. 2024 for the last ~2 years of IPOs).",
+    )
+    ipo_parser.add_argument(
+        "--include-foreign", action="store_true",
+        help="Also attempt rows without a CIK. Off by default — Renaissance is US-IPO-only, so these always 404 and waste quota.",
+    )
+
     perf_parser = subparsers.add_parser(
         "performance",
         help="Generate the Excel and HTML performance reports.",
@@ -302,6 +328,15 @@ def main():
         from universe import lei_backfill
 
         lei_backfill.main(use_cache=not args.no_cache, limit=args.limit)
+    elif args.command == "ipo-backfill":
+        from universe import ipo_backfill
+
+        ipo_backfill.main(
+            use_cache=not args.no_cache,
+            limit=args.limit,
+            us_only=not args.include_foreign,
+            min_year=args.min_year,
+        )
     elif args.command == "weekly-build":
         import weekly_build
 

@@ -272,6 +272,40 @@ ticker list can be joined to any LEI-keyed regulator/provider dataset.
   Module `universe/lei_backfill.py`; tests `tests/test_lei_backfill.py`. Not yet
   wired into the weekly pipeline — run on demand (or add as a weekly step later).
 
+## IPO date backfill (Renaissance Capital)
+
+`python cli.py ipo-backfill [--no-cache] [--limit N] [--min-year YYYY] [--include-foreign]`
+fills three **immutable** columns just after `Year Listed` — **`IPO Date`** (verified
+offer date, ISO), **`Est Lockup 90d`**, **`Est Lockup 180d`** (offer + 90/180d; the API
+has no lockup field) — from **Renaissance Capital**'s free IPO endpoint
+(`api.renaissancecapital.com/free/CompanyIpoDate`, header `Ocp-Apim-Subscription-Key`,
+key `RENAISSANCE_API_KEY` in `.env`).
+
+- **Why, not just the date:** yfinance/FMP often report the *first-trade* or
+  *listing-transfer* date for SMID names, not the offer — this is the clean verifier
+  for the recent SMID HC IPOs that matter. The routing signal is IPO **age**, computed
+  on read by `providers.renaissance_ipo.ipo_age(offer_date)` → `(age_days, bucket)`
+  (`<30d/30-90d/90-180d/180-365d/1-2y/>2y`); never stored (it's date-relative). Lockup
+  dates + IPO date are immutable so they live in the CSV.
+- **Hard quota guard:** the FREE tier is **120 calls/MONTH** (no remaining-count header),
+  so `providers/renaissance_ipo.py` tracks spend in `cache/ipo_renaissance/_usage.json`
+  keyed by month and **raises `RenaissanceBudgetError` at `MONTHLY_CALL_CAP` (115)** —
+  the backfill stops cleanly and reports `budget_exhausted`. IPO dates are immutable, so
+  results (incl. authoritative 404 "no IPO on record") are cached ~forever under
+  `cache/ipo_renaissance/<TICKER>.json` and a resolved/known-empty ticker is never re-hit.
+- **Targeting (avoids wasting the tiny quota):** by default only rows **with a CIK**
+  (US filers — Renaissance is US-IPO-only; foreign no-CIK rows always 404) are looked up,
+  **most-recently-listed first**. `--min-year 2024` restricts to the last ~2 years;
+  `--include-foreign` lifts the CIK requirement (rarely useful). Always use `--limit` to
+  cap a run. Prefers the `?CIK=` query (the API's reliable key) over `?TickerSymbol=`.
+- Non-gating, additive: writes the CSV column (surfaced in `exports/universe.csv` via the
+  snapshot on the next weekly run); `universe_metadata.json` is unchanged (**no schema
+  bump**). Degrades loudly (logs a warning, no-ops) if `RENAISSANCE_API_KEY` is unset.
+  Module `universe/ipo_backfill.py` + `providers/renaissance_ipo.py`; tests
+  `tests/test_ipo_backfill.py` + `tests/test_renaissance_ipo.py`. **Not wired into the
+  weekly pipeline** — run on demand (like `backfill-lei`); wiring it as a weekly step
+  (+ a fresh-discovery hook) is the obvious next increment.
+
 ## Historical valuation columns (Phase 1)
 
 The weekly performance report includes 13 trailing-valuation columns appended after the existing FUND_COLS, populated only for the **Phase 1 universe** = every name with a personal trading-state relationship: `Position ∈ {Portfolio, Researching, Following for Interest, Ready to Buy, Ready to Short}` from `data/positions_and_researching.csv` (read from `exports/portfolio.json` + `exports/researching.json` + `exports/following_for_interest.json` + `exports/ready_to_buy.json` + `exports/ready_to_short.json` at report time). Trigger-ready states are included because they already carry a completed thesis; Following-for-Interest is included because earnings-season context benefits from the same historical-valuation columns. Tickers outside Phase 1 render as `N/A`.
