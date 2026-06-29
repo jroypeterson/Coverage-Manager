@@ -429,7 +429,7 @@ Important comparison rules:
 - Price stays in local currency
 - Performance reports are emailed and posted to Slack `#stock-price-alerts` via `SLACK_WEBHOOK_URL` in `.env`
 - `--refresh` flag bypasses cache reads and refetches from APIs. Avoid it on full runs unless you really need it; provider latency, especially Finnhub on cold cache, is still the main runtime cost
-- The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution)
+- The weekly scheduled task runs via `C:\Users\jroyp\run_weekly_coverage.bat` every Friday at 8am (uses `--dangerously-skip-permissions` for unattended execution). **2026-06-29 hardening:** the bat runs a **deterministic exports-publish backstop** (`"%PYTHON%" cli.py weekly-universe --skip-discovery`) UNCONDITIONALLY after the headless claude session, because on 2026-06-26 the headless `claude -p` session backgrounded the build and exited (no re-invocation in `-p` mode), leaving `exports/manifest.json` 10 days stale while the task showed rc=0. The backstop guarantees exports regenerate regardless of what the agent did; `weekly_coverage_prompt.md` also carries a CRITICAL rule forbidding backgrounding the build. The backstop, `git commit`, and `git push` each capture their exit code and `goto` a fail-label (`endlocal & exit /b <rc>`) so a failed publish/commit/push turns the task **RED** instead of green-but-stale (Codex-reviewed 2026-06-29). Keep that bat **CRLF + ASCII + goto-style (no paren blocks)**.
 - Performance report emails include weekly coverage additions summary + attached files list when `weekly_coverage_universe_additions_{date}.md` exists in `reports/`
 
 ## Weekly universe delta -> Slack #coverage
