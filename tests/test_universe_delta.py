@@ -175,6 +175,98 @@ def test_compute_delta_empty_week_renders_no_changes():
     assert "*After*" in msg
 
 
+def test_format_delta_section_leads_the_post():
+    """JP 2026-07-04: week-over-week diffs come FIRST, before After/Before."""
+    before = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple Inc"}])
+    after = _universe_df([
+        {"Ticker": "AAPL", "Company Name": "Apple Inc"},
+        {"Ticker": "NEWA", "Company Name": "Newco A"},
+    ])
+    delta = ud.compute_universe_delta(before, after)
+    msg = ud.format_universe_delta_slack(delta)
+    assert msg.index("*Week over week*") < msg.index("*After*")
+    assert msg.index("*After*") < msg.index("*Before*")
+
+
+def test_format_empty_week_no_changes_leads_the_post():
+    """The explicit no-changes line sits up top, not buried after state blocks."""
+    df = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple Inc"}])
+    delta = ud.compute_universe_delta(df, df)
+    msg = ud.format_universe_delta_slack(delta)
+    assert msg.index("_No changes this week._") < msg.index("*After*")
+
+
+# ── YTD summary ──────────────────────────────────────────────────────────────
+
+
+def _ytd_payload(added=0, removed=0, modified_tickers=0, position_changes=0,
+                 before_total=100, after_total=100):
+    return {
+        "added": [{"ticker": f"A{i}"} for i in range(added)],
+        "removed": [{"ticker": f"R{i}"} for i in range(removed)],
+        "modified": [{"ticker": f"M{i}", "field": "Core", "old": "", "new": "Y"}
+                     for i in range(modified_tickers)],
+        "position_changes": [{"ticker": f"P{i}"} for i in range(position_changes)],
+        "before_stats": {"total": before_total},
+        "after_stats": {"total": after_total},
+    }
+
+
+def test_compute_ytd_summary_aggregates_across_runs():
+    payloads = [
+        ("2026-01-09", _ytd_payload(added=2, removed=1, before_total=100, after_total=101)),
+        ("2026-02-13", _ytd_payload(added=0, removed=0, before_total=101, after_total=101)),
+        ("2026-07-03", _ytd_payload(added=3, removed=2, modified_tickers=4,
+                                    position_changes=1, before_total=101, after_total=102)),
+    ]
+    ytd = ud.compute_ytd_summary(payloads)
+    assert ytd["added"] == 5
+    assert ytd["removed"] == 3
+    assert ytd["modified_tickers"] == 4
+    assert ytd["position_changes"] == 1
+    assert ytd["start_total"] == 100
+    assert ytd["end_total"] == 102
+    assert ytd["net"] == 2
+    assert ytd["first_date"] == "2026-01-09"
+    assert ytd["runs"] == 3
+
+
+def test_compute_ytd_summary_returns_none_on_empty_history():
+    assert ud.compute_ytd_summary([]) is None
+
+
+def test_load_ytd_delta_history_filters_to_current_year_and_skips_bad_files(tmp_path):
+    good = {"reason": None, "delta": _ytd_payload(added=1)}
+    (tmp_path / "universe_delta_2026-01-09.json").write_text(json.dumps(good), encoding="utf-8")
+    (tmp_path / "universe_delta_2026-03-06.json").write_text(json.dumps(good), encoding="utf-8")
+    (tmp_path / "universe_delta_2025-12-19.json").write_text(json.dumps(good), encoding="utf-8")
+    (tmp_path / "universe_delta_2026-02-13.json").write_text("{not json", encoding="utf-8")
+    payloads = ud.load_ytd_delta_history(fallback_dir=tmp_path, today="2026-07-04")
+    dates = [d for d, _ in payloads]
+    assert dates == ["2026-01-09", "2026-03-06"]  # 2025 excluded, bad file skipped
+    assert all(len(p["added"]) == 1 for _, p in payloads)
+
+
+def test_format_includes_ytd_block_when_provided():
+    df = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple Inc"}])
+    delta = ud.compute_universe_delta(df, df)
+    ytd = ud.compute_ytd_summary([
+        ("2026-01-09", _ytd_payload(added=2, removed=1, before_total=100, after_total=101)),
+    ])
+    msg = ud.format_universe_delta_slack(delta, ytd=ytd)
+    assert "*Year to date* (since 2026-01-09 · 1 run)" in msg
+    assert "+2 added · −1 removed · net +1 tickers (100 → 101)" in msg
+    # YTD renders after the state blocks
+    assert msg.index("*Year to date*") > msg.index("*Before*")
+
+
+def test_format_omits_ytd_block_when_none():
+    df = _universe_df([{"Ticker": "AAPL", "Company Name": "Apple Inc"}])
+    delta = ud.compute_universe_delta(df, df)
+    msg = ud.format_universe_delta_slack(delta, ytd=None)
+    assert "*Year to date*" not in msg
+
+
 # ── _split_into_section_blocks ───────────────────────────────────────────────
 
 
@@ -615,7 +707,7 @@ def test_step_raises_runtime_error_on_slack_post_failure(monkeypatch, tmp_path):
     # Force Slack post to fail
     monkeypatch.setattr(
         ud, "post_universe_delta",
-        lambda webhook, delta, fallback_dir=None: {"posted": False, "reason": "slack returned 500"},
+        lambda webhook, delta, fallback_dir=None, ytd=None: {"posted": False, "reason": "slack returned 500"},
     )
 
     baseline = {
@@ -653,7 +745,7 @@ def test_step_uses_os_environ_first_then_api_keys(monkeypatch, tmp_path):
     monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
 
     captured = {}
-    def fake_post(webhook, delta, fallback_dir=None):
+    def fake_post(webhook, delta, fallback_dir=None, ytd=None):
         captured["webhook"] = webhook
         return {"posted": True, "reason": None}
     monkeypatch.setattr(ud, "post_universe_delta", fake_post)

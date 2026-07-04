@@ -719,10 +719,12 @@ def _step_universe_delta_slack(baseline):
     from reporting.universe_delta import (
         SNAPSHOT_UNIVERSE_PATH,
         compute_universe_delta,
+        compute_ytd_summary,
         load_baseline_universe,
         load_baseline_positions,
         load_universe_snapshot,
         load_positions_snapshot,
+        load_ytd_delta_history,
         post_universe_delta,
         snapshot_mtime_date,
         write_delta_json,
@@ -777,13 +779,22 @@ def _step_universe_delta_slack(baseline):
 
     # ALWAYS persist the delta JSON before posting. Position-change overflow
     # ("see fallback file") relies on this — the file must exist whether or
-    # not the Slack post succeeds.
+    # not the Slack post succeeds. Writing first also means the YTD summary
+    # below includes this run.
     write_delta_json(delta)
+
+    # Year-to-date block: aggregate this year's persisted delta files.
+    # Best-effort — a YTD failure must never block the weekly post.
+    try:
+        ytd = compute_ytd_summary(load_ytd_delta_history())
+    except Exception as e:
+        logger.warning("YTD delta summary failed (posting without it): %s", e)
+        ytd = None
 
     # Webhook resolution: real OS env first, then .env via API_KEYS. Mirrors
     # the health-heartbeat pattern.
     webhook = os.environ.get("SLACK_WEBHOOK_COVERAGE") or API_KEYS.get("SLACK_WEBHOOK_COVERAGE")
-    post_result = post_universe_delta(webhook, delta)
+    post_result = post_universe_delta(webhook, delta, ytd=ytd)
 
     # ALWAYS write the run snapshot — Slack success/failure is orthogonal to
     # what the universe state actually is. Next week's baseline must reflect

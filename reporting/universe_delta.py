@@ -263,6 +263,71 @@ def write_delta_json(delta, fallback_dir=None, reason=None):
     return [timestamped, stable]
 
 
+def load_ytd_delta_history(fallback_dir=None, today=None):
+    """Load this year's persisted delta payloads from `.coverage/`.
+
+    Reads every `universe_delta_YYYY-MM-DD.json` whose filename date falls in
+    the current year (per `today`, default config.TODAY), sorted ascending by
+    date. Returns a list of (date_str, delta_dict). Files that fail to parse
+    are skipped (logged) — the YTD block is best-effort context, never a
+    reason to fail the post.
+
+    Note: a same-day rerun overwrites its dated file, so YTD sums reflect the
+    last run of each date. Good enough for a weekly digest.
+    """
+    fallback_dir = Path(fallback_dir or FALLBACK_DIR)
+    today = today or TODAY
+    year = str(today)[:4]
+    payloads = []
+    for path in sorted(fallback_dir.glob(f"universe_delta_{year}-*.json")):
+        date_str = path.stem.replace("universe_delta_", "")
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            delta = payload.get("delta") or {}
+            payloads.append((date_str, delta))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("YTD delta history: skipping unreadable %s: %s", path.name, e)
+    return payloads
+
+
+def compute_ytd_summary(payloads):
+    """Aggregate a year's delta payloads into a YTD change summary.
+
+    Pure — takes the (date_str, delta_dict) list from `load_ytd_delta_history`.
+    Returns None when there is no history (first run of the year); the
+    formatter then omits the YTD block rather than rendering zeros.
+
+    Fields: added / removed / modified_tickers / position_changes are summed
+    across runs; start_total is the earliest run's before-count and end_total
+    the latest run's after-count, so `net` reflects the actual year-over-year
+    universe drift even if an individual week's file is missing.
+    """
+    if not payloads:
+        return None
+    added = removed = modified_tickers = position_changes = 0
+    for _, delta in payloads:
+        added += len(delta.get("added") or [])
+        removed += len(delta.get("removed") or [])
+        modified_tickers += len({m.get("ticker") for m in (delta.get("modified") or [])})
+        position_changes += len(delta.get("position_changes") or [])
+    first_date, first_delta = payloads[0]
+    last_date, last_delta = payloads[-1]
+    start_total = (first_delta.get("before_stats") or {}).get("total", 0)
+    end_total = (last_delta.get("after_stats") or {}).get("total", 0)
+    return {
+        "added": added,
+        "removed": removed,
+        "modified_tickers": modified_tickers,
+        "position_changes": position_changes,
+        "start_total": start_total,
+        "end_total": end_total,
+        "net": end_total - start_total,
+        "first_date": first_date,
+        "last_date": last_date,
+        "runs": len(payloads),
+    }
+
+
 def snapshot_mtime_date(snapshot_path=None):
     """Return the YYYY-MM-DD mtime of the snapshot file, or None if absent."""
     snapshot_path = Path(snapshot_path or SNAPSHOT_UNIVERSE_PATH)
@@ -496,13 +561,40 @@ def _format_stats_block(label, header_suffix, universe_stats, position_counts,
     return "\n".join(lines)
 
 
-def format_universe_delta_slack(delta):
+def _plural(n, word):
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
+def _format_ytd_block(ytd):
+    """Render the year-to-date change summary as a mrkdwn section."""
+    lines = [
+        f"*Year to date* (since {ytd['first_date']} · {_plural(ytd['runs'], 'run')})",
+        (
+            f"• +{ytd['added']} added · −{ytd['removed']} removed · "
+            f"net {ytd['net']:+d} tickers ({ytd['start_total']:,} → {ytd['end_total']:,})"
+        ),
+    ]
+    detail_bits = []
+    if ytd["modified_tickers"]:
+        detail_bits.append(_plural(ytd["modified_tickers"], "ticker") + " modified")
+    if ytd["position_changes"]:
+        detail_bits.append(_plural(ytd["position_changes"], "position change"))
+    if detail_bits:
+        lines.append("• " + " · ".join(detail_bits))
+    return "\n".join(lines)
+
+
+def format_universe_delta_slack(delta, ytd=None):
     """Render the full delta as Slack mrkdwn (returned as a single string).
 
-    Section order (top-down): header → caveat (if any) → After → Before → Delta.
-    Current-state-first chosen for glanceability; Before is context; Delta is
-    drill-down. See CLAUDE.md "Weekly universe delta -> Slack #coverage" for
-    rationale.
+    Section order (top-down): header → caveat (if any) → Delta (week-over-week
+    diffs, with an explicit "No changes this week." when empty) → After →
+    Before → Year-to-date. Delta-first per JP's 2026-07-04 ask — the WoW diffs
+    are the reason to read the post; state blocks are context; YTD closes with
+    the running drift. See CLAUDE.md "Weekly universe delta -> Slack #coverage".
+
+    `ytd` is the optional output of `compute_ytd_summary`; the block is
+    omitted when None (no history yet).
 
     The wire-payload helper `_split_into_section_blocks` chunks it if needed.
     """
@@ -517,47 +609,19 @@ def format_universe_delta_slack(delta):
     if baseline_caveat:
         parts.append(f":warning: _{baseline_caveat}_")
 
-    # 1) After — current state up top.
-    after_total = delta["after_stats"].get("total", 0)
-    parts.append(
-        _format_stats_block(
-            "After", f" ({after_total:,} tickers)",
-            delta["after_stats"], delta["after_position_counts"],
-            baseline_universe_stats=delta["before_stats"],
-            baseline_position_counts=delta["before_position_counts"],
-        )
-    )
-
-    # 2) Before — last-run context next.
-    if baseline_source == "none" or (baseline_source is None and baseline_label is None):
-        before_header = " (baseline unavailable — first run after snapshot mechanism shipped, or snapshot missing and no git history)"
-    elif baseline_label:
-        before_header = f" ({baseline_label})"
-    else:
-        # legacy / tests passing only baseline_sha + baseline_date
-        baseline_sha = delta.get("baseline_sha")
-        baseline_date = delta.get("baseline_date")
-        if baseline_sha:
-            before_header = f" (committed state @ {baseline_sha[:7]}, {baseline_date or 'previous commit'})"
-        else:
-            before_header = ""
-    parts.append(
-        _format_stats_block(
-            "Before", before_header,
-            delta["before_stats"], delta["before_position_counts"],
-        )
-    )
-
-    # 3) Delta sections — the per-ticker drill-down.
+    # 1) Delta — the week-over-week diffs lead the post.
     added = delta["added"]
     removed = delta["removed"]
     modified = delta["modified"]
     position_changes = delta["position_changes"]
     modified_grouped = _group_modified_by_ticker(modified)
 
-    parts.append(
-        f"*Delta* (+{len(added)} added · −{len(removed)} removed · {len(modified_grouped)} modified)"
-    )
+    if not (added or removed or modified or position_changes):
+        parts.append("*Week over week:* _No changes this week._")
+    else:
+        parts.append(
+            f"*Week over week* (+{len(added)} added · −{len(removed)} removed · {len(modified_grouped)} modified)"
+        )
 
     if added:
         lines = [f"*Added ({len(added)})*"]
@@ -590,8 +654,40 @@ def format_universe_delta_slack(delta):
             lines.append(f"_+{total_pc - MAX_POSITION_CHANGES} more — see fallback file_")
         parts.append("\n".join(lines))
 
-    if not (added or removed or modified or position_changes):
-        parts.append("_No changes this week._")
+    # 2) After — current state.
+    after_total = delta["after_stats"].get("total", 0)
+    parts.append(
+        _format_stats_block(
+            "After", f" ({after_total:,} tickers)",
+            delta["after_stats"], delta["after_position_counts"],
+            baseline_universe_stats=delta["before_stats"],
+            baseline_position_counts=delta["before_position_counts"],
+        )
+    )
+
+    # 3) Before — last-run context.
+    if baseline_source == "none" or (baseline_source is None and baseline_label is None):
+        before_header = " (baseline unavailable — first run after snapshot mechanism shipped, or snapshot missing and no git history)"
+    elif baseline_label:
+        before_header = f" ({baseline_label})"
+    else:
+        # legacy / tests passing only baseline_sha + baseline_date
+        baseline_sha = delta.get("baseline_sha")
+        baseline_date = delta.get("baseline_date")
+        if baseline_sha:
+            before_header = f" (committed state @ {baseline_sha[:7]}, {baseline_date or 'previous commit'})"
+        else:
+            before_header = ""
+    parts.append(
+        _format_stats_block(
+            "Before", before_header,
+            delta["before_stats"], delta["before_position_counts"],
+        )
+    )
+
+    # 4) Year to date — running drift since the first run of the year.
+    if ytd:
+        parts.append(_format_ytd_block(ytd))
 
     return "\n\n".join(parts)
 
@@ -616,8 +712,11 @@ def _split_into_section_blocks(message):
 # ── Post + fallback ─────────────────────────────────────────────────────────
 
 
-def post_universe_delta(webhook_url, delta, fallback_dir=None):
+def post_universe_delta(webhook_url, delta, fallback_dir=None, ytd=None):
     """Post the universe delta to Slack #coverage with fallback on failure.
+
+    `ytd` (optional, from `compute_ytd_summary`) appends the year-to-date
+    block to the message.
 
     On any non-success path, writes TWO files to `fallback_dir`:
       - universe_delta_{TODAY}.json  (timestamped, historical)
@@ -626,7 +725,7 @@ def post_universe_delta(webhook_url, delta, fallback_dir=None):
     Returns {"posted": True/False, "reason": str | None}. Never raises.
     """
     fallback_dir = Path(fallback_dir or FALLBACK_DIR)
-    message = format_universe_delta_slack(delta)
+    message = format_universe_delta_slack(delta, ytd=ytd)
     body = {
         "blocks": _split_into_section_blocks(message),
         "text": message,

@@ -434,7 +434,9 @@ Important comparison rules:
 
 ## Weekly universe delta -> Slack #coverage
 
-Each `weekly-universe` (and therefore `weekly-build`) run posts a single message to Slack `#coverage` summarizing what changed in the coverage universe this week. **Section order: header → optional caveat → After (current state) → Before (last-run context) → Delta (Added / Removed / Modified / Position changes).** Current-state-first is deliberate — the user reads the After block to ground themselves, then scrolls for context. The audit trail is still complete in all three sections.
+Each `weekly-universe` (and therefore `weekly-build`) run posts a single message to Slack `#coverage` summarizing what changed in the coverage universe this week. **Section order (changed 2026-07-04 per JP): header → optional caveat → Week over week (Added / Removed / Modified / Position changes — the diffs LEAD the post; an empty week renders an explicit `*Week over week:* _No changes this week._` line up top) → After (current state) → Before (last-run context) → Year to date.** Diffs-first is deliberate — the WoW changes are the reason to read the post; the state blocks are context.
+
+- **Year-to-date block**: aggregates the timestamped `.coverage/universe_delta_YYYY-MM-DD.json` files for the current calendar year (`load_ytd_delta_history` + pure `compute_ytd_summary`): summed adds/removes/modified-tickers/position-changes, plus net ticker drift (earliest run's before-total → latest run's after-total). Best-effort: a YTD failure logs a warning and the post ships without the block; omitted entirely when there's no history yet. Note the history only reaches back to 2026-05-29 (when the delta mechanism shipped), so "since" shows the first available run of the year until 2027. Same-day reruns overwrite their dated file, so YTD reflects the last run of each date.
 
 - **Webhook**: `SLACK_WEBHOOK_COVERAGE`, resolved via `os.environ.get(...) or API_KEYS.get(...)` (real env var first, then `.env`). Mirrors the health-heartbeat pattern.
 - **Baseline strategy (2-tier)**:
