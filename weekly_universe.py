@@ -709,17 +709,22 @@ def _step_universe_delta_slack(baseline):
       3. Post to Slack #coverage.
       4. Write run snapshot to .coverage/ (ALWAYS — represents this run's end
          state; becomes next week's baseline regardless of Slack success).
-      5. Raise on Slack failure so the step status becomes `failed: ...` and
-         `collect_non_successes` flags `#status-reports` as `partial`.
+      5. Send the [ClaudeFin] email alert (additive channel, independent of
+         Slack outcome; never the old EMAIL_ENABLED full-report email).
+      6. Raise on Slack and/or email failure so the step status becomes
+         `failed: ...` and `collect_non_successes` flags `#status-reports`
+         as `partial`. Non-gating either way.
     """
     import os
     import pandas as pd
 
     from config import API_KEYS
+    from reporting import email_alert_client
     from reporting.universe_delta import (
         SNAPSHOT_UNIVERSE_PATH,
         compute_universe_delta,
         compute_ytd_summary,
+        format_universe_delta_email,
         load_baseline_universe,
         load_baseline_positions,
         load_universe_snapshot,
@@ -801,14 +806,29 @@ def _step_universe_delta_slack(baseline):
     # this run's actual end state.
     write_run_snapshot()
 
+    # [ClaudeFin] email alert — ADDITIVE to the Slack post (root CONVENTIONS.md
+    # "Email alerts ([ClaudeFin])"), sent even when Slack failed (independent
+    # channel). send_alert never raises; a False is folded into this step's
+    # failure below, exactly like the Slack path. This is NOT the old
+    # EMAIL_ENABLED full-report email — that stays flag-disabled.
+    email_subject, email_body = format_universe_delta_email(delta, ytd=ytd)
+    email_sent = email_alert_client.send_alert(
+        "Coverage Manager", email_subject, email_body)
+
+    failures = []
     if not post_result["posted"]:
+        failures.append(f"Slack post failed: {post_result['reason']}")
+    if not email_sent:
+        failures.append("[ClaudeFin] email alert failed (see log)")
+    if failures:
         # Raise so pipeline_utils.run_step marks this step `failed: ...` and
         # collect_non_successes flags the health heartbeat as `partial`.
         # Non-gating — the universe CSV + exports + sigma push already ran.
-        raise RuntimeError(f"Slack post failed: {post_result['reason']}")
+        raise RuntimeError("; ".join(failures))
 
     return {
         "posted": True,
+        "email_alert": True,
         "reason": None,
         "added": len(delta["added"]),
         "removed": len(delta["removed"]),

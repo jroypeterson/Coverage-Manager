@@ -584,6 +584,55 @@ def _format_ytd_block(ytd):
     return "\n".join(lines)
 
 
+def format_universe_delta_email(delta, ytd=None):
+    """(subject, body) for the [ClaudeFin] weekly universe-delta email alert.
+
+    Short by design (root CONVENTIONS.md "Email alerts ([ClaudeFin])"): the
+    week-over-week counts + universe totals + the YTD line, pointing at the
+    Slack #coverage post / fallback JSON for the full detail. Pure — no I/O.
+    The subject is the ``<what>`` part; the shared sender prefixes
+    ``[ClaudeFin] Coverage Manager — ``.
+    """
+    added = len(delta.get("added") or [])
+    removed = len(delta.get("removed") or [])
+    modified = len({m["ticker"] for m in (delta.get("modified") or [])})
+    position_changes = len(delta.get("position_changes") or [])
+    before_total = (delta.get("before_stats") or {}).get("total", 0)
+    after_total = (delta.get("after_stats") or {}).get("total", 0)
+    today = delta.get("today", TODAY)
+
+    subject = f"Weekly universe delta — {today}"
+    if not any((added, removed, modified, position_changes)):
+        wow = "Week over week: no changes this week."
+    else:
+        wow = (
+            f"Week over week: +{added} added · -{removed} removed · "
+            f"{_plural(modified, 'ticker')} modified · "
+            f"{_plural(position_changes, 'position change')}"
+        )
+    lines = [
+        f"Coverage universe weekly delta — {today}",
+        "",
+        wow,
+        f"Universe: {before_total:,} -> {after_total:,} tickers",
+    ]
+    if ytd:
+        lines += [
+            "",
+            (
+                f"Year to date (since {ytd['first_date']} · {_plural(ytd['runs'], 'run')}): "
+                f"+{ytd['added']} added · -{ytd['removed']} removed · "
+                f"net {ytd['net']:+d} tickers ({ytd['start_total']:,} -> {ytd['end_total']:,})"
+            ),
+        ]
+    lines += [
+        "",
+        "Full detail: Slack #coverage post · fallback JSON: "
+        "Coverage Manager/.coverage/last_universe_delta.json",
+    ]
+    return subject, "\n".join(lines)
+
+
 def format_universe_delta_slack(delta, ytd=None):
     """Render the full delta as Slack mrkdwn (returned as a single string).
 

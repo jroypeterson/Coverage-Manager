@@ -704,11 +704,13 @@ def test_step_raises_runtime_error_on_slack_post_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(weekly_universe, "CSV_PATH", fake_universe)
     monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
 
-    # Force Slack post to fail
+    # Force Slack post to fail; email succeeds (and must NOT be a real send)
     monkeypatch.setattr(
         ud, "post_universe_delta",
         lambda webhook, delta, fallback_dir=None, ytd=None: {"posted": False, "reason": "slack returned 500"},
     )
+    from reporting import email_alert_client
+    monkeypatch.setattr(email_alert_client, "send_alert", lambda *a, **kw: True)
 
     baseline = {
         "head_sha": None, "head_date": None,
@@ -749,6 +751,8 @@ def test_step_uses_os_environ_first_then_api_keys(monkeypatch, tmp_path):
         captured["webhook"] = webhook
         return {"posted": True, "reason": None}
     monkeypatch.setattr(ud, "post_universe_delta", fake_post)
+    from reporting import email_alert_client
+    monkeypatch.setattr(email_alert_client, "send_alert", lambda *a, **kw: True)
 
     monkeypatch.setenv("SLACK_WEBHOOK_COVERAGE", "FROM_OS_ENV")
     import config
@@ -768,3 +772,94 @@ def test_step_uses_os_environ_first_then_api_keys(monkeypatch, tmp_path):
     monkeypatch.delenv("SLACK_WEBHOOK_COVERAGE")
     weekly_universe._step_universe_delta_slack(baseline)
     assert captured["webhook"] == "FROM_DOTENV"
+
+
+# ── [ClaudeFin] email alert: formatter + step behavior ──────────────────────
+
+
+def _email_delta(**overrides):
+    delta = {
+        "added": [{"ticker": "NEWCO"}],
+        "removed": [],
+        "modified": [
+            {"ticker": "ABT", "field": "Core", "old": "", "new": "Y"},
+            {"ticker": "ABT", "field": "Subsector (JP)", "old": "X", "new": "Y"},
+        ],
+        "position_changes": [{"ticker": "ENSG", "before_state": "(none)", "after_state": "Portfolio"}],
+        "before_stats": {"total": 1094},
+        "after_stats": {"total": 1095},
+        "today": "2026-07-06",
+    }
+    delta.update(overrides)
+    return delta
+
+
+def test_format_universe_delta_email_counts_and_subject():
+    subject, body = ud.format_universe_delta_email(_email_delta())
+    assert subject == "Weekly universe delta — 2026-07-06"
+    # Modified counts DISTINCT tickers (2 field changes on ABT = 1 ticker).
+    assert "Week over week: +1 added · -0 removed · 1 ticker modified · 1 position change" in body
+    assert "Universe: 1,094 -> 1,095 tickers" in body
+    assert "#coverage" in body  # points at the full post
+
+
+def test_format_universe_delta_email_ytd_line_and_empty_week():
+    ytd = {
+        "first_date": "2026-05-29", "runs": 6, "added": 12, "removed": 3,
+        "net": 9, "start_total": 1086, "end_total": 1095,
+        "modified_tickers": 4, "position_changes": 7,
+    }
+    _, body = ud.format_universe_delta_email(_email_delta(), ytd=ytd)
+    assert ("Year to date (since 2026-05-29 · 6 runs): +12 added · -3 removed · "
+            "net +9 tickers (1,086 -> 1,095)") in body
+
+    empty = _email_delta(added=[], removed=[], modified=[], position_changes=[])
+    _, body = ud.format_universe_delta_email(empty)
+    assert "no changes this week" in body
+
+
+def test_step_raises_on_email_alert_failure_after_side_effects(monkeypatch, tmp_path):
+    """Slack ok + email False must still raise (step -> failed -> health partial),
+    AFTER the delta JSON + run snapshot were written. Non-gating like Slack."""
+    import weekly_universe
+
+    fake_universe = tmp_path / "coverage_universe_tickers.csv"
+    _universe_df([{"Ticker": "AAPL", "Company Name": "Apple"}]).to_csv(fake_universe, index=False)
+    fake_positions = tmp_path / "positions_and_researching.csv"
+    fake_positions.write_text("Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    fake_coverage_dir = tmp_path / ".coverage"
+
+    monkeypatch.setattr(ud, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(ud, "POSITIONS_PATH", fake_positions)
+    monkeypatch.setattr(ud, "FALLBACK_DIR", fake_coverage_dir)
+    monkeypatch.setattr(ud, "SNAPSHOT_UNIVERSE_PATH", fake_coverage_dir / "last_run_universe.csv")
+    monkeypatch.setattr(ud, "SNAPSHOT_POSITIONS_PATH", fake_coverage_dir / "last_run_positions.csv")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", fake_universe)
+    monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
+
+    monkeypatch.setattr(
+        ud, "post_universe_delta",
+        lambda webhook, delta, fallback_dir=None, ytd=None: {"posted": True, "reason": None},
+    )
+    from reporting import email_alert_client
+    sent = {}
+    def fake_send(project, subject, body_text, **kw):
+        sent["project"], sent["subject"] = project, subject
+        return False
+    monkeypatch.setattr(email_alert_client, "send_alert", fake_send)
+
+    baseline = {
+        "head_sha": None, "head_date": None,
+        "universe_rel": "data/coverage_universe_tickers.csv",
+        "positions_rel": "data/positions_and_researching.csv",
+        "dirty_paths": [],
+    }
+
+    with pytest.raises(RuntimeError, match=r"\[ClaudeFin\] email alert failed"):
+        weekly_universe._step_universe_delta_slack(baseline)
+
+    assert sent["project"] == "Coverage Manager"
+    assert sent["subject"].startswith("Weekly universe delta")
+    # Side effects still happened before the raise
+    assert (fake_coverage_dir / "last_universe_delta.json").exists()
+    assert (fake_coverage_dir / "last_run_universe.csv").exists()
