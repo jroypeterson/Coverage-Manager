@@ -19,6 +19,12 @@ def build_parser():
     subparsers.add_parser("cleanup", help="Clean and deduplicate the coverage CSV.")
     subparsers.add_parser("enrich", help="Enrich the coverage CSV with identifiers.")
     subparsers.add_parser("validate", help="Validate the coverage CSV for errors and warnings.")
+    subparsers.add_parser(
+        "baskets",
+        help="Build the thematic-basket returns table (AI trade, GLP-1, obesity, "
+             "Alzheimer's, MRD, oncology; cap- & equal-weighted, WTD/QTD/YTD/2025) "
+             "into reports/ from the latest performance snapshot.",
+    )
 
     dc_parser = subparsers.add_parser(
         "check-delisted",
@@ -313,6 +319,11 @@ def main():
 
         exit_code = validation.main()
         raise SystemExit(exit_code)
+    elif args.command == "baskets":
+        from reporting import thematic_baskets
+
+        path = thematic_baskets.build()
+        print(f"Wrote thematic-basket returns: {path}")
     elif args.command == "check-delisted":
         from universe import delisted_check
 

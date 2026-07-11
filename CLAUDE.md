@@ -400,6 +400,23 @@ Tunable via env or `config.py`:
 | `ANTHROPIC_API_KEY`            | (unset)                | Required for "why" summaries; degrades cleanly if absent |
 | `FINNHUB_API_KEY`              | (existing)             | Reused for `/company-news`                   |
 
+## Thematic baskets
+
+`python cli.py baskets` builds a thematic-basket returns table (JP's 2026-07-08 ask) into
+`reports/thematic_baskets_<perf-date>.md`. Reads the **latest** `cache/perf/perf_df_<date>.pkl`
+(same snapshot the movers report uses — no re-fetch); each row already carries `Mkt Cap`,
+`Sector (JP)`, and per-period returns (`1W`→WTD, `QTD`, `YTD`, calendar-year `2025`). For each
+basket it reports member count + **equal-weighted** and **market-cap-weighted** returns per
+period. Module: `reporting/thematic_baskets.py`; tests: `tests/test_thematic_baskets.py`.
+
+**Basket membership is a curated judgment call** (the scoping JP invited) — edit the `BASKETS`
+dict in `reporting/thematic_baskets.py`. v1 baskets: AI Trade, GLP-1 Winners/Losers, Obesity,
+Alzheimer's, MRD, Oncology. Themes span sectors so they're explicit ticker lists, not a
+Sector/Subsector filter. Intended names outside the coverage universe are kept in the lists and
+reported as "not in universe" so gaps are visible (e.g. much of the AI trade is outside CM's
+HC-focused coverage — a candidate for watchlist adds). Additive/manual — NOT wired into the
+weekly pipeline and does not touch the `exports/` contract; output goes to gitignored `reports/`.
+
 ## Source cross-check workflow
 
 Use `python cli.py cross-check` to run a separate source-validation pass without generating reports. This exists because "is the report producible?" and "do the providers agree?" are different questions.
