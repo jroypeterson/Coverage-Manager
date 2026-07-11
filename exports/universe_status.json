@@ -1,10 +1,10 @@
 {
   "schema_version": 3,
-  "dataset_version": "2026-07-10",
-  "generated_at": "2026-07-11T01:50:57Z",
+  "dataset_version": "2026-07-11",
+  "generated_at": "2026-07-11T17:45:10Z",
   "source_path": "data/coverage_universe_tickers.csv",
-  "row_count": 1095,
-  "ticker_count": 1093,
+  "row_count": 1098,
+  "ticker_count": 1096,
   "normalization_collisions": 2,
   "collision_examples": [
     "ROG",
@@ -14,7 +14,7 @@
   "validation_errors": [],
   "validation_warnings": [
     "2 possible duplicate company name(s) (normalized): ['shimadzu', 'vericel']",
-    "191 ticker(s) missing Subsector (JP) value"
+    "194 ticker(s) missing Subsector (JP) value"
   ],
   "last_discovery_run": null
 }
