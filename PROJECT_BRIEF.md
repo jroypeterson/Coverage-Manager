@@ -184,3 +184,95 @@ vs. wake-race hardening) to do first.
   `test_reporting_calendar.py`, `test_health_reporting.py`, `test_positions.py`.
 - **Repo:** GitHub `jroypeterson/Coverage-Manager`, branch `master`. `exports/`
   is committed on purpose — do not gitignore it.
+
+## 7. Architecture map
+
+*CM is the workspace's primary data producer — §"Integration points" is the load-bearing part.*
+
+### Tech stack
+Python 3.8+, script-driven (no framework). `pandas`, `yfinance`, `openpyxl` (Excel),
+`matplotlib` (Agg), `requests`/`lxml`, `anthropic` (Haiku 4.5 movers "why"), `python-dotenv`,
+`pytest`. **No DB** — CSV masters in `data/`, disk-cached provider JSON in `cache/`, committed
+JSON/CSV contract in `exports/`, gitignored Excel/HTML/PNG in `reports/`, snapshot/delta JSON in
+`.coverage/`, health fallback in `.health/`.
+
+### Module map
+- `cli.py` — argparse entry point; dispatches every subcommand.
+- `weekly_build.py` — Friday wrapper: runs `weekly_universe` then gates `weekly_report` on
+  `validation_passed`; posts `#stock-price-alerts` summary + `#status-reports` health (try/finally).
+- `weekly_universe.py` / `weekly_report.py` — the universe-side and report-side orchestrators.
+- `pipeline_utils.py` — shared `run_step` / `collect_non_successes` three-bucket step status.
+- `config.py` — paths, `.env` keys, `PROVIDER_PRIORITY`, segments/ETFs, movers thresholds.
+- `providers/` — data adapters; `provider_chain.py` owns the fundamentals fallback/merge chain.
+- `reporting/` — Excel/HTML/Slack/email + `sigma_export.py`, `universe_delta.py`, `movers.py`, `charts.py`.
+- `universe/` — CSV lifecycle: validation, cleanup, enrich, positions, reporting_calendar,
+  delisted/ticker-change checks, lei/ipo backfill, export-artifacts.
+- `discovery/` — candidate discovery + staging. `cache.py` / `audit.py` / `ticker_utils.py` — infra.
+- `data/coverage_universe_tickers.csv` (~1,095 rows, source of truth) · `positions_and_researching.csv`
+  (5 Position states) · `delisted_tickers.csv`.
+
+### Data flow
+Sources (yfinance/FMP/Finnhub/AlphaVantage/SEC EDGAR/GLEIF/Renaissance/API Ninjas) → `providers/`
+(chained, `cache/`-backed) → `universe/` validates+enriches `data/*.csv` → **two sinks:**
+(a) `reporting/` builds `reports/` Excel+HTML+PNG (gitignored, emailed when `EMAIL_ENABLED`);
+(b) export-artifacts writes the committed `exports/` **schema-v3** contract siblings read. Slack fans
+to 3 channels (`#coverage` delta · `#stock-price-alerts` movers · `#status-reports` health);
+`sigma-export` pushes metadata straight into the sibling `../sigma-alert/` git clone.
+
+### Configuration & secrets
+`.env` keys: `FINNHUB_API_KEY`, `FMP_API_KEY`, `ALPHAVANTAGE_API_KEY`, `ANTHROPIC_API_KEY`,
+`EDGAR_IDENTITY`, `RENAISSANCE_API_KEY`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `SLACK_WEBHOOK_URL`,
+`SLACK_WEBHOOK_COVERAGE`, `SLACK_WEBHOOK_STATUS_REPORTS`. Env-overridable tunables in `config.py`:
+`PROVIDER_PRIORITY` (`yf_first` default | `fmp_first`), `MOVERS_*`, `MOVERS_LLM_MODEL`, `HEALTH_ATTEMPT`.
+
+### Build / run / schedule
+Entry: `cli.py`. Primary: `python cli.py weekly-build`. Split: `weekly-universe` / `weekly-report`.
+Manual/preview: `cli.py performance --sample`, `cli.py cross-check --sample`, `cli.py validate`.
+**Schedule: Windows Task Scheduler** (not GH Actions): `run_weekly_coverage.bat`
+(`WeeklyCoverageBuilder`, Fri 08:00 ET, headless `claude -p`) + `run_watchlist_monday.bat`
+(`WatchlistMondayReport`, Mon 08:00). Both `.bat` live at `C:\Users\jroyp\` — keep **CRLF + ASCII +
+goto-style**.
+
+### Error handling & observability
+Health v1 → `#status-reports` at end of every `weekly-build` (`error`/`partial`/`ok`; try/finally;
+`.health/last_run.json` fallback). Three-bucket step status (Success/`failed:`/`blocked:`);
+`collect_non_successes` is the canonical rollup; report gated on `validation_passed` (`--force`
+override). **`.bat` publish backstop:** after the headless agent, the bat runs `weekly-universe
+--skip-discovery` then `performance` UNCONDITIONALLY (guards against a backgrounded build leaving
+`exports/` stale), each capturing rc + `goto` fail-label so a bad publish/commit/push turns the task
+RED not green-stale. Audit: `run_log.csv`, `reports/performance_timing.jsonl`, `.coverage/…delta*.json`.
+
+### Testing
+`python -m pytest tests/ -q` (mocked providers, no network) — must pass before committing. Scope/
+notable files in §6.
+
+### Integration points (cross-project) — the load-bearing section
+**Publishes (`exports/`, schema v3 — consumers `assert schema_version == 3`):**
+- `universe.csv` / `universe_metadata.json` / `universe_status.json` — the coverage universe +
+  `{name,sector,subsector,sub_subsector,core}`. Consumed by earnings_agent, sa-monitor, transcripts,
+  forensic_triage, exec_interviews, insider_ownership, earnings_kpi, focus_today, catalyst_watch, …
+- 5 Position-state files `portfolio/researching/following_for_interest/ready_to_buy/ready_to_short.json`
+  + `positions_and_researching.csv` + `positions_status.json` — consumed by sigma-alert, earnings_agent,
+  transcripts, catalyst_watch, analyst-days, exec_interviews, insider_ownership, sector_chart_pack, …
+- `reporting_calendar.json` (+`_status`, own `schema_version==1`, `gating_eligible` zero-false-skip
+  contract) — transcripts precheck (LIVE), earnings_agent (planned), earnings_kpi.
+- `watchlist.{csv,json,_status}` — **DEPRECATED** back-compat (Portfolio∪Researching); analyst-days only.
+- `manifest.json` — directory. **Pushed directly into `../sigma-alert/`** (not `exports/`) by
+  sigma-export: `ticker_metadata.json` + the 5 state files + deprecated `core_watchlist.json`, one commit.
+- Non-`exports/` couplings: `data/coverage_universe_tickers.csv` `Core` column → forensic_triage /
+  analyst-days / earnings_agent; `reports/coverage_performance_<date>.xlsx` → idea_generation;
+  `cache/prices/*` → idea_generation, portfolio_daily, sector_chart_pack; `cache/perf/perf_df_*.pkl`
+  → sector_chart_pack.
+
+**Consumes (reverse channel):** notion_watchlist WRITES `data/positions_and_researching.csv` (only
+downstream that writes CM data; runs as a non-gating pre-step of `WeeklyCoverageBuilder`);
+sigma-alert's `missing_metadata.json` feedback; `_shared/api_rate_ledger` (AV) + `_shared/email_alert`.
+
+⚠️ **Known drift (DEPENDENCIES.md):** sa-monitor `build_universe.py:27` still asserts
+`schema_version == 2` — needs a bump to 3. Any schema change here: grep siblings + patch same session.
+
+### Performance / Security
+Runtime dominated by Finnhub cold-cache 60s rate-limit pauses (~17min full run); `yf_first` keeps the
+normal path fast; S&P 500 benchmark is price-only by design (no 500-name fundamentals pull). Book is
+private but **already committed to two public repos** (CM + sigma-alert) since 2026-05-03 — a
+deliberately deprioritized pre-existing leak, not this project's to fix.
