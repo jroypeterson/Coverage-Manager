@@ -94,7 +94,7 @@ def send_email_report(gmail_addr, gmail_pass, html_paths, today_str,
     msg = MIMEMultipart()
     msg["From"] = gmail_addr
     msg["To"] = gmail_addr
-    msg["Subject"] = f"Coverage Performance Reports — {today_str}"
+    msg["Subject"] = f"[ClaudeFin] Coverage Manager — Performance Reports — {today_str}"
 
     if body_text:
         msg.attach(MIMEText(body_text, "plain"))
