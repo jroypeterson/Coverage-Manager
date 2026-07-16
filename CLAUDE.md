@@ -512,5 +512,21 @@ that commits an approved candidate); `lei_backfill.py` was already safe. Read-on
 copies the master to exports via `shutil.copyfile` (faithful), so protecting the source writers
 protects the export. Regression: `tests/test_universe_csv_roundtrip.py`. See `feedback_published_artifacts`.
 
+## Case-only ticker collisions (validation warning, 2026-07-16)
+
+The universe can carry two rows that collide only by CASE — e.g. `VCEL` + `VCEl` (a
+data-entry typo that silently duplicates a company). `validate_no_duplicate_tickers` uses an
+EXACT match and MISSES these, and `build_universe_metadata`'s later-row-wins then hides one
+spelling — exactly how the Vericel dup lived unnoticed until the `notion_watchlist` sync (which
+does a case-insensitive universe join) surfaced it. `validate_case_only_ticker_collisions`
+(`universe/validation.py`, in `run_all_validations`) groups tickers by `.upper()` and **warns**
+(never errors — must not gate the weekly build) on any group with 2+ distinct spellings. It is
+deliberately narrower than the `normalization_collisions` the metadata builder tracks: legitimate
+exchange dual-listings (`ROG` + `ROG.SW`) differ as raw strings, never group together under
+`.upper()`, and are never flagged — so the check is false-positive-free on real dual-listings.
+When a case-only warning appears in `universe_status.json`'s `validation_warnings`, dedup the two
+rows at the source (keep the correctly-cased ticker; merge in the curated fields). VCEL/VCEl was
+merged 2026-07-16 (commit `e1b0859`). Tests: `tests/test_validation.py`.
+
 ## Testing
 Run `python -m pytest tests/ -q` before committing. All tests must pass.
