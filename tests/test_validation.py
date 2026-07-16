@@ -8,6 +8,7 @@ from universe.validation import (
     validate_no_orphaned_columns,
     validate_no_blank_tickers,
     validate_no_duplicate_tickers,
+    validate_case_only_ticker_collisions,
     validate_duplicate_companies,
     validate_exchange_populated,
     run_all_validations,
@@ -71,6 +72,34 @@ class TestDuplicateTickers:
         errors = validate_no_duplicate_tickers(df)
         assert len(errors) == 1
         assert "AAPL" in errors[0]
+
+
+class TestCaseOnlyTickerCollisions:
+    def test_clean(self):
+        assert validate_case_only_ticker_collisions(_make_df()) == []
+
+    def test_case_only_collision_flagged(self):
+        # The VCEL/VCEl case: exact-match dup check misses this; this one catches it.
+        df = _make_df({
+            "Ticker": ["VCEL", "VCEl", "GOOG"],
+            "Company Name": ["Vericel", "Vericel Corp", "Google"],
+            "Sector (JP)": ["MedTech", "MedTech", "Tech"],
+        })
+        warnings = validate_case_only_ticker_collisions(df)
+        assert len(warnings) == 1
+        assert "VCEL" in warnings[0] and "VCEl" in warnings[0]
+        # And it is NOT reported by the exact-match duplicate check.
+        assert validate_no_duplicate_tickers(df) == []
+
+    def test_suffix_collision_not_flagged(self):
+        # Legitimate exchange dual-listing (ROG + ROG.SW) differs as raw strings
+        # -> must NOT be flagged as a case-only collision.
+        df = _make_df({
+            "Ticker": ["ROG", "ROG.SW", "GOOG"],
+            "Company Name": ["Roche", "Roche", "Google"],
+            "Sector (JP)": ["Biopharma", "Biopharma", "Tech"],
+        })
+        assert validate_case_only_ticker_collisions(df) == []
 
 
 class TestDuplicateCompanies:

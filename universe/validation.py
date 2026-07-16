@@ -57,6 +57,42 @@ def validate_no_duplicate_tickers(df):
     return errors
 
 
+def validate_case_only_ticker_collisions(df):
+    """Warn on tickers that collide ONLY by case, e.g. 'VCEL' and 'VCEl'.
+
+    Returns warnings (not errors). A case-only collision is almost always a
+    data-entry typo that silently duplicates a company: `validate_no_duplicate_
+    tickers` above uses an exact match and so misses it, and the metadata
+    builder's later-row-wins then hides one spelling — the exact way the
+    VCEL/VCEl duplicate lived in the universe unnoticed.
+
+    Deliberately narrower than the exchange-suffix collisions the metadata
+    builder tracks as `normalization_collisions`: those legitimate dual-listings
+    ('ROG' + 'ROG.SW' -> ROG) differ as raw strings, so they never group
+    together under `.upper()` and are never flagged here. This makes the check
+    false-positive-free on real dual-listings.
+
+    A warning, not an error, on purpose: it must not gate the weekly build, and
+    a genuinely mixed-case ticker (rare, e.g. a Bloomberg-style line) shouldn't
+    hard-fail — a human dedups at the source.
+    """
+    warnings = []
+    if "Ticker" not in df.columns:
+        return warnings
+    groups = {}
+    for t in df["Ticker"].dropna().astype(str):
+        s = t.strip()
+        if s:
+            groups.setdefault(s.upper(), set()).add(s)
+    collisions = {k: sorted(v) for k, v in groups.items() if len(v) > 1}
+    if collisions:
+        examples = list(collisions.values())[:10]
+        warnings.append(
+            f"{len(collisions)} case-only ticker collision(s) (likely typos; "
+            f"dedup at the source): {examples}")
+    return warnings
+
+
 def validate_duplicate_companies(df):
     """Check for possible duplicate companies by exact normalized name match.
 
@@ -127,6 +163,7 @@ def run_all_validations(df):
     errors.extend(validate_no_duplicate_tickers(df))
     errors.extend(validate_sector_taxonomy(df))
 
+    warnings.extend(validate_case_only_ticker_collisions(df))
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))
     warnings.extend(validate_subsector_populated(df))
