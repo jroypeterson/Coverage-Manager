@@ -1,6 +1,6 @@
 @echo off
 title Weekly Coverage Universe Builder
-cd /d "C:\Users\jroyp\Dropbox\Claude Folder\Coverage Manager"
+cd /d "%USERPROFILE%\Dropbox\Claude Folder\Coverage Manager"
 echo ============================================
 echo   Weekly Coverage Universe Builder
 echo   %date% %time%

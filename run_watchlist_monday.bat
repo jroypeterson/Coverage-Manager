@@ -10,8 +10,8 @@ REM CONVENTIONS.md. Surfaces python's exit code so a real failure shows red.
 REM CRLF + ASCII only.
 REM ============================================================================
 
-set "PYTHON_EXE=C:\Users\jroyp\AppData\Local\Programs\Python\Python314\python.exe"
-cd /d "C:\Users\jroyp\Dropbox\Claude Folder\Coverage Manager"
+set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
+cd /d "%USERPROFILE%\Dropbox\Claude Folder\Coverage Manager"
 
 echo ============================================
 echo   Weekly Watchlist Report
