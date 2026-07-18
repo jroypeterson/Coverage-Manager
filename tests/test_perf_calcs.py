@@ -1,5 +1,7 @@
 """Tests for perf_calcs pure calculation and formatting functions."""
 
+from datetime import date
+
 import pandas as pd
 import numpy as np
 
@@ -21,11 +23,33 @@ def _make_series(prices, start="2024-01-02", freq="B"):
 
 class TestCalcAnnualReturn:
     def test_normal_year(self):
-        # 100 -> 110 = 10% return
+        # Prior-year close 100 -> year-end 110 = 10% (measured from prior close,
+        # NOT the first in-year bar of 105). Fails under the old first-bar basis.
+        idx = pd.DatetimeIndex(
+            [pd.Timestamp(2023, 12, 29)]
+            + list(pd.bdate_range(start="2024-01-02", periods=51))
+        )
         prices = [100.0] + [105.0] * 50 + [110.0]
-        s = _make_series(prices, start="2024-01-02")
+        s = pd.Series(prices, index=idx)
         result = calc_annual_return(s, 2024)
         assert abs(result - 10.0) < 0.1
+
+    def test_measures_from_prior_year_close(self):
+        # Prior-year close (Dec 29) anchors the return; the Jan-open gap counts.
+        idx = pd.DatetimeIndex([
+            pd.Timestamp(2023, 12, 29),  # prior-year close
+            pd.Timestamp(2024, 1, 2),    # first in-year bar (gapped up)
+            pd.Timestamp(2024, 6, 1),
+            pd.Timestamp(2024, 12, 31),  # year-end close
+        ])
+        s = pd.Series([100.0, 103.0, 108.0, 110.0], index=idx)
+        # New basis: 110 / 100 - 1 = 10%. Old first-bar basis: 110 / 103 - 1 ≈ 6.8%.
+        assert abs(calc_annual_return(s, 2024) - 10.0) < 0.01
+
+    def test_no_prior_year_bar_returns_none(self):
+        # IPO within the year: nothing to anchor on -> None.
+        s = _make_series([100.0] + [110.0] * 5, start="2024-01-02")
+        assert calc_annual_return(s, 2024) is None
 
     def test_insufficient_data(self):
         s = _make_series([100.0], start="2024-06-01")
@@ -34,6 +58,52 @@ class TestCalcAnnualReturn:
     def test_no_data_for_year(self):
         s = _make_series([100.0, 110.0], start="2023-01-02")
         assert calc_annual_return(s, 2025) is None
+
+
+class TestCalcQtdReturn:
+    def test_measures_from_prior_quarter_close(self):
+        today = date.today()
+        q_start_month = ((today.month - 1) // 3) * 3 + 1
+        q_start = pd.Timestamp(today.year, q_start_month, 1)
+        idx = pd.DatetimeIndex([
+            q_start - pd.Timedelta(days=3),  # prior-quarter close
+            q_start + pd.Timedelta(days=1),  # first in-quarter bar (gapped up)
+            q_start + pd.Timedelta(days=2),  # latest bar
+        ])
+        s = pd.Series([100.0, 108.0, 110.0], index=idx)
+        # New basis: 110 / 100 - 1 = 10%. Old first-bar basis: 110 / 108 - 1 ≈ 1.85%.
+        assert abs(calc_qtd_return(s) - 10.0) < 0.01
+
+    def test_no_prior_quarter_bar_returns_none(self):
+        today = date.today()
+        q_start_month = ((today.month - 1) // 3) * 3 + 1
+        q_start = pd.Timestamp(today.year, q_start_month, 1)
+        s = pd.Series([108.0, 110.0], index=pd.DatetimeIndex([
+            q_start + pd.Timedelta(days=1),
+            q_start + pd.Timedelta(days=2),
+        ]))
+        assert calc_qtd_return(s) is None
+
+
+class TestCalcYtdReturn:
+    def test_measures_from_prior_year_close(self):
+        today = date.today()
+        idx = pd.DatetimeIndex([
+            pd.Timestamp(today.year - 1, 12, 29),  # prior-year close
+            pd.Timestamp(today.year, 1, 2),        # first in-year bar (gapped up)
+            pd.Timestamp(today.year, 1, 3),        # latest bar
+        ])
+        s = pd.Series([100.0, 108.0, 110.0], index=idx)
+        # New basis: 110 / 100 - 1 = 10%. Old first-bar basis: 110 / 108 - 1 ≈ 1.85%.
+        assert abs(calc_ytd_return(s) - 10.0) < 0.01
+
+    def test_no_prior_year_bar_returns_none(self):
+        today = date.today()
+        s = pd.Series([108.0, 110.0], index=pd.DatetimeIndex([
+            pd.Timestamp(today.year, 1, 2),
+            pd.Timestamp(today.year, 1, 3),
+        ]))
+        assert calc_ytd_return(s) is None
 
 
 class TestCalcPeriodReturn:

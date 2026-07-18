@@ -10,6 +10,7 @@ import pytest
 from providers.fmp_provider import (
     fetch_profile,
     fetch_fundamentals,
+    fetch_historical_prices,
     _safe_float,
     _pct,
     _RateLimiter,
@@ -139,6 +140,26 @@ class TestFetchFundamentals:
         # Key metrics
         assert result["Enterprise Value"] == 175000000000
         assert result["Net Debt"] == -5000000000
+        # EV/S is the REAL evToSalesTTM from key-metrics (22.0), NOT the
+        # priceToSalesRatioTTM P/S proxy from ratios (22.1).
+        assert result["EV/S"] == 22.0
+
+    @patch("providers.fmp_provider._fetch_key_metrics")
+    @patch("providers.fmp_provider._fetch_ratios")
+    @patch("providers.fmp_provider.fetch_profile")
+    @patch("providers.fmp_provider.cache_get", return_value=None)
+    @patch("providers.fmp_provider.cache_set")
+    def test_evs_is_ev_to_sales_not_price_to_sales(
+        self, mock_cset, mock_cget, mock_profile, mock_ratios, mock_km
+    ):
+        """EV/S must come from key-metrics `evToSalesTTM`, not ratios' P/S proxy."""
+        mock_profile.return_value = SAMPLE_PROFILE
+        # ratios carries priceToSalesRatioTTM (P/S) which must NOT leak into EV/S
+        mock_ratios.return_value = {**SAMPLE_RATIOS, "priceToSalesRatioTTM": 99.9}
+        mock_km.return_value = {**SAMPLE_KEY_METRICS, "evToSalesTTM": 18.5}
+
+        result, _, _ = fetch_fundamentals("ISRG", "test_key", use_cache=False)
+        assert result["EV/S"] == 18.5
 
     @patch("providers.fmp_provider._fetch_key_metrics")
     @patch("providers.fmp_provider._fetch_ratios")
@@ -209,6 +230,35 @@ class TestCacheBehavior:
         mock_cget.assert_not_called()
         # cache_set SHOULD have been called (always writes for later pipeline steps)
         mock_cset.assert_called_once()
+
+
+class TestFetchHistoricalPrices:
+    """FMP price fallback must return a dividend/split-adjusted total-return series."""
+
+    @patch("providers.fmp_provider._fmp_request")
+    def test_uses_dividend_adjusted_close(self, mock_req):
+        # Payload carries both raw close and adjClose (e.g. a 2-for-1 split):
+        # the function must select adjClose so the return series is total-return.
+        mock_req.return_value = [
+            {"symbol": "AAA", "date": "2024-01-02", "adjClose": 50.0, "close": 100.0},
+            {"symbol": "AAA", "date": "2024-01-03", "adjClose": 51.0, "close": 102.0},
+        ]
+        series = fetch_historical_prices("AAA", "key")
+        assert series is not None
+        assert series.iloc[0] == 50.0
+        assert series.iloc[-1] == 51.0
+
+    @patch("providers.fmp_provider._fmp_request")
+    def test_hits_dividend_adjusted_endpoint(self, mock_req):
+        mock_req.return_value = []
+        fetch_historical_prices("AAA", "key")
+        called_url = mock_req.call_args[0][0]
+        assert "dividend-adjusted" in called_url
+
+    @patch("providers.fmp_provider._fmp_request")
+    def test_missing_adjclose_returns_none(self, mock_req):
+        mock_req.return_value = [{"symbol": "AAA", "date": "2024-01-02", "close": 100.0}]
+        assert fetch_historical_prices("AAA", "key") is None
 
 
 class TestRateLimiter:

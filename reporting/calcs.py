@@ -154,13 +154,22 @@ def format_price(value, currency=""):
 # ── Return calculations ──────────────────────────────────────────────────
 
 def calc_annual_return(hist, year):
-    """Calculate total return for a given calendar year."""
+    """Calculate total return for a calendar year.
+
+    Standard convention: measured from the PRIOR year's close (the last trading
+    bar before Jan 1), not the first trading bar inside the year — so the
+    Jan-1→first-open gap is captured. Returns None if there's no prior-year bar
+    to anchor on (e.g. an IPO during `year`).
+    """
     year_data = hist[hist.index.year == year]
-    if len(year_data) < 2:
+    if year_data.empty:
         return None
-    first = year_data.iloc[0]
+    prior = hist[hist.index.year < year]
+    if prior.empty:
+        return None
+    start = prior.iloc[-1]
     last = year_data.iloc[-1]
-    return (last / first - 1) * 100
+    return (last / start - 1) * 100
 
 
 def calc_period_return(hist, days):
@@ -191,25 +200,42 @@ def calc_1w_return(hist):
 
 
 def calc_qtd_return(hist):
-    """Calculate quarter-to-date return."""
+    """Calculate quarter-to-date return.
+
+    Standard convention: measured from the PRIOR quarter's close (the last
+    trading bar before the quarter start), not the first bar inside the quarter.
+    Returns None if there's no bar before the quarter start to anchor on.
+    """
     today = date.today()
     q_start_month = ((today.month - 1) // 3) * 3 + 1
     q_start = pd.Timestamp(today.year, q_start_month, 1)
     qtr_data = hist[hist.index >= q_start]
-    if len(qtr_data) < 2:
+    if qtr_data.empty:
         return None
-    return (qtr_data.iloc[-1] / qtr_data.iloc[0] - 1) * 100
+    prior = hist[hist.index < q_start]
+    if prior.empty:
+        return None
+    start = prior.iloc[-1]
+    return (qtr_data.iloc[-1] / start - 1) * 100
 
 
 def calc_ytd_return(hist):
-    """Calculate YTD return."""
+    """Calculate YTD return.
+
+    Standard convention: measured from the PRIOR year's close (last trading bar
+    before Jan 1), not the first bar inside the year. Returns None if there's no
+    prior-year bar to anchor on.
+    """
     today = date.today()
     year_data = hist[hist.index.year == today.year]
-    if len(year_data) < 2:
+    if year_data.empty:
         return None
-    first = year_data.iloc[0]
+    prior = hist[hist.index.year < today.year]
+    if prior.empty:
+        return None
+    start = prior.iloc[-1]
     last = year_data.iloc[-1]
-    return (last / first - 1) * 100
+    return (last / start - 1) * 100
 
 
 # ── Color formatting ─────────────────────────────────────────────────────

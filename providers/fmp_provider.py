@@ -59,19 +59,25 @@ def _fmp_request(url):
 def fetch_historical_prices(ticker, api_key):
     """Get historical prices from FMP API as fallback (US tickers only).
 
+    Uses the FMP dividend-adjusted endpoint and its `adjClose` column so the
+    returned series is a TOTAL-return series (dividend- and split-adjusted),
+    matching yfinance's `auto_adjust=True` prices. Raw `close` would give a
+    price-return series (e.g. a 2-for-1 split reads as -50%), which is wrong for
+    the total-return columns the report labels.
+
     Returns a pandas Series indexed by date, or None on failure.
     """
     try:
-        url = f"https://financialmodelingprep.com/stable/historical-price-eod/full?symbol={ticker}&apikey={api_key}"
+        url = f"https://financialmodelingprep.com/stable/historical-price-eod/dividend-adjusted?symbol={ticker}&apikey={api_key}"
         data = _fmp_request(url)
         if not data or not isinstance(data, list):
             return None
         df = pd.DataFrame(data)
-        if "date" not in df.columns or "close" not in df.columns:
+        if "date" not in df.columns or "adjClose" not in df.columns:
             return None
         df["date"] = pd.to_datetime(df["date"])
         df = df.set_index("date").sort_index()
-        series = df["close"].dropna()
+        series = df["adjClose"].dropna()
         return series if len(series) > 0 else None
     except Exception as e:
         log_exception(logger, f"FMP historical lookup failed for {ticker}", e)
@@ -199,7 +205,9 @@ def fetch_fundamentals(ticker, api_key, use_cache=True):
         result["Fwd P/E"] = _safe_float(ratios.get("priceToEarningsRatioTTM"))
         result["EV/EBITDA"] = _safe_float(ratios.get("enterpriseValueMultipleTTM"))
         result["PEG"] = _safe_float(ratios.get("priceToEarningsGrowthRatioTTM"))
-        result["EV/S"] = _safe_float(ratios.get("priceToSalesRatioTTM"))
+        # NOTE: ratios-ttm has no true EV/S — `priceToSalesRatioTTM` is P/S, which
+        # differs from EV/S whenever net debt != 0. Leave EV/S None here so the
+        # real `evToSalesTTM` from key-metrics-ttm (fetched below) populates it.
         result["Gross Mgn"] = _pct(ratios.get("grossProfitMarginTTM"))
         result["Op Mgn"] = _pct(ratios.get("operatingProfitMarginTTM"))
         # ROE not in ratios-ttm — comes from key-metrics-ttm below

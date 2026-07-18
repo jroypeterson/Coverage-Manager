@@ -156,7 +156,13 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
         result["EV/EBITDA"] = info.get("enterpriseToEbitda")
         result["EV/S"] = info.get("enterpriseToRevenue")
 
-        currency = info.get("financialCurrency") or info.get("currency") or ""
+        # Mkt Cap / EV / Net Debt are price-derived, so they are in the QUOTE
+        # currency (`currency`), not the reporting currency (`financialCurrency`).
+        # For foreign lines / ADRs where the two differ (e.g. NVO quotes USD but
+        # reports DKK) the reporting currency would mis-convert to USD. Quote
+        # currency first. NOTE: currency is cached alongside fundamentals, so a
+        # re-cache (`--refresh`, or 24h TTL expiry) is needed for existing rows.
+        currency = info.get("currency") or info.get("financialCurrency") or ""
 
         gm = info.get("grossMargins")
         result["Gross Mgn"] = gm * 100 if gm is not None else None
