@@ -232,7 +232,13 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
     )
 
     # Footnote
-    footnote_row = len(df) + 3
+    returns_note_row = len(df) + 3
+    cell = ws.cell(row=returns_note_row, column=1,
+                   value="Returns (1D / 1W / QTD / YTD / 1Y / 3Y / 5Y / 10Y and calendar-year columns) are TOTAL returns (dividend- and split-adjusted prices), CUMULATIVE over each period — not annualized. The 3Y / 5Y / 10Y figures are the full compounded change over the period, not a per-year rate.")
+    cell.font = Font(size=8, italic=True, color="888888")
+    ws.merge_cells(start_row=returns_note_row, start_column=1, end_row=returns_note_row, end_column=8)
+
+    footnote_row = len(df) + 4
     cell = ws.cell(row=footnote_row, column=1,
                    value="* Value reflects quarterly YoY growth (yfinance) rather than TTM YoY (Finnhub). TTM YoY data was not available for this ticker.")
     cell.font = Font(size=8, italic=True, color="888888")

@@ -327,6 +327,7 @@ def write_html_report(seg_df, html_path, report_title, health_data=None):
 <p class="timestamp">Generated: {timestamp}
   <button class="toggle-annual" onclick="toggleAnnual()">Show Annual Returns</button>
 </p>
+<p class="footnote">Returns (1D / 1W / QTD / YTD / 1Y / 3Y / 5Y / 10Y and calendar-year columns) are <b>total returns</b> — computed from dividend- and split-adjusted prices — and are <b>cumulative over each period, not annualized</b>. The 3Y / 5Y / 10Y figures show the full compounded change over 3, 5, and 10 years, not a per-year rate.</p>
 <p class="footnote">* Value reflects quarterly YoY growth (yfinance) rather than TTM YoY (Finnhub). TTM YoY data was not available for this ticker.</p>
 <div class="row-count" id="rowCount"></div>
 <div class="table-wrapper">
