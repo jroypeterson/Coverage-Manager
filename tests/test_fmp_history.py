@@ -319,3 +319,56 @@ class TestProviderFailureIsNotNoData:
     def test_ttm_empty_list_is_not_an_error(self, _req):
         from providers.fmp_history import _fetch_ratios_ttm_live
         assert _fetch_ratios_ttm_live("AAPL", "key") == ({}, False)
+
+
+class TestPartialFailureIsNeverCached:
+    """ANY failed source makes the record incomplete. `has_data` used to win, so
+    a failed annual-ratios call plus a working TTM call cached status=ok with an
+    all-None pe_history — and history-backfill then skipped that ticker as
+    "already cached" for 30 days (codex 2026-07-20)."""
+
+    def _run(self, side_effect):
+        with patch("providers.fmp_history.cache_get", return_value=None), \
+             patch("providers.fmp_history.cache_set") as mock_set, \
+             patch("providers.fmp_history._fmp_request", side_effect=side_effect):
+            return fetch_history("XYZ", "key", use_cache=True), mock_set
+
+    def test_annual_ratios_failure_is_not_cached_even_with_a_good_ttm(self):
+        result, mock_set = self._run([None, [], [{"priceToEarningsRatioTTM": 42}]])
+        assert result["status"] == STATUS_ERROR
+        mock_set.assert_not_called()
+
+    def test_key_metrics_failure_is_not_cached(self):
+        result, mock_set = self._run([[{"priceToEarningsRatio": 10}], None, []])
+        assert result["status"] == STATUS_ERROR
+        mock_set.assert_not_called()
+
+    def test_ttm_failure_is_not_cached_even_with_good_annual_history(self):
+        result, mock_set = self._run([[{"priceToEarningsRatio": 10}], [], None])
+        assert result["status"] == STATUS_ERROR
+        mock_set.assert_not_called()
+
+    def test_ttm_error_payload_dict_is_not_success(self):
+        """ratios-ttm legitimately returns a dict, so an error payload can only
+        be spotted by its keys."""
+        result, mock_set = self._run([[], [], {"Error Message": "Invalid API KEY"}])
+        assert result["status"] == STATUS_ERROR
+        mock_set.assert_not_called()
+
+    def test_a_fully_successful_fetch_is_still_ok_and_cached(self):
+        result, mock_set = self._run([
+            [{"priceToEarningsRatio": 10}],
+            [{"evToSales": 3.0}],
+            [{"priceToEarningsRatioTTM": 42}],
+        ])
+        assert result["status"] == "ok"
+        assert result["pe_ttm"] == 42.0
+        mock_set.assert_called_once()
+
+    def test_error_payload_detection(self):
+        from providers.fmp_history import _is_fmp_error_payload
+        assert _is_fmp_error_payload({"Error Message": "x"}) is True
+        assert _is_fmp_error_payload({"error": "x"}) is True
+        assert _is_fmp_error_payload({"priceToEarningsRatioTTM": 42}) is False
+        assert _is_fmp_error_payload([]) is False
+        assert _is_fmp_error_payload(None) is False

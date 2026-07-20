@@ -61,6 +61,17 @@ STATUS_ERROR = "error"
 STATUS_NOT_ATTEMPTED = "not_attempted"
 
 
+# FMP signals an error with a JSON object rather than an HTTP status, e.g.
+# {"Error Message": "Invalid API KEY..."}. That matters most on ratios-ttm,
+# which LEGITIMATELY returns a dict, so type alone can't separate an error
+# payload from a real one — the key has to be checked.
+_FMP_ERROR_KEYS = ("Error Message", "error", "errorMessage")
+
+
+def _is_fmp_error_payload(data) -> bool:
+    return isinstance(data, dict) and any(k in data for k in _FMP_ERROR_KEYS)
+
+
 def _unwrap_list_response(data, ticker, what):
     """Split an FMP list-endpoint response into (rows, errored).
 
@@ -133,6 +144,15 @@ def _fetch_ratios_ttm_live(ticker, api_key):
                 "FMP ratios-ttm returned no payload for %s (402/non-200) — "
                 "treating as a retryable error, not as 'no data'", ticker)
             return {}, True
+        if _is_fmp_error_payload(data):
+            # ratios-ttm legitimately returns a dict, so an error payload is
+            # only distinguishable by its keys (codex 2026-07-20). Without this
+            # an invalid key or a gated response was cached as "no history".
+            logger.warning(
+                "FMP ratios-ttm returned an error payload for %s (%s) — "
+                "treating as a retryable error, not as 'no data'",
+                ticker, next((data[k] for k in _FMP_ERROR_KEYS if k in data), "?"))
+            return {}, True
         if isinstance(data, list):
             return (data[0] if data else {}), False
         if isinstance(data, dict):
@@ -198,12 +218,24 @@ def fetch_history(ticker, api_key, use_cache=True, cache_only=False):
         or any(v is not None for v in evs_history)
     )
 
-    if has_data:
-        status = STATUS_OK
-    elif ratios_err or km_err or ttm_err:
-        # Every source either blew up or returned nothing AND something errored →
-        # treat as a transient error so the next run retries. Do not cache.
+    # ANY failed source makes the record incomplete, so errors are checked
+    # BEFORE has_data (codex 2026-07-20). Previously has_data won: a failed
+    # annual-ratios call plus a successful TTM call cached status=ok with
+    # pe_history all None, and history-backfill then skipped that ticker as
+    # "already cached" for 30 days — a transient blip frozen into a permanently
+    # blank valuation history. Retrying next run costs one call; caching a
+    # partial answer as authoritative costs a month of wrong columns.
+    if ratios_err or km_err or ttm_err:
+        failed = ", ".join(n for n, e in (
+            ("annual ratios", ratios_err),
+            ("annual key-metrics", km_err),
+            ("ratios-ttm", ttm_err)) if e)
+        logger.warning(
+            "FMP history for %s is incomplete (%s failed) — not caching, so the "
+            "next run retries rather than freezing a partial record", ticker, failed)
         status = STATUS_ERROR
+    elif has_data:
+        status = STATUS_OK
     else:
         status = STATUS_NO_DATA
 
