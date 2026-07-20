@@ -63,6 +63,7 @@ from providers.fmp_history import (
     STATUS_OK,
     STATUS_NO_DATA,
     STATUS_ERROR,
+    STATUS_GATED,
     fetch_history_parallel,
     is_cached,
 )
@@ -157,6 +158,11 @@ def main(limit=None, tickers=None, use_cache=True, max_workers=10):
     ok = sorted(t for t, h in results.items() if h.get("status") == STATUS_OK)
     no_data = sorted(t for t, h in results.items() if h.get("status") == STATUS_NO_DATA)
     errored = sorted(t for t, h in results.items() if h.get("status") == STATUS_ERROR)
+    # `gated` = FMP 402, our plan can't see the symbol. It IS cached, so it must
+    # count as resolved — otherwise the ~170 foreign lines would be reported as
+    # "still pending" on every run forever, and the summary's ok/no_data/error
+    # counts wouldn't add up to what was attempted.
+    gated = sorted(t for t, h in results.items() if h.get("status") == STATUS_GATED)
 
     summary = {
         "run_at": datetime.now(timezone.utc).isoformat(),
@@ -166,20 +172,29 @@ def main(limit=None, tickers=None, use_cache=True, max_workers=10):
         "ok": len(ok),
         "no_data": len(no_data),
         "error": len(errored),
+        "gated": len(gated),
         "estimated_fmp_calls": est_calls,
         "elapsed_sec": round(elapsed, 1),
         "no_data_tickers": no_data,
         "error_tickers": errored,
-        "remaining_after_run": max(0, len(universe) - already_done - len(ok) - len(no_data)),
+        "gated_tickers": gated,
+        "remaining_after_run": max(
+            0, len(universe) - already_done - len(ok) - len(no_data) - len(gated)),
     }
     write_state(summary)
 
     logger.info(
-        "History backfill done in %.1fs — ok=%s no_data=%s error=%s; %s ticker(s) still pending",
-        elapsed, len(ok), len(no_data), len(errored), summary["remaining_after_run"],
+        "History backfill done in %.1fs — ok=%s no_data=%s gated=%s error=%s; "
+        "%s ticker(s) still pending",
+        elapsed, len(ok), len(no_data), len(gated), len(errored),
+        summary["remaining_after_run"],
     )
     if no_data:
         logger.info("No FMP history available for: %s", ", ".join(no_data[:40]))
+    if gated:
+        logger.info(
+            "Gated by the FMP plan (402, cached so we stop asking) for %s ticker(s): %s",
+            len(gated), ", ".join(gated[:40]))
     if errored:
         # Errors are transient by definition (never cached) — surface them loudly
         # so a systematically failing provider isn't mistaken for missing data.
