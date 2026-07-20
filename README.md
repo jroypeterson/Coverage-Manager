@@ -14,7 +14,7 @@ Script-driven tooling for maintaining a coverage universe CSV, discovering new t
 - Maintains the master coverage universe at `data/coverage_universe_tickers.csv`
 - Cleans, deduplicates, validates, and enriches identifiers
 - Discovers new candidate tickers via an external Claude prompt and a staging workflow
-- **Publishes a versioned, generic artifact contract under `exports/`** (schema v3) for downstream projects (forensic_triage, biotech_triage, idea_generation, 13F analyzer, sigma-alert, earnings_agent, analyst-days, sa-monitor, catalyst_watch) to consume
+- **Publishes a versioned, generic artifact contract under `exports/`** (schema v3) for downstream projects (forensic_triage, biotech_triage, screens_equity/quantitative_screens, 13F analyzer, sigma-alert, earnings_agent, analyst-days, sa-monitor, catalyst_watch) to consume
 - Generates Excel and HTML performance reports segmented by `Sector (JP)` / `Subsector (JP)`
 - **Posts a weekly After/Before/Delta summary to Slack `#coverage`** (`SLACK_WEBHOOK_COVERAGE`). The Friday email transport is currently off (`EMAIL_ENABLED = False` in `config.py`); revisit 2026-06-29.
 - Posts a movers summary to `#stock-price-alerts` and a workspace-standard health heartbeat to `#status-reports`

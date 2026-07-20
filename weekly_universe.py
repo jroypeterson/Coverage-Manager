@@ -5,7 +5,7 @@ validate -> archive -> discovery -> export-artifacts -> sigma-export.
 
 Produces a versioned, published artifact contract under `exports/` that other
 projects in this workspace consume (forensic_triage, biotech_triage,
-idea_generation, 13F analyzer). See `exports/manifest.json` and
+screens_equity/quantitative_screens, 13F analyzer). See `exports/manifest.json` and
 `exports/universe_status.json` for the contract.
 
 Returns a standardized result dict; see `_make_result` for the shape.

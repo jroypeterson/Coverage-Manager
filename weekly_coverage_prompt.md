@@ -227,7 +227,7 @@ Coverage Manager/reports/weekly_coverage_universe_additions_YYYY-MM-DD.md
 
 After the recommendation table in the report, add a **## Company Summaries** section with a subsection for each recommended company. Each subsection uses the company name and ticker as heading (e.g., `### PayPay Corp (PAYP)`), followed by the 2-4 sentence elevator pitch from field 11.
 
-Also run generate_performance.py to create new dated performance files. The script automatically dates them.
+Do NOT try to run `generate_performance.py` — that script was deleted in `3ac4425` when the repo moved to the modular package layout. The dated performance files are produced deterministically by `run_weekly_coverage.bat`, which runs `cli.py performance` unconditionally after the exports publish and git push (see `CLAUDE.md`). Nothing is required of you here.
 
 ## Full Company Background Report
 
@@ -356,7 +356,7 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 
 ## Publish exports (required every run)
 
-Discovery (steps 1-14) only edits `data/coverage_universe_tickers.csv`. That is **not** the published interface — downstream projects (earnings_agent, sigma-alert, idea_generation, forensic_triage, 13F analyzer) read the regenerated artifacts in `Coverage Manager/exports/`, and earnings_agent's watchdog raises a Slack staleness alert if `exports/manifest.json` is more than **7 days** old. So the universe CSV growing without an export regeneration leaves consumers stale even though the CSV is current.
+Discovery (steps 1-14) only edits `data/coverage_universe_tickers.csv`. That is **not** the published interface — downstream projects (earnings_agent, sigma-alert, screens_equity/quantitative_screens, forensic_triage, 13F analyzer) read the regenerated artifacts in `Coverage Manager/exports/`, and earnings_agent's watchdog raises a Slack staleness alert if `exports/manifest.json` is more than **7 days** old. So the universe CSV growing without an export regeneration leaves consumers stale even though the CSV is current.
 
 **Run this every week, unconditionally** — whether or not any tickers were added this run, so the manifest timestamp stays fresh inside the 7-day window:
 
