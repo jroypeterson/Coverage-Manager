@@ -37,7 +37,7 @@ from datetime import datetime, timezone
 
 from cache import cache_get, cache_set
 from logging_utils import get_logger, log_exception
-from providers.fmp_provider import _fmp_request, _safe_float
+from providers.fmp_provider import _fmp_request, _safe_float, FMP_GATED_STATUS
 
 logger = get_logger("providers.fmp_history")
 
@@ -59,6 +59,15 @@ STATUS_OK = "ok"
 STATUS_NO_DATA = "no_data"
 STATUS_ERROR = "error"
 STATUS_NOT_ATTEMPTED = "not_attempted"
+#: FMP answered 402 — our plan can't see this symbol. Distinct from `no_data`
+#: (FMP looked and there's nothing) and from `error` (transient, retry). Foreign
+#: lines like ROG.SW / 4543.T 402 on all three endpoints, ~170 of 1,093 names.
+#: Treating those as `error` would mean never caching them and refetching every
+#: single run forever; treating them as `no_data` would claim the company has no
+#: history when really we just can't see it. Cached, with its own TTL, so a plan
+#: upgrade is picked up without hammering the endpoint in the meantime.
+STATUS_GATED = "gated"
+HISTORY_GATED_TTL_HOURS = 720.0  # 30 days — tier access rarely changes
 
 
 # FMP signals an error with a JSON object rather than an HTTP status, e.g.
@@ -72,33 +81,42 @@ def _is_fmp_error_payload(data) -> bool:
     return isinstance(data, dict) and any(k in data for k in _FMP_ERROR_KEYS)
 
 
-def _unwrap_list_response(data, ticker, what):
+def _unwrap_list_response(data, ticker, what, status_code=None):
     """Split an FMP list-endpoint response into (rows, errored).
+
+    Returns `(rows, errored, gated)`.
 
     ONLY an actual list means the call succeeded — an empty list is a genuine
     "this company has no rows", which is a fact worth caching. Everything else
-    is a provider failure and must be retryable:
+    is a failure, and the two kinds must not be conflated:
 
-      None  -> `_fmp_request` swallowed a 402 or a non-200 (gated endpoint,
-               bad key, outage). Foreign lines like ROG.SW / 4543.T land here.
-      dict  -> an FMP error payload, e.g. {"Error Message": "Invalid API KEY"}.
+      402       -> our PLAN can't see this symbol. Permanent; retrying never
+                   helps. Foreign lines (ROG.SW, 4543.T) 402 on all three
+                   endpoints. Reported as `gated`.
+      other 5xx -> transient. Reported as `errored`, must be retried.
+      dict      -> an FMP error payload, e.g. {"Error Message": "Invalid API KEY"}.
+                   Treated as transient — a bad key is fixable.
 
-    Conflating those with no-data (codex 2026-07-20) meant an outage or an
-    expired key got cached as authoritative "no history for this ticker" for 7
-    days, and `history-backfill` would then skip right past it. Silent, and
-    self-perpetuating across the whole universe.
+    Conflating any of these with no-data (codex 2026-07-20) meant an outage or
+    an expired key got cached as authoritative "no history for this ticker",
+    and `history-backfill` would then skip right past it.
     """
     if isinstance(data, list):
-        return data, False
+        return data, False, False
+    if data is None and status_code == FMP_GATED_STATUS:
+        logger.info(
+            "FMP %s is gated (402) for %s — our plan can't see this symbol; "
+            "recording as 'gated' rather than retrying forever", what, ticker)
+        return [], False, True
     if data is None:
         logger.warning(
-            "FMP %s returned no payload for %s (402/non-200) — treating as a "
-            "retryable error, not as 'no data'", what, ticker)
+            "FMP %s returned no payload for %s (HTTP %s) — treating as a "
+            "retryable error, not as 'no data'", what, ticker, status_code)
     else:
         logger.warning(
             "FMP %s returned %s for %s, expected a list — treating as a "
             "retryable error, not as 'no data'", what, type(data).__name__, ticker)
-    return [], True
+    return [], True, False
 
 
 def _fetch_ratios_annual(ticker, api_key, limit=HISTORY_YEARS):
@@ -113,10 +131,11 @@ def _fetch_ratios_annual(ticker, api_key, limit=HISTORY_YEARS):
             f"https://financialmodelingprep.com/stable/ratios"
             f"?symbol={ticker}&period=annual&limit={limit}&apikey={api_key}"
         )
-        return _unwrap_list_response(_fmp_request(url), ticker, "annual ratios")
+        data, code = _fmp_request(url, want_status=True)
+        return _unwrap_list_response(data, ticker, "annual ratios", code)
     except Exception as e:
         log_exception(logger, f"FMP annual ratios lookup failed for {ticker}", e)
-        return [], True
+        return [], True, False
 
 
 def _fetch_key_metrics_annual(ticker, api_key, limit=HISTORY_YEARS):
@@ -126,24 +145,29 @@ def _fetch_key_metrics_annual(ticker, api_key, limit=HISTORY_YEARS):
             f"https://financialmodelingprep.com/stable/key-metrics"
             f"?symbol={ticker}&period=annual&limit={limit}&apikey={api_key}"
         )
-        return _unwrap_list_response(_fmp_request(url), ticker, "annual key-metrics")
+        data, code = _fmp_request(url, want_status=True)
+        return _unwrap_list_response(data, ticker, "annual key-metrics", code)
     except Exception as e:
         log_exception(logger, f"FMP annual key-metrics lookup failed for {ticker}", e)
-        return [], True
+        return [], True, False
 
 
 def _fetch_ratios_ttm_live(ticker, api_key):
     """Fetch FMP /stable/ratios-ttm for the current TTM P/E. Returns (dict, errored)."""
     try:
         url = f"https://financialmodelingprep.com/stable/ratios-ttm?symbol={ticker}&apikey={api_key}"
-        data = _fmp_request(url)
-        # Same distinction as _unwrap_list_response: None is a 402/non-200 and
-        # must stay retryable. An empty list IS a valid "no TTM row".
+        data, code = _fmp_request(url, want_status=True)
+        # Same distinction as _unwrap_list_response. An empty list IS a valid
+        # "no TTM row"; a 402 is a permanent plan limit, not a retryable error.
+        if data is None and code == FMP_GATED_STATUS:
+            logger.info(
+                "FMP ratios-ttm is gated (402) for %s — recording as 'gated'", ticker)
+            return {}, False, True
         if data is None:
             logger.warning(
-                "FMP ratios-ttm returned no payload for %s (402/non-200) — "
-                "treating as a retryable error, not as 'no data'", ticker)
-            return {}, True
+                "FMP ratios-ttm returned no payload for %s (HTTP %s) — "
+                "treating as a retryable error, not as 'no data'", ticker, code)
+            return {}, True, False
         if _is_fmp_error_payload(data):
             # ratios-ttm legitimately returns a dict, so an error payload is
             # only distinguishable by its keys (codex 2026-07-20). Without this
@@ -152,15 +176,15 @@ def _fetch_ratios_ttm_live(ticker, api_key):
                 "FMP ratios-ttm returned an error payload for %s (%s) — "
                 "treating as a retryable error, not as 'no data'",
                 ticker, next((data[k] for k in _FMP_ERROR_KEYS if k in data), "?"))
-            return {}, True
+            return {}, True, False
         if isinstance(data, list):
-            return (data[0] if data else {}), False
+            return (data[0] if data else {}), False, False
         if isinstance(data, dict):
-            return data, False
-        return {}, True
+            return data, False, False
+        return {}, True, False
     except Exception as e:
         log_exception(logger, f"FMP ratios-ttm lookup failed for {ticker}", e)
-        return {}, True
+        return {}, True, False
 
 
 def fetch_history(ticker, api_key, use_cache=True, cache_only=False):
@@ -196,15 +220,19 @@ def fetch_history(ticker, api_key, use_cache=True, cache_only=False):
                 fresh = cache_get(HISTORY_CACHE_NAMESPACE, ticker, HISTORY_NO_DATA_TTL_HOURS)
                 if _cache_entry_usable(fresh):
                     return fresh
+            elif cached.get("status") == STATUS_GATED:
+                fresh = cache_get(HISTORY_CACHE_NAMESPACE, ticker, HISTORY_GATED_TTL_HOURS)
+                if _cache_entry_usable(fresh):
+                    return fresh
             else:
                 return cached
 
     if cache_only or not api_key:
         return _empty_history(STATUS_NOT_ATTEMPTED)
 
-    ratios_annual, ratios_err = _fetch_ratios_annual(ticker, api_key)
-    key_metrics_annual, km_err = _fetch_key_metrics_annual(ticker, api_key)
-    ratios_ttm, ttm_err = _fetch_ratios_ttm_live(ticker, api_key)
+    ratios_annual, ratios_err, ratios_gated = _fetch_ratios_annual(ticker, api_key)
+    key_metrics_annual, km_err, km_gated = _fetch_key_metrics_annual(ticker, api_key)
+    ratios_ttm, ttm_err, ttm_gated = _fetch_ratios_ttm_live(ticker, api_key)
 
     pe_ttm = _safe_float(ratios_ttm.get("priceToEarningsRatioTTM")) if ratios_ttm else None
     pe_history = _pad([_safe_float(r.get("priceToEarningsRatio")) for r in ratios_annual], HISTORY_YEARS)
@@ -225,7 +253,16 @@ def fetch_history(ticker, api_key, use_cache=True, cache_only=False):
     # "already cached" for 30 days — a transient blip frozen into a permanently
     # blank valuation history. Retrying next run costs one call; caching a
     # partial answer as authoritative costs a month of wrong columns.
-    if ratios_err or km_err or ttm_err:
+    # A 402 on every endpoint means our plan simply can't see this symbol —
+    # permanent, so it is CACHED as `gated` rather than retried forever. ~170
+    # foreign lines (ROG.SW, 4543.T) 402 on all three. Treating them as `error`
+    # would refetch 510 calls every run, none of which can ever succeed.
+    if ratios_gated and km_gated and ttm_gated:
+        logger.info(
+            "FMP history for %s is gated on every endpoint (402) — recording "
+            "'gated' so we stop asking until the plan changes", ticker)
+        status = STATUS_GATED
+    elif ratios_err or km_err or ttm_err:
         failed = ", ".join(n for n, e in (
             ("annual ratios", ratios_err),
             ("annual key-metrics", km_err),
@@ -253,7 +290,7 @@ def fetch_history(ticker, api_key, use_cache=True, cache_only=False):
     # is visibly distinct from one we haven't). Never cache errors — those must
     # be retried, and caching one would silently freeze a transient failure into
     # a permanent blank column.
-    if status in (STATUS_OK, STATUS_NO_DATA):
+    if status in (STATUS_OK, STATUS_NO_DATA, STATUS_GATED):
         cache_set(HISTORY_CACHE_NAMESPACE, ticker, result)
     else:
         logger.warning("FMP history unavailable for %s (status=error) — will retry next run", ticker)

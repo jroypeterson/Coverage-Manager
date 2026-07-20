@@ -337,10 +337,19 @@ The per-ticker cache file **is** the resume state — there is no separate curso
 
 | Status | Meaning | Cached? |
 |---|---|---|
-| `ok` | data present | yes, 30d |
+| `ok` | data present, and **every** endpoint succeeded | yes, 30d |
 | `no_data` | FMP answered and has nothing for this ticker — a recorded fact | yes, 7d (retried sooner) |
-| `error` | the call failed | **no** — retried next run; logged as a warning |
+| `gated` | FMP returned **402** on all three endpoints — our plan can't see this symbol | yes, 30d |
+| `error` | a call failed transiently, or only *some* endpoints succeeded | **no** — retried next run; logged as a warning |
 | `not_attempted` | backfill has never reached this name | n/a |
+
+Three distinctions here are load-bearing (all three were Codex findings on 2026-07-20, and each had already shipped as a live bug):
+
+1. **A provider failure is not `no_data`.** `_fmp_request` returns `None` on a 402/non-200 and FMP signals some errors with a JSON object (`{"Error Message": ...}`) rather than an HTTP status. Both used to report `errored=False`, so an outage or an expired key got cached as authoritative "this ticker has no history" — and `history-backfill` then skipped it. Only an actual `list` counts as success; an empty list is still a real fact and still cached. `ratios-ttm` legitimately returns a dict, so there an error payload is detectable **only by its keys** (`_is_fmp_error_payload`).
+
+2. **A partial success is not `ok`.** Errors are evaluated *before* `has_data`. Previously a failed annual-ratios call plus a working `ratios-ttm` produced `status=ok` with `pe_history` all `None`, cached for 30 days, and skipped by the backfill as "already cached" — a transient blip frozen into a permanently blank valuation history.
+
+3. **`gated` is not `error`.** A 402 is a *permanent* plan limit, not a transient failure. ~170 of 1,095 names are foreign lines (`ROG.SW`, `4543.T`) that 402 on all three endpoints — verified live. Classing them `error` would mean never caching them and re-issuing ~510 calls every single run, none of which can ever succeed; classing them `no_data` would claim the company has no history when really we just can't see it. So `gated` is cached (30d, tier access rarely changes) and named honestly.
 
 Caching an `error` is specifically avoided: it would freeze a transient failure into a permanent-looking blank column.
 

@@ -39,19 +39,32 @@ _rate_limiter = _RateLimiter(calls_per_minute=300)
 
 # ── Low-level request ───────────────────────────────────────────────────────
 
+#: HTTP 402 from FMP means "your plan can't access this", which is a PERMANENT
+#: state, not a transient failure — retrying never helps. Callers that care
+#: (fmp_history) ask for it via want_status so they can cache a "gated" verdict
+#: instead of hammering the endpoint forever.
+FMP_GATED_STATUS = 402
+
+
 @retry_on_failure(max_retries=2, base_delay=1.0, logger_name="providers.fmp")
-def _fmp_request(url):
-    """Make an FMP API request with retry on transient failures."""
+def _fmp_request(url, *, want_status=False):
+    """Make an FMP API request with retry on transient failures.
+
+    Returns the decoded JSON, or None on a non-200. With `want_status=True`
+    returns `(data, status_code)` instead — the default keeps the original
+    contract for the existing callers.
+    """
     _rate_limiter.wait()
     resp = requests.get(url, timeout=10)
     if resp.status_code == 429:
         raise Exception("FMP rate limited (429)")
-    if resp.status_code == 402:
+    if resp.status_code == FMP_GATED_STATUS:
         logger.warning("FMP 402 (payment required) — endpoint may be gated")
-        return None
+        return (None, resp.status_code) if want_status else None
     if resp.status_code != 200:
-        return None
-    return resp.json()
+        return (None, resp.status_code) if want_status else None
+    data = resp.json()
+    return (data, resp.status_code) if want_status else data
 
 
 # ── Price history (existing) ────────────────────────────────────────────────
