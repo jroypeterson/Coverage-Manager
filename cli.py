@@ -71,6 +71,31 @@ def build_parser():
         help="Only look up the first N missing rows (for a test pass).",
     )
 
+    hist_parser = subparsers.add_parser(
+        "history-backfill",
+        help=(
+            "Populate the FMP 5Y/10Y valuation-history cache for the full coverage "
+            "universe. Resumable — already-cached names are skipped, so a run that "
+            "dies partway costs nothing to resume. ~3 FMP calls per uncached ticker."
+        ),
+    )
+    hist_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Only fetch the first N pending tickers (bounds a test/partial run).",
+    )
+    hist_parser.add_argument(
+        "--tickers", type=str, default=None,
+        help="Comma-separated ticker list to fetch instead of the full universe.",
+    )
+    hist_parser.add_argument(
+        "--refresh", action="store_true",
+        help="Bypass the cache and refetch everything in scope (expensive).",
+    )
+    hist_parser.add_argument(
+        "--max-workers", type=int, default=10,
+        help="Parallel fetch width (FMP is globally rate-limited at 300/min regardless).",
+    )
+
     ipo_parser = subparsers.add_parser(
         "ipo-backfill",
         help=(
@@ -339,6 +364,15 @@ def main():
         from universe import lei_backfill
 
         lei_backfill.main(use_cache=not args.no_cache, limit=args.limit)
+    elif args.command == "history-backfill":
+        from universe import history_backfill
+
+        history_backfill.main(
+            limit=args.limit,
+            tickers=args.tickers,
+            use_cache=not args.refresh,
+            max_workers=args.max_workers,
+        )
     elif args.command == "ipo-backfill":
         from universe import ipo_backfill
 

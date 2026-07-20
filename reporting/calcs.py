@@ -35,12 +35,40 @@ HIST_EVS_COLS = [
     "EV/S 5Y Avg", "EV/S 5Y +1σ", "EV/S 5Y -1σ",
     "EV/S 5Y Min", "EV/S 5Y Max", "EV/S vs 5Y Avg",
 ]
-HIST_COLS = HIST_PE_COLS + HIST_EVS_COLS
+# 10-year window (added 2026-07-19). Same FMP annual series as the 5Y columns —
+# Starter returns 15 annual rows, so the wider window costs ZERO extra API calls
+# (5Y is just the first 5 elements). APPENDED after the 5Y columns: downstream
+# consumers read the perf xlsx/pickle by column NAME, and adding columns is safe
+# while renaming or reordering existing ones is not.
+HIST_PE_10Y_COLS = [
+    "P/E 10Y Avg", "P/E 10Y +1σ", "P/E 10Y -1σ",
+    "P/E 10Y Min", "P/E 10Y Max", "P/E vs 10Y Avg",
+]
+HIST_EVS_10Y_COLS = [
+    "EV/S 10Y Avg", "EV/S 10Y +1σ", "EV/S 10Y -1σ",
+    "EV/S 10Y Min", "EV/S 10Y Max", "EV/S vs 10Y Avg",
+]
+
+# "History Status" records WHY a row is blank: ok / no_data / error / not_attempted.
+# Without it a blank cell is ambiguous between "we tried and FMP has nothing" and
+# "this name was never fetched" — see providers/fmp_history.py.
+HIST_STATUS_COL = "History Status"
+
+HIST_COLS = (
+    HIST_PE_COLS + HIST_EVS_COLS
+    + HIST_PE_10Y_COLS + HIST_EVS_10Y_COLS
+    + [HIST_STATUS_COL]
+)
 HIST_RATIO_COLS = {
     "P/E (TTM)", "P/E 5Y Avg", "P/E 5Y +1σ", "P/E 5Y -1σ", "P/E 5Y Min", "P/E 5Y Max",
     "EV/S 5Y Avg", "EV/S 5Y +1σ", "EV/S 5Y -1σ", "EV/S 5Y Min", "EV/S 5Y Max",
+    "P/E 10Y Avg", "P/E 10Y +1σ", "P/E 10Y -1σ", "P/E 10Y Min", "P/E 10Y Max",
+    "EV/S 10Y Avg", "EV/S 10Y +1σ", "EV/S 10Y -1σ", "EV/S 10Y Min", "EV/S 10Y Max",
 }
-HIST_VS_AVG_COLS = {"P/E vs 5Y Avg", "EV/S vs 5Y Avg"}  # premium (+) / discount (-) %
+HIST_VS_AVG_COLS = {  # premium (+) / discount (-) %
+    "P/E vs 5Y Avg", "EV/S vs 5Y Avg",
+    "P/E vs 10Y Avg", "EV/S vs 10Y Avg",
+}
 
 FUND_DISPLAY_NAMES = {
     "Mkt Cap": "Mkt Cap (USD $B)",

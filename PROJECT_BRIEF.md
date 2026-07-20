@@ -29,7 +29,7 @@ Its job is twofold:
    prompt with human sign-off), and probe for delisted/recycled names.
 2. **Publish a versioned, generic artifact contract** under `exports/` (schema
    v3) that ~9 downstream sibling projects consume (forensic_triage,
-   biotech_triage, idea_generation, 13F analyzer, sigma-alert, earnings_agent,
+   biotech_triage, screens_equity/quantitative_screens, 13F analyzer, sigma-alert, earnings_agent,
    analyst-days, sa-monitor, catalyst_watch) — so they read CM's canonical
    universe + positions instead of each re-hitting metered fundamentals APIs or
    re-inventing the taxonomy.
@@ -56,7 +56,7 @@ what changed in the universe week-to-week.
 | 9 | No silent failures — visible alarm on partial/failed runs | ✅ Done | 3-bucket status semantics (success/failed/blocked); `pipeline_utils.collect_non_successes`; `health/v1` heartbeat to `#status-reports`; `tests/test_health_reporting.py`, `test_weekly_build_wrapper.py` |
 | 10 | Runs unattended weekly | ✅ Done | Windows Task Scheduler, Fri 08:00 ET, `run_weekly_coverage.bat`; `weekly-build` wrapper with try/finally heartbeat guarantee |
 | 11 | Delisted/recycled tickers caught before they rot the universe | 🟡 Partial | `check-delisted` probe (step [4/6]) flags but is **non-gating**; removal + archival to `data/delisted_tickers.csv` is a **manual** confirm-then-edit step |
-| 12 | Per-position historical valuation context (P/E, EV/S vs 5Y) | 🟡 Partial | Phase 1 shipped: 13 HIST_COLS in the **Excel** report for the positions universe only. Phase 2 (HTML rendering + full-universe expansion) **deferred** — `reporting/html.py` doesn't iterate `HIST_COLS` |
+| 12 | Historical valuation context (P/E, EV/S vs 5Y **and 10Y**) across the universe | 🟡 Partial | Full-universe expansion shipped 2026-07-19: 26 HIST_COLS (5Y + 10Y + `History Status`) in the **Excel**/pickle output; `cli.py history-backfill` populates the cache resumably for all ~1,095 names, the report reads it cache-only so runtime is unchanged. Still deferred: HTML rendering (`reporting/html.py` doesn't iterate `HIST_COLS`), weekly-pipeline wiring, and the negative-P/E-mean decision |
 | 13 | Reporting-calendar artifact (fiscal-quarter → report-date map) | 🟡 Partial | `exports/reporting_calendar.json` shipped (schema v1, own version) with `gating_eligible` zero-false-skip contract; US-filer-only gating (foreign/Q4 default `false` by design) |
 | 14 | Weekly performance email delivery | ⬜ Not yet (disabled) | `EMAIL_ENABLED = False` in `config.py`; intentionally off, replaced by `#coverage` Slack post. Revisit 2026-06-29. Honored by both orchestrator and standalone `cli.py performance` |
 | 15 | sigma-alert ETF augmentation lives in the consumer (no cross-repo coupling) | ⬜ Not yet | Deferred "Stage 2": `reporting/sigma_export.py` still composes generic builder with hardcoded sector ETFs and pushes into the sibling clone; TODO tracked in-code |
@@ -126,8 +126,10 @@ removal), not missing core function.
   it. Flipping `EMAIL_ENABLED = True` re-enables with no other code change.
 - **`financial-growth` FMP endpoint is skipped** (402 on Starter tier); growth
   fields come from the Finnhub TTM overlay instead.
-- **Phase 1 history columns cover only the positions universe**, not all ~1,095
-  tickers — by design, to bound FMP calls until formatting is validated.
+- **History columns now cover the full ~1,095-ticker universe** (2026-07-19), but
+  the *fetching* is a separate on-demand command (`history-backfill`), not part of
+  the weekly pipeline — the report itself reads the cache only, so a cold cache
+  shows `not_attempted` rather than blocking or slowing the run.
 - **Public-repo privacy exposure is out of scope here.** The full book is
   committed to public repos; that is a known, separately-tracked workspace
   decision, not something this project re-litigates.
@@ -260,8 +262,8 @@ notable files in §6.
 - `manifest.json` — directory. **Pushed directly into `../sigma-alert/`** (not `exports/`) by
   sigma-export: `ticker_metadata.json` + the 5 state files + deprecated `core_watchlist.json`, one commit.
 - Non-`exports/` couplings: `data/coverage_universe_tickers.csv` `Core` column → forensic_triage /
-  analyst-days / earnings_agent; `reports/coverage_performance_<date>.xlsx` → idea_generation;
-  `cache/prices/*` → idea_generation, portfolio_daily, sector_chart_pack; `cache/perf/perf_df_*.pkl`
+  analyst-days / earnings_agent; `reports/coverage_performance_<date>.xlsx` → screens_equity/quantitative_screens;
+  `cache/prices/*` → screens_equity/quantitative_screens, portfolio_daily, sector_chart_pack; `cache/perf/perf_df_*.pkl`
   → sector_chart_pack.
 
 **Consumes (reverse channel):** notion_watchlist WRITES `data/positions_and_researching.csv` (only

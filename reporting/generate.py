@@ -24,13 +24,13 @@ from ticker_utils import normalize_ticker
 from logging_utils import configure_logging, get_logger
 
 from reporting.calcs import (
-    FUND_COLS, VAL_COLS, HIST_COLS,
+    FUND_COLS, VAL_COLS, HIST_COLS, HIST_STATUS_COL,
     compute_returns, build_result_row, forward_2yr_eps_growth_pct,
 )
 from reporting.history_stats import stats_from_series
 from providers.wikipedia_provider import fetch_sp500_tickers
 from providers.fmp_provider import fetch_historical_prices as try_fmp_historical
-from providers.fmp_history import fetch_history_parallel
+from providers.fmp_history import fetch_history_parallel, STATUS_NOT_ATTEMPTED
 from providers.fmp_estimates import fetch_estimates_parallel
 from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import batch_download_prices
@@ -86,43 +86,62 @@ def _load_phase1_tickers():
 
 
 def _hist_columns_from_payload(payload):
-    """Convert a fetch_history result dict into the 13 history columns.
+    """Convert a fetch_history result dict into the history columns.
 
-    Returns a dict with keys matching `HIST_COLS`. Any field that can't be
-    computed (insufficient data) is set to None — the Excel writer renders
-    those as N/A.
+    Returns a dict with keys matching `HIST_COLS` (5Y block, 10Y block, and the
+    `History Status` marker). Any field that can't be computed (insufficient
+    data) is set to None — the Excel writer renders those as N/A. Nothing is
+    ever defaulted to 0: a 0 in a P/E-min column would silently corrupt every
+    downstream valuation screen.
+
+    The 5Y and 10Y windows are two slices of the SAME annual series, so the 10Y
+    columns add no API cost.
     """
     pe_ttm = payload.get("pe_ttm")
     pe_history = payload.get("pe_history") or []
     evs_history = payload.get("evs_history") or []
 
-    pe_stats = stats_from_series(pe_history, current=pe_ttm)
-    # For EV/S vs-avg we use the same 5Y annual history; the "current" comparison
-    # is left to the existing EV/S (TTM) column populated by the provider chain.
-    # Pass current=None here — the row-injection step below fills vs_avg_pct
-    # using the live TTM EV/S value once we know it.
-    evs_stats = stats_from_series(evs_history, current=None)
+    pe_5 = stats_from_series(pe_history[:5], current=pe_ttm)
+    pe_10 = stats_from_series(pe_history[:10], current=pe_ttm)
+    # For EV/S vs-avg the "current" comparison uses the existing EV/S (TTM)
+    # column populated by the provider chain, which isn't in scope here — pass
+    # current=None and let the row-injection step below fill vs_avg_pct.
+    evs_5 = stats_from_series(evs_history[:5], current=None)
+    evs_10 = stats_from_series(evs_history[:10], current=None)
 
     return {
         "P/E (TTM)": pe_ttm,
-        "P/E 5Y Avg": pe_stats["avg"],
-        "P/E 5Y +1σ": pe_stats["plus_1sd"],
-        "P/E 5Y -1σ": pe_stats["minus_1sd"],
-        "P/E 5Y Min": pe_stats["min"],
-        "P/E 5Y Max": pe_stats["max"],
-        "P/E vs 5Y Avg": pe_stats["vs_avg_pct"],
-        "EV/S 5Y Avg": evs_stats["avg"],
-        "EV/S 5Y +1σ": evs_stats["plus_1sd"],
-        "EV/S 5Y -1σ": evs_stats["minus_1sd"],
-        "EV/S 5Y Min": evs_stats["min"],
-        "EV/S 5Y Max": evs_stats["max"],
+        "P/E 5Y Avg": pe_5["avg"],
+        "P/E 5Y +1σ": pe_5["plus_1sd"],
+        "P/E 5Y -1σ": pe_5["minus_1sd"],
+        "P/E 5Y Min": pe_5["min"],
+        "P/E 5Y Max": pe_5["max"],
+        "P/E vs 5Y Avg": pe_5["vs_avg_pct"],
+        "EV/S 5Y Avg": evs_5["avg"],
+        "EV/S 5Y +1σ": evs_5["plus_1sd"],
+        "EV/S 5Y -1σ": evs_5["minus_1sd"],
+        "EV/S 5Y Min": evs_5["min"],
+        "EV/S 5Y Max": evs_5["max"],
         "EV/S vs 5Y Avg": None,  # filled later once TTM EV/S is in scope
+        "P/E 10Y Avg": pe_10["avg"],
+        "P/E 10Y +1σ": pe_10["plus_1sd"],
+        "P/E 10Y -1σ": pe_10["minus_1sd"],
+        "P/E 10Y Min": pe_10["min"],
+        "P/E 10Y Max": pe_10["max"],
+        "P/E vs 10Y Avg": pe_10["vs_avg_pct"],
+        "EV/S 10Y Avg": evs_10["avg"],
+        "EV/S 10Y +1σ": evs_10["plus_1sd"],
+        "EV/S 10Y -1σ": evs_10["minus_1sd"],
+        "EV/S 10Y Min": evs_10["min"],
+        "EV/S 10Y Max": evs_10["max"],
+        "EV/S vs 10Y Avg": None,  # filled later once TTM EV/S is in scope
+        HIST_STATUS_COL: payload.get("status") or STATUS_NOT_ATTEMPTED,
     }
 
 
-def _evs_vs_avg_pct(current_evs, evs_history):
-    """Compute (current TTM EV/S - 5Y avg) / 5Y avg * 100. None-safe."""
-    stats = stats_from_series(evs_history, current=current_evs)
+def _evs_vs_avg_pct(current_evs, evs_history, years=5):
+    """Compute (current TTM EV/S - N-year avg) / N-year avg * 100. None-safe."""
+    stats = stats_from_series((evs_history or [])[:years], current=current_evs)
     return stats["vs_avg_pct"]
 
 
@@ -353,20 +372,43 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     # when a sample ticker overlaps with Phase 1.
     phase1_universe = _load_phase1_tickers()
     history_data = {}
-    if phase1_universe:
-        fmp_key_for_history = API_KEYS.get("FMP_API_KEY")
-        if fmp_key_for_history:
-            t0 = time.monotonic()
-            logger.info("Fetching 5Y history for %s Phase 1 tickers...", len(phase1_universe))
+    fmp_key_for_history = API_KEYS.get("FMP_API_KEY")
+    if fmp_key_for_history:
+        t0 = time.monotonic()
+        all_universe_tickers = set(df_unique["Ticker"].dropna().astype(str).str.strip()) - {""}
+        # Two-speed scope (widened to the full universe 2026-07-19):
+        #  - Position names are fetched LIVE, exactly as before, so the set JP
+        #    looks at every week is never stale.
+        #  - Every OTHER universe name is read cache-only — zero API calls — so
+        #    the report's runtime never depends on a cold full-universe fetch.
+        #    `cli.py history-backfill` is what populates that cache (weekly,
+        #    resumable). Names it hasn't reached yet come back
+        #    status="not_attempted" and render as N/A, never as 0.
+        cache_only_tickers = sorted(all_universe_tickers - set(phase1_universe))
+        if phase1_universe:
+            logger.info("Fetching history LIVE for %s position tickers...", len(phase1_universe))
             history_data = fetch_history_parallel(
                 sorted(phase1_universe), fmp_key_for_history,
                 max_workers=10, use_cache=use_cache,
             )
-            covered = sum(1 for h in history_data.values() if h.get("pe_ttm") is not None or any(h.get("pe_history") or []))
-            step_timings.append(("history", time.monotonic() - t0, f"{covered}/{len(phase1_universe)} tickers"))
-            logger.info("History loaded for %s/%s Phase 1 tickers", covered, len(phase1_universe))
-        else:
-            logger.info("Skipping 5Y history fetch — FMP_API_KEY not set")
+        if cache_only_tickers:
+            logger.info("Reading cached history for %s non-position tickers...", len(cache_only_tickers))
+            history_data.update(fetch_history_parallel(
+                cache_only_tickers, fmp_key_for_history,
+                max_workers=10, use_cache=True, cache_only=True, progress_every=0,
+            ))
+        covered = sum(1 for h in history_data.values() if h.get("status") == "ok")
+        unattempted = sum(1 for h in history_data.values() if h.get("status") == STATUS_NOT_ATTEMPTED)
+        step_timings.append((
+            "history", time.monotonic() - t0,
+            f"{covered}/{len(history_data)} tickers ({unattempted} not yet backfilled)",
+        ))
+        logger.info(
+            "History: %s/%s tickers populated (%s never attempted — run `cli.py history-backfill`)",
+            covered, len(history_data), unattempted,
+        )
+    else:
+        logger.warning("Skipping history enrichment — FMP_API_KEY not set")
 
     # Forward annual EPS estimates for the same Phase 1 universe — drives the
     # P/E vs forward-2yr-growth scatter. FMP-only, 30-day cached (same scope +
@@ -419,12 +461,17 @@ def main(sample_mode=False, refresh=False, skip_email=False):
         hist_payload = history_data.get(orig_ticker)
         if hist_payload:
             hist_cols = _hist_columns_from_payload(hist_payload)
-            # Fill EV/S vs 5Y Avg from the live TTM EV/S in `fund`
+            # Fill EV/S vs 5Y/10Y Avg from the live TTM EV/S in `fund`
             current_evs = fund.get("EV/S")
-            hist_cols["EV/S vs 5Y Avg"] = _evs_vs_avg_pct(current_evs, hist_payload.get("evs_history") or [])
+            evs_hist = hist_payload.get("evs_history") or []
+            hist_cols["EV/S vs 5Y Avg"] = _evs_vs_avg_pct(current_evs, evs_hist, years=5)
+            hist_cols["EV/S vs 10Y Avg"] = _evs_vs_avg_pct(current_evs, evs_hist, years=10)
             result_row.update(hist_cols)
         else:
+            # No payload at all — mark explicitly as never attempted rather than
+            # leaving an ambiguous blank.
             result_row.update({col: None for col in HIST_COLS})
+            result_row[HIST_STATUS_COL] = STATUS_NOT_ATTEMPTED
 
         results.append(result_row)
 

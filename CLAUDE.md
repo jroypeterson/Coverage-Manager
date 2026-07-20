@@ -31,18 +31,18 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 
   Managed via `universe/positions.py` and the `positions` CLI subcommand. Published to `exports/positions_and_researching.csv`, `exports/portfolio.json`, `exports/researching.json`, `exports/following_for_interest.json`, `exports/ready_to_buy.json`, `exports/ready_to_short.json` (and back-compat `exports/watchlist*.{csv,json}` for one cycle — these only include `Portfolio ∪ Researching` to preserve the historical contract).
 - `data/delisted_tickers.csv` — Hand-managed archive of tickers that have been acquired/de-listed. Captures last-known sector + market cap so the data isn't lost when a row is removed from the active universe. Append manually after confirming a `delisted_check` flag is real. Schema: `Ticker, Company Name, Sector (JP), Subsector (JP), Sub-subsector (JP), Country (HQ), Exchange, ISIN, Currency, Last Mkt Cap (USD), Last Price, Last Data Date, Delisted Date, Reason, Notes, Date Recorded`. Supersedes the legacy `reports/delisted_tickers.xlsx` (which is gitignored and was migrated into this CSV on 2026-04-27).
-- `providers/` — External data sources (yfinance, Finnhub, FMP, AlphaVantage, FX). `providers/fmp_history.py` is a separate FMP-only fetcher for 5-year P/E and EV/S history used by the Phase 1 historical valuation enrichment (see "Historical valuation columns" below).
+- `providers/` — External data sources (yfinance, Finnhub, FMP, AlphaVantage, FX). `providers/fmp_history.py` is a separate FMP-only fetcher for 5-year and 10-year P/E and EV/S history used by the historical valuation enrichment (see "Historical valuation columns" below).
 - `reporting/` — Report generation (Excel, HTML, email, Slack, sigma_export). `reporting/history_stats.py` holds None-safe avg/stdev/min/max/vs-avg helpers for the Phase 1 history columns.
 - `universe/` — CSV validation, enrichment, cleanup
 - `discovery/` — Candidate discovery pipeline
 - `exports/` — **Published artifact contract for downstream projects (committed to git)**
 - `reports/` — Generated reports (gitignored)
 - `reports/samples/` — Sample/preview reports
-- `cache/` — Cached API data (gitignored). Namespaces: `prices/`, `fundamentals/`, `fx/`, `news/`, `perf/`, `identity/`, and `key_metrics_history/` (30-day TTL — annual P/E + EV/S series for the Phase 1 historical valuation columns)
+- `cache/` — Cached API data (gitignored). Namespaces: `prices/`, `fundamentals/`, `fx/`, `news/`, `perf/`, `identity/`, and `key_metrics_history/` (30-day TTL, schema v2 — 10-year annual P/E + EV/S series backing both the 5Y and 10Y historical valuation columns; populated for the full universe by `cli.py history-backfill`)
 
 ## Exports — published artifact contract
 
-`exports/` is the versioned, committed interface that other projects in this workspace consume (forensic_triage, biotech_triage, idea_generation, 13F analyzer, sigma-alert via a separate path). **Files are committed to git** so consumers get history, reproducibility, and rollback. Downstream projects should read these files directly rather than importing Coverage Manager code or hitting fundamentals providers themselves.
+`exports/` is the versioned, committed interface that other projects in this workspace consume (forensic_triage, biotech_triage, screens_equity/quantitative_screens, 13F analyzer, sigma-alert via a separate path). **Files are committed to git** so consumers get history, reproducibility, and rollback. Downstream projects should read these files directly rather than importing Coverage Manager code or hitting fundamentals providers themselves.
 
 **These artifacts are generic and canonical** — they describe the coverage universe and nothing else. Consumer-specific transforms (e.g. sigma-alert sector ETF augmentation) belong in the consumer, not here. If you find yourself wanting to add tickers to `universe_metadata.json` that aren't in `data/coverage_universe_tickers.csv`, that's a sign the transform belongs downstream.
 
@@ -306,22 +306,74 @@ key `RENAISSANCE_API_KEY` in `.env`).
   weekly pipeline** — run on demand (like `backfill-lei`); wiring it as a weekly step
   (+ a fresh-discovery hook) is the obvious next increment.
 
-## Historical valuation columns (Phase 1)
+## Historical valuation columns (Phase 2 — full universe, 5Y + 10Y)
 
-The weekly performance report includes 13 trailing-valuation columns appended after the existing FUND_COLS, populated only for the **Phase 1 universe** = every name with a personal trading-state relationship: `Position ∈ {Portfolio, Researching, Following for Interest, Ready to Buy, Ready to Short}` from `data/positions_and_researching.csv` (read from `exports/portfolio.json` + `exports/researching.json` + `exports/following_for_interest.json` + `exports/ready_to_buy.json` + `exports/ready_to_short.json` at report time). Trigger-ready states are included because they already carry a completed thesis; Following-for-Interest is included because earnings-season context benefits from the same historical-valuation columns. Tickers outside Phase 1 render as `N/A`.
+The weekly performance report appends **26 trailing-valuation columns** after the existing FUND_COLS: the original 13 five-year columns, 12 new **ten-year** columns, and a `History Status` marker. As of **2026-07-19** these are populated for the **full coverage universe** (~1,095 names), not just the positions set.
+
+### Why it was only ~77 names before
+
+Nothing was capping it — no quota guard, no filter bug, no partial backfill. `reporting/generate.py:_load_phase1_tickers()` deliberately scoped the fetch to the union of the five position-state export files (77 tickers on 2026-07-19; 76 had cache entries), because the fetch ran **inline during the weekly performance run** and a full-universe fetch inside that run wasn't something we wanted to pay for. The skew to Tech/Consumer/Industrials was simply the sector mix of the positions file, and it left the ~1,000-name HC universe absent from every downstream "valuation vs history" view.
+
+### The fix: decouple fetching from reporting
+
+- **`python cli.py history-backfill`** (`universe/history_backfill.py`) populates the cache for the whole universe. Resumable; safe to run weekly.
+- **The report** (`reporting/generate.py`) fetches position names **live** (unchanged behaviour) and reads every other universe name **`cache_only=True`** — zero API calls, zero added runtime. Names the backfill hasn't reached yet come back `not_attempted` and render `N/A`, never `0`.
+
+So widening coverage costs the *report* nothing; the cost lives in a separate weekly command.
+
+### Cost — and why 10Y is free
+
+3 FMP calls per uncached ticker (annual `ratios` + annual `key-metrics` + `ratios-ttm`) — the **same 3 calls** that already served the 5Y columns. Full cold universe ≈ 1,095 × 3 = **~3,285 calls**, ~11 min at the client's self-imposed 300/min. Warm weekly passes are far cheaper (30-day TTL, so only aged-out + new names).
+
+**The 10-year window costs ZERO extra calls.** Probed live 2026-07-19: FMP **Starter** returns **15** annual rows from `ratios` and `key-metrics`. The older `reference_fmp_starter_tier` note that Starter is "5yr annual only" is **wrong for these two endpoints**. The 10Y window is the same request with a higher `limit`, and the 5Y stats are the first 5 elements of that same series. Do not add a second round of calls for the 10Y columns.
+
+### Resumability
+
+The per-ticker cache file **is** the resume state — there is no separate cursor to corrupt. Every run skips tickers with a fresh, current-schema entry (`fmp_history.is_cached`), so a pass that dies at name 600 doesn't restart from zero. `--limit N` bounds a run (the intended way to test, or to spread a cold backfill over days). A run summary lands in `cache/key_metrics_history/_backfill_state.json`.
+
+### No silent failures — missing vs unattempted
+
+`History Status` records **why** a row is blank. All numeric fields are `None` (rendered `N/A`) in every non-`ok` case — never `0`, because a `0` in a P/E-min column would corrupt every downstream valuation screen.
+
+| Status | Meaning | Cached? |
+|---|---|---|
+| `ok` | data present | yes, 30d |
+| `no_data` | FMP answered and has nothing for this ticker — a recorded fact | yes, 7d (retried sooner) |
+| `error` | the call failed | **no** — retried next run; logged as a warning |
+| `not_attempted` | backfill has never reached this name | n/a |
+
+Caching an `error` is specifically avoided: it would freeze a transient failure into a permanent-looking blank column.
+
+### Known data caveat — negative/charge-hit fiscal years
+
+The series are raw FMP annual P/E, which goes **negative or enormous** in loss or one-off-charge years. Verified real (not bugs), each landing on a known event: `MRK` FY2023 P/E **778.7** (Prometheus IPR&D charge crushed EPS), `LLY` FY2017 **-444.5** (Tax Cuts & Jobs Act charge), `CAT` FY2016 **-843.1** (mining-downturn net loss), `VRTX` FY2024 **-193.6** (Alpine IPR&D charge).
+
+**Consequence:** an arithmetic mean over such a series is not a usable "average valuation" — e.g. `LLY` P/E 10Y Avg computes to **-2.2** and `CAT` to **-56.3**. This affects the **pre-existing** 5Y columns identically, so it was NOT changed here (that would silently alter numbers downstream already consumes). Open decision for JP: winsorize, drop non-positive P/E years, or switch to a median. Until then, downstream screens should prefer **EV/S** (always positive, unaffected) or filter on `P/E 5Y Min > 0`.
 
 ### Columns (in order)
+
+Existing 13 (unchanged — **never rename or reorder**, downstream reads by name):
 
 | Column | Source | Format |
 |---|---|---|
 | P/E (TTM) | FMP `/stable/ratios-ttm` `priceToEarningsRatioTTM` | float, 1dp |
-| P/E 5Y Avg | mean of FMP `/stable/ratios?period=annual&limit=5` `priceToEarningsRatio` | float, 1dp |
+| P/E 5Y Avg | mean of the first 5 elements of FMP `/stable/ratios?period=annual` `priceToEarningsRatio` | float, 1dp |
 | P/E 5Y +1σ | avg + sample stdev (n-1) | float, 1dp |
 | P/E 5Y -1σ | avg − sample stdev | float, 1dp |
 | P/E 5Y Min / Max | min/max of the 5Y series | float, 1dp |
 | P/E vs 5Y Avg | (TTM − avg) / avg × 100 | percent; **red = premium, green = discount** (inverted vs return colors) |
 | EV/S 5Y Avg / +1σ / -1σ / Min / Max | from FMP `/stable/key-metrics?period=annual` `evToSales` | float, 1dp |
 | EV/S vs 5Y Avg | (existing TTM `EV/S` column − avg) / avg × 100 | percent; same red/green semantics |
+
+New 10Y block (appended 2026-07-19; same series, elements 1–10):
+
+| Column | Source | Format |
+|---|---|---|
+| P/E 10Y Avg / +1σ / -1σ / Min / Max | same annual `priceToEarningsRatio` series, 10 elements | float, 1dp |
+| P/E vs 10Y Avg | (TTM − 10Y avg) / 10Y avg × 100 | percent; red = premium, green = discount |
+| EV/S 10Y Avg / +1σ / -1σ / Min / Max | same annual `evToSales` series, 10 elements | float, 1dp |
+| EV/S vs 10Y Avg | (TTM `EV/S` − 10Y avg) / 10Y avg × 100 | percent; same semantics |
+| History Status | `ok` / `no_data` / `error` / `not_attempted` | string |
 
 ### Why a new "P/E (TTM)" column
 
@@ -333,18 +385,27 @@ Comparing forward to a 5-year trailing average is apples-to-oranges, so the Phas
 
 ### Caching
 
-- Namespace: `cache/key_metrics_history/<TICKER>.json`
-- TTL: 30 days (annual fundamentals change slowly; weekly re-fetches would be wasteful)
-- Schema: `{pe_ttm, pe_history[5], evs_history[5], record_dates[5]}` — most-recent-first, padded with None to length 5
+- Namespace: `cache/key_metrics_history/<TICKER>.json` (+ `_backfill_state.json` run summary)
+- TTL: 30 days for `ok`, 7 days for `no_data`; `error` is never cached
+- Schema **v2**: `{status, pe_ttm, pe_history[10], evs_history[10], record_dates[10], fetched_at, schema_version}` — most-recent-first, padded with None to length 10
+- **v1 entries (5-element, no `status`) are treated as a cache miss and refetched** — `_cache_entry_usable` checks `schema_version`, so an old payload can never be silently mis-parsed as a 10Y series
 
-### Performance
+### Running it
 
-Cold cache: ~3 FMP calls per Phase 1 ticker (annual ratios + annual key-metrics + ratios-ttm). Phase 1 has ~50–100 tickers, so ~150–300 calls at 300/min = 30–60 sec one-time, then 30-day-cached.
+```bash
+python cli.py history-backfill                      # full universe, resumable
+python cli.py history-backfill --limit 200          # spread a cold backfill over days
+python cli.py history-backfill --tickers MRK,PFE    # targeted
+python cli.py history-backfill --refresh            # bypass cache (expensive)
+```
 
-### Phase 2 (deferred)
+Not yet wired into the weekly pipeline — run on demand (like `backfill-lei` / `ipo-backfill`). Wiring it as a weekly `weekly-universe` step is the obvious next increment; JP has confirmed a 1×/week cadence is sufficient.
 
-- HTML report rendering (`reporting/html.py` iterates `FUND_COLS`, doesn't include `HIST_COLS`)
-- Expand to full universe / Core flag once formatting is validated
+### Still deferred
+
+- HTML report rendering (`reporting/html.py` iterates `FUND_COLS`, doesn't include `HIST_COLS`) — the columns are Excel/pickle-only
+- Wiring `history-backfill` into the weekly pipeline
+- The negative-P/E-mean decision above
 
 ## P/E vs forward-2yr-EPS-growth scatter (Phase 1)
 
