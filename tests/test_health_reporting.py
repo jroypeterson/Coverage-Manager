@@ -364,3 +364,101 @@ def test_dry_run_skips_heartbeat_post(monkeypatch):
     weekly_build.main(skip_discovery=True, dry_run=True)
 
     assert "called" not in captured, "heartbeat should NOT be posted on dry runs"
+
+
+# --- universe drop warning (abnormal-counts rule, HEALTH_REPORTING.md 4.2) ---
+
+def test_universe_drop_warning_fires_on_material_drop():
+    import weekly_build as wb
+    warn = wb._universe_drop_warning(1095, 1000)  # -8.7%
+    assert warn is not None and "1,095" in warn and "1,000" in warn
+
+
+def test_universe_drop_warning_quiet_on_normal_week():
+    import weekly_build as wb
+    assert wb._universe_drop_warning(1095, 1093) is None  # -0.2%
+    assert wb._universe_drop_warning(1095, 1102) is None  # growth
+    assert wb._universe_drop_warning(1095, 1095) is None  # unchanged
+
+
+def test_universe_drop_warning_skips_missing_totals():
+    import weekly_build as wb
+    assert wb._universe_drop_warning(None, 1000) is None
+    assert wb._universe_drop_warning(1095, None) is None
+    assert wb._universe_drop_warning(0, 0) is None
+
+
+def test_universe_wiped_to_zero_is_the_worst_drop_not_missing():
+    """A header-valid zero-row CSV must WARN (Codex round-2 High: truthiness
+    treated after=0 as missing data and skipped the warning)."""
+    import weekly_build as wb
+    warn = wb._universe_drop_warning(1095, 0)
+    assert warn is not None and "-100.0%" in warn
+
+
+def test_build_health_payload_downgrades_on_drop(monkeypatch, tmp_path):
+    import weekly_build as wb
+    from datetime import datetime, timezone
+    monkeypatch.setattr(wb, "_load_universe_drop_warning",
+                        lambda: "universe shrank 1,095 -> 900 tickers (-17.8% week-over-week) -- verify deliberate")
+    now = datetime.now(timezone.utc)
+    payload = wb._build_health_payload({"validate": "ok"}, [], True, now, now)
+    assert payload["status"] == "partial"
+    assert any("universe shrank" in w for w in payload["warnings"])
+
+
+def test_build_health_payload_error_not_masked_by_drop(monkeypatch):
+    """error (validation failed) must stay error even when a drop also fired."""
+    import weekly_build as wb
+    from datetime import datetime, timezone
+    monkeypatch.setattr(wb, "_load_universe_drop_warning", lambda: "universe shrank ...")
+    now = datetime.now(timezone.utc)
+    payload = wb._build_health_payload({"validate": "failed: x"}, [], False, now, now)
+    assert payload["status"] == "error"
+
+
+def test_load_universe_drop_warning_missing_file(monkeypatch, tmp_path):
+    import weekly_build as wb
+    monkeypatch.setattr(wb, "DELTA_JSON", tmp_path / "nope.json")
+    assert wb._load_universe_drop_warning() is None
+
+
+def test_load_universe_drop_warning_reads_real_nested_shape(monkeypatch, tmp_path):
+    """The delta writer nests stats under "delta" ({reason, today, delta:
+    {before_stats,...}}) — the loader must read THAT shape (Codex round-1
+    High: a flat-only read meant real drops would never have warned)."""
+    import json as _json
+
+    import weekly_build as wb
+    p = tmp_path / "last_universe_delta.json"
+    p.write_text(_json.dumps({
+        "reason": "weekly", "today": "2026-07-22",
+        "delta": {"before_stats": {"total": 1095},
+                  "after_stats": {"total": 950}},
+    }), encoding="utf-8")
+    monkeypatch.setattr(wb, "DELTA_JSON", p)
+    warn = wb._load_universe_drop_warning()
+    assert warn is not None and "-13.2%" in warn
+
+
+def test_load_universe_drop_warning_tolerates_flat_shape(monkeypatch, tmp_path):
+    """Back-compat: a future writer refactor to a flat payload degrades to a
+    working check, not a silent None."""
+    import json as _json
+
+    import weekly_build as wb
+    p = tmp_path / "last_universe_delta.json"
+    p.write_text(_json.dumps({"before_stats": {"total": 1095},
+                              "after_stats": {"total": 950}}), encoding="utf-8")
+    monkeypatch.setattr(wb, "DELTA_JSON", p)
+    warn = wb._load_universe_drop_warning()
+    assert warn is not None and "-13.2%" in warn
+
+
+def test_load_universe_drop_warning_against_live_delta_file():
+    """Smoke against the REAL .coverage/last_universe_delta.json when present:
+    must parse without raising (warning may legitimately be None)."""
+    import weekly_build as wb
+    if not wb.DELTA_JSON.exists():
+        return
+    wb._load_universe_drop_warning()  # must not raise

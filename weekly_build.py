@@ -14,6 +14,7 @@ uncaught exception in the orchestration produces an `error` heartbeat before
 the exception propagates.
 """
 
+import json
 import os
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
@@ -31,6 +32,52 @@ PROJECT_NAME = "Coverage Manager"
 HEALTH_DIR = SCRIPT_DIR / ".health"
 HEALTH_FALLBACK_PATH = HEALTH_DIR / "last_run.json"
 UNIVERSE_CSV = SCRIPT_DIR / "data" / "coverage_universe_tickers.csv"
+DELTA_JSON = SCRIPT_DIR / ".coverage" / "last_universe_delta.json"
+
+# Abnormal-counts rule (HEALTH_REPORTING.md §4.2): a hard-broken universe is
+# already caught by validation → `error`, but a *valid-yet-shrunken* CSV (e.g.
+# rows silently dropped by a bad edit that still passes validation) would
+# heartbeat `ok`. A week-over-week drop at/above this fraction downgrades to
+# `partial` with a warning. Normal weeks move by a handful of names; a
+# deliberate mass-prune tripping this once is fine (verify-and-move-on).
+UNIVERSE_DROP_THRESHOLD_PCT = 5.0
+
+
+def _universe_drop_warning(before_total, after_total,
+                           threshold_pct=UNIVERSE_DROP_THRESHOLD_PCT):
+    """Warning string when the universe shrank materially this run, else None.
+    Pure — totals injected for tests. NOTE: `after_total == 0` is the WORST
+    drop (universe wiped), not missing data — only `None` means missing
+    (Codex round-2 High: a truthiness check made a zero-row wipe skip the
+    very warning this exists for)."""
+    if before_total is None or after_total is None:
+        return None  # first run / missing stats — nothing to compare
+    if before_total <= 0 or after_total >= before_total:
+        return None
+    drop_pct = (before_total - after_total) / before_total * 100.0
+    if drop_pct >= threshold_pct:
+        return (f"universe shrank {before_total:,} → {after_total:,} tickers "
+                f"(-{drop_pct:.1f}% week-over-week) — verify deliberate")
+    return None
+
+
+def _load_universe_drop_warning():
+    """Read this run's delta JSON (written by the weekly-universe delta step)
+    and return the drop warning, or None. Best-effort: a missing/unreadable
+    delta file (first run, or a run that failed before the delta step) skips
+    the check rather than fabricating a warning."""
+    try:
+        data = json.loads(DELTA_JSON.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    # The delta payload nests the stats under "delta" ({reason, today, delta:
+    # {before_stats, after_stats, ...}}); accept a flat shape too so a future
+    # writer refactor degrades to no-check instead of a crash. (Codex round-1
+    # High: the flat-only read meant real drops would never have warned.)
+    stats_root = data.get("delta") if isinstance(data.get("delta"), dict) else data
+    before = (stats_root.get("before_stats") or {}).get("total")
+    after = (stats_root.get("after_stats") or {}).get("total")
+    return _universe_drop_warning(before, after)
 
 
 def _gate_report(skip_performance, validation_passed, force):
@@ -96,6 +143,13 @@ def _build_health_payload(combined_steps, combined_artifacts, validation_passed,
         non_successes = collect_non_successes(combined_steps)
         status = "partial" if non_successes else "ok"
 
+    warnings = []
+    drop_warning = _load_universe_drop_warning()
+    if drop_warning:
+        warnings.append(drop_warning)
+        if status == "ok":
+            status = "partial"
+
     cycle = f"{TODAY} weekly"
     attempt = os.environ.get("HEALTH_ATTEMPT", "1")
 
@@ -142,7 +196,7 @@ def _build_health_payload(combined_steps, combined_artifacts, validation_passed,
         "next_expected": _next_friday_label(end_dt),
         "counters": counters,
         "artifacts": artifact_entries,
-        "warnings": [],
+        "warnings": warnings,
         "errors": errors,
         "run_link": None,
         "tag": "health/v1",
