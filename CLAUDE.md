@@ -219,21 +219,58 @@ PROVIDER_PRIORITY (config.py, env-overridable)
 
 `python cli.py check-delisted` probes yfinance for each universe ticker (via a lightweight `Ticker.info` pull, results cached for 7 days under `cache/identity/`) and flags rows that look delisted, acquired, or recycled to a non-equity instrument.
 
+**Three outcomes, not two (2026-07-25).** Every ticker resolves to `flagged`,
+`clean`, or **`inconclusive`** — the last meaning *we could not find out*. This is
+the module's central distinction: a throttled lookup and a dead company return
+the same empty response, and only one of them is a delisting. The 2026-07-25 run
+reported **58 flags**, but `ACLX` (Arcellx) was trading at **$115.07 on NASDAQ
+with 13.2M shares of volume**; that same run logged 53 price-probe failures out of
+1,093 names. Yahoo was throttling, and throttling was being recorded as death.
+Inconclusive rows are reported in their own section and **never enter the flagged
+list**. Two guards enforce it:
+
+- **`.info` and the price probe are fetched independently.** A `.info` exception
+  used to abort the whole lookup and return `{}`, discarding a price probe that
+  would have succeeded — and `{}` classified as "likely delisted". `info_ok`
+  records whether the metadata call actually answered, so an
+  empty-because-throttled `.info` is never read as empty-because-gone. A ticker
+  with a **live price feed is never flagged**, whatever `.info` says; it is
+  reported under "trading, but missing vendor identity metadata".
+- **A comparison that can't be made has no result.** `_name_similarity` returns
+  `None` (not `0.0`) when either side has no name — `ACLX` returned a `quoteType`
+  with empty `longName`/`shortName` and was flagged `name mismatch
+  (similarity=0.00), yfinance=''`, i.e. a disagreement with an empty string.
+
+**Run-level `degraded` flag**: when over `DEGRADED_FAILURE_RATE` (2%) of lookups
+fail, the run is marked degraded in the report, the `weekly-universe` step
+summary, and the CLI exit code — because a throttled run's *flags* are also less
+trustworthy, and the reader needs to see that rather than infer it. Cache
+namespace bumped to `identity_v3` (a v2 entry has no `info_ok`, which would
+downgrade a genuine flag to `inconclusive` for a full TTL).
+
 Flag rules (evaluated in this order):
-- yfinance returns nothing (`.info` empty) → likely delisted
+- both probes failed → **`inconclusive`**, never a flag
+- `.info` empty but price feed live → **clean** (vendor metadata gap, reported)
+- `.info` empty AND price feed dead → likely delisted (both signals agree)
 - **no recent price data** → likely delisted/renamed (or an extended halt). A price-recency probe pulls ~1mo of daily bars; if the most recent bar is older than `PRICE_STALE_DAYS` (10) the price feed is treated as dead. This is the reliable tell for a **clean acquisition / take-private**: Yahoo keeps the stale `.info` metadata (longName etc.) populated for months, so the `.info`-empty and name-similarity rules miss these — but the price feed goes empty immediately. Added 2026-06-13 after EXAS (Abbott), HOLX (Blackstone/TPG), and the MPW→MPT / GMRE→XRN rebrands lingered in the universe for months. Robustness: the probe uses `history(raise_errors=True)` so a transient 429/network error becomes a *skipped* probe (counted as `price_probe_failures`, surfaced in the report) rather than a false "delisted" flag; the stale/not-stale decision is **frozen at probe time** into the cached `price_stale` field so a cached `last_close_date` can't "age into" staleness within the 7-day identity-cache TTL.
 - `quoteType` is `ETF`, `MUTUALFUND`, `INDEX`, `CURRENCY`, or `CRYPTOCURRENCY` → ticker has been recycled
 - Normalized fuzzy similarity between the universe `Company Name` and yfinance `longName`/`shortName` falls below 0.55 → ticker may have been recycled to a different issuer
 
 Outputs (in `reports/`, archived weekly):
-- `delisted_check_YYYY-MM-DD.csv` — flagged rows with reason
-- `delisted_check_YYYY-MM-DD.md` — human-readable summary
+- `delisted_check_YYYY-MM-DD.csv` — one row per non-clean ticker, with a leading
+  **`verdict`** column (`flagged` / `inconclusive` / `clean`) so a reader of the
+  CSV alone cannot mistake an unresolved lookup for a delisting candidate
+- `delisted_check_YYYY-MM-DD.md` — human-readable summary, with flagged,
+  inconclusive, and metadata-gap rows in separate sections
 
 The check is **non-gating** — it never blocks the report or the published artifacts. After confirming a flag is real, the user manually:
 1. Removes the row from `data/coverage_universe_tickers.csv`
 2. Appends an entry to `data/delisted_tickers.csv` with the last-known sector + market cap (the `Last Mkt Cap (USD)` / `Last Price` can be pulled from the most recent `cache/fundamentals/yf_<TICKER>.json` before clearing it)
 
-The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at least one flag is raised.
+The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at
+least one flag is raised **or the run was degraded** — a run that failed to learn
+what it was asked to learn must not exit `0` and report its silence as a clean
+universe. Module: `universe/delisted_check.py`; tests: `tests/test_delisted_check.py`.
 
 ## Ticker-change / deregistration discovery
 

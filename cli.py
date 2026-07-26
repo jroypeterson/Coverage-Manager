@@ -368,7 +368,9 @@ def main():
         from universe import delisted_check
 
         result = delisted_check.main(use_cache=not args.no_cache)
-        raise SystemExit(0 if not result["flagged"] else 2)
+        # A degraded run also exits 2: it did not learn what it was asked to
+        # learn, and exiting 0 would report that silence as a clean universe.
+        raise SystemExit(2 if (result["flagged"] or result.get("degraded")) else 0)
     elif args.command == "check-ticker-changes":
         from universe import ticker_change_check
 

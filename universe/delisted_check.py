@@ -16,6 +16,15 @@ flagged `no recent price data (likely delisted/renamed)`. This is what would
 have caught EXAS (Abbott, 2026-03), HOLX (Blackstone/TPG, 2026-04), and the
 MPW→MPT / GMRE→XRN rebrands instead of letting them linger in the universe.
 
+**A failed lookup is not a delisting** (fixed 2026-07-25). Every probe has three
+possible outcomes, not two: the ticker looks dead, the ticker looks alive, or
+*we could not find out*. Collapsing the third into the first is what made the
+2026-07-25 run report 58 flags when independent quotes showed `ACLX` trading at
+$115.07 on NASDAQ with 13.2M shares of volume. The same run recorded 53
+price-probe failures out of 1,093 names — Yahoo was throttling, and throttling
+was being written down as death. So the check now reports `inconclusive`
+separately and never lets it reach the flagged list. See `_classify`.
+
 Output:
   - `reports/delisted_check_{date}.csv`  — flagged rows with reason
   - `reports/delisted_check_{date}.md`   — human-readable summary
@@ -39,9 +48,12 @@ from ticker_utils import normalize_company_for_comparison, normalize_ticker
 logger = get_logger("delisted_check")
 
 # v2: added price-recency fields (last_close_date / price_probe_ran / price_stale).
-# Bumping the namespace ignores pre-v2 entries so the price probe activates on
-# the next run instead of waiting up to a TTL for old caches to roll over.
-IDENTITY_CACHE_NS = "identity_v2"
+# v3: added `info_ok`. The bump is REQUIRED, not hygiene -- a v2 entry has no
+# `info_ok`, which reads as False, so a cached "identity empty + price feed
+# dead" row (a genuine delisting, both signals agreeing) would be downgraded to
+# `inconclusive` for up to a full TTL. Bumping the namespace ignores older
+# entries so the new logic sees real data on the next run.
+IDENTITY_CACHE_NS = "identity_v3"
 IDENTITY_CACHE_TTL_HOURS = 24.0 * 7  # weekly refresh is enough
 
 # quoteType values from yfinance that should never appear in the equity universe
@@ -56,6 +68,21 @@ NAME_SIMILARITY_THRESHOLD = 0.55
 # long weekend / holiday cluster with margin while still catching a stop in
 # trading promptly on the weekly cadence.
 PRICE_STALE_DAYS = 10
+
+# Per-ticker verdicts. A probe has THREE outcomes, not two — the third is the
+# whole point of this module's 2026-07-25 fix, so it gets a name rather than
+# living as a special case of "flagged".
+VERDICT_CLEAN = "clean"
+VERDICT_FLAGGED = "flagged"
+#: We could not find out. Never appears in the flagged list; reported apart.
+VERDICT_INCONCLUSIVE = "inconclusive"
+
+# Share of tickers whose lookup failed outright, above which the whole run is
+# reported degraded. Yahoo throttles bursty traffic, and a throttled run's
+# *flags* are also less trustworthy — a reader needs to see that in the report
+# rather than infer it. 2% is well clear of the odd one-off failure and well
+# below the 4.8% (53/1093) seen when Yahoo was actually rate-limiting us.
+DEGRADED_FAILURE_RATE = 0.02
 
 
 def _probe_recent_price(yf_obj):
@@ -90,7 +117,16 @@ def _fetch_identity(yf_ticker, use_cache=True):
     """Fetch identity + price-recency probe for a single ticker from yfinance.
 
     Returns dict with {quoteType, longName, shortName, last_close_date,
-    price_probe_ran, price_stale} or {} on a total failure.
+    info_ok, price_probe_ran, price_stale}.
+
+    The two probes are fetched INDEPENDENTLY. A `.info` call that raises used to
+    abort the whole function and return `{}`, discarding a price probe that
+    would have succeeded — and `{}` was then classified as "likely delisted".
+    That is precisely how a $115 NASDAQ name with 13M shares of daily volume got
+    reported as delisted: `.info` was throttled, and nothing else was allowed to
+    speak for the ticker. `info_ok` records whether the metadata call actually
+    answered, so an empty-because-throttled `.info` is never mistaken for an
+    empty-because-the-company-is-gone one.
 
     Staleness is decided HERE, at probe time, and frozen into `price_stale` —
     not recomputed at classify time. The identity cache (7-day TTL) would
@@ -106,38 +142,56 @@ def _fetch_identity(yf_ticker, use_cache=True):
         import yfinance as yf
 
         yf_obj = yf.Ticker(yf_ticker)
-        info = yf_obj.info or {}
-        price_probe_ran, last_close_date = _probe_recent_price(yf_obj)
-        identity = {
-            "quoteType": info.get("quoteType") or "",
-            "longName": info.get("longName") or "",
-            "shortName": info.get("shortName") or "",
-            "last_close_date": last_close_date,
-            "price_probe_ran": price_probe_ran,
-            # frozen-at-probe-time decision (avoids the cache-aging trap)
-            "price_stale": bool(price_probe_ran and _price_is_stale(last_close_date)),
-        }
-        # Do NOT cache a transient probe failure — let the next run retry it
-        # rather than disabling the price check for this ticker for a full TTL.
-        if use_cache and price_probe_ran:
-            cache_set(IDENTITY_CACHE_NS, yf_ticker, identity)
-        return identity
     except Exception as e:
         log_exception(logger, f"Identity lookup failed for {yf_ticker}", e)
-        return {}
+        return {"info_ok": False, "price_probe_ran": False, "price_stale": False,
+                "quoteType": "", "longName": "", "shortName": "",
+                "last_close_date": ""}
+
+    try:
+        info = yf_obj.info or {}
+        info_ok = True
+    except Exception as e:
+        log_exception(logger, f"Identity metadata failed for {yf_ticker}", e)
+        info, info_ok = {}, False
+
+    price_probe_ran, last_close_date = _probe_recent_price(yf_obj)
+    identity = {
+        "quoteType": info.get("quoteType") or "",
+        "longName": info.get("longName") or "",
+        "shortName": info.get("shortName") or "",
+        "last_close_date": last_close_date,
+        "info_ok": info_ok,
+        "price_probe_ran": price_probe_ran,
+        # frozen-at-probe-time decision (avoids the cache-aging trap)
+        "price_stale": bool(price_probe_ran and _price_is_stale(last_close_date)),
+    }
+    # Do NOT cache a transient failure of EITHER probe — that would disable the
+    # check for this ticker for a full TTL on the strength of a network blip.
+    if use_cache and price_probe_ran and info_ok:
+        cache_set(IDENTITY_CACHE_NS, yf_ticker, identity)
+    return identity
 
 
 def _name_similarity(recorded_name, yf_long, yf_short):
     """Best similarity ratio between recorded name and yfinance long/short names.
 
-    Both are first normalized (drop Inc/Corp/etc.) so corp-suffix differences
+    Returns **None** when there is nothing to compare — no recorded name, or no
+    yfinance name. That is not a similarity of 0.0: a comparison that could not
+    be made has no result, and scoring it 0.0 reads as "these two names are
+    completely different" when in truth only one name exists. Caught live on
+    2026-07-25, where `ACLX` came back with a `quoteType` but empty
+    `longName`/`shortName` and was flagged `name mismatch (similarity=0.00),
+    yfinance=''` — a disagreement with an empty string.
+
+    Both names are normalized (drop Inc/Corp/etc.) so corp-suffix differences
     don't trigger false positives.
     """
     recorded = normalize_company_for_comparison(recorded_name)
     if not recorded:
-        return 1.0  # no recorded name to compare against; don't flag
+        return None  # nothing recorded to compare against
 
-    best = 0.0
+    best = None
     for yf_name in (yf_long, yf_short):
         if not yf_name:
             continue
@@ -149,7 +203,7 @@ def _name_similarity(recorded_name, yf_long, yf_short):
         # "premier" vs "premier inc holdings" doesn't get penalized.
         if recorded in candidate or candidate in recorded:
             score = max(score, 0.85)
-        best = max(best, score)
+        best = score if best is None else max(best, score)
     return best
 
 
@@ -166,13 +220,26 @@ def _price_is_stale(last_close_date, today=None):
 
 
 def _classify(row, identity):
-    """Return (flagged: bool, reason: str) for a single ticker.
+    """Return (verdict, reason) for a single ticker.
 
-    No identity data        => 'no yfinance data' (likely delisted).
-    Price feed gone stale    => 'no recent price data' (likely delisted/renamed).
-    Non-equity quoteType     => 'recycled to {ETF|MUTUALFUND|...}'.
-    Low name similarity      => 'name mismatch (recorded vs yfinance)'.
-    Otherwise unflagged.
+    `verdict` is one of VERDICT_CLEAN / VERDICT_FLAGGED / VERDICT_INCONCLUSIVE.
+
+    **The three-state result is the point.** "yfinance told us nothing" and
+    "yfinance couldn't be reached" produce identical-looking data, and treating
+    them alike is a claim the evidence does not support: an absent answer is
+    absent for exactly one of those two reasons, and only one of them is a
+    delisting. Every rule below therefore checks whether a probe actually ran
+    before reading anything into what it returned.
+
+    Rules, in order:
+      Nothing answered            => INCONCLUSIVE (we did not find out).
+      No metadata, price is live  => CLEAN (it trades; the vendor's metadata is
+                                    simply missing — recorded, not flagged).
+      No metadata, no price feed  => FLAGGED, both signals agreeing.
+      Price feed gone stale       => FLAGGED 'no recent price data'.
+      Non-equity quoteType        => FLAGGED 'recycled to {ETF|MUTUALFUND|...}'.
+      Low name similarity         => FLAGGED 'name mismatch'.
+      Otherwise                   => CLEAN.
 
     The price-recency rule sits above the name-similarity rule because a clean
     acquisition keeps `.info` (and thus the name match) intact for months; the
@@ -184,32 +251,73 @@ def _classify(row, identity):
     long_name = identity.get("longName") or ""
     short_name = identity.get("shortName") or ""
     recorded_name = str(row.get("Company Name", "") or "")
+    info_ok = bool(identity.get("info_ok"))
+    probe_ran = bool(identity.get("price_probe_ran"))
+    has_identity = bool(quote_type or long_name or short_name)
 
-    if not identity or (not quote_type and not long_name and not short_name):
-        return True, "no yfinance data (likely delisted)"
+    if not identity or (not info_ok and not probe_ran):
+        # Neither probe answered. This is the absence of evidence, not evidence
+        # of absence -- the distinction the pre-2026-07-25 code collapsed.
+        return VERDICT_INCONCLUSIVE, (
+            "yfinance lookup failed (both metadata and price probe); "
+            "no evidence either way"
+        )
+
+    if not has_identity:
+        if not info_ok:
+            # The metadata call itself failed, so its emptiness says nothing.
+            if probe_ran and not identity.get("price_stale"):
+                return VERDICT_CLEAN, (
+                    f"metadata lookup failed but price feed is live "
+                    f"(last bar={identity.get('last_close_date') or 'unknown'})"
+                )
+            return VERDICT_INCONCLUSIVE, (
+                "metadata lookup failed; price feed inconclusive"
+            )
+        if probe_ran and not identity.get("price_stale"):
+            # Answered, and answered empty -- but the thing demonstrably trades.
+            # A vendor metadata gap, not a delisting.
+            return VERDICT_CLEAN, (
+                f"no yfinance identity metadata, but price feed is live "
+                f"(last bar={identity.get('last_close_date') or 'unknown'})"
+            )
+        if not probe_ran:
+            return VERDICT_INCONCLUSIVE, (
+                "no yfinance identity metadata and the price probe failed"
+            )
+        return VERDICT_FLAGGED, (
+            "no yfinance data and no recent price data (likely delisted)"
+        )
 
     if identity.get("price_stale"):
         last_seen = identity.get("last_close_date") or "never"
-        return True, (
+        return VERDICT_FLAGGED, (
             f"no recent price data (likely delisted/renamed, or extended halt); "
             f"last bar={last_seen}"
         )
 
     if quote_type in NON_EQUITY_QUOTE_TYPES:
-        return True, f"ticker recycled to non-equity instrument ({quote_type})"
+        return VERDICT_FLAGGED, f"ticker recycled to non-equity instrument ({quote_type})"
 
     if quote_type and quote_type not in {"EQUITY", "ADR", ""}:
         # Surface any other unexpected types but don't hard-flag
         pass
 
     score = _name_similarity(recorded_name, long_name, short_name)
+    if score is None:
+        # A quoteType but no name. Nothing to compare, so no mismatch can be
+        # asserted -- surfaced as a vendor gap instead of invented as a finding.
+        return VERDICT_CLEAN, (
+            f"yfinance returned no company name to compare "
+            f"(quoteType={quote_type or 'none'}); identity rule skipped"
+        )
     if score < NAME_SIMILARITY_THRESHOLD:
-        return True, (
+        return VERDICT_FLAGGED, (
             f"company name mismatch (similarity={score:.2f}); recorded="
             f"{recorded_name!r}, yfinance={long_name or short_name!r}"
         )
 
-    return False, ""
+    return VERDICT_CLEAN, ""
 
 
 def check_universe(csv_path=None, max_workers=6, use_cache=True):
@@ -217,11 +325,16 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
 
     Returns dict with keys:
       - flagged: list of dicts with ticker/recorded_name/quoteType/yf_name/reason
+      - inconclusive: same shape, for tickers we could not find out about. These
+        are NOT delisting candidates and must never be merged into `flagged`.
+      - metadata_gaps: same shape, for tickers that trade fine but whose vendor
+        identity metadata came back empty (reported so the gap isn't silent)
       - checked: total tickers checked
-      - missing_data: count of tickers yfinance returned nothing for
-      - price_probe_failures: count of tickers whose price probe raised (the
-        price-recency rule was skipped for them; a high count means a Yahoo
-        rate-limit/outage, not a delisting wave)
+      - missing_data: count of tickers yfinance returned no identity for
+      - price_probe_failures: count of tickers whose price probe raised
+      - info_failures: count of tickers whose `.info` call raised
+      - degraded: True when the failure rate exceeds DEGRADED_FAILURE_RATE — the
+        run hit Yahoo throttling and even its flags deserve less trust
 
     max_workers defaults to 6 (down from 10): the run now pulls 1mo of history
     per ticker in addition to `.info`, and Yahoo rate-limits bursty traffic —
@@ -258,8 +371,11 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
                 logger.info("  progress: %d/%d", i, len(pairs))
 
     flagged = []
+    inconclusive = []
+    metadata_gaps = []
     missing_data = 0
     price_probe_failures = 0
+    info_failures = 0
     for row, yf_t in pairs:
         identity = identities.get(yf_t, {})
         if not identity or (
@@ -268,31 +384,50 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
             and not identity.get("shortName")
         ):
             missing_data += 1
-        # identity present but the price probe raised → rule skipped for it
-        if identity and not identity.get("price_probe_ran", True):
+        if not identity or not identity.get("price_probe_ran"):
             price_probe_failures += 1
-        is_flagged, reason = _classify(row, identity)
-        if is_flagged:
-            flagged.append({
-                "ticker": row.get("Ticker", ""),
-                "yf_ticker": yf_t,
-                "recorded_name": row.get("Company Name", ""),
-                "yf_long_name": identity.get("longName", ""),
-                "yf_short_name": identity.get("shortName", ""),
-                "quote_type": identity.get("quoteType", ""),
-                "last_close_date": identity.get("last_close_date", ""),
-                "sector_jp": row.get("Sector (JP)", ""),
-                "subsector_jp": row.get("Subsector (JP)", ""),
-                "reason": reason,
-            })
+        if not identity or not identity.get("info_ok"):
+            info_failures += 1
+        verdict, reason = _classify(row, identity)
+        if verdict == VERDICT_CLEAN and not reason:
+            continue
+        entry = {
+            "ticker": row.get("Ticker", ""),
+            "yf_ticker": yf_t,
+            "recorded_name": row.get("Company Name", ""),
+            "yf_long_name": identity.get("longName", ""),
+            "yf_short_name": identity.get("shortName", ""),
+            "quote_type": identity.get("quoteType", ""),
+            "last_close_date": identity.get("last_close_date", ""),
+            "sector_jp": row.get("Sector (JP)", ""),
+            "subsector_jp": row.get("Subsector (JP)", ""),
+            "reason": reason,
+        }
+        if verdict == VERDICT_FLAGGED:
+            flagged.append(entry)
+        elif verdict == VERDICT_INCONCLUSIVE:
+            inconclusive.append(entry)
+        else:  # clean, but carrying a note worth surfacing
+            metadata_gaps.append(entry)
 
-    flagged.sort(key=lambda r: r["ticker"])
+    for bucket in (flagged, inconclusive, metadata_gaps):
+        bucket.sort(key=lambda r: r["ticker"])
+
+    checked = len(pairs)
+    # A single failure rate over both probes: either one failing means the run
+    # learned less than it should have about that name.
+    worst_failures = max(price_probe_failures, info_failures)
+    degraded = bool(checked and worst_failures / checked > DEGRADED_FAILURE_RATE)
 
     return {
-        "checked": len(pairs),
+        "checked": checked,
         "flagged": flagged,
+        "inconclusive": inconclusive,
+        "metadata_gaps": metadata_gaps,
         "missing_data": missing_data,
         "price_probe_failures": price_probe_failures,
+        "info_failures": info_failures,
+        "degraded": degraded,
     }
 
 
@@ -312,43 +447,95 @@ def write_report(result, reports_dir=None, run_date=None):
         "ticker", "yf_ticker", "recorded_name", "yf_long_name", "yf_short_name",
         "quote_type", "last_close_date", "sector_jp", "subsector_jp", "reason",
     ]
+    # `verdict` is written so a reader of the CSV alone can never mistake an
+    # inconclusive row for a delisting candidate.
+    csv_fields = ["verdict"] + fieldnames
+    inconclusive = result.get("inconclusive", [])
+    metadata_gaps = result.get("metadata_gaps", [])
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=csv_fields)
         writer.writeheader()
-        for row in result["flagged"]:
-            writer.writerow(row)
+        for verdict, bucket in ((VERDICT_FLAGGED, result["flagged"]),
+                                (VERDICT_INCONCLUSIVE, inconclusive),
+                                (VERDICT_CLEAN, metadata_gaps)):
+            for row in bucket:
+                writer.writerow({"verdict": verdict, **row})
+
+    def _table(rows):
+        out = ["| Ticker | Recorded Name | yfinance Name | quoteType | Last Bar | Reason |",
+               "|--------|---------------|---------------|-----------|----------|--------|"]
+        for row in rows:
+            yf_name = row["yf_long_name"] or row["yf_short_name"]
+            last_bar = row.get("last_close_date") or "-"
+            out.append(
+                f"| {row['ticker']} | {row['recorded_name']} | {yf_name} | "
+                f"{row['quote_type']} | {last_bar} | {row['reason']} |"
+            )
+        return out
 
     lines = []
     lines.append(f"# Delisted / recycled ticker check — {run_date}")
     lines.append("")
     lines.append(f"- Checked: {result['checked']} tickers")
-    lines.append(f"- Flagged: {len(result['flagged'])}")
-    lines.append(f"- No yfinance data: {result['missing_data']}")
+    lines.append(f"- Flagged (likely delisted/recycled): {len(result['flagged'])}")
+    lines.append(f"- Inconclusive (lookup failed — **not** delisting candidates): "
+                 f"{len(inconclusive)}")
+    lines.append(f"- No yfinance identity data: {result['missing_data']}")
     probe_fail = result.get("price_probe_failures", 0)
-    if probe_fail:
+    info_fail = result.get("info_failures", 0)
+    if probe_fail or info_fail:
         lines.append(
-            f"- :warning: Price probe failed (rule skipped): {probe_fail} "
-            f"— transient Yahoo errors, not delistings; re-run if high"
+            f"- Probe failures: {probe_fail} price, {info_fail} metadata "
+            f"— transient Yahoo errors, not delistings"
+        )
+    if result.get("degraded"):
+        lines.append("")
+        lines.append(
+            f"> :warning: **This run was degraded.** More than "
+            f"{DEGRADED_FAILURE_RATE:.0%} of lookups failed, which is the "
+            f"signature of Yahoo rate-limiting rather than a wave of "
+            f"delistings. Treat the flags below as provisional and re-run "
+            f"before acting on any of them."
         )
     lines.append("")
     if result["flagged"]:
-        lines.append("| Ticker | Recorded Name | yfinance Name | quoteType | Last Bar | Reason |")
-        lines.append("|--------|---------------|---------------|-----------|----------|--------|")
-        for row in result["flagged"]:
-            yf_name = row["yf_long_name"] or row["yf_short_name"]
-            last_bar = row.get("last_close_date") or "—"
-            lines.append(
-                f"| {row['ticker']} | {row['recorded_name']} | {yf_name} | "
-                f"{row['quote_type']} | {last_bar} | {row['reason']} |"
-            )
+        lines.extend(_table(result["flagged"]))
     else:
         lines.append("_No flagged tickers — universe identity matches yfinance._")
+
+    if inconclusive:
+        lines.append("")
+        lines.append("## Inconclusive — we could not find out")
+        lines.append("")
+        lines.append(
+            "yfinance did not answer for these. That is **not** evidence of a "
+            "delisting: a throttled lookup and a dead company return the same "
+            "empty response, and only one of them means anything. They are "
+            "listed apart so they are never actioned as delistings; re-run to "
+            "resolve them."
+        )
+        lines.append("")
+        lines.extend(_table(inconclusive))
+
+    if metadata_gaps:
+        lines.append("")
+        lines.append("## Trading, but missing vendor identity metadata")
+        lines.append("")
+        lines.append(
+            "These have a live price feed, so they are demonstrably not "
+            "delisted — yfinance simply returned no `longName`/`quoteType`. "
+            "Recorded so the vendor gap is visible rather than silent."
+        )
+        lines.append("")
+        lines.extend(_table(metadata_gaps))
+
     lines.append("")
     lines.append(
         "Review flagged rows. To mark a ticker as delisted/acquired, "
         "remove it from `data/coverage_universe_tickers.csv` and append "
         "an entry to `data/delisted_tickers.csv` with last-known sector "
-        "and market cap data."
+        "and market cap data. **Confirm against a second source first** — a "
+        "flag is a prompt to look, not a finding."
     )
     md_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -360,10 +547,18 @@ def main(use_cache=True):
     result = check_universe(use_cache=use_cache)
     paths = write_report(result)
     logger.info(
-        "Delisted check: %d/%d flagged (missing data: %d, price-probe failures: %d)",
-        len(result["flagged"]), result["checked"], result["missing_data"],
-        result.get("price_probe_failures", 0),
+        "Delisted check: %d/%d flagged, %d inconclusive "
+        "(no identity: %d, probe failures: %d price / %d metadata)",
+        len(result["flagged"]), result["checked"],
+        len(result.get("inconclusive", [])), result["missing_data"],
+        result.get("price_probe_failures", 0), result.get("info_failures", 0),
     )
+    if result.get("degraded"):
+        logger.warning(
+            "  DEGRADED RUN: over %.0f%% of lookups failed - this is Yahoo "
+            "throttling, not a delisting wave. Flags are provisional; re-run "
+            "before acting on them.", DEGRADED_FAILURE_RATE * 100,
+        )
     logger.info("  CSV: %s", paths["csv_path"])
     logger.info("  MD:  %s", paths["md_path"])
     if result["flagged"]:

@@ -669,6 +669,11 @@ def _step_delisted_check():
     return {
         "checked": result["checked"],
         "flagged": len(result["flagged"]),
+        # Tickers the run could not resolve. Kept separate from `flagged` all
+        # the way out to the run summary: a lookup that failed is not a
+        # delisting, and merging the two is what made this check untrustworthy.
+        "inconclusive": len(result.get("inconclusive", [])),
+        "degraded": bool(result.get("degraded")),
         "missing_data": result["missing_data"],
         "report": paths["md_path"],
     }
@@ -974,12 +979,20 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         if dc_result:
             steps["delisted_check"] = (
                 f"{dc_result['flagged']} flagged of {dc_result['checked']} "
-                f"(missing data: {dc_result['missing_data']})"
+                f"({dc_result.get('inconclusive', 0)} inconclusive, "
+                f"missing data: {dc_result['missing_data']})"
+                + (" [DEGRADED]" if dc_result.get("degraded") else "")
             )
             if dc_result["flagged"]:
                 logger.warning(
-                    "  %d ticker(s) flagged — review %s",
+                    "  %d ticker(s) flagged - review %s",
                     dc_result["flagged"], dc_result["report"],
+                )
+            if dc_result.get("degraded"):
+                logger.warning(
+                    "  DEGRADED: high lookup-failure rate (Yahoo throttling), "
+                    "so this week's flags are provisional - see %s",
+                    dc_result["report"],
                 )
         else:
             steps["delisted_check"] = status
