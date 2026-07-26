@@ -17368,7 +17368,7 @@
       "fiscal_quarter": 3,
       "report_date": "2026-11-02",
       "source": "finnhub",
-      "gating_eligible": false
+      "gating_eligible": true
     }
   },
   "ERF": {
