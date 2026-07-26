@@ -693,6 +693,24 @@ def _step_ticker_change_check():
     }
 
 
+def _step_cik_backfill():
+    """Fill blank CIKs from SEC's bulk map before anything reads the exports.
+
+    A CIK is a fact about whether a company has REGISTERED YET, not a static
+    property, so blanks must be re-probed on a schedule. Without this, a name
+    that registers after its row was enriched keeps a blank CIK forever and
+    every CIK-keyed lane silently skips it — which is precisely how SpaceX went
+    unscreened by insider_ownership while sitting in the portfolio (2026-07-25).
+
+    Runs BEFORE the export steps so a newly-resolved CIK reaches consumers in
+    the same run. Non-gating: a failed SEC fetch changes nothing and is
+    reported.
+    """
+    from universe import cik_backfill
+
+    return cik_backfill.main()
+
+
 def _step_universe_delta_slack(baseline):
     """Post a weekly before/delta/after universe summary to Slack #coverage.
 
@@ -965,6 +983,29 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 )
         else:
             steps["delisted_check"] = status
+
+    # Step 4a: Backfill blank CIKs from SEC's bulk map. Placed before the export
+    # steps so a company that has newly registered becomes visible to
+    # CIK-keyed consumers (insider_ownership, earnings_agent) in this same run.
+    if dry_run:
+        logger.info("[4a/6] CIK backfill... SKIPPED (dry run)")
+        steps["cik_backfill"] = "skipped (dry run)"
+    else:
+        logger.info("[4a/6] Backfilling blank CIKs from SEC EDGAR...")
+        status, cb_result = run_step("cik_backfill", _step_cik_backfill)
+        if cb_result:
+            if not cb_result["fetched_ok"]:
+                steps["cik_backfill"] = "SEC map unavailable - no rows changed"
+                logger.warning("  SEC map unavailable; blank CIKs NOT re-probed")
+            else:
+                steps["cik_backfill"] = (
+                    f"{cb_result['filled']} filled, "
+                    f"{cb_result['still_blank']} still blank (non-US)"
+                )
+                for t, cik, name in cb_result.get("rows", []):
+                    logger.warning("  NEW REGISTRANT %s -> CIK %s (%s)", t, cik, name)
+        else:
+            steps["cik_backfill"] = status
 
     # Step 4b: Ticker-change / deregistration discovery (SEC CIK->ticker map).
     # Complements delisted_check: it surfaces the NEW symbol for a renamed

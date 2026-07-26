@@ -54,6 +54,21 @@ def build_parser():
         help="Bypass the SEC ticker-map cache and refetch from sec.gov.",
     )
 
+    cik_parser = subparsers.add_parser(
+        "backfill-cik",
+        help=(
+            "Fill blank CIKs from SEC EDGAR's free bulk ticker map. A CIK is a "
+            "fact about whether a company has REGISTERED YET, so blanks must be "
+            "re-probed: a name that registers after its row was enriched keeps a "
+            "blank CIK forever and every CIK-keyed lane silently skips it "
+            "(SpaceX, 2026-07-25). One HTTP GET; never overwrites an existing CIK."
+        ),
+    )
+    cik_parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Report what would be filled without writing the CSV.",
+    )
+
     lei_parser = subparsers.add_parser(
         "backfill-lei",
         help=(
@@ -360,6 +375,13 @@ def main():
         result = ticker_change_check.main(use_cache=not args.no_cache)
         flagged = len(result["changes"]) + len(result["deregistered"])
         raise SystemExit(0 if (result["sec_fetched_ok"] and not flagged) else 2)
+    elif args.command == "backfill-cik":
+        from universe import cik_backfill
+
+        result = cik_backfill.main(dry_run=args.dry_run)
+        # Exit 2 when the SEC fetch failed: a silent no-op here would let the
+        # very gap this step closes reopen unnoticed.
+        raise SystemExit(0 if result["fetched_ok"] else 2)
     elif args.command == "backfill-lei":
         from universe import lei_backfill
 
