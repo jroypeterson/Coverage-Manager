@@ -31,17 +31,40 @@ from __future__ import annotations
 
 import json
 
-import pandas as pd
 import requests
 
-from config import CSV_PATH
+from config import API_KEYS, CSV_PATH
 from logging_utils import get_logger, log_exception
+from ticker_utils import normalize_symbol_for_matching as _norm_symbol
+from ticker_utils import read_universe_csv
 
 logger = get_logger(__name__)
 
 SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-#: SEC requires a real contact in the User-Agent or it serves 403/garbage.
-SEC_USER_AGENT = "Coverage Manager (jroypeterson@gmail.com)"
+#: SEC requires a real contact in the User-Agent or it serves 403/garbage. Read
+#: from the workspace EDGAR identity so updating it in `.env` reaches every SEC
+#: caller at once — a second hard-coded contact string would silently keep using
+#: stale details after the configured one changed. Mirrors `ticker_change_check`.
+SEC_USER_AGENT = (API_KEYS.get("EDGAR_IDENTITY")
+                  or "Coverage Manager jroypeterson@gmail.com")
+
+
+def build_norm_index(cik_map: dict[str, str]) -> dict[str, str]:
+    """`{normalized_symbol: cik}` for symbols whose normalized form is unique.
+
+    SEC writes share classes with a hyphen (`BRK-B`) where the universe often
+    carries a dot (`BRK.B`), so exact string matching leaves a registered issuer
+    blank and invisible to every CIK-keyed lane. Normalizing strips the
+    separator — but only unambiguous mappings are kept: if two different SEC
+    symbols normalize to the same string we cannot tell which issuer a universe
+    row meant, and guessing would write a WRONG CIK, which is far worse than
+    leaving it blank (a blank is visibly missing; a wrong CIK silently pulls
+    another company's filings).
+    """
+    seen: dict[str, set[str]] = {}
+    for ticker, cik in cik_map.items():
+        seen.setdefault(_norm_symbol(ticker), set()).add(cik)
+    return {norm: next(iter(ciks)) for norm, ciks in seen.items() if len(ciks) == 1}
 
 
 def fetch_sec_cik_map() -> dict[str, str]:
@@ -67,7 +90,12 @@ def fetch_sec_cik_map() -> dict[str, str]:
 
 
 def main(dry_run: bool = False) -> dict:
-    df = pd.read_csv(CSV_PATH, dtype=str).fillna("")
+    # MUST be read_universe_csv: this function writes the WHOLE file back, and a
+    # bare read maps literal tokens like "NA"/"N/A"/"NULL" to NaN, which a
+    # subsequent write would persist as an empty cell -- silently destroying a
+    # curated field while "successfully" filling a CIK. See CONVENTIONS in
+    # CLAUDE.md, "Universe CSV I/O -- float-safe loader".
+    df = read_universe_csv(CSV_PATH)
     if "CIK" not in df.columns or "Ticker" not in df.columns:
         logger.warning("CIK backfill: CSV lacks Ticker/CIK columns; skipping")
         return {"filled": 0, "still_blank": 0, "fetched_ok": False}
@@ -80,11 +108,13 @@ def main(dry_run: bool = False) -> dict:
         return {"filled": 0, "still_blank": int((df["CIK"].str.strip() == "").sum()),
                 "fetched_ok": False}
 
+    norm_index = build_norm_index(cik_map)
     blank = df["CIK"].str.strip() == ""
     filled: list[tuple[str, str, str]] = []
     for idx in df.index[blank]:
         t = str(df.at[idx, "Ticker"]).strip().upper()
-        cik = cik_map.get(t)
+        # Exact first, then separator-insensitive (universe "BRK.B" vs SEC "BRK-B").
+        cik = cik_map.get(t) or norm_index.get(_norm_symbol(t))
         if cik:
             df.at[idx, "CIK"] = cik
             filled.append((t, cik, str(df.at[idx, "Company Name"])[:40]))

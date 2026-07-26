@@ -252,10 +252,30 @@ def test_live_ticker_not_flagged():
 
 
 def test_transient_probe_failure_does_not_trigger_price_flag():
-    # probe didn't run (network blip) → price_stale is False → not flagged on price;
-    # falls through to identity rules, which pass for a matching name.
+    # probe didn't run (network blip) → price_stale is False → never FLAGGED.
     verdict, reason = _classify(_row(), _identity(last="", probe_ran=False, stale=False))
-    assert verdict == VERDICT_CLEAN, reason
+    assert verdict != VERDICT_FLAGGED, reason
+
+
+def test_matching_identity_with_a_failed_price_probe_is_inconclusive():
+    """Not clean. A clean acquisition keeps `.info` — and therefore the name
+    match — intact for months, so the price feed is the ONLY signal that finds
+    it. With the probe failed, the check that mattered never ran."""
+    verdict, reason = _classify(_row(), _identity(last="", probe_ran=False, stale=False))
+    assert verdict == VERDICT_INCONCLUSIVE
+    assert "was not checked" in reason
+
+
+def test_metadata_only_findings_survive_a_failed_price_probe():
+    """The inconclusive downgrade must not swallow rules that never needed the
+    price feed — a recycled quoteType and a name mismatch are still findings."""
+    recycled = _classify(_row(), _identity(name="Some ETF", quote="ETF",
+                                           probe_ran=False, stale=False))
+    assert recycled[0] == VERDICT_FLAGGED and "non-equity" in recycled[1]
+
+    renamed = _classify(_row(), _identity(name="Completely Different Issuer Holdings",
+                                          probe_ran=False, stale=False))
+    assert renamed[0] == VERDICT_FLAGGED and "mismatch" in renamed[1]
 
 
 def test_non_equity_recycle_flagged():
@@ -387,6 +407,27 @@ def test_live_price_with_missing_metadata_is_reported_but_not_flagged(monkeypatc
     assert result["flagged"] == []
     assert result["inconclusive"] == []
     assert [r["ticker"] for r in result["metadata_gaps"]] == ["ACLX"]
+
+
+def test_degraded_counts_the_union_of_failed_probes(monkeypatch):
+    """max(price_fails, info_fails) understates the damage: the probes fail
+    independently, so disjoint failures affect more tickers than either count."""
+    ids = {}
+    for i in range(20):
+        if i == 0:      # price-only failure
+            ids[f"T{i}"] = _identity(name="Some Company Inc", probe_ran=False)
+        elif i == 1:    # metadata-only failure, price fine
+            ids[f"T{i}"] = _identity(name="", quote="", info_ok=False,
+                                     last=_fresh(1))
+        else:
+            ids[f"T{i}"] = _identity(name="Some Company Inc", last=_fresh(1))
+    result = _fake_universe(monkeypatch, [_urow(f"T{i}") for i in range(20)], ids)
+
+    assert result["price_probe_failures"] == 1
+    assert result["info_failures"] == 1
+    assert result["tickers_with_a_failed_probe"] == 2, "the union, not the max"
+    # 2/20 = 10% > 2%; max() would have seen 1/20 = 5%... still over, so pin the
+    # count itself rather than relying on the threshold to expose the bug.
 
 
 def test_high_failure_rate_marks_the_run_degraded(monkeypatch):

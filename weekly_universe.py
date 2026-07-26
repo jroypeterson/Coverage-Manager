@@ -977,11 +977,20 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         logger.info("[4/6] Checking universe for delisted/recycled tickers...")
         status, dc_result = run_step("delisted_check", _step_delisted_check)
         if dc_result:
-            steps["delisted_check"] = (
+            summary = (
                 f"{dc_result['flagged']} flagged of {dc_result['checked']} "
                 f"({dc_result.get('inconclusive', 0)} inconclusive, "
                 f"missing data: {dc_result['missing_data']})"
-                + (" [DEGRADED]" if dc_result.get("degraded") else "")
+            )
+            # A degraded run must reach the health heartbeat, and
+            # `collect_non_successes` only recognises the "failed:"/"blocked:"
+            # prefixes -- an unprefixed "[DEGRADED]" note reads as success and
+            # posts a green :white_check_mark: for a run that checked half the
+            # universe. The CLI already exits 2 here; the scheduled path must
+            # agree with it rather than quietly disagreeing.
+            steps["delisted_check"] = (
+                f"failed: degraded - {summary}" if dc_result.get("degraded")
+                else summary
             )
             if dc_result["flagged"]:
                 logger.warning(
@@ -1008,7 +1017,11 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         status, cb_result = run_step("cik_backfill", _step_cik_backfill)
         if cb_result:
             if not cb_result["fetched_ok"]:
-                steps["cik_backfill"] = "SEC map unavailable - no rows changed"
+                # "failed:" so it reaches the heartbeat -- see the delisted_check
+                # note above. A silent pass here means the blanks were never
+                # re-probed, i.e. the exact gap this step exists to close stayed
+                # open while the run reported ok.
+                steps["cik_backfill"] = "failed: SEC map unavailable - no rows changed"
                 logger.warning("  SEC map unavailable; blank CIKs NOT re-probed")
             else:
                 steps["cik_backfill"] = (

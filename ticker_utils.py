@@ -312,3 +312,21 @@ def normalize_company_for_comparison(name):
     s = re.sub(r'\b(inc|corp|corporation|plc|ltd|limited|holdings|co|company|group|se|ag|sa|nv)\b', '', s)
     s = re.sub(r'[.,\s]+', ' ', s).strip()
     return s
+
+
+# Share-class / exchange separators, stripped for symbol EQUALITY comparisons so
+# a universe "BRK.B" matches SEC's "BRK-B". Deliberately NOT part of
+# `normalize_ticker` (which produces a yfinance-callable symbol) — this form is
+# a matching key only and must never be used to make a request.
+_SYMBOL_SEPARATORS = re.compile(r"[.\-/ ]")
+
+
+def normalize_symbol_for_matching(ticker):
+    """Separator-insensitive symbol key ("BRK.B" and "BRK-B" -> "BRKB").
+
+    Shared by `ticker_change_check` (SEC symbol comparison) and `cik_backfill`
+    (SEC CIK lookup); both compare against SEC's bulk `company_tickers.json`,
+    which writes share classes with a hyphen while the universe CSV commonly
+    carries a dot.
+    """
+    return _SYMBOL_SEPARATORS.sub("", str(ticker or "").strip().upper())

@@ -53,6 +53,7 @@ import requests
 
 from cache import cache_get, cache_set
 from config import API_KEYS, CSV_PATH, REPORTS_DIR
+from ticker_utils import normalize_symbol_for_matching
 from logging_utils import get_logger, log_exception
 
 logger = get_logger("ticker_change_check")
@@ -75,12 +76,9 @@ SEC_CACHE_TTL_HOURS = 24.0
 _PLAIN_US_SYMBOL = re.compile(r"^[A-Z]{1,5}([.\-/][A-Z])?$")
 
 # Strip share-class / exchange separators for symbol equality so "BRK.B" matches
-# SEC's "BRK-B".
-_SEP = re.compile(r"[.\-/ ]")
-
-
-def _norm_symbol(t):
-    return _SEP.sub("", str(t or "").strip().upper())
+# SEC's "BRK-B". Shared with `cik_backfill`, which compares against the same SEC
+# bulk file — one definition so the two can never drift apart.
+_norm_symbol = normalize_symbol_for_matching
 
 
 def load_sec_cik_map(use_cache=True):

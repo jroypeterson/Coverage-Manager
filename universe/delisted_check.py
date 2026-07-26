@@ -426,6 +426,19 @@ def _classify(row, identity):
             f"{recorded_name!r}, yfinance={long_name or short_name!r}"
         )
 
+    if not probe_ran:
+        # LAST, deliberately: every metadata-only rule above (recycled quoteType,
+        # name mismatch) is decidable without the price feed and keeps its flag.
+        # What is left is "metadata looks fine" -- and the price feed is the ONLY
+        # signal that catches a clean acquisition, because Yahoo keeps `.info`
+        # (and therefore the name match) intact for months afterwards. With the
+        # probe failed we did not check the one thing that would have found it,
+        # so calling this clean asserts a check we never ran.
+        return VERDICT_INCONCLUSIVE, (
+            "identity looks unchanged but the price probe failed; the delisting "
+            "signal was not checked"
+        )
+
     return VERDICT_CLEAN, ""
 
 
@@ -492,6 +505,7 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
     missing_data = 0
     price_probe_failures = 0
     info_failures = 0
+    any_probe_failed = 0
     for row, yf_t in pairs:
         identity = identities.get(yf_t, {})
         if not identity or (
@@ -504,6 +518,8 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
             price_probe_failures += 1
         if not identity or not identity.get("info_ok"):
             info_failures += 1
+        if not identity or not identity.get("price_probe_ran") or not identity.get("info_ok"):
+            any_probe_failed += 1
         verdict, reason = _classify(row, identity)
         if verdict == VERDICT_CLEAN and not reason:
             continue
@@ -530,10 +546,10 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
         bucket.sort(key=lambda r: r["ticker"])
 
     checked = len(pairs)
-    # A single failure rate over both probes: either one failing means the run
-    # learned less than it should have about that name.
-    worst_failures = max(price_probe_failures, info_failures)
-    degraded = bool(checked and worst_failures / checked > DEGRADED_FAILURE_RATE)
+    # The UNION of affected tickers, not max() of the two counts. The probes fail
+    # independently, so 1.5% price-only plus 1.5% metadata-only degrades 3% of
+    # the universe while max() reports 1.5% and stays silent.
+    degraded = bool(checked and any_probe_failed / checked > DEGRADED_FAILURE_RATE)
 
     return {
         "checked": checked,
@@ -543,6 +559,7 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
         "missing_data": missing_data,
         "price_probe_failures": price_probe_failures,
         "info_failures": info_failures,
+        "tickers_with_a_failed_probe": any_probe_failed,
         "rate_limit_trips": _THROTTLE.trips,
         "degraded": degraded,
     }
