@@ -330,3 +330,23 @@ def normalize_symbol_for_matching(ticker):
     carries a dot.
     """
     return _SYMBOL_SEPARATORS.sub("", str(ticker or "").strip().upper())
+
+
+def write_universe_csv(df, path=CSV_PATH):
+    """Write the coverage-universe CSV back in its canonical encoding.
+
+    Pairs with `read_universe_csv`. The committed master AND the published
+    `exports/universe.csv` snapshot both carry a UTF-8 BOM, so that is the
+    canonical form; a writer using pandas' default UTF-8 silently strips it,
+    producing a spurious whole-file first-line diff and flipping the header cell
+    a stdlib-`csv` consumer sees between ``Ticker`` and ``﻿Ticker``.
+    Reads were centralized here in 2026-06-20 for the same class of reason;
+    writes were not, and drifted.
+
+    NOTE (2026-07-26): five other whole-file writers still call `df.to_csv`
+    directly and will strip the BOM -- `add_exchanges.py`, `cleanup.py`,
+    `enrich.py`, `lei_backfill.py`, `ipo_backfill.py`, plus
+    `discovery/candidates.py`. Migrating them is a separate change with its own
+    blast radius; until then the encoding depends on which step wrote last.
+    """
+    df.to_csv(path, index=False, encoding="utf-8-sig")

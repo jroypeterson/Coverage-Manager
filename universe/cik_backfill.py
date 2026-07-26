@@ -29,27 +29,42 @@ CLI: `python cli.py backfill-cik [--dry-run]`
 """
 from __future__ import annotations
 
-import json
+import re
+from difflib import SequenceMatcher
 
-import requests
-
-from config import API_KEYS, CSV_PATH
-from logging_utils import get_logger, log_exception
+from config import CSV_PATH
+from logging_utils import get_logger
+from ticker_utils import (
+    backup_csv,
+    normalize_company_for_comparison,
+    read_universe_csv,
+    write_universe_csv,
+)
 from ticker_utils import normalize_symbol_for_matching as _norm_symbol
-from ticker_utils import read_universe_csv
 
 logger = get_logger(__name__)
 
-SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-#: SEC requires a real contact in the User-Agent or it serves 403/garbage. Read
-#: from the workspace EDGAR identity so updating it in `.env` reaches every SEC
-#: caller at once — a second hard-coded contact string would silently keep using
-#: stale details after the configured one changed. Mirrors `ticker_change_check`.
-SEC_USER_AGENT = (API_KEYS.get("EDGAR_IDENTITY")
-                  or "Coverage Manager jroypeterson@gmail.com")
+# The SEC download itself (URL, User-Agent, 24h cache, fetched-ok contract) lives
+# in `ticker_change_check.load_sec_cik_map` -- see `fetch_sec_cik_map` below.
 
 
-def build_norm_index(cik_map: dict[str, str]) -> dict[str, str]:
+#: Below this normalized-name similarity, refuse to bind a row to a CIK. Mirrors
+#: `delisted_check.NAME_SIMILARITY_THRESHOLD`, which solves the same problem
+#: (has this ticker been recycled to a different issuer?) from the other side.
+NAME_MATCH_THRESHOLD = 0.55
+
+#: Only plain US-style symbols take the separator-insensitive fallback. Foreign
+#: lines dominate the blank-CIK population (`4503.T`, `000100.KS`, `1093.HK`),
+#: and stripping their separators produces keys like `4503T` that could collide
+#: with an unrelated SEC symbol. `build_norm_index` can only rule out
+#: collisions among SEC's own symbols -- it cannot stop a universe-side foreign
+#: ticker from normalizing onto a real US one. Those rows are US-registrant
+#: candidates only via an exact match, which needs no normalization anyway.
+#: Same gate `ticker_change_check` applies for the same reason.
+_PLAIN_US_SYMBOL = re.compile(r"^[A-Z]{1,5}([.\-/][A-Z])?$")
+
+
+def build_norm_index(cik_map: dict[str, tuple[str, str]]) -> dict[str, str]:
     """`{normalized_symbol: cik}` for symbols whose normalized form is unique.
 
     SEC writes share classes with a hyphen (`BRK-B`) where the universe often
@@ -62,31 +77,63 @@ def build_norm_index(cik_map: dict[str, str]) -> dict[str, str]:
     another company's filings).
     """
     seen: dict[str, set[str]] = {}
-    for ticker, cik in cik_map.items():
+    for ticker, (cik, _title) in cik_map.items():
         seen.setdefault(_norm_symbol(ticker), set()).add(cik)
     return {norm: next(iter(ciks)) for norm, ciks in seen.items() if len(ciks) == 1}
 
 
-def fetch_sec_cik_map() -> dict[str, str]:
-    """`{TICKER: cik}` from SEC's bulk file. Empty dict on any failure."""
-    try:
-        resp = requests.get(SEC_TICKERS_URL,
-                            headers={"User-Agent": SEC_USER_AGENT}, timeout=30)
-        if resp.status_code != 200:
-            logger.warning("SEC company_tickers.json HTTP %s", resp.status_code)
-            return {}
-        data = resp.json()
-    except (requests.RequestException, json.JSONDecodeError) as e:
-        log_exception(logger, "SEC company_tickers.json fetch failed", e)
+def fetch_sec_cik_map() -> dict[str, tuple[str, str]]:
+    """`{TICKER: (cik, sec_title)}` from SEC's bulk file. Empty on any failure.
+
+    Delegates to `ticker_change_check.load_sec_cik_map`, which downloads the
+    same ~1 MB file this module needs and caches it for 24h. Fetching it
+    separately meant weekly steps 4a and 4b pulled it back-to-back, and only one
+    of them survived a brief SEC outage on cache. Sharing also carries the SEC
+    **title** through, which `_name_matches` needs.
+    """
+    from universe.ticker_change_check import load_sec_cik_map  # noqa: PLC0415
+
+    cik_map, fetched_ok = load_sec_cik_map()
+    if not fetched_ok:
         return {}
-    out: dict[str, str] = {}
-    for entry in data.values():
-        t = str(entry.get("ticker", "")).strip().upper()
-        cik = entry.get("cik_str")
-        if t and cik:
-            out[t] = str(cik)
+    out: dict[str, tuple[str, str]] = {}
+    for cik, entry in cik_map.items():
+        title = str(entry.get("title") or "")
+        for ticker in entry.get("tickers") or []:
+            t = str(ticker).strip().upper()
+            if t:
+                out[t] = (str(cik), title)
     logger.info("SEC EDGAR: %s ticker->CIK mappings", len(out))
     return out
+
+
+def _name_matches(recorded_name: str, sec_title: str) -> bool:
+    """Does the universe row plausibly describe the same company SEC does?
+
+    A ticker string alone is NOT identity. Tickers get recycled between issuers
+    -- that is the entire premise of the sibling `delisted_check` module -- and
+    the rows this backfill targets are the most exposed of all: privately-held
+    names carried under provisional symbols (SPCX, Cerebras, Fervo, Quantinuum)
+    assigned before any listing existed. If such a symbol is, or later becomes,
+    some other registrant's ticker, matching on the string alone writes THAT
+    company's CIK into the master CSV, and the CIK-keyed lanes downstream
+    (insider_ownership, earnings_agent) then silently pull the wrong company's
+    filings. Writing a wrong CIK is far worse than leaving a blank one: a blank
+    is visibly missing, a wrong one looks like data.
+
+    Deliberately permissive -- the goal is to catch "this is a different
+    company", not to adjudicate naming style. An unavailable name on either side
+    cannot disconfirm anything, so it passes.
+    """
+    if not recorded_name or not sec_title:
+        return True
+    a = normalize_company_for_comparison(recorded_name)
+    b = normalize_company_for_comparison(sec_title)
+    if not a or not b:
+        return True
+    if a in b or b in a:
+        return True
+    return SequenceMatcher(None, a, b).ratio() >= NAME_MATCH_THRESHOLD
 
 
 def main(dry_run: bool = False) -> dict:
@@ -110,24 +157,52 @@ def main(dry_run: bool = False) -> dict:
 
     norm_index = build_norm_index(cik_map)
     blank = df["CIK"].str.strip() == ""
+    blank_before = int(blank.sum())
     filled: list[tuple[str, str, str]] = []
+    rejected: list[tuple[str, str, str]] = []
     for idx in df.index[blank]:
         t = str(df.at[idx, "Ticker"]).strip().upper()
-        # Exact first, then separator-insensitive (universe "BRK.B" vs SEC "BRK-B").
-        cik = cik_map.get(t) or norm_index.get(_norm_symbol(t))
-        if cik:
-            df.at[idx, "CIK"] = cik
-            filled.append((t, cik, str(df.at[idx, "Company Name"])[:40]))
+        recorded = str(df.at[idx, "Company Name"])
+        hit = cik_map.get(t)
+        if hit:
+            cik, sec_title = hit
+        elif _PLAIN_US_SYMBOL.match(t):
+            # Separator-insensitive fallback (universe "BRK.B" vs SEC "BRK-B"),
+            # US-style symbols only -- see _PLAIN_US_SYMBOL.
+            cik = norm_index.get(_norm_symbol(t))
+            sec_title = next((title for sym, (c, title) in cik_map.items()
+                              if c == cik), "") if cik else ""
+        else:
+            continue
+        if not cik:
+            continue
+        if not _name_matches(recorded, sec_title):
+            # Warn and skip, never write. A ticker match with a company-name
+            # disagreement is the recycled-symbol case, and guessing here writes
+            # another company's filings into seven downstream projects.
+            rejected.append((t, cik, sec_title[:40]))
+            continue
+        df.at[idx, "CIK"] = cik
+        filled.append((t, cik, recorded[:40]))
 
     if filled and not dry_run:
-        df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+        backup_csv(CSV_PATH)
+        write_universe_csv(df, CSV_PATH)
 
-    still_blank = int((df["CIK"].str.strip() == "").sum())
+    # Report the CURRENT state, not the hypothetical post-fill one: in dry-run
+    # the whole point is what the file looks like now.
+    still_blank = blank_before - (0 if dry_run else len(filled))
     verb = "would fill" if dry_run else "filled"
-    logger.info("CIK backfill: %s %s blank CIK(s); %s still blank "
-                "(expected - non-US registrants)", verb, len(filled), still_blank)
+    logger.info("CIK backfill: %s %s blank CIK(s); %s blank before this step "
+                "(most are non-US registrants, but not all - review "
+                "periodically)", verb, len(filled), blank_before)
     for t, cik, name in filled:
-        logger.warning("  NEW CIK %s -> %s (%s) - now visible to CIK-keyed lanes",
-                       t, cik, name)
+        logger.info("  NEW CIK %s -> %s (%s) - now visible to CIK-keyed lanes",
+                    t, cik, name)
+    for t, cik, sec_title in rejected:
+        logger.warning("  SKIPPED %s: SEC CIK %s is '%s', which does not match "
+                       "the universe company name - possible recycled ticker",
+                       t, cik, sec_title)
     return {"filled": len(filled), "still_blank": still_blank,
+            "rejected_name_mismatch": len(rejected),
             "fetched_ok": True, "rows": filled}

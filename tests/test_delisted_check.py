@@ -8,6 +8,9 @@ import pytest
 
 from universe.delisted_check import (
     DEGRADED_FAILURE_RATE,
+    PRICE_FAILED,
+    PRICE_NO_DATA,
+    PRICE_OK,
     PRICE_STALE_DAYS,
     VERDICT_CLEAN,
     VERDICT_FLAGGED,
@@ -88,27 +91,30 @@ def _hist(dates, tz="America/New_York"):
 def test_probe_returns_last_bar_date_tz_aware():
     t = _FakeTicker(_hist(["2026-06-10", "2026-06-11", "2026-06-12"]))
     ran, last = _probe_recent_price(t)
-    assert ran is True
+    assert ran == PRICE_OK
     assert last == "2026-06-12"  # exchange-local trading date, not UTC-shifted
     # essential: raise_errors must be passed so 429s don't masquerade as dead feeds
     assert t.called_with.get("raise_errors") is True
 
 
-def test_probe_empty_frame_is_dead_feed():
+def test_probe_empty_frame_is_no_data_not_a_dead_feed():
+    """An empty frame means Yahoo has nothing -- NOT that the company is gone.
+    Verified 2026-07-26: ACLX answers this way on both 1mo and 1y windows while
+    trading at $115.07 on NASDAQ."""
     ran, last = _probe_recent_price(_FakeTicker(pd.DataFrame()))
-    assert ran is True and last == ""
+    assert ran == PRICE_NO_DATA and last == ""
 
 
 def test_probe_all_nan_close_is_dead_feed():
     idx = pd.to_datetime(["2026-06-12"]).tz_localize("UTC")
     df = pd.DataFrame({"Close": [float("nan")]}, index=idx)
     ran, last = _probe_recent_price(_FakeTicker(df))
-    assert ran is True and last == ""
+    assert ran == PRICE_NO_DATA and last == ""
 
 
 def test_probe_exception_marks_not_run():
     ran, last = _probe_recent_price(_FakeTicker(raises=True))
-    assert ran is False and last == ""
+    assert ran == PRICE_FAILED and last == ""
 
 
 # ── rate-limit backoff ──────────────────────────────────────────────────────
@@ -148,7 +154,7 @@ def test_rate_limit_detection():
 def test_probe_retries_through_rate_limiting(_no_real_sleeping):
     t = _FlakyTicker(2, _hist(["2026-06-12"]))
     ran, last = _probe_recent_price(t)
-    assert ran is True and last == "2026-06-12", (
+    assert ran == PRICE_OK and last == "2026-06-12", (
         "a rate-limited probe that later succeeds must not be recorded as a "
         "failed lookup"
     )
@@ -161,23 +167,40 @@ def test_probe_gives_up_after_the_attempt_budget():
 
     t = _FlakyTicker(99, None)
     ran, _last = _probe_recent_price(t)
-    assert ran is False
+    assert ran == PRICE_FAILED
     assert t.calls == RETRY_ATTEMPTS
 
 
 def test_a_404_is_not_retried():
     """Only rate limiting is transient; a dead symbol answers immediately."""
-    t = _FakeTicker(raises=True)
-    t._raises = True
 
     class _NotFound(_FakeTicker):
         def history(self, **kwargs):
             self.called_with = kwargs
-            raise RuntimeError("404 Not Found: no data for symbol")
+            self.calls = getattr(self, "calls", 0) + 1
+            raise RuntimeError("404 Not Found")
 
     nf = _NotFound()
     ran, _last = _probe_recent_price(nf)
-    assert ran is False
+    assert ran == PRICE_FAILED
+    assert nf.calls == 1, "a real answer must not be retried"
+
+
+def test_yfinance_no_data_is_its_own_outcome_not_a_failure():
+    """yfinance raises "possibly delisted; no price data found" for symbols that
+    trade perfectly well (ACLX, verified 2026-07-26). It is an ANSWER, so it is
+    not retried -- and it is not EVIDENCE, so it is not a failure either."""
+
+    class _NoData(_FakeTicker):
+        def history(self, **kwargs):
+            self.calls = getattr(self, "calls", 0) + 1
+            raise RuntimeError(
+                "$ACLX: possibly delisted; no price data found  (period=1y)")
+
+    nd = _NoData()
+    ran, _last = _probe_recent_price(nd)
+    assert ran == PRICE_NO_DATA
+    assert nd.calls == 1
 
 
 def test_throttle_escalates_then_relaxes():

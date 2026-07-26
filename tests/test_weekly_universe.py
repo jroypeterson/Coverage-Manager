@@ -62,8 +62,8 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "validate",
         "archive",
         "discovery",
+        "delisted_check",
         "cik_backfill",
-            "delisted_check",
         "ticker_change_check",
         "export_artifacts",
         "export_watchlist",
@@ -106,3 +106,38 @@ def test_main_validation_failure_sets_validation_passed_false(monkeypatch, tmp_p
     assert result["validation_passed"] is False
     # validate step itself completed (it's the rules that failed, not the step)
     assert result["steps"]["validate"] == "ok"
+
+
+# --- degraded/failed steps must reach the health heartbeat ------------------
+#
+# `collect_non_successes` recognises ONLY the "failed:"/"blocked:" prefixes, so
+# a step that reports trouble in prose posts a green heartbeat. That is how a
+# delisted check which resolved half the universe, and a CIK backfill that never
+# reached SEC, both reported :white_check_mark: to #status-reports.
+
+
+def test_degraded_delisted_check_is_a_non_success():
+    from pipeline_utils import collect_non_successes
+
+    steps = {"delisted_check": "failed: degraded - 0 flagged of 1093",
+             "export_artifacts": "ok"}
+    assert collect_non_successes(steps) == ["delisted_check"]
+
+
+def test_unreachable_sec_map_is_a_non_success():
+    from pipeline_utils import collect_non_successes
+
+    steps = {"cik_backfill": "failed: SEC map unavailable - no rows changed",
+             "export_artifacts": "ok"}
+    assert collect_non_successes(steps) == ["cik_backfill"]
+
+
+def test_an_ordinary_run_stays_a_success():
+    """The alarm must not be permanently lit -- flags and inconclusive rows are
+    the check's normal output, not a failure of the run."""
+    from pipeline_utils import collect_non_successes
+
+    steps = {"delisted_check": "3 flagged of 1093 (11 inconclusive, missing data: 4)",
+             "cik_backfill": "filled 0 blank CIK(s); 241 blank before this step",
+             "export_artifacts": "ok"}
+    assert collect_non_successes(steps) == []

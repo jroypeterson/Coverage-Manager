@@ -166,11 +166,20 @@ class _Throttle:
 _THROTTLE = _Throttle()
 
 
-def _with_retry(fn, label):
-    """Call `fn`, retrying through Yahoo rate limiting. Returns (value, ok).
+#: Third `ok` value from `_with_retry`: the call answered, and the answer was
+#: "I have nothing for this symbol". Distinct from both success and failure.
+_NO_DATA = "no_data"
 
-    Only rate-limit errors are retried — a 404 for a genuinely dead symbol is a
-    real answer, and retrying it would just burn the budget that the throttled
+
+def _with_retry(fn, label, no_data_markers=()):
+    """Call `fn`, retrying through Yahoo rate limiting.
+
+    Returns `(value, ok)` where `ok` is True, False, or `_NO_DATA` when the
+    exception text matches `no_data_markers` — an authoritative-sounding "no
+    data" reply, which the caller must decide how much to believe.
+
+    Only rate-limit errors are retried — a "no data" answer for a symbol is a
+    real reply, and retrying it would just burn the budget that the throttled
     names need.
     """
     for attempt in range(1, RETRY_ATTEMPTS + 1):
@@ -178,50 +187,85 @@ def _with_retry(fn, label):
         try:
             value = fn()
         except Exception as exc:  # noqa: BLE001 - yfinance raises bare Exceptions
-            if not _is_rate_limited(exc):
-                log_exception(logger, f"{label} failed", exc)
-                return None, False
-            if attempt >= RETRY_ATTEMPTS:
-                logger.warning("%s: still rate limited after %d attempts",
-                               label, RETRY_ATTEMPTS)
-                return None, False
-            delay = _THROTTLE.trip()
-            logger.info("%s: rate limited, backing off %.1fs (attempt %d/%d)",
-                        label, delay, attempt, RETRY_ATTEMPTS)
-            continue
+            if _is_rate_limited(exc):
+                if attempt >= RETRY_ATTEMPTS:
+                    # Trip on the way out too. A fourth consecutive 429 is the
+                    # STRONGEST evidence Yahoo is still refusing; returning
+                    # without extending the cooldown sends the next ticker
+                    # straight into a server we know is saying no.
+                    _THROTTLE.trip()
+                    logger.warning("%s: still rate limited after %d attempts",
+                                   label, RETRY_ATTEMPTS)
+                    return None, False
+                delay = _THROTTLE.trip()
+                logger.info("%s: rate limited, backing off %.1fs (attempt %d/%d)",
+                            label, delay, attempt, RETRY_ATTEMPTS)
+                continue
+            text = str(exc).lower()
+            if any(marker in text for marker in no_data_markers):
+                # Answered, with nothing. Not retried, not logged as a failure.
+                return None, _NO_DATA
+            log_exception(logger, f"{label} failed", exc)
+            return None, False
         _THROTTLE.relax()
         return value, True
     return None, False
 
 
+#: One YEAR of bars, not one month. The delisting signal is a *stale* last bar,
+#: and bars only stay visible while they fall inside the requested window — a
+#: name acquired three months ago returns nothing at all on a 1mo pull and so is
+#: invisible, whereas a 1y pull still shows its final bars and flags correctly.
+#: Verified 2026-07-26: ASRT (Zydus, delisted 2026-06-16) returns 3 bars on 1mo
+#: and 9 on 1y, both ending 2026-06-29 — the wider window extends the detection
+#: horizon from ~1 month to ~1 year at the cost of one request either way.
+PROBE_PERIOD = "1y"
+
+#: Price-probe outcomes. `no_data` is deliberately NOT merged into either
+#: neighbour: it is an ANSWER (Yahoo replied) but not EVIDENCE (see below).
+PRICE_OK = "ok"
+PRICE_NO_DATA = "no_data"
+PRICE_FAILED = "failed"
+
+
 def _probe_recent_price(yf_obj):
-    """Return (probe_ran: bool, last_close_date: str|"") for a yfinance Ticker.
+    """Return (status, last_close_date) for a yfinance Ticker.
 
-    Pulls ~1 month of daily bars and reports the most recent bar date. A clean
-    acquisition/take-private leaves `.info` stale but kills the price feed, so
-    an empty/old result here is the reliable delisted signal.
+    `status` is PRICE_OK (bars returned), PRICE_NO_DATA (Yahoo answered but
+    serves no bars for this symbol) or PRICE_FAILED (rate-limited or errored).
 
-    `probe_ran` is False ONLY when the history pull itself raised (transient
-    network / rate-limit error) so the caller can avoid false-flagging on an
-    infrastructure blip vs. a genuinely dead feed (empty result with no error).
-    `raise_errors=True` is essential: yfinance otherwise swallows 429s/network
-    errors and returns an empty frame, which would masquerade as a dead feed.
+    **`no_data` is not evidence of a delisting.** yfinance raises
+    `YFPricesMissingError` — "possibly delisted; no price data found" — for
+    symbols that are trading perfectly well: verified 2026-07-26 that `ACLX`
+    raises it on both a 1mo and a 1y window while quoting $115.07 on NASDAQ with
+    13.2M shares of volume. Yahoo's own wording is simply wrong, and believing it
+    is what produced 58 false flags. Only a *stale last bar* — real bars, ending
+    too long ago — supports a delisting claim, so `no_data` is kept as its own
+    outcome and never reaches a flag.
+
+    Separating it from PRICE_FAILED matters operationally too: `no_data` is a
+    stable property of a few dozen names, so counting it as a run failure would
+    hold the degraded flag permanently on and train the reader to ignore it.
     """
     hist, ok = _with_retry(
-        lambda: yf_obj.history(period="1mo", auto_adjust=True, raise_errors=True),
+        lambda: yf_obj.history(period=PROBE_PERIOD, auto_adjust=True,
+                               raise_errors=True),
         "price probe",
+        no_data_markers=("no price data found", "possibly delisted"),
     )
+    if ok is _NO_DATA:
+        return PRICE_NO_DATA, ""
     if not ok:
-        return False, ""  # transient — do NOT treat as delisted
+        return PRICE_FAILED, ""  # transient — do NOT treat as delisted
     try:
         if hist is None or hist.empty or "Close" not in hist:
-            return True, ""  # ran cleanly, genuinely no bars → dead feed
+            return PRICE_NO_DATA, ""
         closes = hist["Close"].dropna()
         if closes.empty:
-            return True, ""
-        return True, closes.index[-1].date().isoformat()
+            return PRICE_NO_DATA, ""
+        return PRICE_OK, closes.index[-1].date().isoformat()
     except Exception:
-        return True, ""
+        return PRICE_NO_DATA, ""
 
 
 def _fetch_identity(yf_ticker, use_cache=True):
@@ -264,20 +308,25 @@ def _fetch_identity(yf_ticker, use_cache=True):
     if not info_ok:
         info = {}
 
-    price_probe_ran, last_close_date = _probe_recent_price(yf_obj)
+    price_status, last_close_date = _probe_recent_price(yf_obj)
     identity = {
         "quoteType": info.get("quoteType") or "",
         "longName": info.get("longName") or "",
         "shortName": info.get("shortName") or "",
         "last_close_date": last_close_date,
         "info_ok": info_ok,
-        "price_probe_ran": price_probe_ran,
+        "price_status": price_status,
+        # Back-compat for cached v3 payloads and existing readers.
+        "price_probe_ran": price_status == PRICE_OK,
         # frozen-at-probe-time decision (avoids the cache-aging trap)
-        "price_stale": bool(price_probe_ran and _price_is_stale(last_close_date)),
+        "price_stale": bool(price_status == PRICE_OK
+                            and _price_is_stale(last_close_date)),
     }
-    # Do NOT cache a transient failure of EITHER probe — that would disable the
-    # check for this ticker for a full TTL on the strength of a network blip.
-    if use_cache and price_probe_ran and info_ok:
+    # Do NOT cache a TRANSIENT failure of either probe -- that would disable the
+    # check for this ticker for a full TTL on the strength of a network blip. A
+    # `no_data` answer IS cacheable: it is a stable property of the symbol, and
+    # re-probing it every run buys nothing but rate-limit pressure.
+    if use_cache and info_ok and price_status in (PRICE_OK, PRICE_NO_DATA):
         cache_set(IDENTITY_CACHE_NS, yf_ticker, identity)
     return identity
 
@@ -361,10 +410,24 @@ def _classify(row, identity):
     short_name = identity.get("shortName") or ""
     recorded_name = str(row.get("Company Name", "") or "")
     info_ok = bool(identity.get("info_ok"))
-    probe_ran = bool(identity.get("price_probe_ran"))
+    price_status = identity.get("price_status") or (
+        PRICE_OK if identity.get("price_probe_ran") else PRICE_FAILED)
+    probe_ran = price_status == PRICE_OK
     has_identity = bool(quote_type or long_name or short_name)
 
-    if not identity or (not info_ok and not probe_ran):
+    # A stale last bar is decidable from the price probe ALONE, so it is checked
+    # before anything conditioned on `.info`. Previously a throttled `.info`
+    # discarded a perfectly good stale-price answer and reported the price feed
+    # "inconclusive" when it had in fact answered -- which is the EXAS case the
+    # module exists for.
+    if identity.get("price_stale"):
+        last_seen = identity.get("last_close_date") or "never"
+        return VERDICT_FLAGGED, (
+            f"no recent price data (likely delisted/renamed, or extended halt); "
+            f"last bar={last_seen}"
+        )
+
+    if not identity or (not info_ok and price_status == PRICE_FAILED):
         # Neither probe answered. This is the absence of evidence, not evidence
         # of absence -- the distinction the pre-2026-07-25 code collapsed.
         return VERDICT_INCONCLUSIVE, (
@@ -390,19 +453,12 @@ def _classify(row, identity):
                 f"no yfinance identity metadata, but price feed is live "
                 f"(last bar={identity.get('last_close_date') or 'unknown'})"
             )
-        if not probe_ran:
-            return VERDICT_INCONCLUSIVE, (
-                "no yfinance identity metadata and the price probe failed"
-            )
-        return VERDICT_FLAGGED, (
-            "no yfinance data and no recent price data (likely delisted)"
-        )
-
-    if identity.get("price_stale"):
-        last_seen = identity.get("last_close_date") or "never"
-        return VERDICT_FLAGGED, (
-            f"no recent price data (likely delisted/renamed, or extended halt); "
-            f"last bar={last_seen}"
+        # No metadata AND no usable price feed. Tempting to call this delisted --
+        # two signals agreeing! -- but they are not independent: ACLX returns
+        # neither, and trades at $115. Both being empty means we learned nothing.
+        return VERDICT_INCONCLUSIVE, (
+            f"no yfinance identity metadata and no price data "
+            f"(price probe: {price_status}); no evidence either way"
         )
 
     if quote_type in NON_EQUITY_QUOTE_TYPES:
@@ -431,9 +487,16 @@ def _classify(row, identity):
         # name mismatch) is decidable without the price feed and keeps its flag.
         # What is left is "metadata looks fine" -- and the price feed is the ONLY
         # signal that catches a clean acquisition, because Yahoo keeps `.info`
-        # (and therefore the name match) intact for months afterwards. With the
-        # probe failed we did not check the one thing that would have found it,
-        # so calling this clean asserts a check we never ran.
+        # (and therefore the name match) intact for months afterwards. With no
+        # usable price feed we did not check the one thing that would have found
+        # it, so calling this clean asserts a check we never ran.
+        if price_status == PRICE_NO_DATA:
+            return VERDICT_INCONCLUSIVE, (
+                "identity looks unchanged, but yfinance serves no price history "
+                "for this symbol at all - not evidence of a delisting (ACLX "
+                "does the same while trading normally), and re-running will not "
+                "resolve it; confirm against a second source"
+            )
         return VERDICT_INCONCLUSIVE, (
             "identity looks unchanged but the price probe failed; the delisting "
             "signal was not checked"
@@ -502,24 +565,35 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
     flagged = []
     inconclusive = []
     metadata_gaps = []
-    missing_data = 0
+    missing_identity = 0
+    price_no_data = 0
     price_probe_failures = 0
     info_failures = 0
-    any_probe_failed = 0
+    any_transport_failure = 0
     for row, yf_t in pairs:
         identity = identities.get(yf_t, {})
+        price_status = identity.get("price_status") or (
+            PRICE_OK if identity.get("price_probe_ran") else PRICE_FAILED)
+        info_ok = bool(identity.get("info_ok"))
         if not identity or (
             not identity.get("quoteType")
             and not identity.get("longName")
             and not identity.get("shortName")
         ):
-            missing_data += 1
-        if not identity or not identity.get("price_probe_ran"):
+            missing_identity += 1
+        if price_status == PRICE_NO_DATA:
+            price_no_data += 1
+        elif price_status == PRICE_FAILED:
             price_probe_failures += 1
-        if not identity or not identity.get("info_ok"):
+        if not info_ok:
             info_failures += 1
-        if not identity or not identity.get("price_probe_ran") or not identity.get("info_ok"):
-            any_probe_failed += 1
+        # TRANSPORT failures only. A `no_data` reply is an answer and a stable
+        # property of a few dozen symbols; counting it here would hold `degraded`
+        # permanently on against a fixed baseline, and an alarm that is always
+        # lit is one the reader learns to ignore -- which defeats the point of
+        # having wired it into the heartbeat at all.
+        if not identity or price_status == PRICE_FAILED or not info_ok:
+            any_transport_failure += 1
         verdict, reason = _classify(row, identity)
         if verdict == VERDICT_CLEAN and not reason:
             continue
@@ -549,17 +623,18 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
     # The UNION of affected tickers, not max() of the two counts. The probes fail
     # independently, so 1.5% price-only plus 1.5% metadata-only degrades 3% of
     # the universe while max() reports 1.5% and stays silent.
-    degraded = bool(checked and any_probe_failed / checked > DEGRADED_FAILURE_RATE)
+    degraded = bool(checked and any_transport_failure / checked > DEGRADED_FAILURE_RATE)
 
     return {
         "checked": checked,
         "flagged": flagged,
         "inconclusive": inconclusive,
         "metadata_gaps": metadata_gaps,
-        "missing_data": missing_data,
+        "missing_data": missing_identity,
+        "price_no_data": price_no_data,
         "price_probe_failures": price_probe_failures,
         "info_failures": info_failures,
-        "tickers_with_a_failed_probe": any_probe_failed,
+        "tickers_with_a_failed_probe": any_transport_failure,
         "rate_limit_trips": _THROTTLE.trips,
         "degraded": degraded,
     }
@@ -614,13 +689,22 @@ def write_report(result, reports_dir=None, run_date=None):
     lines.append(f"- Flagged (likely delisted/recycled): {len(result['flagged'])}")
     lines.append(f"- Inconclusive (lookup failed — **not** delisting candidates): "
                  f"{len(inconclusive)}")
-    lines.append(f"- No yfinance identity data: {result['missing_data']}")
+    lines.append(f"- No yfinance identity metadata: {result['missing_data']}")
+    no_data = result.get("price_no_data", 0)
+    if no_data:
+        lines.append(
+            f"- No price history at all: {no_data} — Yahoo *answered* and has "
+            f"nothing for these symbols. Not evidence: `ACLX` answers the same "
+            f"way while trading at $115 on NASDAQ. Re-running will not resolve "
+            f"them; they need a second source."
+        )
     probe_fail = result.get("price_probe_failures", 0)
     info_fail = result.get("info_failures", 0)
     if probe_fail or info_fail:
         lines.append(
-            f"- Probe failures: {probe_fail} price, {info_fail} metadata "
-            f"— transient Yahoo errors, not delistings"
+            f"- Transport failures: {probe_fail} price, {info_fail} metadata "
+            f"— transient Yahoo errors, not delistings; these drive the "
+            f"degraded flag and a re-run should clear them"
         )
     trips = result.get("rate_limit_trips", 0)
     if trips:
@@ -645,11 +729,13 @@ def write_report(result, reports_dir=None, run_date=None):
         lines.append("## Inconclusive — we could not find out")
         lines.append("")
         lines.append(
-            "yfinance did not answer for these. That is **not** evidence of a "
-            "delisting: a throttled lookup and a dead company return the same "
-            "empty response, and only one of them means anything. They are "
-            "listed apart so they are never actioned as delistings; re-run to "
-            "resolve them."
+            "yfinance gave us nothing usable for these. That is **not** evidence "
+            "of a delisting: a throttled lookup and a dead company return the "
+            "same empty response, and only one of them means anything. They are "
+            "listed apart so they are never actioned as delistings. Rows whose "
+            "reason says *transport* failure should clear on a re-run; rows "
+            "saying yfinance **serves no price history at all** will not — "
+            "those need a second source, not another attempt."
         )
         lines.append("")
         lines.extend(_table(inconclusive))

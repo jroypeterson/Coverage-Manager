@@ -241,6 +241,28 @@ list**. Two guards enforce it:
   with empty `longName`/`shortName` and was flagged `name mismatch
   (similarity=0.00), yfinance=''`, i.e. a disagreement with an empty string.
 
+**"No price data" is an answer, not evidence (2026-07-26).** yfinance raises
+`YFPricesMissingError` — *"possibly delisted; no price data found"* — for symbols
+that trade perfectly well. Verified live: **`ACLX` raises it on both a 1mo and a
+1y window while quoting $115.07 on NASDAQ with 13.2M volume.** So the probe has
+three outcomes (`PRICE_OK` / `PRICE_NO_DATA` / `PRICE_FAILED`) and **only a stale
+last bar ever supports a flag** — real bars, ending too long ago. An empty
+result never flags, whatever Yahoo calls it.
+
+Two consequences worth knowing:
+- **`PROBE_PERIOD` is `1y`, not `1mo`.** Bars are only visible inside the
+  requested window, so a name acquired three months ago returns *nothing* on a
+  1mo pull and is invisible; on 1y its final bars still show and it flags
+  correctly. Verified: ASRT (Zydus, delisted 2026-06-16) returns 3 bars on 1mo
+  and 9 on 1y, both ending 2026-06-29. Same one request either way.
+- **`no_data` is excluded from the `degraded` calculation** and *is* cached. It
+  is a stable property of a few dozen symbols, so counting it as a run failure
+  would hold the degraded flag permanently on — and an alarm that is always lit
+  is one the reader learns to ignore, which would defeat wiring it into the
+  heartbeat at all. `degraded` counts **transport** failures only. These names
+  are reported in their own bucket: re-running will not resolve them, they need
+  a second source.
+
 **Rate-limit backoff (2026-07-26).** The first full cold run after the above fix
 lost **518 of 1,093 price probes and 488 `.info` calls** to "Too Many Requests" —
 502 names came back `inconclusive`. The verdict logic handled that honestly
@@ -302,6 +324,50 @@ universe. Module: `universe/delisted_check.py`; tests: `tests/test_delisted_chec
 **Scope:** only rows with a CIK; mismatch detection gated to plain US-style symbols (`ABT`, `BRK.B`) so a cross-listed row tracking the foreign line (`DIA.MI`) isn't flagged as "changed to the US ADR." The SEC bulk map is cached 24h (`cache/sec_company_tickers/`).
 
 Outputs (in `reports/`, archived weekly): `ticker_change_check_YYYY-MM-DD.{csv,md}`. Non-gating. Runs as step `[4b/6]` of `weekly-universe` (right after `delisted_check`). CLI exit code is `2` when any mismatch or deregistration is flagged. Module: `universe/ticker_change_check.py`; tests: `tests/test_ticker_change_check.py`.
+
+## Blank-CIK re-probe (weekly step `[4a/6]`)
+
+`python cli.py backfill-cik [--dry-run]` fills blank `CIK` cells from SEC's bulk
+ticker map. It exists because **a CIK is not a static property of a company — it
+is a fact about whether that company has registered with the SEC *yet*, which
+changes.** `enrich.py` resolves CIKs when a row is first enriched and nothing
+re-checked the blanks, so a name that registered *later* kept a blank CIK forever
+and every CIK-keyed lane silently skipped it. That is not hypothetical: on
+2026-07-25 an independent cross-check found SpaceX filing 40 Form 3s while
+`insider_ownership` had been skipping it for want of a CIK. Re-probing found 16
+such rows (Cerebras, Fervo, Quantinuum, HawkEye 360, Lumexa…).
+
+Runs as step `[4a/6]`, deliberately **before** the export steps, so a newly
+registered company reaches CIK-keyed consumers in the *same* run. Costs one HTTP
+GET per week regardless of universe size. **Only fills blanks** — an existing CIK
+is never overwritten, because a CIK is stable across a ticker change (the
+invariant `ticker_change_check` relies on), so a populated-CIK disagreement means
+the *ticker* moved, which is that module's finding to surface.
+
+**A ticker string is not an identity.** The fill is gated on a name-similarity
+check between the universe `Company Name` and SEC's `title` (threshold 0.55,
+mirroring `delisted_check`); a disagreement is **warned and skipped, never
+written**. Tickers get recycled between issuers — the premise of the sibling
+`delisted_check` — and the rows this module targets are the most exposed of all:
+private names under provisional symbols (SPCX, Cerebras, Fervo, Quantinuum)
+assigned before any listing existed. Writing another registrant's CIK would make
+`insider_ownership` and `earnings_agent` silently pull the wrong company's
+filings; a blank CIK is visibly missing, a wrong one looks like data. The gate
+yields a deliberate false negative — a row reading "SpaceX" against SEC's "Space
+Exploration Technologies Corp" is skipped — which is the intended trade, since a
+warned skip is resolved by a human in seconds.
+
+Separator-insensitive matching (universe `BRK.B` vs SEC `BRK-B`) applies **only
+to plain US-style symbols**, and only for unambiguous normalized keys. Foreign
+lines dominate the blank-CIK population (`4503.T`, `000100.KS`) and stripping
+their separators yields keys that could collide with an unrelated US symbol.
+
+The SEC bulk file comes from `ticker_change_check.load_sec_cik_map` (24h cache,
+`fetched_ok` contract) rather than a second downloader — otherwise weekly steps
+4a and 4b pull the same ~1 MB back-to-back and only one survives a brief SEC
+outage on cache. A failed fetch changes nothing and reports
+`failed: SEC map unavailable`; CLI exits `2`. Module `universe/cik_backfill.py`;
+tests `tests/test_cik_backfill.py`.
 
 ## LEI (Legal Entity Identifier) backfill
 
