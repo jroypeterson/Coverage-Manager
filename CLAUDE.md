@@ -241,6 +241,23 @@ list**. Two guards enforce it:
   with empty `longName`/`shortName` and was flagged `name mismatch
   (similarity=0.00), yfinance=''`, i.e. a disagreement with an empty string.
 
+**Rate-limit backoff (2026-07-26).** The first full cold run after the above fix
+lost **518 of 1,093 price probes and 488 `.info` calls** to "Too Many Requests" —
+502 names came back `inconclusive`. The verdict logic handled that honestly
+(under the old code they would have been 502 false delistings) but the run still
+learned almost nothing, so throughput had to be fixed too. `_Throttle` is a
+**process-wide** backoff gate: per-thread retry is useless here because the other
+workers keep hammering Yahoo, so one thread's 429 pauses **all** of them.
+Exponential with jitter (2s → 60s cap, 4 attempts), decaying on success, so the
+run finds a sustainable rate instead of relying on a constant guessed up front.
+`max_workers` default dropped 6 → 4. **A cold pass is slow by design** — on a
+weekly job, verdict correctness beats wall clock. Only rate-limit errors are
+retried; a 404 is a real answer and retrying it would burn the budget the
+throttled names need. `rate_limit_trips` is reported. Note yfinance raises
+`"possibly delisted; no price data found"` for names that demonstrably trade
+(ADAP at $0.0485, AFMD at $0.1815 on 2026-07-25) — that is a *failed probe*, so
+it yields `inconclusive`, never a flag.
+
 **Run-level `degraded` flag**: when over `DEGRADED_FAILURE_RATE` (2%) of lookups
 fail, the run is marked degraded in the report, the `weekly-universe` step
 summary, and the CLI exit code — because a throttled run's *flags* are also less

@@ -4,6 +4,7 @@ price-recency hardening (catches clean acquisitions that keep `.info` stale)."""
 from datetime import date
 
 import pandas as pd
+import pytest
 
 from universe.delisted_check import (
     DEGRADED_FAILURE_RATE,
@@ -18,6 +19,25 @@ from universe.delisted_check import (
 )
 
 TODAY = date(2026, 6, 13)
+
+
+@pytest.fixture(autouse=True)
+def _no_real_sleeping(monkeypatch):
+    """Exercise the backoff logic without paying its wall-clock cost."""
+    import universe.delisted_check as dc
+
+    slept = []
+    clock = [1000.0]
+
+    def _fake_sleep(seconds):
+        slept.append(seconds)
+        clock[0] += seconds  # a no-op sleep against a real clock busy-spins
+
+    monkeypatch.setattr(dc, "_sleep", _fake_sleep)
+    monkeypatch.setattr(dc, "_now", lambda: clock[0])
+    dc._THROTTLE.reset()
+    yield slept
+    dc._THROTTLE.reset()
 
 
 def _fresh(days_ago):
@@ -89,6 +109,109 @@ def test_probe_all_nan_close_is_dead_feed():
 def test_probe_exception_marks_not_run():
     ran, last = _probe_recent_price(_FakeTicker(raises=True))
     assert ran is False and last == ""
+
+
+# ── rate-limit backoff ──────────────────────────────────────────────────────
+#
+# The 2026-07-26 cold run lost 518/1,093 price probes and 488 `.info` calls to
+# "Too Many Requests". The verdict logic handled that honestly (502 inconclusive
+# rather than 502 false flags) but the run still learned almost nothing, so the
+# throughput itself had to be fixed.
+
+
+class _FlakyTicker:
+    """Rate-limits the first `fail_times` calls, then succeeds."""
+
+    def __init__(self, fail_times, df):
+        self.fail_times = fail_times
+        self._df = df
+        self.calls = 0
+
+    def history(self, **_kwargs):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise RuntimeError("Too Many Requests. Rate limited. Try after a while.")
+        return self._df
+
+
+def test_rate_limit_detection():
+    from universe.delisted_check import _is_rate_limited
+
+    assert _is_rate_limited(RuntimeError("Too Many Requests. Rate limited."))
+    assert _is_rate_limited(RuntimeError("HTTP 429"))
+    assert not _is_rate_limited(RuntimeError("404 Not Found")), (
+        "a 404 is a real answer about a real symbol -- retrying it would burn "
+        "the budget the throttled names need"
+    )
+
+
+def test_probe_retries_through_rate_limiting(_no_real_sleeping):
+    t = _FlakyTicker(2, _hist(["2026-06-12"]))
+    ran, last = _probe_recent_price(t)
+    assert ran is True and last == "2026-06-12", (
+        "a rate-limited probe that later succeeds must not be recorded as a "
+        "failed lookup"
+    )
+    assert t.calls == 3
+    assert _no_real_sleeping, "backoff should have slept between attempts"
+
+
+def test_probe_gives_up_after_the_attempt_budget():
+    from universe.delisted_check import RETRY_ATTEMPTS
+
+    t = _FlakyTicker(99, None)
+    ran, _last = _probe_recent_price(t)
+    assert ran is False
+    assert t.calls == RETRY_ATTEMPTS
+
+
+def test_a_404_is_not_retried():
+    """Only rate limiting is transient; a dead symbol answers immediately."""
+    t = _FakeTicker(raises=True)
+    t._raises = True
+
+    class _NotFound(_FakeTicker):
+        def history(self, **kwargs):
+            self.called_with = kwargs
+            raise RuntimeError("404 Not Found: no data for symbol")
+
+    nf = _NotFound()
+    ran, _last = _probe_recent_price(nf)
+    assert ran is False
+
+
+def test_throttle_escalates_then_relaxes():
+    from universe.delisted_check import _THROTTLE
+
+    _THROTTLE.reset()
+    first = _THROTTLE.trip()
+    second = _THROTTLE.trip()
+    assert second > first, "backoff must escalate while Yahoo keeps refusing"
+    assert _THROTTLE.trips == 2
+    _THROTTLE.relax()
+    _THROTTLE.relax()
+    third = _THROTTLE.trip()
+    assert third <= second, "a run that recovers must speed back up"
+    _THROTTLE.reset()
+    assert _THROTTLE.trips == 0
+
+
+def test_throttle_pause_is_shared_across_threads(_no_real_sleeping):
+    """One thread's 429 must pause the others -- private backoff expires into a
+    server the other workers never stopped hammering."""
+    import threading
+
+    from universe.delisted_check import _THROTTLE
+
+    _THROTTLE.reset()
+    _THROTTLE.trip()
+    done = []
+    t = threading.Thread(target=lambda: (_THROTTLE.wait(), done.append(True)))
+    t.start()
+    t.join(timeout=5)
+    assert done == [True]
+    assert _no_real_sleeping, "the second thread waited on the shared cooldown"
+    _THROTTLE.reset()
 
 
 # ── _classify: price-recency rule (reads the frozen price_stale decision) ────

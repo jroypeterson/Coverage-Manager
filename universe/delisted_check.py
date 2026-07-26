@@ -34,6 +34,9 @@ moves them to `data/delisted_tickers.csv` manually after confirming.
 """
 
 import csv
+import random
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from difflib import SequenceMatcher
@@ -84,6 +87,112 @@ VERDICT_INCONCLUSIVE = "inconclusive"
 # below the 4.8% (53/1093) seen when Yahoo was actually rate-limiting us.
 DEGRADED_FAILURE_RATE = 0.02
 
+# --- Yahoo rate limiting ----------------------------------------------------
+#
+# The 2026-07-26 cold run lost 518 of 1,093 price probes and 488 `.info` calls
+# to "Too Many Requests". The three-state verdict meant that degraded into 502
+# honest `inconclusive` rows rather than 502 false delistings — but honest and
+# useless is still useless. Yahoo has no published quota and no Retry-After
+# header, so the only workable strategy is to notice refusal and back off.
+RETRY_ATTEMPTS = 4
+RETRY_BASE_SECONDS = 2.0
+RETRY_MAX_SECONDS = 60.0
+#: yfinance raises plain exceptions; rate limiting is only identifiable by text.
+_RATE_LIMIT_MARKERS = ("too many requests", "rate limit", "429", "yfratelimit")
+
+#: Indirection so tests exercise the backoff logic without actually sleeping.
+#: The CLOCK is injectable too, not just the sleep: `wait()` re-checks the
+#: deadline in a loop (it must, since another thread can extend the cooldown
+#: mid-wait), so a no-op sleep against a real clock would busy-spin for the
+#: full backoff instead of skipping it.
+_sleep = time.sleep
+_now = time.monotonic
+
+
+def _is_rate_limited(exc) -> bool:
+    text = f"{type(exc).__name__} {exc}".lower()
+    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+
+
+class _Throttle:
+    """Process-wide backoff gate shared by every worker thread.
+
+    Per-thread retry is not enough. When Yahoo starts refusing, the other
+    workers keep hammering it, so each thread's private backoff expires into a
+    server that is still angry and the run never recovers — which is exactly
+    what the 2026-07-26 run did. One thread hitting a 429 therefore pauses ALL
+    of them, and the delay escalates per trip and decays on success, so the run
+    finds a sustainable rate by itself instead of guessing one up front.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._resume_at = 0.0
+        self._level = 0
+        self.trips = 0
+
+    def wait(self):
+        """Block until the shared cooldown has elapsed."""
+        while True:
+            with self._lock:
+                remaining = self._resume_at - _now()
+            if remaining <= 0:
+                return
+            _sleep(min(remaining, 1.0))
+
+    def trip(self) -> float:
+        """Record a rate-limit rejection; returns the new cooldown in seconds."""
+        with self._lock:
+            self._level += 1
+            delay = min(RETRY_BASE_SECONDS * (2 ** (self._level - 1)),
+                        RETRY_MAX_SECONDS)
+            # Jitter, so the workers don't resume in lockstep and re-trip together.
+            delay += random.uniform(0.0, delay * 0.25)
+            self._resume_at = max(self._resume_at, _now() + delay)
+            self.trips += 1
+            return delay
+
+    def relax(self):
+        """A success: ease off one level so the run speeds back up."""
+        with self._lock:
+            if self._level:
+                self._level -= 1
+
+    def reset(self):
+        with self._lock:
+            self._resume_at, self._level, self.trips = 0.0, 0, 0
+
+
+_THROTTLE = _Throttle()
+
+
+def _with_retry(fn, label):
+    """Call `fn`, retrying through Yahoo rate limiting. Returns (value, ok).
+
+    Only rate-limit errors are retried — a 404 for a genuinely dead symbol is a
+    real answer, and retrying it would just burn the budget that the throttled
+    names need.
+    """
+    for attempt in range(1, RETRY_ATTEMPTS + 1):
+        _THROTTLE.wait()
+        try:
+            value = fn()
+        except Exception as exc:  # noqa: BLE001 - yfinance raises bare Exceptions
+            if not _is_rate_limited(exc):
+                log_exception(logger, f"{label} failed", exc)
+                return None, False
+            if attempt >= RETRY_ATTEMPTS:
+                logger.warning("%s: still rate limited after %d attempts",
+                               label, RETRY_ATTEMPTS)
+                return None, False
+            delay = _THROTTLE.trip()
+            logger.info("%s: rate limited, backing off %.1fs (attempt %d/%d)",
+                        label, delay, attempt, RETRY_ATTEMPTS)
+            continue
+        _THROTTLE.relax()
+        return value, True
+    return None, False
+
 
 def _probe_recent_price(yf_obj):
     """Return (probe_ran: bool, last_close_date: str|"") for a yfinance Ticker.
@@ -98,9 +207,11 @@ def _probe_recent_price(yf_obj):
     `raise_errors=True` is essential: yfinance otherwise swallows 429s/network
     errors and returns an empty frame, which would masquerade as a dead feed.
     """
-    try:
-        hist = yf_obj.history(period="1mo", auto_adjust=True, raise_errors=True)
-    except Exception:
+    hist, ok = _with_retry(
+        lambda: yf_obj.history(period="1mo", auto_adjust=True, raise_errors=True),
+        "price probe",
+    )
+    if not ok:
         return False, ""  # transient — do NOT treat as delisted
     try:
         if hist is None or hist.empty or "Close" not in hist:
@@ -148,12 +259,10 @@ def _fetch_identity(yf_ticker, use_cache=True):
                 "quoteType": "", "longName": "", "shortName": "",
                 "last_close_date": ""}
 
-    try:
-        info = yf_obj.info or {}
-        info_ok = True
-    except Exception as e:
-        log_exception(logger, f"Identity metadata failed for {yf_ticker}", e)
-        info, info_ok = {}, False
+    info, info_ok = _with_retry(lambda: yf_obj.info or {},
+                                f"Identity metadata for {yf_ticker}")
+    if not info_ok:
+        info = {}
 
     price_probe_ran, last_close_date = _probe_recent_price(yf_obj)
     identity = {
@@ -320,7 +429,7 @@ def _classify(row, identity):
     return VERDICT_CLEAN, ""
 
 
-def check_universe(csv_path=None, max_workers=6, use_cache=True):
+def check_universe(csv_path=None, max_workers=4, use_cache=True):
     """Run the delisted/recycled check across the full universe CSV.
 
     Returns dict with keys:
@@ -333,12 +442,18 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
       - missing_data: count of tickers yfinance returned no identity for
       - price_probe_failures: count of tickers whose price probe raised
       - info_failures: count of tickers whose `.info` call raised
+      - rate_limit_trips: how many times Yahoo refused and the shared throttle
+        backed off — the direct measure of how hard we were being rejected
       - degraded: True when the failure rate exceeds DEGRADED_FAILURE_RATE — the
         run hit Yahoo throttling and even its flags deserve less trust
 
-    max_workers defaults to 6 (down from 10): the run now pulls 1mo of history
-    per ticker in addition to `.info`, and Yahoo rate-limits bursty traffic —
-    a 429 storm would degrade the probe (failures are skipped, not false-flagged).
+    max_workers defaults to 4 (was 6, originally 10). The run pulls 1mo of
+    history per ticker in addition to `.info`, and Yahoo rate-limits bursty
+    traffic hard: a cold full-universe pass at 6 lost ~half its probes. Lowering
+    the ceiling is only half the answer — `_Throttle` adapts the real rate
+    downward when Yahoo pushes back, so the run self-paces rather than relying
+    on a constant guessed here. A cold pass is consequently SLOW by design;
+    correctness of the verdict matters more than the wall clock on a weekly job.
     """
     csv_path = csv_path or CSV_PATH
     df = pd.read_csv(csv_path)
@@ -358,6 +473,7 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
         pairs.append((row, yf_t))
 
     identities = {}
+    _THROTTLE.reset()
 
     def _fetch_one(yf_t):
         return yf_t, _fetch_identity(yf_t, use_cache=use_cache)
@@ -427,6 +543,7 @@ def check_universe(csv_path=None, max_workers=6, use_cache=True):
         "missing_data": missing_data,
         "price_probe_failures": price_probe_failures,
         "info_failures": info_failures,
+        "rate_limit_trips": _THROTTLE.trips,
         "degraded": degraded,
     }
 
@@ -488,6 +605,9 @@ def write_report(result, reports_dir=None, run_date=None):
             f"- Probe failures: {probe_fail} price, {info_fail} metadata "
             f"— transient Yahoo errors, not delistings"
         )
+    trips = result.get("rate_limit_trips", 0)
+    if trips:
+        lines.append(f"- Rate-limit backoffs: {trips}")
     if result.get("degraded"):
         lines.append("")
         lines.append(
