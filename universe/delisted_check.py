@@ -87,6 +87,16 @@ VERDICT_INCONCLUSIVE = "inconclusive"
 # below the 4.8% (53/1093) seen when Yahoo was actually rate-limiting us.
 DEGRADED_FAILURE_RATE = 0.02
 
+# Share of the universe returning "no price history at all" above which the
+# answer stops being believable as a property of the UNIVERSE and starts being a
+# property of the RUN. A few dozen symbols genuinely have no yfinance history;
+# a fifth of the coverage list does not. Because `no_data` is deliberately
+# excluded from the transport-failure rate above (it is stable, and counting it
+# would pin `degraded` on forever), a systemic fault that manifests AS `no_data`
+# -- a Yahoo API change, an auth/endpoint break -- would otherwise sail through
+# reporting zero flags and a green heartbeat. This is the backstop for that.
+IMPLAUSIBLE_NO_DATA_RATE = 0.20
+
 # --- Yahoo rate limiting ----------------------------------------------------
 #
 # The 2026-07-26 cold run lost 518 of 1,093 price probes and 488 `.info` calls
@@ -98,7 +108,12 @@ RETRY_ATTEMPTS = 4
 RETRY_BASE_SECONDS = 2.0
 RETRY_MAX_SECONDS = 60.0
 #: yfinance raises plain exceptions; rate limiting is only identifiable by text.
-_RATE_LIMIT_MARKERS = ("too many requests", "rate limit", "429", "yfratelimit")
+#: A bare "429" is deliberately NOT a marker -- it matches that digit string
+#: anywhere in a message (an identifier, a price, a share count), costing a full
+#: retry-and-backoff cycle on an error that will never clear.
+_RATE_LIMIT_MARKERS = ("too many requests", "rate limit", "yfratelimit")
+#: HTTP status forms, matched with enough context to actually mean a status code.
+_RATE_LIMIT_STATUS = ("429 ", "429:", "status 429", "http 429", "error 429")
 
 #: Indirection so tests exercise the backoff logic without actually sleeping.
 #: The CLOCK is injectable too, not just the sleep: `wait()` re-checks the
@@ -111,7 +126,9 @@ _now = time.monotonic
 
 def _is_rate_limited(exc) -> bool:
     text = f"{type(exc).__name__} {exc}".lower()
-    return any(marker in text for marker in _RATE_LIMIT_MARKERS)
+    if any(marker in text for marker in _RATE_LIMIT_MARKERS):
+        return True
+    return text.endswith("429") or any(m in text for m in _RATE_LIMIT_STATUS)
 
 
 class _Throttle:
@@ -258,14 +275,23 @@ def _probe_recent_price(yf_obj):
     if not ok:
         return PRICE_FAILED, ""  # transient — do NOT treat as delisted
     try:
+        # An EMPTY FRAME IS ANOMALOUS, not authoritative. With
+        # `raise_errors=True`, yfinance signals a missing feed by RAISING -- so
+        # a silent empty result means the error path is not behaving as assumed.
+        # yfinance 1.4.1 already deprecates `raise_errors`; if it ever becomes
+        # accepted-but-ignored, every throttled response arrives here as an
+        # empty frame. Calling that `no_data` would cache it for a week, keep it
+        # out of the degraded count, and report a green heartbeat for a run
+        # that checked nothing. Treating it as a transport failure means that
+        # scenario shows up as a loud, uncached, degraded run instead.
         if hist is None or hist.empty or "Close" not in hist:
-            return PRICE_NO_DATA, ""
+            return PRICE_FAILED, ""
         closes = hist["Close"].dropna()
         if closes.empty:
-            return PRICE_NO_DATA, ""
+            return PRICE_FAILED, ""
         return PRICE_OK, closes.index[-1].date().isoformat()
     except Exception:
-        return PRICE_NO_DATA, ""
+        return PRICE_FAILED, ""
 
 
 def _fetch_identity(yf_ticker, use_cache=True):
@@ -629,6 +655,16 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
     # independently, so 1.5% price-only plus 1.5% metadata-only degrades 3% of
     # the universe while max() reports 1.5% and stays silent.
     degraded = bool(checked and any_transport_failure / checked > DEGRADED_FAILURE_RATE)
+    no_data_implausible = bool(
+        checked and price_no_data / checked > IMPLAUSIBLE_NO_DATA_RATE)
+    if no_data_implausible:
+        logger.warning(
+            "IMPLAUSIBLE: %d/%d tickers (%.0f%%) report no price history at "
+            "all. That is a property of this RUN, not of the universe - "
+            "suspect a Yahoo API change or broken error handling, not a wave "
+            "of delistings.", price_no_data, checked,
+            100.0 * price_no_data / checked)
+        degraded = True
 
     return {
         "checked": checked,
@@ -637,6 +673,7 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
         "metadata_gaps": metadata_gaps,
         "missing_data": missing_identity,
         "price_no_data": price_no_data,
+        "no_data_implausible": no_data_implausible,
         "price_probe_failures": price_probe_failures,
         "info_failures": info_failures,
         "tickers_with_a_failed_probe": any_transport_failure,

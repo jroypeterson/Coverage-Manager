@@ -97,19 +97,25 @@ def test_probe_returns_last_bar_date_tz_aware():
     assert t.called_with.get("raise_errors") is True
 
 
-def test_probe_empty_frame_is_no_data_not_a_dead_feed():
-    """An empty frame means Yahoo has nothing -- NOT that the company is gone.
-    Verified 2026-07-26: ACLX answers this way on both 1mo and 1y windows while
-    trading at $115.07 on NASDAQ."""
+def test_probe_empty_frame_is_anomalous_not_authoritative():
+    """With `raise_errors=True`, yfinance signals a missing feed by RAISING, so
+    a silent empty frame means the error path is not behaving as assumed.
+
+    This matters because `raise_errors` is already deprecated in yfinance 1.4.1.
+    If it ever becomes accepted-but-ignored, every throttled response lands here
+    as an empty frame -- and calling that `no_data` would cache it for a week,
+    exclude it from the degraded rate, and post a green heartbeat for a run that
+    checked nothing. As a transport failure it is loud, uncached, and degrades
+    the run. Either way it is never a flag."""
     ran, last = _probe_recent_price(_FakeTicker(pd.DataFrame()))
-    assert ran == PRICE_NO_DATA and last == ""
+    assert ran == PRICE_FAILED and last == ""
 
 
-def test_probe_all_nan_close_is_dead_feed():
+def test_probe_all_nan_close_is_not_a_dead_feed():
     idx = pd.to_datetime(["2026-06-12"]).tz_localize("UTC")
     df = pd.DataFrame({"Close": [float("nan")]}, index=idx)
     ran, last = _probe_recent_price(_FakeTicker(df))
-    assert ran == PRICE_NO_DATA and last == ""
+    assert ran == PRICE_FAILED and last == ""
 
 
 def test_probe_exception_marks_not_run():
@@ -535,3 +541,68 @@ def test_missing_identity_excludes_throttled_lookups(monkeypatch):
     )
     assert result["missing_data"] == 1, "only the ticker that actually answered"
     assert result["info_failures"] == 1
+
+
+def test_a_universe_wide_no_data_answer_is_implausible(monkeypatch):
+    """`no_data` is excluded from the transport-failure rate on purpose, so a
+    systemic fault that manifests AS no_data -- a Yahoo API change, a broken
+    endpoint -- would otherwise report zero flags behind a green heartbeat.
+    Past a threshold the answer describes the RUN, not the universe."""
+    ids = {f"T{i}": _identity(name="Some Company Inc", info_ok=True,
+                              probe_ran=False, stale=False)
+           for i in range(10)}
+    for v in ids.values():
+        v["price_status"] = PRICE_NO_DATA
+    result = _fake_universe(monkeypatch, [_urow(f"T{i}") for i in range(10)], ids)
+
+    assert result["price_no_data"] == 10
+    assert result["tickers_with_a_failed_probe"] == 0, (
+        "no_data must stay out of the transport rate, or degraded pins on"
+    )
+    assert result["no_data_implausible"] is True
+    assert result["degraded"] is True, "the backstop must still fire"
+
+
+def test_a_normal_no_data_population_does_not_degrade_the_run(monkeypatch):
+    """A few dozen symbols genuinely have no yfinance history. That is the
+    baseline, and it must not hold the alarm on."""
+    ids = {}
+    for i in range(100):
+        ident = _identity(name="Some Company Inc", last=_fresh(1))
+        if i < 3:
+            ident = _identity(name="Some Company Inc", info_ok=True,
+                              probe_ran=False, stale=False)
+            ident["price_status"] = PRICE_NO_DATA
+        ids[f"T{i}"] = ident
+    result = _fake_universe(monkeypatch, [_urow(f"T{i}") for i in range(100)], ids)
+
+    assert result["price_no_data"] == 3
+    assert result["no_data_implausible"] is False
+    assert result["degraded"] is False
+
+
+def test_no_console_log_line_carries_non_ascii():
+    """A non-ASCII character in a LOGGED string raises UnicodeEncodeError under
+    the scheduled task's cp1252-redirected console and kills the run BEFORE its
+    heartbeat posts -- so the failure is invisible. Markdown written to a UTF-8
+    report file is fine and is not checked here; only console output is.
+
+    Found two live instances on 2026-07-27, both in failure paths (a missing
+    baseline SHA, and SEC being unavailable) -- i.e. they would have fired
+    exactly when something was already going wrong.
+    """
+    import pathlib
+    import re
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    offenders = []
+    for rel in ("universe/delisted_check.py", "universe/cik_backfill.py",
+                "universe/ticker_change_check.py", "weekly_universe.py",
+                "weekly_build.py", "cli.py"):
+        for n, line in enumerate((repo / rel).read_text(encoding="utf-8").splitlines(), 1):
+            if re.search(r"(logger\.\w+|print)\(", line) and any(ord(c) > 127 for c in line):
+                offenders.append(f"{rel}:{n}")
+    assert not offenders, (
+        "non-ASCII on a console line; a cp1252 scheduled run dies here before "
+        "its heartbeat: " + ", ".join(offenders)
+    )

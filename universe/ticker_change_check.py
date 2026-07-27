@@ -358,7 +358,7 @@ def main(use_cache=True):
     result = check_ticker_changes(use_cache=use_cache)
     paths = write_report(result)
     if not result["sec_fetched_ok"]:
-        logger.warning("Ticker-change check: SEC data unavailable — no check performed.")
+        logger.warning("Ticker-change check: SEC data unavailable - no check performed.")
         return result
     logger.info(
         "Ticker-change check: %d mismatch(es), %d deregistered, %d active-omission(s) dropped (of %d CIK rows)",

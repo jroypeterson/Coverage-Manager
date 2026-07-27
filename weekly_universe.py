@@ -921,7 +921,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                     baseline.get("head_date") or "unknown date",
                 )
             else:
-                logger.warning("No baseline SHA available — Slack delta will mark baseline as unavailable")
+                logger.warning("No baseline SHA available - Slack delta will mark baseline as unavailable")
         except Exception as e:
             logger.warning("Failed to capture baseline SHA: %s", e)
 
