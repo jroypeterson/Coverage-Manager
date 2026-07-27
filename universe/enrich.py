@@ -17,6 +17,7 @@ from ticker_utils import (
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
     COUNTRY_TO_ISIN_PREFIX,
     normalize_company_for_comparison, backup_csv, read_universe_csv,
+    write_universe_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
 from providers.fmp_provider import fetch_profile as _fmp_fetch_profile
@@ -780,7 +781,7 @@ def main():
 
     # Step 8: Save
     print("\n8. Saving enriched CSV...")
-    df.to_csv(CSV_PATH, index=False)
+    write_universe_csv(df, CSV_PATH)
     print(f"   Saved: {CSV_PATH}")
 
     # Summary

@@ -15,6 +15,7 @@ from ticker_utils import (
     CSV_PATH, SUFFIX_TO_EXCHANGE, SPACE_SUFFIX_TO_EXCHANGE,
     EXCHANGE_NORMALIZE, get_exchange_from_suffix, normalize_exchange,
     normalize_company_for_comparison, backup_csv, read_universe_csv,
+    write_universe_csv,
 )
 from logging_utils import configure_logging, get_logger, log_exception
 
@@ -295,7 +296,7 @@ def main():
 
     # Step 6: Save cleaned CSV
     print("\n6. Saving cleaned CSV...")
-    df.to_csv(CSV_PATH, index=False)
+    write_universe_csv(df, CSV_PATH)
     print(f"   Saved: {CSV_PATH}")
 
     # Summary

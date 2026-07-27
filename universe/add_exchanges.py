@@ -5,6 +5,7 @@ import warnings
 import time
 
 from ticker_utils import CSV_PATH, get_exchange_from_suffix, normalize_exchange, read_universe_csv
+from ticker_utils import write_universe_csv
 from logging_utils import configure_logging, get_logger, log_exception
 
 warnings.filterwarnings("ignore")
@@ -80,7 +81,7 @@ def main():
         df.insert(1, "Exchange", exchanges)
 
     # Save
-    df.to_csv(CSV_PATH, index=False)
+    write_universe_csv(df, CSV_PATH)
     logger.info("Saved updated CSV with Exchange column: %s", CSV_PATH)
     logger.info("Done!")
 

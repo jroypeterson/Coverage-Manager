@@ -343,10 +343,10 @@ def write_universe_csv(df, path=CSV_PATH):
     Reads were centralized here in 2026-06-20 for the same class of reason;
     writes were not, and drifted.
 
-    NOTE (2026-07-26): five other whole-file writers still call `df.to_csv`
-    directly and will strip the BOM -- `add_exchanges.py`, `cleanup.py`,
-    `enrich.py`, `lei_backfill.py`, `ipo_backfill.py`, plus
-    `discovery/candidates.py`. Migrating them is a separate change with its own
-    blast radius; until then the encoding depends on which step wrote last.
+    All seven whole-file writers use this as of 2026-07-26 (`add_exchanges`,
+    `cleanup`, `enrich`, `lei_backfill`, `ipo_backfill`, `cik_backfill`,
+    `discovery/candidates`). `tests/test_universe_csv_roundtrip.py` fails if any
+    of them regresses to a bare `df.to_csv` -- the six-way drift is what made
+    the file's encoding depend on which step happened to write last.
     """
     df.to_csv(path, index=False, encoding="utf-8-sig")

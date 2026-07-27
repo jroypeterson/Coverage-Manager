@@ -32,6 +32,7 @@ from config import API_KEYS, CSV_PATH
 from logging_utils import get_logger
 from providers import renaissance_ipo
 from ticker_utils import read_universe_csv
+from ticker_utils import write_universe_csv
 
 logger = get_logger("ipo_backfill")
 
@@ -151,7 +152,7 @@ def backfill(csv_path=None, use_cache=True, limit=None, us_only=True,
         if _fetcher is None:
             time.sleep(renaissance_ipo.REQUEST_SPACING_SEC)
 
-    df.to_csv(csv_path, index=False)
+    write_universe_csv(df, csv_path)
     still_missing = int((df[IPO_DATE_COL].str.strip() == "").sum())
     return {
         "total": len(df),

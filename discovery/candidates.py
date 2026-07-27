@@ -13,6 +13,7 @@ import pandas as pd
 
 from config import CSV_PATH, DATA_DIR, TODAY
 from ticker_utils import normalize_company_for_comparison, read_universe_csv
+from ticker_utils import write_universe_csv
 from audit import log_change
 from logging_utils import get_logger
 
@@ -254,7 +255,7 @@ def commit_staged_candidates(staging_path, csv_path=None):
     if rows_to_add:
         new_df = pd.DataFrame(rows_to_add)
         combined = pd.concat([df, new_df], ignore_index=True)
-        combined.to_csv(csv_path, index=False)
+        write_universe_csv(combined, csv_path)
         logger.info("Committed %d new tickers to %s", added, csv_path)
 
     return added

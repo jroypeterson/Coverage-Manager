@@ -87,3 +87,63 @@ def test_commit_staged_candidates_preserves_existing_cik(tmp_path, monkeypatch):
     assert "NEWCO" in set(out["Ticker"])
     new_cik = out.loc[out["Ticker"] == "NEWCO", "CIK"].iloc[0]
     assert new_cik == ""
+
+
+# --- writes go through the shared helper, or the encoding drifts again -------
+#
+# The committed master AND exports/universe.csv both carry a UTF-8 BOM, so that
+# is the canonical form. Six modules used pandas' default UTF-8 and silently
+# stripped it, so the file's encoding depended on which step happened to write
+# last -- producing spurious whole-file first-line diffs and flipping the header
+# cell a stdlib-`csv` consumer sees between "Ticker" and "﻿Ticker".
+# Centralizing the READ was done in 2026-06-20 for the same class of reason;
+# the write was left uncentralized and drifted. This test is the ratchet.
+
+import pathlib
+import re
+
+_REPO = pathlib.Path(__file__).resolve().parent.parent
+
+#: Modules that write the whole universe CSV back.
+_UNIVERSE_WRITERS = [
+    "universe/add_exchanges.py",
+    "universe/cleanup.py",
+    "universe/enrich.py",
+    "universe/lei_backfill.py",
+    "universe/ipo_backfill.py",
+    "universe/cik_backfill.py",
+    "discovery/candidates.py",
+]
+
+#: `to_csv` calls that legitimately write something OTHER than the universe.
+_ALLOWED_OTHER_TARGETS = ("conflict_path",)
+
+
+def test_no_universe_writer_calls_to_csv_directly():
+    offenders = []
+    for rel in _UNIVERSE_WRITERS:
+        src = (_REPO / rel).read_text(encoding="utf-8")
+        for match in re.finditer(r"\.to_csv\(\s*([A-Za-z_][A-Za-z_0-9]*)", src):
+            target = match.group(1)
+            if target not in _ALLOWED_OTHER_TARGETS:
+                line = src[: match.start()].count("\n") + 1
+                offenders.append(f"{rel}:{line} -> .to_csv({target}, ...)")
+    assert not offenders, (
+        "these write the universe CSV without write_universe_csv(), which "
+        "strips the canonical BOM: " + "; ".join(offenders)
+    )
+
+
+def test_write_universe_csv_round_trips_the_bom():
+    import pandas as pd
+
+    from ticker_utils import read_universe_csv, write_universe_csv
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "u.csv"
+        write_universe_csv(pd.DataFrame([{"Ticker": "AAPL", "CIK": "320193"}]), p)
+        assert p.read_bytes()[:3] == b"\xef\xbb\xbf", "canonical BOM must survive"
+        assert read_universe_csv(p)["Ticker"].iloc[0] == "AAPL", (
+            "and the BOM must not leak into the first column name"
+        )

@@ -25,6 +25,7 @@ import requests
 
 from cache import cache_get, cache_set
 from config import CSV_PATH
+from ticker_utils import write_universe_csv
 from logging_utils import get_logger, log_exception
 
 logger = get_logger("lei_backfill")
@@ -116,7 +117,7 @@ def backfill(csv_path=None, use_cache=True, limit=None, _fetcher=None):
         if _fetcher is None:
             time.sleep(REQUEST_SPACING_SEC)
 
-    df.to_csv(csv_path, index=False)
+    write_universe_csv(df, csv_path)
     result = {
         "total": len(df),
         "with_isin": int(have_isin.sum()),
