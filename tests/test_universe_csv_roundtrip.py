@@ -189,3 +189,52 @@ def test_foreign_rows_resolve_to_their_own_listing():
         "these resolve to a US namesake and would pull another company's "
         "fundamentals into the report and every export: " + "; ".join(wrong)
     )
+
+
+# --- ADR boilerplate must not read as a different company -------------------
+
+
+def test_adr_wrapper_names_match_their_issuer():
+    """The universe records the INSTRUMENT, providers record the ISSUER. That
+    scored ~0.5 and produced a standing weekly "name mismatch" flag for 22 rows
+    -- noise in the one list that has to stay readable."""
+    from difflib import SequenceMatcher
+
+    from ticker_utils import normalize_company_for_comparison as norm
+
+    pairs = [
+        ("Can Fite Biopharma ADR Representing 300 Ord Shs", "Can-Fite BioPharma Ltd."),
+        ("Inventiva ADR Representing Ord Shs", "Inventiva S.A."),
+        ("Centessa Pharmaceuticals PLC - ADR", "Centessa Pharmaceuticals plc"),
+        ("Grifols SA - ADR ADR Class B", "Grifols, S.A."),
+    ]
+    for recorded, provider in pairs:
+        a, b = norm(recorded), norm(provider)
+        score = 0.85 if (a in b or b in a) else SequenceMatcher(None, a, b).ratio()
+        assert score >= 0.55, f"{recorded!r} vs {provider!r} scored {score:.2f}"
+
+
+def test_adr_stripping_respects_word_boundaries():
+    """"Cadrenal", "Madrigal" and "Adrian" all contain "adr"; truncating them
+    would turn a real company into a stub and could match the wrong issuer."""
+    from ticker_utils import normalize_company_for_comparison as norm
+
+    assert norm("Cadrenal Therapeutics Inc") == "cadrenal therapeutics"
+    assert "madrigal" in norm("Madrigal Pharmaceuticals")
+    assert "adrian" in norm("Padres Adrian Corp")
+
+
+def test_adr_stripping_adds_no_duplicate_company_collisions():
+    """Guards the live file: this normalizer feeds the duplicate-company
+    validation, so a broader strip must not manufacture false warnings."""
+    import collections
+
+    from ticker_utils import normalize_company_for_comparison as norm
+    from ticker_utils import read_universe_csv
+
+    names = list(read_universe_csv()["Company Name"])
+    counts = collections.Counter(norm(n) for n in names if str(n).strip())
+    dupes = {k: v for k, v in counts.items() if v > 1 and k}
+    assert dupes == {"shimadzu": 2}, (
+        f"unexpected normalized-name collisions: {dupes}"
+    )

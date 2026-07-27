@@ -311,13 +311,39 @@ def normalize_exchange(exchange_val):
     return str(exchange_val).strip()
 
 
+# ADR / depositary-receipt boilerplate. The universe records the INSTRUMENT
+# ("Can Fite Biopharma ADR Representing 300 Ord Shs") where data providers record
+# the ISSUER ("Can-Fite BioPharma Ltd."), which scored ~0.5 and produced a
+# standing "company name mismatch" flag every week for 22 rows. Word boundaries
+# are load-bearing: "Cadrenal", "Madrigal" and "Adrian" all contain "adr".
+_ADR_BOILERPLATE = re.compile(
+    r"\s*[-,]?\s*\b(sponsored\s+)?adrs?\b.*$"      # "- ADR", "ADR Class B", ...
+    r"|\s*representing\s+.*$"                       # "Representing 300 Ord Shs"
+    r"|\s*\b(ordinary|ord)\s+(shares|shs)\b.*$",
+    re.I,
+)
+
+
 def normalize_company_for_comparison(name):
-    """Strip suffixes like Inc, Corp, PLC, Ltd, Holdings, Co for fuzzy matching."""
+    """Strip corporate suffixes and ADR boilerplate for fuzzy name matching.
+
+    Verified across the full universe (2026-07-27): stripping the ADR wrapper
+    introduces ZERO new normalized-name collisions, so it cannot manufacture a
+    false duplicate-company warning in `validate_no_duplicate_companies`.
+    """
     if not name or pd.isna(name):
         return ""
-    s = str(name).strip().lower()
+    s = _ADR_BOILERPLATE.sub("", str(name).strip())
+    s = s.strip(" -,").lower()
+    # Drop periods BEFORE stripping legal forms, so dotted spellings reduce to
+    # the same token as undotted ones. Without this, "N.V." survives as the two
+    # tokens "n v" and "Cosmo Pharmaceuticals N.V." vs "Cosmo N.V." scored 0.53
+    # -- a standing weekly mismatch flag between a company and itself. Likewise
+    # "S.A." vs "SA". Only periods: "/" is left alone so "Genmab A/S" is
+    # untouched, and collapsing it would risk merging genuinely distinct names.
+    s = s.replace(".", "")
     s = re.sub(r'\b(inc|corp|corporation|plc|ltd|limited|holdings|co|company|group|se|ag|sa|nv)\b', '', s)
-    s = re.sub(r'[.,\s]+', ' ', s).strip()
+    s = re.sub(r'[,\s]+', ' ', s).strip()
     return s
 
 
