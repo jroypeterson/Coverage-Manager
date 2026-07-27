@@ -147,3 +147,45 @@ def test_write_universe_csv_round_trips_the_bom():
         assert read_universe_csv(p)["Ticker"].iloc[0] == "AAPL", (
             "and the BOM must not leak into the first column name"
         )
+
+
+# --- foreign lines must not resolve to a US namesake -------------------------
+#
+# Five coverage rows carried a bare US ticker for a foreign company, so every
+# consumer resolving them got a DIFFERENT COMPANY's fundamentals: CSL Ltd
+# (Australian biotech, A$55.7bn) was pulling Carlisle Companies at $13.4bn, and
+# UCB SA (Belgian pharma, EUR 46.8bn) was pulling United Community Banks at
+# $4.3bn. Their Country/Exchange columns had been auto-enriched FROM the wrong
+# symbol, so the bad data looked self-consistent. Found 2026-07-27 via the
+# delisted check's name-mismatch rule.
+
+_FOREIGN_SYMBOL_EXPECTATIONS = {
+    "CSL": "CSL.AX",            # not Carlisle Companies (NYSE: CSL)
+    "UCB": "UCB.BR",            # not United Community Banks (NYSE: UCB)
+    "IPN": "IPN.PA",            # not the SPDR S&P Intl Industrial ETF
+    "MED": "MED.SW",            # not Medifast (NYSE: MED)
+    "MOVE": "MOVE.SW",          # not Corvex (NASDAQ: MOVE)
+    "ZEN": "ZEN.V",             # TSX-V, not TSX (.TO returns garbage)
+    "COLOB DC": "COLO-B.CO",    # Yahoo hyphenates the B share class
+    "GETIB SS": "GETI-B.ST",
+}
+
+
+def test_foreign_rows_resolve_to_their_own_listing():
+    from ticker_utils import normalize_ticker, read_universe_csv
+
+    df = read_universe_csv()
+    wrong = []
+    for ticker, expected in _FOREIGN_SYMBOL_EXPECTATIONS.items():
+        row = df[df["Ticker"] == ticker]
+        if row.empty:
+            continue  # retired from coverage; nothing to protect
+        row = row.iloc[0]
+        got = normalize_ticker(row["Ticker"], company_name=row["Company Name"],
+                               exchange=row["Exchange"])
+        if got != expected:
+            wrong.append(f"{ticker}: {got} (expected {expected})")
+    assert not wrong, (
+        "these resolve to a US namesake and would pull another company's "
+        "fundamentals into the report and every export: " + "; ".join(wrong)
+    )

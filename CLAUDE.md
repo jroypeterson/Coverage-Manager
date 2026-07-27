@@ -630,6 +630,38 @@ Important comparison rules:
 - Finnhub is mainly used for overlapping growth and PEG fields.
 - The cross-check is diagnostic only; it does not gate report generation.
 
+## Foreign lines that collide with a US namesake (found 2026-07-27)
+
+A universe row for a foreign company carrying a **bare US-style ticker** silently
+pulls a *different company's* fundamentals into the report and every export.
+`normalize_ticker` only appends an exchange suffix when `Exchange` is non-US, so
+a wrong `Exchange` value yields a bare symbol that Yahoo happily resolves to
+whoever owns it in the US:
+
+| Row | Was pulling | Actual |
+|---|---|---|
+| CSL Ltd (Australia) | Carlisle Companies, $13.4bn | **CSL.AX**, A$55.7bn |
+| UCB SA (Belgium) | United Community Banks, $4.3bn | **UCB.BR**, EUR 46.8bn |
+| Ipsen SA (France) | an SPDR ETF | **IPN.PA**, EUR 13.1bn |
+| Medartis (Switzerland) | Medifast, $119M | **MED.SW**, CHF 1.08bn |
+| Medacta (Switzerland) | Corvex, $351M | **MOVE.SW**, CHF 2.64bn |
+
+**The failure is self-concealing**: `Country (HQ)` and `Exchange` had been
+auto-enriched *from the wrong symbol*, so all four columns agreed with each
+other and looked clean (CSL Ltd read "United States / NYSE"). Fixing `Exchange`
+is therefore the fix — the suffix map already had every needed entry.
+
+Two cases `Exchange` cannot express go in `MANUAL_TICKER_MAP` instead: Yahoo
+hyphenates Nordic B-shares (`COLOB DC` -> **`COLO-B.CO`**, not `COLOB.CO`;
+`GETIB SS` -> **`GETI-B.ST`**), which had been returning a `MUTUALFUND`
+quoteType with no usable fundamentals at all.
+
+Caught by `delisted_check`'s name-mismatch rule, which is exactly what it is for.
+Pinned by `test_foreign_rows_resolve_to_their_own_listing`. **When adding a
+non-US name, verify `normalize_ticker` returns a suffixed symbol** — a bare one
+for a foreign company is the tell. Poisoned `cache/fundamentals/yf_<T>.json`
+entries must be deleted when fixing one, or the wrong data is reused.
+
 ## Key conventions
 - Sector classification uses `Sector (JP)` and `Subsector (JP)` columns (user-defined taxonomy)
 - Market cap, EV, and Net Debt are converted to USD at report time

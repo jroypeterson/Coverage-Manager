@@ -19,6 +19,13 @@ from config import SCRIPT_DIR, CSV_PATH, REPORTS_DIR, BACKUPS_DIR
 # ── Manual yfinance ticker mappings ─────────────────────────────────────────
 
 MANUAL_TICKER_MAP = {
+    # Nordic B-shares. The universe carries Bloomberg-style symbols ("COLOB DC")
+    # and the space-suffix rule yields "COLOB.CO", but Yahoo writes the share
+    # class with a hyphen: "COLO-B.CO". No Exchange value can express that, so
+    # these are mapped by company name. Both previously returned a MUTUALFUND
+    # quoteType with no name, i.e. no usable fundamentals at all.
+    "Coloplast A/S": "COLO-B.CO",
+    "Getinge AB": "GETI-B.ST",
     # Japanese tickers (name-based in CSV → numeric yfinance format)
     "Olympus": "7733.T",
     "Shimadzu": "7701.T",
