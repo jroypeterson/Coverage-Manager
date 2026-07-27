@@ -3856,13 +3856,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "KALV": {
-    "name": "Kalvista Pharmaceuticals Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
   "KIDS": {
     "name": "OrthoPediatrics Corp.",
     "sector": "MedTech",
@@ -4112,13 +4105,6 @@
     "name": "Larimar Therapeutics Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
-  "LSB": {
-    "name": "LakeShore Biopharma Co., Ltd",
-    "sector": "Biopharma",
-    "subsector": "",
     "sub_subsector": "",
     "core": ""
   },
