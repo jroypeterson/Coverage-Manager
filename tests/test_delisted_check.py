@@ -515,3 +515,23 @@ def test_degraded_run_says_so_in_the_report(tmp_path):
     assert "provisional" in md.lower(), (
         "a throttled run's flags must not read as findings"
     )
+
+
+def test_missing_identity_excludes_throttled_lookups(monkeypatch):
+    """`missing_data` must mean "Yahoo has no metadata for this symbol", not
+    "Yahoo would not talk to us" -- otherwise the ambiguity this module was
+    rewritten to remove survives inside a counter and inflates under throttling,
+    double-counting against the transport-failure line."""
+    result = _fake_universe(
+        monkeypatch,
+        [_urow("ANSWERED"), _urow("THROTTLED"), _urow("FINE")],
+        {
+            # answered, and genuinely has nothing
+            "ANSWERED": _identity(name="", quote="", info_ok=True, last=_fresh(1)),
+            # never answered
+            "THROTTLED": _identity(name="", quote="", info_ok=False, probe_ran=False),
+            "FINE": _identity(name="Some Company Inc", last=_fresh(1)),
+        },
+    )
+    assert result["missing_data"] == 1, "only the ticker that actually answered"
+    assert result["info_failures"] == 1

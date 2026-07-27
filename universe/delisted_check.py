@@ -575,7 +575,12 @@ def check_universe(csv_path=None, max_workers=4, use_cache=True):
         price_status = identity.get("price_status") or (
             PRICE_OK if identity.get("price_probe_ran") else PRICE_FAILED)
         info_ok = bool(identity.get("info_ok"))
-        if not identity or (
+        # Counted ONLY when `.info` actually answered. Otherwise this number
+        # conflates "Yahoo has no metadata for this symbol" with "Yahoo refused
+        # to talk to us", which is the exact ambiguity this module was rewritten
+        # to remove -- it would just have survived inside a counter, inflating
+        # during throttled runs and overlapping the transport-failure line.
+        if info_ok and (
             not identity.get("quoteType")
             and not identity.get("longName")
             and not identity.get("shortName")

@@ -1026,10 +1026,16 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
             else:
                 steps["cik_backfill"] = (
                     f"{cb_result['filled']} filled, "
-                    f"{cb_result['still_blank']} still blank (non-US)"
+                    f"{cb_result['still_blank']} still blank"
+                    # NOT "(non-US)": most are, but asserting it here explains
+                    # away a count that can also contain real US misses.
+                    + (f", {cb_result['rejected_name_mismatch']} skipped on "
+                       f"name mismatch"
+                       if cb_result.get("rejected_name_mismatch") else "")
                 )
-                for t, cik, name in cb_result.get("rows", []):
-                    logger.warning("  NEW REGISTRANT %s -> CIK %s (%s)", t, cik, name)
+                # The module already logs each filled row; repeating them here
+                # doubled every line, at WARNING, for a SUCCESS event -- which
+                # pollutes any warn-level monitoring.
         else:
             steps["cik_backfill"] = status
 
