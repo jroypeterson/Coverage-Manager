@@ -734,6 +734,50 @@ that commits an approved candidate); `lei_backfill.py` was already safe. Read-on
 copies the master to exports via `shutil.copyfile` (faithful), so protecting the source writers
 protects the export. Regression: `tests/test_universe_csv_roundtrip.py`. See `feedback_published_artifacts`.
 
+## Exports are BOM-free, and are read back before shipping (2026-07-27)
+
+**The published CSVs are UTF-8 without a BOM, and that is now enforced.** A BOM reached
+`data/coverage_universe_tickers.csv` around 2026-07-25; `_step_export_artifacts` read its
+fieldnames as plain utf-8, so the first field was `"﻿Ticker"` while every row set
+`row["Ticker"]` — and `DictWriter(extrasaction="ignore")` silently dropped the join key from
+everything it wrote. Measured cost, reproduced with each consumer's own read path:
+
+| Artifact / consumer | Result |
+|---|---|
+| `exports/positions_and_researching.csv` | 84 of 84 rows blank `Ticker` |
+| `exports/watchlist.csv` | 66 of 66 blank (undetected until an audit) |
+| `earnings_agent/coverage.py:212` | **0 of 1,086 tickers** — Tier 2/3 collapsed |
+| `post_earnings_movers/pem/universe.py:97` | 0 of 1,086 — cuts and position badges gone |
+| `analyst-days/src/universe.py:180` | 0 rows matched any sector |
+
+All of it while `positions_status.json` said `validation_passed: true`, because **validation
+ran on the source and nothing read the published artifact back**.
+
+Three rules follow, and each is pinned by a test:
+
+1. **BOM-free is canonical.** This reverses the 2026-07-16 ratchet, which made the BOM
+   canonical because that was what the files happened to contain. One canonical form was the
+   right goal; BOM-ful was the wrong form. A `utf-8-sig` reader handles a BOM-free file, a
+   plain-`utf-8` reader does not handle a BOM, and most consumers are the latter — so for a
+   file ~20 siblings join on, the encoding must be the one that survives the least careful
+   reader. `ticker_utils.write_universe_csv` writes plain utf-8.
+2. **Read the source with `utf-8-sig` anyway.** Tolerant in, strict out.
+   `universe/artifacts.py:71` always did this and said why; the exporter did not.
+3. **Never `extrasaction="ignore"` on an export writer.** It converts a header/row key
+   mismatch — a bug — into silent data loss. Let it raise.
+
+**Step `[5d/6]` `check_published_exports`** (`universe/export_acceptance.py`) re-opens every
+published CSV with the encoding the least careful consumer uses, asserts the join key is
+present and populated, and cross-checks row counts against the status file that claims to
+describe them. It runs after every writer and before `sigma_export`, so a broken contract is
+reported before it propagates to the sibling repo. Deliberately dumb and deliberately last:
+it shares no code with the writer, so it cannot share a bug with it. Non-gating — the universe
+CSV update is still the real product — but it turns a silent green zero-ticker export into a
+visible failure in the run summary and the health heartbeat.
+
+**When adding an export:** add it to `CHECKS` in `export_acceptance.py` with its join key.
+An artifact nothing validates is an artifact that will eventually ship empty.
+
 ## Case-only ticker collisions (validation warning, 2026-07-16)
 
 The universe can carry two rows that collide only by CASE — e.g. `VCEL` + `VCEl` (a
