@@ -86,6 +86,28 @@ def build_parser():
         help="Only look up the first N missing rows (for a test pass).",
     )
 
+    fid_parser = subparsers.add_parser(
+        "backfill-foreign-ids",
+        help=(
+            "Recover ISIN + LEI for foreign-listed rows by joining broad international "
+            "ETF holdings files (local ticker + country) to the same funds' SEC N-PORT "
+            "filings (ISIN + LEI). Fills the 200 foreign rows yfinance and FMP cannot "
+            "resolve. Never overwrites an existing value."
+        ),
+    )
+    fid_parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Report what would be filled without writing the universe CSV.",
+    )
+    fid_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the 7-day source cache and refetch the holdings + N-PORT files.",
+    )
+    fid_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Apply only the first N proposals (bounds a first run).",
+    )
+
     crsp_parser = subparsers.add_parser(
         "crsp-snapshot",
         help=(
@@ -419,6 +441,25 @@ def main():
         from universe import lei_backfill
 
         lei_backfill.main(use_cache=not args.no_cache, limit=args.limit)
+    elif args.command == "backfill-foreign-ids":
+        from universe import foreign_identifiers
+
+        result = foreign_identifiers.main(
+            dry_run=args.dry_run, use_cache=not args.no_cache, limit=args.limit,
+        )
+        report = foreign_identifiers.write_report(result)
+        print(f"status: {result.status}")
+        print(f"map keys: {result.map_size:,}  eligible rows: {result.candidates:,}  "
+              f"proposals: {len(result.proposals):,}")
+        print(f"ISIN written: {result.isin_written}  LEI written: {result.lei_written}")
+        for f in result.funds_failed:
+            print(f"WARNING: source failed - {f}")
+        for e in result.errors:
+            print(f"ERROR: {e}")
+        print(f"report: {report}")
+        # Exit 2 when no source answered: a run that learned nothing must not
+        # report a clean universe (mirrors backfill-cik / check-delisted).
+        raise SystemExit(0 if result.status != "failed" else 2)
     elif args.command == "crsp-snapshot":
         import csv as _csv
 

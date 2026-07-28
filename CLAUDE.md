@@ -438,6 +438,75 @@ key `RENAISSANCE_API_KEY` in `.env`).
   weekly pipeline** — run on demand (like `backfill-lei`); wiring it as a weekly step
   (+ a fresh-discovery hook) is the obvious next increment.
 
+## Foreign identifier backfill (ISIN + LEI from fund holdings)
+
+`python cli.py backfill-foreign-ids [--dry-run] [--no-cache] [--limit N]`
+recovers **ISIN and LEI for foreign-listed rows** that `enrich.py` cannot resolve.
+Before it ran, **200 of the 350 foreign-HQ rows had no ISIN at all** — the binding
+constraint on every identifier-keyed cross-check, since a reconciliation can only
+reach rows that have something to join on. First live run (2026-07-28) wrote
+**55 ISIN + 43 LEI**, taking foreign ISIN coverage 43% → **59%** and universe LEI
+334 → **377**.
+
+### Why two sources, joined
+
+Neither public file is sufficient alone; both describe the *same* portfolio of a
+broad international ETF:
+
+| Source | Gives | Missing |
+|---|---|---|
+| iShares holdings CSV (`/us/products/<id>/x/latest-holdings.csv`) | local exchange ticker, `Location`, `Exchange`, `Market Currency`, daily | **no ISIN** |
+| SEC **N-PORT** (`NPORT-P` `primary_doc.xml`) | **ISIN, LEI, `invCountry`** — verified 100% coverage on all three across 4,198 IXUS holdings | **no ticker** (0.5%) |
+
+Joined on normalised company name within one fund, they yield
+`(local ticker, country) → {ISIN, LEI, incorporation country, exchange, currency}`
+**from an SEC filing**. Funds are identified by `(iShares product id, SEC CIK, SEC
+series id)` — the URL *slug is ignored*, only the product id resolves the fund.
+Currently IXUS + IEMG; adding funds is a one-line change and raises coverage.
+
+### The guards, and why each exists
+
+1. **`(ticker, country)`, never ticker alone.** A bare local ticker is not an
+   identity — that is what the exchange suffix is for. Keyed on ticker alone,
+   `1801.HK` (Innovent, Hong Kong) resolves to `JP3443600006`, a **Japanese**
+   ISIN, because `1801` is also a Tokyo issuer's code. Measured, not
+   hypothesised. Keyed properly: zero collisions across 3,147 keys, and Innovent
+   resolves to `KYG4818G1010`.
+2. **Suffix → expected country.** `SUFFIX_COUNTRIES` maps `.T`→Japan, `.HK`→
+   {China, Hong Kong}, etc. A fund row from the wrong country is rejected and
+   reported — this caught `2359.HK` (WuXi AppTech) matching a *Taiwanese* `2359`.
+3. **Name agreement** (token-based, prefix-aware — reuses
+   `crsp_snapshot._name_similarity`). Ticker and country can both match while the
+   companies do not.
+4. **Never overwrites.** An existing ISIN or LEI is left alone; the two halves
+   fill independently.
+
+A wrong identifier is far worse than a missing one: a blank ISIN is visibly
+missing, a wrong one looks like data and silently mis-joins every consumer.
+
+### Incorporation is not domicile — do not "fix" this
+
+The recovered ISIN's country prefix often disagrees with `Country (HQ)` **and is
+still correct**: Innovent is China-HQ'd, Cayman-incorporated (`KYG…`); likewise
+WuXi Biologics, Hansoh. `enrich.validate_isin_for_row` would reject those, and is
+right to for *its* inputs — it guards against yfinance returning a wrong ISIN for
+a rebranded ticker. These come from an SEC filing carrying the issuer's own LEI,
+so that heuristic is deliberately **not** applied; instead every prefix-vs-HQ
+divergence is listed in the report so an *unexpected* one is seen rather than
+silently written or silently dropped.
+
+Sources cached 7 days under `cache/foreign_ids/`. iShares 403s a non-browser
+user-agent (same CDN behaviour the comments tracker hit); SEC needs
+`EDGAR_IDENTITY`. Non-gating, additive; not wired into the weekly pipeline — run
+on demand like `backfill-lei`. Exit 2 when **every** source failed (a run that
+learned nothing must not report a clean universe). Report:
+`reports/foreign_identifiers_<date>.md`. Module
+`universe/foreign_identifiers.py`; tests `tests/test_foreign_identifiers.py` (19).
+
+**Known remaining gap:** ~60 foreign rows carry no exchange suffix (`207940`,
+`SUNPHARMA`), so there is nothing to resolve the market from and they are counted,
+not guessed.
+
 ## CRSP / Morningstar US Total Market snapshot
 
 `python cli.py crsp-snapshot [--force] [--skip-levels] [--dry-run] [--no-reconcile]`

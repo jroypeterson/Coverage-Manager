@@ -598,9 +598,13 @@ def test_no_console_log_line_carries_non_ascii():
     offenders = []
     for rel in ("universe/delisted_check.py", "universe/cik_backfill.py",
                 "universe/ticker_change_check.py", "weekly_universe.py",
-                "weekly_build.py", "cli.py"):
+                "weekly_build.py", "cli.py",
+                # Both run under Task Scheduler, so both are exposed to the same
+                # cp1252 console. `cli.py` shipped an em-dash `print()` for the
+                # foreign-ids verb on 2026-07-28 and this test caught it.
+                "universe/crsp_snapshot.py", "universe/foreign_identifiers.py"):
         for n, line in enumerate((repo / rel).read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r"(logger\.\w+|print)\(", line) and any(ord(c) > 127 for c in line):
+            if re.search(r"(logger\.\w+|log\.\w+|print)\(", line) and any(ord(c) > 127 for c in line):
                 offenders.append(f"{rel}:{n}")
     assert not offenders, (
         "non-ASCII on a console line; a cp1252 scheduled run dies here before "
