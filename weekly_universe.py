@@ -68,7 +68,11 @@ def _step_archive_universe():
     """Archive prior dated universe-side outputs (discovery md files)."""
     from reporting.email import archive_files
 
-    return archive_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY, UNIVERSE_ARCHIVE_PATTERNS)
+    # prune_days=0: these are the analytical outputs (weekly recommendations +
+    # company backgrounds), not regenerable renders. `reports/` is gitignored, so
+    # a delete here is permanent - keep them all. See archive_files' docstring.
+    return archive_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY,
+                         UNIVERSE_ARCHIVE_PATTERNS, prune_days=0)
 
 
 def _step_discovery(dry_run=False):

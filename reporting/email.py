@@ -34,15 +34,27 @@ REPORT_ARCHIVE_PATTERNS = [
 def archive_files(source_dir, archive_dir, today_str, patterns, prune_days=60):
     """Move files matching any of `patterns` from source_dir to archive_dir.
 
-    Files whose basename contains `today_str` are left in place. Files in
-    `archive_dir` older than `prune_days` are deleted to keep the archive bounded.
+    Files whose basename contains `today_str` are left in place, so the current
+    run's output stays in `source_dir` and only prior dates are archived.
+
+    **Pruning only ever touches files matching this caller's own `patterns`**
+    (2026-07-28). It used to glob `archive_dir/*` and delete anything older than
+    `prune_days` — which meant every caller pruned every other caller's archive.
+    Four callers share this archive with the 60-day default, so a Monday watchlist
+    run or any performance run silently deleted the weekly coverage-recommendation
+    reports and their company-background briefings. Those are LLM-authored analysis,
+    not regenerable output, and `reports/` is gitignored, so there was no other
+    copy: every additions report before 2026-06-05 was destroyed this way.
+
+    Set `prune_days=0` for artifacts that must be retained indefinitely.
 
     Args:
         source_dir: Directory to scan for matching files.
         archive_dir: Destination directory for moved files.
         today_str: Date string; files containing this in the basename are skipped.
-        patterns: Iterable of glob patterns (basename globs, joined to source_dir).
-        prune_days: Delete files in archive_dir older than this many days.
+        patterns: Iterable of glob patterns (basename globs).
+        prune_days: Delete archived files matching `patterns` older than this many
+            days. 0 or None disables pruning entirely.
 
     Returns:
         dict with keys 'moved' (count of files moved) and 'pruned' (count deleted).
@@ -62,10 +74,11 @@ def archive_files(source_dir, archive_dir, today_str, patterns, prune_days=60):
     pruned = 0
     if prune_days and prune_days > 0:
         cutoff = time.time() - prune_days * 86400
-        for f in glob.glob(os.path.join(str(archive_dir), "*")):
-            if os.path.isfile(f) and os.path.getmtime(f) < cutoff:
-                os.remove(f)
-                pruned += 1
+        for pattern in patterns:
+            for f in glob.glob(os.path.join(str(archive_dir), pattern)):
+                if os.path.isfile(f) and os.path.getmtime(f) < cutoff:
+                    os.remove(f)
+                    pruned += 1
         if pruned:
             logger.info("Deleted %s archived file(s) older than %s days", pruned, prune_days)
 
