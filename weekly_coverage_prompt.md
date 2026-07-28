@@ -194,18 +194,53 @@ A bulleted list of all report files saved this week with their filenames and a o
 - `coverage_consolidated_2026-04-03.html` — Consolidated HTML performance report (all sectors)
 - (etc. for each HTML sector report generated)
 
-## Slack notification
-After the email draft is created and all reports are generated, send a message to the Slack channel #all-jp-personal-hub with a brief summary:
+## Slack notification — post to #ipo
+
+After the email draft is created and all reports are generated, post a summary to the Slack
+channel **#ipo**.
+
+**There is no webhook for #ipo — post with `chat.postMessage`**, using `SLACK_BOT_TOKEN` and
+`SLACK_IPO_CHANNEL_ID` (`C0BKLC32EHK`) from `Coverage Manager/.env`. ClaudeBot is already a
+member of the channel.
+
+```
+POST https://slack.com/api/chat.postMessage
+Authorization: Bearer $SLACK_BOT_TOKEN
+{"channel": "$SLACK_IPO_CHANNEL_ID", "blocks": [...], "text": "<fallback>"}
+```
+
+**Confirm the response has `"ok": true`.** If it does not, say so explicitly in your final
+summary — do not report the run as clean. A post that silently failed is worse than no post,
+because the report is otherwise invisible (see "Why #ipo" below).
+
+Include:
 
 - Subject line (matching the email subject)
 - Number of recommendations this week
 - One-line summary for each recommended company (ticker, trigger, and short reason)
+- **A "Pipeline / filings to monitor" section** — deals that have filed or launched a roadshow
+  but not yet priced, with expected pricing date. This is the highest-value part of the post:
+  it is the only forward-looking signal in the whole pipeline, and it is what tells JP about a
+  deal while he can still act on it.
 - Whether any CSV changes were made
-- A note that the full report and performance files have been emailed
-
+- **The running count of recommendations still pending approval**, this week's and all prior
+  weeks' (list the tickers). The weekly job runs headless, so step 13 ("ask me which additions
+  I want to add") cannot execute and the backlog only grows — surfacing the count is what keeps
+  it from growing silently.
+- The report filename, and a note that a Gmail **draft** was created (it is never sent)
 - A Dropbox link to the reports folder: https://www.dropbox.com/home/Claude%20Folder/Coverage%20Manager/reports
 
-Keep the Slack message concise — no tables, no HTML. Use plain text with line breaks.
+Use Block Kit (`blocks`), per the workspace convention. `context` blocks must use `elements[]`.
+Always set a plain-text `text` fallback.
+
+### Why #ipo, and what NOT to do
+
+Do **not** post to `#all-jp-personal-hub` — no webhook for it exists in this workspace, and
+earlier runs silently fell back to `SLACK_WEBHOOK_URL`, landing this report in
+**#stock-price-alerts** between two thousand-line Sigma Alert dumps, where it went unread. The
+2026-07-24 run flagged Jersey Mike's (JMKE) with full terms four days before pricing and JP
+never saw it. `SLACK_WEBHOOK_COVERAGE` is also wrong here — that channel carries the
+mechanical universe-delta post, not discovery.
 
 ## File output
 Before creating new files, move any prior dated report and performance files into:
@@ -350,8 +385,8 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 10. Move old report files (including company_backgrounds_*.md) to Coverage Manager/reports/old reports/.
 11. Draft the Gmail email and save the dated markdown report (with Company Summaries section).
 12. For each recommended company, use web search to research and generate a full company background briefing following the Full Company Background Report template above. Compile all briefings into a single file and save as Coverage Manager/reports/company_backgrounds_YYYY-MM-DD.md.
-13. Ask me which additions (if any) I want to add to the CSV.
-14. For any I approve, append them to Coverage Manager/data/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file.
+13. Ask me which additions (if any) I want to add to the CSV. **On the scheduled headless run there is no one to ask** — so instead carry the recommendation forward as pending, and report the full pending backlog in the Slack post (see "Slack notification"). Never add a name to the CSV unapproved.
+14. For any I approve, append them to Coverage Manager/data/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file. **Write the CSV via `ticker_utils.read_universe_csv` / `write_universe_csv`** — a bare pandas round-trip float-ifies `CIK` and `Year Listed` and corrupts the published exports.
 15. **Publish the regenerated exports (see "Publish exports" below) — do this EVERY run, even in a quiet week with zero additions.**
 
 ## Publish exports (required every run)
