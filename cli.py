@@ -104,6 +104,11 @@ def build_parser():
         help="Skip the 12 MB daily index-levels refresh (constituents only).",
     )
     crsp_parser.add_argument(
+        "--archive-levels", action="store_true",
+        help=("Force a dated gzip copy of the index-level history into "
+              "data/crsp/archive/ (normally written only when a new quarter lands)."),
+    )
+    crsp_parser.add_argument(
         "--dry-run", action="store_true",
         help="Download and verify, report the delta, write nothing.",
     )
@@ -423,6 +428,7 @@ def main():
         result = crsp_snapshot.snapshot(
             force=args.force,
             skip_levels=args.skip_levels,
+            archive_levels=args.archive_levels,
             dry_run=args.dry_run,
         )
 
@@ -444,6 +450,8 @@ def main():
                 f"delta vs {result.prior_trade_date}: "
                 f"+{len(result.added)} added, -{len(result.dropped)} dropped"
             )
+        if result.levels_archive:
+            print(f"levels archived: {result.levels_archive.name}")
         for w in result.warnings:
             print(f"WARNING: {w}")
         for e in result.errors:

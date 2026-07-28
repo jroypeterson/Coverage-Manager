@@ -153,6 +153,7 @@ class SnapshotResult:
     constituent_count: int = 0
     path: Path | None = None
     levels_path: Path | None = None
+    levels_archive: Path | None = None
     sector_labelled: int = 0
     added: list[str] = field(default_factory=list)
     dropped: list[str] = field(default_factory=list)
@@ -353,6 +354,7 @@ def snapshot(
     snapshot_dir: Path = CRSP_DIR,
     force: bool = False,
     skip_levels: bool = False,
+    archive_levels: bool = False,
     dry_run: bool = False,
 ) -> SnapshotResult:
     """Download, verify, and archive the current quarterly constituent file.
@@ -444,8 +446,64 @@ def snapshot(
             # copy stays valid and only loses recent days. The constituent
             # archive is the irreplaceable half of this job.
             result.warnings.append(f"levels download failed (prior copy retained): {exc}")
+        else:
+            # Archive a dated, compressed copy when a new quarter lands (or on
+            # demand). The working file is refreshed in place every run, which is
+            # fine while the source lives — the series is cumulative from
+            # inception, so each download is a superset of the last. It stops
+            # being fine the moment CRSP restates history or the URL dies
+            # mid-migration: an in-place refresh has already overwritten the only
+            # copy by then. Quarterly (not weekly) because 52 near-identical
+            # 2.8 MB snapshots a year is hoarding, not provenance.
+            if archive_levels or (result.status == "ok" and not already):
+                try:
+                    result.levels_archive = _archive_levels(levels, snapshot_dir)
+                except (OSError, ValueError) as exc:
+                    result.warnings.append(f"levels archive failed: {exc}")
 
     return result
+
+
+def _levels_last_date(path: Path) -> str:
+    """Latest Date in the levels CSV — the file's own as-of, not today's date.
+
+    Named by content rather than download date so a re-run, a retry, or a stale
+    upstream file cannot mint a second archive claiming to be newer data.
+    """
+    latest = ""
+    with path.open(newline="", encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(fh):
+            d = (row.get("Date") or "").strip()
+            if d > latest:
+                latest = d
+    if not latest:
+        raise ValueError(f"{path.name}: no dates found")
+    return _iso_date(latest)
+
+
+def _archive_levels(levels: Path, snapshot_dir: Path) -> Path | None:
+    """Write `archive/index_levels_<lastdate>.csv.gz`. Returns the path, or None
+    if that date is already archived."""
+    import gzip
+    import shutil
+
+    archive_dir = snapshot_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    dest = archive_dir / f"index_levels_{_levels_last_date(levels)}.csv.gz"
+    if dest.exists():
+        return None
+    fd, tmp_name = tempfile.mkstemp(dir=str(archive_dir), suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        os.close(fd)
+        with levels.open("rb") as src, gzip.open(tmp, "wb", compresslevel=6) as out:
+            shutil.copyfileobj(src, out)
+        _replace_with_retry(tmp, dest)
+    except BaseException:
+        _remove_quietly(tmp)
+        raise
+    log.info("archived levels -> %s (%.1f MB)", dest.name, dest.stat().st_size / 1e6)
+    return dest
 
 
 def _replace_with_retry(src: Path, dest: Path, *, attempts: int = 6) -> None:

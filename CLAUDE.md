@@ -501,7 +501,15 @@ burning the run.
 - `data/crsp/classification_<TradeDate>.json` — ticker → `{sector, size, style}`
   derived from index membership
 - `data/crsp/index_levels.csv` — daily PR + TR levels, all 76 indexes, refreshed
-  in place (cumulative from inception, so a refresh loses nothing)
+  in place (cumulative from inception, so each download is a superset of the last)
+- `data/crsp/archive/index_levels_<lastdate>.csv.gz` — dated compressed copies,
+  2.8 MB each (21% of raw). Written when a **new quarter** lands, or on demand
+  with `--archive-levels`. In-place refresh is fine while the source lives; it
+  stops being fine the moment CRSP restates history or the URL dies mid-migration,
+  because by then the refresh has already overwritten the only copy. Quarterly,
+  not weekly — 52 near-identical snapshots a year is hoarding, not provenance.
+  Named by the file's own latest `Date`, not the download date, so a re-run or a
+  stale upstream file cannot mint a second archive claiming to be newer data.
 - `reports/crsp_snapshot_<today>.md` — delta vs the prior quarter + universe
   reconciliation
 

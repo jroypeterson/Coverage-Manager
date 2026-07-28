@@ -403,6 +403,108 @@ def test_snapshot_dry_run_writes_nothing(tmp_path, stub_download):
     assert not list(tmp_path.glob("constituents_*.csv"))
 
 
+def _levels_csv(path, dates):
+    path.write_text(
+        "Date,Name,Ticker,Level\n"
+        + "".join(f"{d},Total Market,CRSPTMT,{1000 + i}\n" for i, d in enumerate(dates)),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_levels_archive_named_by_content_not_download_date(tmp_path):
+    lv = _levels_csv(tmp_path / "index_levels.csv", ["2026-07-25", "2026-07-27", "2026-07-26"])
+    out = cs._archive_levels(lv, tmp_path)
+    assert out is not None and out.name == "index_levels_2026-07-27.csv.gz"
+    assert out.parent.name == "archive"
+
+
+def test_levels_archive_is_readable_gzip(tmp_path):
+    import gzip
+
+    lv = _levels_csv(tmp_path / "index_levels.csv", ["2026-07-27"])
+    out = cs._archive_levels(lv, tmp_path)
+    assert gzip.open(out, "rt", encoding="utf-8").read() == lv.read_text(encoding="utf-8")
+
+
+def test_levels_archive_is_idempotent(tmp_path):
+    """A re-run, a retry, or a stale upstream file must not mint a second copy
+    claiming to be newer data."""
+    lv = _levels_csv(tmp_path / "index_levels.csv", ["2026-07-27"])
+    assert cs._archive_levels(lv, tmp_path) is not None
+    assert cs._archive_levels(lv, tmp_path) is None
+    assert len(list((tmp_path / "archive").glob("*.csv.gz"))) == 1
+
+
+def test_levels_archive_handles_crsp_slash_dates(tmp_path):
+    lv = _levels_csv(tmp_path / "index_levels.csv", ["07/27/2026", "07/25/2026"])
+    assert cs._archive_levels(lv, tmp_path).name == "index_levels_2026-07-27.csv.gz"
+
+
+def test_levels_archive_rejects_a_file_with_no_dates(tmp_path):
+    p = tmp_path / "index_levels.csv"
+    p.write_text("Date,Name,Ticker,Level\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="no dates"):
+        cs._archive_levels(p, tmp_path)
+
+
+def test_snapshot_archives_levels_on_a_new_quarter(tmp_path, monkeypatch):
+    """The working copy is refreshed in place; a dated copy is kept when a new
+    quarter lands, so a restatement or a dead URL cannot erase the history."""
+    payload = _rows()
+
+    def fake(url, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if "index_levels" in url or "daily-index-levels" in url:
+            _levels_csv(dest, ["2026-07-27"])
+        else:
+            _write(dest, payload)
+
+    monkeypatch.setattr(cs, "_download", fake)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=False)
+    assert r.status == "ok"
+    assert r.levels_archive is not None
+    assert (tmp_path / "index_levels.csv").exists()          # working copy
+    assert (tmp_path / "archive" / "index_levels_2026-07-27.csv.gz").exists()
+
+    # Second run, same quarter: refreshed in place, no duplicate archive.
+    r2 = cs.snapshot(snapshot_dir=tmp_path, skip_levels=False)
+    assert r2.status == "unchanged"
+    assert r2.levels_archive is None
+    assert len(list((tmp_path / "archive").glob("*.csv.gz"))) == 1
+
+
+def test_snapshot_archive_levels_flag_forces_a_copy(tmp_path, monkeypatch):
+    def fake(url, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if "index_levels" in url or "daily-index-levels" in url:
+            _levels_csv(dest, ["2026-08-14"])
+        else:
+            _write(dest, _rows())
+
+    monkeypatch.setattr(cs, "_download", fake)
+    cs.snapshot(snapshot_dir=tmp_path, skip_levels=False)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=False, archive_levels=True)
+    assert r.status == "unchanged"          # same quarter...
+    assert r.levels_archive is None         # ...and that date is already archived
+
+
+def test_levels_archive_failure_is_a_warning_not_a_failed_run(tmp_path, monkeypatch):
+    """The constituent archive is the irreplaceable half; a levels-archive
+    problem must not turn a successful capture into a failed run."""
+    def fake(url, dest):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if "index_levels" in url or "daily-index-levels" in url:
+            dest.write_text("Date,Name,Ticker,Level\n", encoding="utf-8")   # no dates
+        else:
+            _write(dest, _rows())
+
+    monkeypatch.setattr(cs, "_download", fake)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=False)
+    assert r.status == "ok"
+    assert any("levels archive failed" in w for w in r.warnings)
+
+
 def test_download_retries_transient_network_errors(tmp_path, monkeypatch):
     """The scheduled run fires on wake, often before DNS is up. One shot a week
     means a first-attempt URLError must not end the run."""
