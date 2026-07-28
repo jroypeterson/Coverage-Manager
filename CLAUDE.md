@@ -507,6 +507,75 @@ learned nothing must not report a clean universe). Report:
 `SUNPHARMA`), so there is nothing to resolve the market from and they are counted,
 not guessed.
 
+## Foreign metadata cross-check (`crosscheck-foreign`)
+
+`python cli.py crosscheck-foreign [--no-cache]` is the **read-only companion** to
+`backfill-foreign-ids`: same sources (iShares holdings ⋈ SEC N-PORT), same guards,
+opposite question — where does the metadata the universe *already carries*
+disagree with a legally filed document? Mirrors the `delisted_check` /
+`ticker_change_check` pairing. It only became worth building after the backfill,
+since the check can reach only rows with something to join on.
+
+First live run (2026-07-28): **350 foreign rows checked, 73 matched, 13
+conflicts.** Matches ISIN-first (an exact identifier beats any heuristic), then
+falls back to `(local ticker, country)`.
+
+### It found seven wrong ISINs the live guard should already block
+
+| Ticker | Company | Stored | Authoritative |
+|---|---|---|---|
+| `000100.KS` | Yuhan (South Korea) | `INE156M01017` (**India**) | `KR7000100008` |
+| `9926.HK` | Akeso (China) | `INE087A01019` (**India**) | `KYG0146B1032` |
+| `ZEN` | Zentek (Canada) | `INE251B01027` (**India**) | — |
+| `7741.T` | Hoya (Japan) | `DE0005297204` (**Germany**) | `JP3837800006` |
+| `FAGR.BR` | Fagron (Belgium) | `CZ0008461209` (**Czechia**) | `BE0003874915` |
+| `6446.TW` | PharmaEssentia (Taiwan) | `US7169722037` (**US**) | `TW0006446008` |
+| `8086.T` | Nipro (Japan) | `JP3750800009` | `JP3673600007` |
+
+Five of these have a prefix matching **neither** `Country (HQ)` nor `Country
+(Listing)` — precisely what `enrich.validate_isin_for_row` exists to reject — so
+they predate that guard or were written by a path that skips it. **Three are
+Indian `INE…` ISINs on non-Indian companies**, which looks like one bad ingestion
+rather than three independent slips. `7741.T` and `FAGR.BR` carry a conflicting
+**LEI** too. Not auto-corrected: overwriting an existing identifier is a
+different risk class from filling a blank, so this is a review list like
+`delisted_check`'s.
+
+### Three finding classes, deliberately kept apart
+
+- **`isin-conflict` / `lei-conflict`** — one side is simply wrong.
+- **`listing-mismatch`** — the row's ISIN identifies a *different listing* than
+  its ticker, exchange and currency do. `AZN` is the live case: ticker on NYQ in
+  USD (the US ADR) carrying `GB0009895292`, the London ordinary. Both facts are
+  individually right; the row mixes two securities, so any ISIN-keyed join
+  silently returns London for a row tracking New York. Same for `FER`, `MDA`,
+  and `2359.HK` (HK line, Shanghai A-share ISIN).
+- **`name-divergence`** — an ISIN survives a rename, so diverging names under a
+  matching ISIN normally *is* the rename. Not always: `ZEN` (Zentek, Canada)
+  matched `ZEN TECHNOLOGIES` (India) because the stored ISIN is the Indian
+  company's. The note keeps both readings open, and this finding **suppresses**
+  the `listing-mismatch` for the same row — a currency difference between two
+  *different companies* is a symptom, and calling it a listing conflation would
+  send a reader hunting for an Indian listing of a Canadian company.
+
+### What is deliberately NOT a finding
+
+- **ISO alpha-3 vs alpha-2.** The universe stores `GBR`, N-PORT uses `GB`. Every
+  one of the first 18 hand-found "country mismatches" was this. Normalised
+  before comparison, never reported.
+- **Incorporation vs headquarters.** `invCountry` is where the security is
+  *incorporated*, `Country (HQ)` where the company *operates*. Innovent is `CN`
+  HQ / `KY` incorporated; Legend Biotech is US-HQ'd / `KY`. Both right. Reported
+  in a separate labelled section (7 rows) — **do not "fix" these**.
+- **Unmatched rows** (277). Not being held by these two funds is an absence of
+  evidence, not evidence of a problem. Counted, never flagged.
+
+Exit code `2` on any conflict **or** on a run where every source failed — a run
+that learned nothing must not report agreement. Report:
+`reports/foreign_crosscheck_<date>.md`. Module `universe/foreign_crosscheck.py`;
+tests `tests/test_foreign_crosscheck.py` (20). Non-gating, read-only, not wired
+into the weekly pipeline.
+
 ## CRSP / Morningstar US Total Market snapshot
 
 `python cli.py crsp-snapshot [--force] [--skip-levels] [--dry-run] [--no-reconcile]`

@@ -108,6 +108,19 @@ def build_parser():
         help="Apply only the first N proposals (bounds a first run).",
     )
 
+    fcc_parser = subparsers.add_parser(
+        "crosscheck-foreign",
+        help=(
+            "Audit foreign-row metadata (ISIN, LEI, currency, name) against the same "
+            "SEC N-PORT + fund-holdings sources backfill-foreign-ids uses. Read-only. "
+            "Reports incorporation-vs-HQ separately - those are not errors."
+        ),
+    )
+    fcc_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the 7-day source cache and refetch.",
+    )
+
     crsp_parser = subparsers.add_parser(
         "crsp-snapshot",
         help=(
@@ -460,6 +473,24 @@ def main():
         # Exit 2 when no source answered: a run that learned nothing must not
         # report a clean universe (mirrors backfill-cik / check-delisted).
         raise SystemExit(0 if result.status != "failed" else 2)
+    elif args.command == "crosscheck-foreign":
+        from universe import foreign_crosscheck
+
+        result = foreign_crosscheck.main(use_cache=not args.no_cache)
+        report = foreign_crosscheck.write_report(result)
+        print(f"status: {result.status}")
+        print(f"checked: {result.checked:,}  matched: {result.matched:,}  "
+              f"unmatched: {result.unmatched:,}")
+        print(f"conflicts: {len(result.conflicts)}  "
+              f"incorporation notes: {len(result.incorporation_notes)}")
+        for f in result.funds_failed:
+            print(f"WARNING: source failed - {f}")
+        for e in result.errors:
+            print(f"ERROR: {e}")
+        print(f"report: {report}")
+        # Exit 2 on a real conflict OR on a run that learned nothing, so a
+        # scheduled invocation cannot report silence as agreement.
+        raise SystemExit(2 if (result.conflicts or not result.ok) else 0)
     elif args.command == "crsp-snapshot":
         import csv as _csv
 
