@@ -20,6 +20,7 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `movers_runner.py` — Movers report orchestration (loads perf snapshot, calls `reporting.movers`, writes HTML/MD, posts Slack). Used by `cli.py movers` and `weekly_report._step_movers`
 - `pipeline_utils.py` — Shared `run_step` / `collect_failures` helpers used by all three orchestrators
 - `weekly_coverage_prompt.md` — Weekly coverage discovery prompt (run by scheduled task)
+- `scripts/post_coverage_to_ipo.py` — Posts the weekly additions summary to Slack **#ipo** and each company's full briefing as a **threaded reply**, so JP can decide from the thread without opening `reports/`. #ipo has no webhook: posts via `chat.postMessage` with `SLACK_BOT_TOKEN` + `SLACK_IPO_CHANNEL_ID`. Handles md→mrkdwn, fences financial tables, chunks under the 3,000-char block cap, raises on any non-`ok`. Manual: `python scripts/post_coverage_to_ipo.py --date YYYY-MM-DD [--dry-run] [--thread-ts TS]`. Replaces hand-rolled payloads in the headless session, which twice delivered the report somewhere unread — see `COVERAGE_APPROVAL_PLAN.md`.
 - `config.py` — All paths, API keys, segment definitions
 - `data/coverage_universe_tickers.csv` — Master coverage universe
 - `data/positions_and_researching.csv` — Positions and research list (subset of universe). Replaces `data/watchlist.csv` (deleted 2026-05-03). Schema: `Ticker, Position, Position Date, Buy Price, Sell Price, First Buy Date, Average Cost, Shares, Notes`. `Position` is one of:

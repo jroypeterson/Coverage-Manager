@@ -74,8 +74,14 @@ bumped, decided rows never touched.
 
 ### S3 — In-thread approval (~1–2 sessions) — *the actual ask*
 
-1. Post the weekly summary to `#ipo` via `chat.postMessage`; capture the returned `ts` and write
-   it to `slack_thread_ts` on this week's ledger rows.
+1. Post the weekly summary to `#ipo` via `scripts/post_coverage_to_ipo.py`; capture the returned
+   `ts` and write it to `slack_thread_ts` on this week's ledger rows.
+
+   **The thread already carries each company's full briefing** (shipped 2026-07-28) — business
+   description, financials, bull/bear, swing factor. So approval happens in the same thread as
+   the evidence: JP reads the case and replies `add CSQR` under it, with no context-switch to
+   Dropbox and no ambiguity about which candidate a bare `yes` refers to. Build the poller
+   against that thread, not a separate approval message.
 2. A poller reads `conversations.replies` on those threads, filters to JP (`U0ALRRASV6X`), and
    parses a small grammar: `add TICKER` · `no TICKER` · `add all` · `skip all` ·
    `add TICKER following` (S4 adds `revive TICKER`).

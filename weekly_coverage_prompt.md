@@ -199,21 +199,33 @@ A bulleted list of all report files saved this week with their filenames and a o
 After the email draft is created and all reports are generated, post a summary to the Slack
 channel **#ipo**.
 
-**There is no webhook for #ipo — post with `chat.postMessage`**, using `SLACK_BOT_TOKEN` and
-`SLACK_IPO_CHANNEL_ID` (`C0BKLC32EHK`) from `Coverage Manager/.env`. ClaudeBot is already a
-member of the channel.
+**Do not hand-roll the Slack payload. Run the script:**
 
 ```
-POST https://slack.com/api/chat.postMessage
-Authorization: Bearer $SLACK_BOT_TOKEN
-{"channel": "$SLACK_IPO_CHANNEL_ID", "blocks": [...], "text": "<fallback>"}
+python scripts/post_coverage_to_ipo.py --date YYYY-MM-DD
 ```
 
-**Confirm the response has `"ok": true`.** If it does not, say so explicitly in your final
-summary — do not report the run as clean. A post that silently failed is worse than no post,
-because the report is otherwise invisible (see "Why #ipo" below).
+It reads `reports/weekly_coverage_universe_additions_<date>.md` and
+`reports/company_backgrounds_<date>.md` (falling back to `reports/old reports/`), posts the
+summary to #ipo, and posts **each company's full briefing as a threaded reply** to that
+summary. It handles the markdown→mrkdwn conversion, fences the financial tables so the columns
+stay aligned, chunks under Slack's 3,000-char block cap, and raises on any non-`ok` response.
 
-Include:
+**The threaded briefings are required, not optional.** JP must be able to read the whole case
+— business description, financial snapshot, bull/bear, key swing factor, what to watch — in
+the thread and reply in-line. Having to open the Dropbox folder to find the write-up is the
+failure mode this replaces. If the backgrounds file is missing, the script warns and exits
+non-zero; **produce the backgrounds file first**, then re-run.
+
+The script exits non-zero on failure. **If it fails, say so explicitly in your final summary —
+do not report the run as clean.** A post that silently failed is worse than no post, because
+the report is otherwise invisible (see "Why #ipo" below).
+
+Credentials are `SLACK_BOT_TOKEN` + `SLACK_IPO_CHANNEL_ID` (`C0BKLC32EHK`) in
+`Coverage Manager/.env` — #ipo has **no webhook**, so this posts via `chat.postMessage`.
+ClaudeBot is already a member of the channel.
+
+The summary report (which the script posts verbatim as the thread parent) must include:
 
 - Subject line (matching the email subject)
 - Number of recommendations this week
@@ -230,8 +242,8 @@ Include:
 - The report filename, and a note that a Gmail **draft** was created (it is never sent)
 - A Dropbox link to the reports folder: https://www.dropbox.com/home/Claude%20Folder/Coverage%20Manager/reports
 
-Use Block Kit (`blocks`), per the workspace convention. `context` blocks must use `elements[]`.
-Always set a plain-text `text` fallback.
+The script renders all of this as Block Kit with a plain-text fallback — you do not need to
+build blocks yourself. Write good markdown; the script does the rest.
 
 ### Why #ipo, and what NOT to do
 
