@@ -556,26 +556,75 @@ First live run (2026-07-28): **350 foreign rows checked, 73 matched, 13
 conflicts.** Matches ISIN-first (an exact identifier beats any heuristic), then
 falls back to `(local ticker, country)`.
 
-### It found seven wrong ISINs the live guard should already block
+### It found seven wrong ISINs — all seven CORRECTED 2026-07-28 (JP-approved)
 
-| Ticker | Company | Stored | Authoritative |
+Every stored value below identified a **different company**. JP reviewed and
+approved applying all seven; the corrections are in the universe CSV and the
+published `exports/`. Each replacement was verified against **OpenFIGI**
+(Bloomberg) and **GLEIF** — sources independent of the N-PORT join that proposed
+it — plus its ISO 6166 check digit.
+
+| Ticker | Company | Stored (wrong) — what it actually was | Corrected |
 |---|---|---|---|
-| `000100.KS` | Yuhan (South Korea) | `INE156M01017` (**India**) | `KR7000100008` |
-| `9926.HK` | Akeso (China) | `INE087A01019` (**India**) | `KYG0146B1032` |
-| `ZEN` | Zentek (Canada) | `INE251B01027` (**India**) | — |
-| `7741.T` | Hoya (Japan) | `DE0005297204` (**Germany**) | `JP3837800006` |
-| `FAGR.BR` | Fagron (Belgium) | `CZ0008461209` (**Czechia**) | `BE0003874915` |
-| `6446.TW` | PharmaEssentia (Taiwan) | `US7169722037` (**US**) | `TW0006446008` |
-| `8086.T` | Nipro (Japan) | `JP3750800009` | `JP3673600007` |
+| `000100.KS` | Yuhan (South Korea) | `INE156M01017` — Yuranus Infrastructure (**India**) | `KR7000100008` |
+| `9926.HK` | Akeso (China) | `INE087A01019` — Kesoram Industries (**India**) | `KYG0146B1032` |
+| `ZEN` | Zentek (Canada) | `INE251B01027` — Zen Technologies (**India**) | `CA98942X1024` |
+| `7741.T` | Hoya (Japan) | `DE0005297204` — Homag Group AG (**Germany**) | `JP3837800006` |
+| `FAGR.BR` | Fagron NV (Belgium) | `CZ0008461209` — Fagron a.s. (**Czechia**) | `BE0003874915` |
+| `6446.TW` | PharmaEssentia (Taiwan) | `US7169722037` — its **GDR** line, not the TWSE ordinary | `TW0006446008` |
+| `8086.T` | Nipro (Japan) | `JP3750800009` — NMS Holdings (**Japan**) | `JP3673600007` |
 
-Five of these have a prefix matching **neither** `Country (HQ)` nor `Country
-(Listing)` — precisely what `enrich.validate_isin_for_row` exists to reject — so
-they predate that guard or were written by a path that skips it. **Three are
-Indian `INE…` ISINs on non-Indian companies**, which looks like one bad ingestion
-rather than three independent slips. `7741.T` and `FAGR.BR` carry a conflicting
-**LEI** too. Not auto-corrected: overwriting an existing identifier is a
-different risk class from filling a blank, so this is a review list like
-`delisted_check`'s.
+Two rows carried the wrong company's **LEI** as a matched pair with the wrong
+ISIN, and both were corrected too: `7741.T` `5299009ROBNLE4G0RK14` (GLEIF: *Homag
+Group AG, DE*) → `353800X4VR3BHEUCJB42` (*HOYA, JP*); `FAGR.BR`
+`3157004AQG2TA4ZS7Y94` (*FAGRON a.s., CZ*) → `549300TRKRUFK2RRG779` (*Fagron,
+BE*). Nipro's LEI was already right — only its ISIN was another issuer's.
+
+**`ZEN` needed more than an ISIN.** Correcting only the identifier would have
+left a row that still lied: its **three Bloomberg FIGIs were Zen Technologies'
+too** (`BBG000BTLY23` resolves to `ZEN TECHNOLOGIES LTD` on OpenFIGI). Fixed as a
+set — `FIGI` → `BBG0018QK5P0` (ZEN on TSXV), `Composite FIGI` → `BBG0018QK5L4`,
+`Share Class FIGI` → `BBG001TFBYY8`. The `Company Name` was already correct.
+**Still open, deliberately not guessed:** `ZEN`'s `Sector (JP)` is **`SaaS`**,
+which fits neither Zentek (graphene / nanotech materials) nor Zen Technologies —
+it reads as a leftover from **Zendesk**, whose NYSE ticker was `ZEN` until its
+2022 take-private. There is no authoritative source for JP's own taxonomy, so it
+needs JP's call rather than a guess.
+
+### Why the guard did not block them — and the hole that is still open
+
+All seven arrived with the **initial universe CSV import** (`3ac4425`,
+2026-04-03); `enrich.validate_isin_for_row` landed eight days later (`ce3cf91`,
+2026-04-11). So no live path bypasses the guard — they predate it, and the bulk
+enrich only fills **blank** cells, so nothing ever revisited them.
+
+**The writer is yfinance's `.isin` property, and it is still wrong today.**
+Verified live 2026-07-28 — `yf.Ticker(...).isin` returns the *exact* stored wrong
+value for `000100.KS` (`INE156M01017`), `9926.HK` (`INE087A01019`), `8086.T`
+(`JP3750800009`) and `6446.TW` (`US7169722037`), and yet another Indian ISIN
+(`INE510H01015`) for `7741.T`. Yahoo resolves a bare local code (`000100`,
+`9926`, `8086`) against the wrong market, and India's `INE…` space dominates the
+collisions — which is why "three Indian ISINs" was **one** bad source, not three
+slips.
+
+**A prefix check is a country check, not an identity check.** Six of the seven
+are caught by the guard today. `8086.T` is **not**: `JP3750800009` is NMS
+Holdings', also Japanese, so the prefix matches and the guard accepts it — and
+yfinance still serves it. Any future row that enriches with a blank ISIN on a
+Japanese/US/etc. line can take a same-country wrong-issuer value. Closing it
+needs an identity cross-check (ISIN → issuer name, e.g. OpenFIGI, compared to
+`Company Name`), not a tighter prefix rule. Pinned by
+`test_guard_does_NOT_catch_a_same_country_wrong_issuer_isin` so the limitation is
+not mistaken for coverage.
+
+**Post-fix acceptance:** `crosscheck-foreign` returns **4 conflicts, all
+`listing-mismatch`** (`AZN`, `FER`, `MDA`, `2359.HK`) — the ADR-vs-ordinary
+convention question, scoped separately. Zero `isin-conflict`, zero
+`lei-conflict`, zero `name-divergence`. `matched` moves 73 → 72 because `ZEN` was
+only ever matching through the *Indian* company's ISIN; Zentek is a TSXV
+micro-cap that IXUS/IEMG do not hold, so falling out of the matched set is the
+correct outcome. Regression tests: `tests/test_foreign_crosscheck.py`
+(the `CORRECTED_ISINS` block).
 
 ### Three finding classes, deliberately kept apart
 
@@ -588,8 +637,10 @@ different risk class from filling a blank, so this is a review list like
   and `2359.HK` (HK line, Shanghai A-share ISIN).
 - **`name-divergence`** — an ISIN survives a rename, so diverging names under a
   matching ISIN normally *is* the rename. Not always: `ZEN` (Zentek, Canada)
-  matched `ZEN TECHNOLOGIES` (India) because the stored ISIN is the Indian
-  company's. The note keeps both readings open, and this finding **suppresses**
+  matched `ZEN TECHNOLOGIES` (India) because the stored ISIN **was** the Indian
+  company's — the reading this class kept open turned out to be the right one,
+  and the row was corrected 2026-07-28 (above). The note keeps both readings
+  open, and this finding **suppresses**
   the `listing-mismatch` for the same row — a currency difference between two
   *different companies* is a symptom, and calling it a listing conflation would
   send a reader hunting for an Indian listing of a Canadian company.
