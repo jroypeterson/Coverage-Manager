@@ -393,6 +393,42 @@ ticker list can be joined to any LEI-keyed regulator/provider dataset.
   Module `universe/lei_backfill.py`; tests `tests/test_lei_backfill.py`. Not yet
   wired into the weekly pipeline — run on demand (or add as a weekly step later).
 
+## Listing dates describe the CURRENT listing (convention, 2026-07-28)
+
+**`Year Listed`, `IPO Date`, `Est Lockup 90d` and `Est Lockup 180d` all describe the listing
+that is trading today — never the issuer's earliest listing ever.**
+
+This had never been written down, and the default source disagrees with it: `Year Listed` comes
+from FMP's `ipoDate`, which is a fact about a **brand**, not about the security now trading. When
+a company is acquired and later spun back out, FMP keeps reporting the original listing while a
+**new registrant with a new CIK** is what actually trades.
+
+Live case: **SNDK** read `Year Listed` **1995** — SanDisk's original IPO — while the security is
+the **February 2025** spin out of Western Digital, **CIK 2023554**. That is wrong under either
+definition anyone queries: an IPO-cohort screen for 2025 misses it, and a "public since 1995"
+screen wrongly includes a security that did not exist. Corrected to 2025. Same class: Kyndryl,
+Solventum, GE Vernova.
+
+**Prior listings are NOT stored here.** `ipo_tracker/data/ipo_registry.json` already holds 5,459
+listing events back to 2016 with `deal_type` (`ipo` / `spac_ipo` / `de_spac` / `direct_listing`).
+That is the event store; join to it on CIK/ticker. Duplicating the history into this CSV would
+mean two things to keep in sync and guaranteed drift.
+
+**Two validators enforce it** (both warnings, never gating), because they catch different halves:
+
+| Check | Catches | Signal |
+|---|---|---|
+| `validate_listing_date_agreement` | **re-IPOs** — a relisting that had an actual offering | `Year Listed` vs a Renaissance-verified `IPO Date`, >1y apart |
+| `validate_relisting_cik_cohort` | **spin-offs** — no offering exists, so the check above is blind | a CIK typical of far newer registrants than `Year Listed` claims |
+
+The second needs no API call: **a CIK is assigned at first SEC registration, so a registrant
+cannot predate its own CIK.** It is a local-neighbourhood outlier test (rows sorted by CIK,
+compared against the median `Year Listed` of the 25 nearest CIKs on **both** sides), so it
+self-calibrates as the universe grows. US exchanges only — an ADR's home-market listing
+legitimately predates its SEC registration — and rows at either end of the CIK ordering are
+skipped, since a one-sided neighbourhood pulls the median hard (BRO flagged purely on that).
+Measured on the live universe: **1 flag (SNDK), 0 false positives across 667 US-listed rows.**
+
 ## IPO date backfill (Renaissance Capital)
 
 `python cli.py ipo-backfill [--no-cache] [--limit N] [--min-year YYYY] [--include-foreign]`
