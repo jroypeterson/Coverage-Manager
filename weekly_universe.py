@@ -68,11 +68,14 @@ def _step_archive_universe():
     """Archive prior dated universe-side outputs (discovery md files)."""
     from reporting.email import archive_files
 
-    # prune_days=0: these are the analytical outputs (weekly recommendations +
-    # company backgrounds), not regenerable renders. `reports/` is gitignored, so
-    # a delete here is permanent - keep them all. See archive_files' docstring.
+    # 90 days (JP 2026-07-28), up from the shared 60-day default. These are the
+    # analytical outputs - weekly recommendations + company backgrounds - not
+    # regenerable renders, and `reports/` is gitignored, so a delete here is
+    # permanent. 90 covers a full quarter of recommendations; JP explicitly did not
+    # want indefinite retention. Pruning is scoped to these patterns only, so this
+    # can no longer reach another caller's artifacts (see archive_files' docstring).
     return archive_files(REPORTS_DIR, OLD_REPORTS_DIR, TODAY,
-                         UNIVERSE_ARCHIVE_PATTERNS, prune_days=0)
+                         UNIVERSE_ARCHIVE_PATTERNS, prune_days=90)
 
 
 def _step_discovery(dry_run=False):

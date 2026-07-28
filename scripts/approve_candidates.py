@@ -38,14 +38,22 @@ from universe import candidate_ledger as cl  # noqa: E402
 from universe.enrich import EnrichError, enrich_single_ticker  # noqa: E402
 
 
-def parse_add(spec: str) -> tuple[str, str, str]:
-    """'TICKER:Sector:Subsector' -> (ticker, sector, subsector). Subsector optional."""
+def parse_add(spec: str) -> tuple[str, str, str, str]:
+    """'TICKER:Sector[:Subsector[:Exchange]]' -> (ticker, sector, subsector, exchange).
+
+    The per-name exchange matters for foreign lines: `normalize_ticker` only appends
+    a Yahoo suffix when `Exchange` is non-US, so a wrong or missing exchange yields a
+    bare symbol that resolves to whoever owns it in the US — the CSL/UCB/Ipsen class
+    of bug (see CLAUDE.md). A batch-wide flag cannot express `2475.HK -> HKEX` and
+    `MWH -> NASDAQ` in the same run.
+    """
     parts = spec.split(":")
     if len(parts) < 2:
-        raise SystemExit(f"--add needs TICKER:Sector[:Subsector], got {spec!r}")
+        raise SystemExit(f"--add needs TICKER:Sector[:Subsector[:Exchange]], got {spec!r}")
     ticker, sector = parts[0].strip(), parts[1].strip()
     subsector = parts[2].strip() if len(parts) > 2 else ""
-    return ticker, sector, subsector
+    exchange = parts[3].strip() if len(parts) > 3 else ""
+    return ticker, sector, subsector, exchange
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
     enriched, failed = [], []
     for spec in a.add:
-        ticker, sector, subsector = parse_add(spec)
+        ticker, sector, subsector, exchange = parse_add(spec)
 
         if ticker.upper() in existing:
             print(f"  SKIP {ticker}: already in the universe CSV")
@@ -78,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             row = enrich_single_ticker(ticker, sector,
-                                       exchange_hint=a.exchange_hint)
+                                       exchange_hint=exchange or a.exchange_hint)
         except EnrichError as exc:
             # Loud, and the candidate stays pending. Never append a stub.
             print(f"  FAIL {ticker}: enrichment incomplete - {exc}", file=sys.stderr)

@@ -31284,6 +31284,89 @@
       "gating_eligible": false
     }
   },
+  "MWH": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 42,
+    "report_cadence_months": [
+      3,
+      5,
+      12
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-05-12",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-07-28",
+        "n_rows": 3,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-07-28",
+        "n_events": 1,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-07-28",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-05-12",
+        "period_end": "2026-03-31",
+        "eps_actual": 0.15,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-03-19",
+        "period_end": null,
+        "eps_actual": 0.18,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-12-03",
+        "period_end": null,
+        "eps_actual": 0.401,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 2,
+      "report_date": "2026-08-13",
+      "source": "finnhub",
+      "gating_eligible": false
+    }
+  },
   "MYGN": {
     "fye_month": 12,
     "calendar_aligned": true,
