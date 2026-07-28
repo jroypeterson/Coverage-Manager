@@ -15,6 +15,14 @@ run_log.csv
 .health/
 .coverage/
 
+# CRSP / Morningstar index data — kept on disk (Dropbox-synced), never pushed.
+# THIS REPO IS PUBLIC. CRSP licenses the free constituent and index-level
+# downloads for informational, non-commercial use only, with no redistribution;
+# committing a 3,477-name constituent list with weights to a public remote is
+# redistribution. The archive is the point of `cli.py crsp-snapshot`, so it must
+# survive locally — it just must not be republished. Back it up outside git.
+data/crsp/
+
 # Codex review output — kept on disk as proof-of-run, but untracked.
 # If tracked/untracked, each review appears in the next review's working-tree
 # diff and pollutes it with hundreds of KB of prior review text (2026-07-20).

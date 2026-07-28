@@ -86,6 +86,32 @@ def build_parser():
         help="Only look up the first N missing rows (for a test pass).",
     )
 
+    crsp_parser = subparsers.add_parser(
+        "crsp-snapshot",
+        help=(
+            "Archive the current CRSP/Morningstar US Total Market constituent list "
+            "(~3,500 names with weights) and diff it against the prior quarter. CRSP "
+            "OVERWRITES this file each quarter with no archive, so a missed quarter "
+            "is unrecoverable. Also refreshes the daily PR+TR index-level history."
+        ),
+    )
+    crsp_parser.add_argument(
+        "--force", action="store_true",
+        help="Re-archive even if this quarter's TradeDate is already captured.",
+    )
+    crsp_parser.add_argument(
+        "--skip-levels", action="store_true",
+        help="Skip the 12 MB daily index-levels refresh (constituents only).",
+    )
+    crsp_parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Download and verify, report the delta, write nothing.",
+    )
+    crsp_parser.add_argument(
+        "--no-reconcile", action="store_true",
+        help="Skip the coverage-universe reconciliation section of the report.",
+    )
+
     hist_parser = subparsers.add_parser(
         "history-backfill",
         help=(
@@ -388,6 +414,45 @@ def main():
         from universe import lei_backfill
 
         lei_backfill.main(use_cache=not args.no_cache, limit=args.limit)
+    elif args.command == "crsp-snapshot":
+        import csv as _csv
+
+        import config
+        from universe import crsp_snapshot
+
+        result = crsp_snapshot.snapshot(
+            force=args.force,
+            skip_levels=args.skip_levels,
+            dry_run=args.dry_run,
+        )
+
+        recon = None
+        if result.ok and not args.no_reconcile and result.path and result.path.exists():
+            tm_rows = [
+                r for r in crsp_snapshot.parse_constituents(result.path)
+                if r["Index Ticker"].strip() == crsp_snapshot.TOTAL_MARKET_KEY
+            ]
+            with config.CSV_PATH.open(newline="", encoding="utf-8-sig") as fh:
+                recon = crsp_snapshot.reconcile_universe(tm_rows, list(_csv.DictReader(fh)))
+
+        report = crsp_snapshot.write_report(result, recon)
+        print(f"status: {result.status}")
+        if result.trade_date:
+            print(f"trade date: {result.trade_date}  constituents: {result.constituent_count:,}")
+        if result.prior_trade_date:
+            print(
+                f"delta vs {result.prior_trade_date}: "
+                f"+{len(result.added)} added, -{len(result.dropped)} dropped"
+            )
+        for w in result.warnings:
+            print(f"WARNING: {w}")
+        for e in result.errors:
+            print(f"ERROR: {e}")
+        print(f"report: {report}")
+        # Exit 2 on failure so a scheduled run that learned nothing cannot report
+        # success — the whole point of the job is that a missed quarter is
+        # unrecoverable, which makes a silent failure the expensive outcome.
+        raise SystemExit(0 if result.ok else 2)
     elif args.command == "history-backfill":
         from universe import history_backfill
 

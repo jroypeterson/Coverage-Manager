@@ -427,6 +427,113 @@ key `RENAISSANCE_API_KEY` in `.env`).
   weekly pipeline** — run on demand (like `backfill-lei`); wiring it as a weekly step
   (+ a fresh-discovery hook) is the obvious next increment.
 
+## CRSP / Morningstar US Total Market snapshot
+
+`python cli.py crsp-snapshot [--force] [--skip-levels] [--dry-run] [--no-reconcile]`
+archives the **full constituent list of the CRSP US Total Market index** — 3,477
+names with weights as of 2026-03-31 — plus the **daily PR + TR index levels for
+all 76 CRSP indexes back to 2011-03-31**. Both are free CSVs from crsp.org.
+
+**Why it is scheduled and not a one-off:** CRSP **overwrites** the constituents
+file each quarter and keeps no archive. A quarter not captured while it is live
+is gone permanently, and the value of the dataset is in the *delta* — a name
+leaving the index is a delisting, acquisition, or a fall out of the investable
+universe. One snapshot is a list; two are a signal. The job runs **weekly**
+(`CrspQuarterlySnapshot`, Mondays 08:00, `run_crsp_snapshot.bat`) rather than
+quarterly because CRSP posts a new quarter roughly a month after each rebalance
+and the exact date drifts; a weekly poll costs one 2 MB download and returns
+`unchanged` until a new `TradeDate` appears.
+
+**Provenance / expected breakage:** Morningstar acquired CRSP (closed
+2026-02-02) and the index is being renamed the **Morningstar US Total Market
+Index (FS00009VTK)** as of late July 2026; `crsp.org` began redirecting to
+`indexes.morningstar.com` on 2026-07-28. **The download URLs are expected to
+move.** The module fails loudly (exit 2) rather than silently keeping the last
+snapshot — a 4xx is never retried, precisely so a moved path surfaces instead of
+burning the run.
+
+### Two gotchas that will bite
+
+1. **The total-market list is keyed under `CRSPTM1`, not `CRSPTMT`.** Constituents
+   are identical for the price- and total-return variants, so CRSP publishes only
+   one — under the *price*-return ticker, while `CRSPTMT` names the index
+   everywhere else. Filtering on `CRSPTMT` returns an empty set with no error.
+2. **Sector labels cover 49% of the index, and the missing half is not random.**
+   CRSP publishes no sector column; sector is recovered from which of the eleven
+   sector indexes a name appears in, and those partition **Core Cap** (1,713
+   names), not the total market. All 1,764 unlabelled names are micro-caps.
+   `build_classification` returns `sector: None` for them — never a fallback
+   string, so "no sector published" stays distinguishable from a real value.
+   By **weight** the picture is the opposite: the unlabelled micro tail is
+   **1.2% of the index**, so sector work on a weighted basis is ~99% covered.
+3. **`CRSPLC1 "Large Cap"` is a composite, not a size tier.** It is Mega ∪ Mid
+   exactly (173 + 288 − 18 packeting straddles = 443), and Mega is a strict
+   subset of it. Treating the five size indexes as a ladder labelled every
+   mid-cap "Large" and erased Mega from the index entirely, depending on row
+   order. The disjoint ladder is **Mega / Mid / Small / Micro** (173 / 270 /
+   1,270 / 1,764 after resolving the 107 packeting straddles to the larger
+   tier). Same trap for the other composites: `CRSPXM1` Core Cap, `CRSPMS1`
+   Small/Micro, `CRSPSM1` Small/Mid, `CRSPXE1` ex-Mega — fine as index series,
+   wrong as per-name labels.
+4. **Style is recorded as an axis, not a box.** The style indexes are *not*
+   nested (Mega Growth is not a subset of Large Growth), because CRSP assigns
+   style separately within each size band — so no single "Mega Growth"-style box
+   is the right label for a name, and last-write-wins gave NVDA `Large Growth`
+   while Mega Growth existed. `classification.style` is `Growth` (578) /
+   `Value` (1,001) / `Growth+Value` (134) / `None` (1,764 micro-caps).
+   `Growth+Value` is a real state: CRSP splits those names across both boxes
+   with partial weight in each.
+
+### Outputs
+
+- `data/crsp/constituents_<TradeDate>.csv` — the archived quarter (**gitignored**)
+- `data/crsp/classification_<TradeDate>.json` — ticker → `{sector, size, style}`
+  derived from index membership
+- `data/crsp/index_levels.csv` — daily PR + TR levels, all 76 indexes, refreshed
+  in place (cumulative from inception, so a refresh loses nothing)
+- `reports/crsp_snapshot_<today>.md` — delta vs the prior quarter + universe
+  reconciliation
+
+**`data/crsp/` is gitignored and this repo is PUBLIC.** CRSP licenses these free
+downloads for informational, non-commercial use with no redistribution;
+committing a full constituent list with weights to a public remote would be
+republishing it. The archive is the point of the job, so it must survive on disk
+— back it up outside git, not by tracking it here.
+
+### Universe reconciliation — two findings, deliberately separate
+
+`reconcile_universe` compares `coverage_universe_tickers.csv` against the CRSP
+list and reports two things that must not be collapsed:
+
+- **Absent from CRSP (437 rows)** — *mostly a domicile fact, not a delisting.*
+  CRSP carries US-domiciled exchange-listed operating companies only, so argenx,
+  ASML, Ascendis, Alcon, and Amarin are all correctly absent. Useful as a
+  cross-check on the cross-listing map; **never** as a delisting flag.
+- **Symbol collisions (3 rows)** — a foreign-HQ row whose plain US-style symbol
+  belongs to a *different*, US-domiciled company, so any US price or fundamentals
+  lookup on the bare symbol returns the wrong issuer. Live findings: `UCB`
+  (Belgian UCB SA vs United Community Banks), `CSL` (Australian CSL Ltd vs
+  Carlisle Companies), `MED` (Swiss Medartis vs Medifast).
+
+Foreign HQ is a **prior, not a finding**. Flagging on domicile alone produced 12
+rows, 9 of which were Irish/UK inversions (Medtronic, Linde, Jazz, Perrigo,
+Atlassian) that are foreign-domiciled and legitimately in CRSP under matching
+names. What domicile justifies is a *stricter name threshold* (0.70 vs 0.55),
+because a foreign row whose name only half-matches is far likelier to be a
+collision than a US row scoring the same.
+
+Name comparison is **token-based and prefix-aware**, not a sequence ratio. CRSP
+writes names surname-first and truncates words — `Eli Lilly And Co` is `LILLY ELI
+& CO COM`, `Henry Schein` is `SCHEIN HENRY INC`, `Pharmaceuticals` becomes
+`PHARMA`, `International` becomes `INTER`. A plain `SequenceMatcher` scored those
+around 0.5 and produced 9 cosmetic flags that buried the 3 real ones.
+`_name_similarity` returns `None` when either side has no comparable token — a
+comparison that cannot be made has no result (the same rule `delisted_check`
+follows).
+
+Module `universe/crsp_snapshot.py`; tests `tests/test_crsp_snapshot.py` (35).
+Non-gating; not part of `weekly-universe`.
+
 ## Historical valuation columns (Phase 2 — full universe, 5Y + 10Y)
 
 The weekly performance report appends **26 trailing-valuation columns** after the existing FUND_COLS: the original 13 five-year columns, 12 new **ten-year** columns, and a `History Status` marker. As of **2026-07-19** these are populated for the **full coverage universe** (~1,095 names), not just the positions set.
