@@ -108,7 +108,7 @@ def _count_universe_rows():
     if not UNIVERSE_CSV.exists():
         return None
     try:
-        with open(UNIVERSE_CSV, "r", encoding="utf-8") as f:
+        with open(UNIVERSE_CSV, "r", encoding="utf-8-sig") as f:
             return sum(1 for _ in f) - 1
     except Exception as e:
         logger.warning("Could not count universe rows for health payload: %s", e)

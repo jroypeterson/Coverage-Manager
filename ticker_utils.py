@@ -382,4 +382,9 @@ def write_universe_csv(df, path=CSV_PATH):
     of them regresses to a bare `df.to_csv` -- the six-way drift is what made
     the file's encoding depend on which step happened to write last.
     """
-    df.to_csv(path, index=False, encoding="utf-8-sig")
+    # utf-8 WITHOUT the BOM. utf-8-sig here put a BOM on the master CSV on 2026-07-25;
+    # the export step then read fieldnames as plain utf-8, so "﻿Ticker" != "Ticker"
+    # and DictWriter silently dropped the join key from every published row. Readers
+    # using utf-8-sig handle a BOM-free file fine; the reverse is not true, so BOM-free
+    # is the safe direction for a file ~20 sibling projects consume.
+    df.to_csv(path, index=False, encoding="utf-8")

@@ -5813,8 +5813,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-27",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -8529,8 +8529,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -20159,8 +20159,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -26470,8 +26470,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -31689,8 +31689,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": false
     }
@@ -34979,8 +34979,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-11-03",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -37774,8 +37774,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -38599,8 +38599,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -46339,8 +46339,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -49255,8 +49255,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 2,
-      "report_date": "2026-07-27",
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
       "source": "finnhub",
       "gating_eligible": true
     }

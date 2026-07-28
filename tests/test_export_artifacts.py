@@ -418,3 +418,52 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "reporting_calendar_status.json",
         "manifest.json",
     }
+
+
+# --- acceptance: exports are re-read as a consumer would (2026-07-27) --------
+
+def test_acceptance_catches_a_bom_prefixed_export(tmp_path):
+    """The check whose absence let a BOM ship 84 blank-Ticker rows under
+    `validation_passed: true`."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_bytes(
+        "\ufeffTicker,Name\nAAPL,Apple\n".encode("utf-8"))
+    with pytest.raises(ExportAcceptanceError, match="BOM"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_blank_join_key(tmp_path):
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\n,Portfolio\n,Researching\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="blank 'Ticker'"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_row_count_that_contradicts_its_status_file(tmp_path):
+    import json
+
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "positions_status.json").write_text(
+        json.dumps({"entry_count": 84}), encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="claims 84"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_passes_on_a_healthy_export(tmp_path):
+    from universe.export_acceptance import check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    assert check_exports(tmp_path) == []

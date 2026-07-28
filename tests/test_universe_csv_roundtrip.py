@@ -91,13 +91,22 @@ def test_commit_staged_candidates_preserves_existing_cik(tmp_path, monkeypatch):
 
 # --- writes go through the shared helper, or the encoding drifts again -------
 #
-# The committed master AND exports/universe.csv both carry a UTF-8 BOM, so that
-# is the canonical form. Six modules used pandas' default UTF-8 and silently
-# stripped it, so the file's encoding depended on which step happened to write
-# last -- producing spurious whole-file first-line diffs and flipping the header
-# cell a stdlib-`csv` consumer sees between "Ticker" and "﻿Ticker".
-# Centralizing the READ was done in 2026-06-20 for the same class of reason;
-# the write was left uncentralized and drifted. This test is the ratchet.
+# ONE canonical form for the universe CSV, and as of 2026-07-27 that form is
+# UTF-8 **without** a BOM.
+#
+# The original ratchet (2026-07-16) picked BOM-ful because that was what the files
+# happened to contain. The goal -- one form, no drift -- was right; the form was
+# not. On 2026-07-25 a BOM reached the master, `_step_export_artifacts` read the
+# header as plain utf-8, and `"﻿Ticker" != "Ticker"` meant DictWriter dropped
+# the join key from every published row: 84 blank position rows, 66 blank
+# watchlist rows, and a universe.csv from which earnings_agent,
+# post_earnings_movers and analyst-days each recovered 0 of 1,086 tickers -- all
+# reported as a clean run.
+#
+# BOM-free is the safe direction: a reader using utf-8-sig handles a BOM-free file
+# correctly, but a reader using plain utf-8 does NOT handle a BOM, and most
+# consumers use plain utf-8. For a file ~20 sibling projects join on, the encoding
+# must be the one that survives the least careful reader.
 
 import pathlib
 import re
@@ -134,7 +143,7 @@ def test_no_universe_writer_calls_to_csv_directly():
     )
 
 
-def test_write_universe_csv_round_trips_the_bom():
+def test_write_universe_csv_is_bom_free():
     import pandas as pd
 
     from ticker_utils import read_universe_csv, write_universe_csv
@@ -143,10 +152,35 @@ def test_write_universe_csv_round_trips_the_bom():
     with tempfile.TemporaryDirectory() as d:
         p = pathlib.Path(d) / "u.csv"
         write_universe_csv(pd.DataFrame([{"Ticker": "AAPL", "CIK": "320193"}]), p)
-        assert p.read_bytes()[:3] == b"\xef\xbb\xbf", "canonical BOM must survive"
-        assert read_universe_csv(p)["Ticker"].iloc[0] == "AAPL", (
-            "and the BOM must not leak into the first column name"
+        assert p.read_bytes()[:3] != b"\xef\xbb\xbf", (
+            "the universe CSV must be BOM-free: a consumer reading plain utf-8 sees "
+            "'﻿Ticker' and silently joins on nothing"
         )
+        assert read_universe_csv(p)["Ticker"].iloc[0] == "AAPL"
+
+
+def test_published_exports_are_readable_by_a_plain_utf8_consumer():
+    """The ratchet the original was missing.
+
+    It pinned the SOURCE encoding and said nothing about the published artifact —
+    which is where the contract actually lives, and where the 2026-07-25 breakage
+    landed. Reads each export the way the least careful consumer does.
+    """
+    import csv as _csv
+
+    exports = _REPO / "exports"
+    for fname, key in (("universe.csv", "Ticker"),
+                       ("positions_and_researching.csv", "Ticker"),
+                       ("watchlist.csv", "Ticker")):
+        p = exports / fname
+        if not p.exists():
+            continue
+        assert p.read_bytes()[:3] != b"\xef\xbb\xbf", f"{fname} starts with a BOM"
+        with p.open(encoding="utf-8", newline="") as fh:
+            rows = list(_csv.DictReader(fh))
+        assert rows, f"{fname} has no rows"
+        blank = sum(1 for r in rows if not (r.get(key) or "").strip())
+        assert not blank, f"{fname}: {blank}/{len(rows)} rows have a blank {key}"
 
 
 # --- foreign lines must not resolve to a US namesake -------------------------

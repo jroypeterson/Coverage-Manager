@@ -140,9 +140,17 @@ def _step_export_artifacts(validation_result):
 
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # 1. Snapshot the CSV.
+    # 1. Snapshot the CSV — transcoded, NOT raw-copied.
+    #    The source carries a UTF-8 BOM (ticker_utils writes it with utf-8-sig). A raw copy
+    #    propagated that BOM into the published artifact, and every consumer that opens it
+    #    as plain utf-8 — earnings_agent, post_earnings_movers, analyst-days — then read
+    #    "﻿Ticker" as the first field and recovered ZERO of 1,086 tickers while
+    #    reporting success. Exports are the contract; they are published BOM-free.
     universe_csv_path = EXPORTS_DIR / "universe.csv"
-    shutil.copyfile(CSV_PATH, universe_csv_path)
+    universe_csv_path.write_text(
+        CSV_PATH.read_text(encoding="utf-8-sig") if hasattr(CSV_PATH, "read_text")
+        else Path(CSV_PATH).read_text(encoding="utf-8-sig"),
+        encoding="utf-8", newline="")
 
     # 2. Build the structured metadata dict (ticker -> {name, sector, subsector}).
     #    Generic builder only — no consumer-specific augmentation. Sigma-alert
@@ -389,7 +397,13 @@ def _step_export_positions():
     # Read universe rows + header so the export mirrors whatever columns the
     # coverage universe currently carries (auto-tracks schema changes there).
     universe_rows = pos._load_universe_rows(CSV_PATH)
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+    # utf-8-sig, NOT utf-8. `ticker_utils.write_universe_csv` writes the source with a
+    # BOM, so a plain read makes the first fieldname "\ufeffTicker". Every row below
+    # then sets row["Ticker"], which DictWriter(extrasaction="ignore") silently drops --
+    # publishing 84 position rows and 66 watchlist rows with a blank join key, and
+    # (via the raw copy of universe.csv) costing earnings_agent and post_earnings_movers
+    # all 1,086 universe tickers. `universe/artifacts.py:71` already had this right.
+    with open(CSV_PATH, newline="", encoding="utf-8-sig") as f:
         universe_fieldnames = list(csv.DictReader(f).fieldnames or [])
 
     metadata = build_universe_metadata(CSV_PATH)
@@ -406,8 +420,11 @@ def _step_export_positions():
         c for c in pos_unique_cols if c not in universe_fieldnames
     ]
     pos_csv_out = EXPORTS_DIR / "positions_and_researching.csv"
+    # Exports are written BOM-FREE so a consumer reading plain utf-8 -- which most
+    # of them do -- gets a usable header. extrasaction is left at its strict default:
+    # "ignore" is what turned a header/row key mismatch into silent data loss.
     with open(pos_csv_out, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=pos_csv_fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=pos_csv_fieldnames)
         writer.writeheader()
         for e in sorted(pos_entries, key=lambda x: x["Ticker"].upper()):
             t = e["Ticker"]
@@ -513,8 +530,11 @@ def _step_export_positions():
         c for c in legacy_unique_cols if c not in universe_fieldnames
     ]
     legacy_csv_out = EXPORTS_DIR / "watchlist.csv"
+    # Exports are written BOM-FREE so a consumer reading plain utf-8 -- which most
+    # of them do -- gets a usable header. extrasaction is left at its strict default:
+    # "ignore" is what turned a header/row key mismatch into silent data loss.
     with open(legacy_csv_out, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=legacy_csv_fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=legacy_csv_fieldnames)
         writer.writeheader()
         for e in sorted(legacy_entries, key=lambda x: x["Ticker"].upper()):
             t = e["Ticker"]
@@ -581,6 +601,22 @@ def _step_export_positions():
         "ready_to_short_count": len(ready_to_short_entries),
         "validation_passed": len(pos_errors) == 0,
     }
+
+
+def _step_check_published_exports():
+    """Re-read the published artifacts the way consumers do. Runs LAST, on purpose.
+
+    Everything above validates source data and then writes. This reads the written file
+    back and asserts the join key survived -- the check whose absence let a BOM ship
+    84 blank-Ticker position rows, 66 blank watchlist rows, and a universe.csv from which
+    three downstream projects recovered zero of 1,086 tickers, all under
+    `validation_passed: true`.
+    """
+    from universe.export_acceptance import check_exports
+    problems = check_exports(EXPORTS_DIR, strict=False)
+    for msg in problems:
+        logger.error("  EXPORT ACCEPTANCE: %s", msg)
+    return {"checked": True, "problems": problems, "passed": not problems}
 
 
 # Back-compat alias — `weekly_build` and tests reference the old name.
@@ -1114,6 +1150,19 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 "  Wrote reporting-calendar (%d tickers, %d gating-eligible)",
                 rc_result["ticker_count"], rc_result["gating_eligible_count"],
             )
+
+    # Step 5d: acceptance — re-read the published artifacts the way consumers do.
+    # Deliberately AFTER every writer and BEFORE sigma_export, so a broken contract is
+    # reported before it is propagated into the sibling repo. Non-gating by design (the
+    # universe CSV update is still the real product) but it turns a silent, green,
+    # zero-ticker export into a visible failure in the run summary and heartbeat.
+    if not dry_run:
+        logger.info("[5d/6] Re-reading published exports as a consumer would...")
+        status, acc = run_step("check_published_exports", _step_check_published_exports)
+        steps["check_published_exports"] = status
+        if acc and not acc["passed"]:
+            steps["check_published_exports"] = (
+                f"failed: {len(acc['problems'])} export(s) unreadable or missing a join key")
 
     # Step 6: Sigma-alert metadata export
     if dry_run:
