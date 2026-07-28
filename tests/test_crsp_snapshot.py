@@ -2,6 +2,7 @@
 
 import csv
 import json
+import urllib.error
 
 import pytest
 
@@ -542,6 +543,149 @@ def test_download_does_not_retry_a_404(tmp_path, monkeypatch):
     with pytest.raises(urllib.error.HTTPError):
         cs._download("https://example.invalid/x.csv", tmp_path / "x.csv", attempts=4)
     assert calls["n"] == 1
+
+
+# ── failure classification ───────────────────────────────────────────────────
+#
+# A moved URL and a network blip need opposite responses from the reader, so the
+# job has to say which one happened rather than leaving it to the traceback.
+
+
+@pytest.mark.parametrize("exc,want", [
+    (cs.SourceMoved("landing page"), cs.MOVED),
+    (cs.TransientDownload("4 attempts failed"), cs.TRANSIENT),
+    (urllib.error.HTTPError("u", 404, "Not Found", {}, None), cs.MOVED),
+    (urllib.error.HTTPError("u", 503, "Unavailable", {}, None), cs.TRANSIENT),
+    (urllib.error.URLError("name resolution"), cs.TRANSIENT),
+    (TimeoutError("timed out"), cs.TRANSIENT),
+    (RuntimeError("something else entirely"), cs.UNKNOWN),
+])
+def test_classify_download_failure(exc, want):
+    assert cs.classify_download_failure(exc) == want
+
+
+def test_failure_guidance_is_ascii_and_actionable():
+    """These strings are printed to a cp1252 console by the scheduled task. A
+    non-ASCII character in the error path would raise UnicodeEncodeError at the
+    exact moment the job is trying to report why it failed."""
+    for kind in (cs.MOVED, cs.TRANSIENT, cs.CONTENT, cs.UNKNOWN):
+        text = cs.failure_guidance(kind)
+        text.encode("ascii")            # raises if a stray arrow/dash creeps in
+        assert text.strip()
+    assert "NOT help" in cs.failure_guidance(cs.MOVED)
+    assert "Re-run" in cs.failure_guidance(cs.TRANSIENT)
+
+
+@pytest.mark.parametrize("head,ctype,want", [
+    (b"<!doctype html><html>", "text/html; charset=UTF-8", True),
+    (b"\n  <html lang=en>", "", True),
+    (b"TradeDate,Index Ticker", "text/html", True),        # header alone is enough
+    (b"TradeDate,Index Ticker,Index Name", "text/csv", False),
+    (b"Date,Name,Ticker,Level", "", False),
+])
+def test_looks_like_html(head, ctype, want):
+    assert cs._looks_like_html(head, ctype) is want
+
+
+def test_download_rejects_a_200_html_landing_page(tmp_path, monkeypatch):
+    """The characteristic failure of a retired CDN path is not a 404 — it is the
+    site's landing page served with HTTP 200, which parses as a one-column CSV.
+    It must be caught as a MOVED url, not as a mysterious schema change."""
+    class _Resp:
+        status = 200
+        headers = {"Content-Type": "text/html; charset=UTF-8"}
+
+        def geturl(self):
+            return "https://indexes.morningstar.com/morningstar-market-indexes"
+
+        def read(self, n=-1):
+            return b"<!doctype html><html><body>Moved</body></html>"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(cs.urllib.request, "urlopen", lambda *a, **k: _Resp())
+    with pytest.raises(cs.SourceMoved):
+        cs._download_once("https://www.crsp.org/old/path.csv", tmp_path / "x.csv")
+    assert not list(tmp_path.iterdir())     # no partial file left behind
+
+
+def test_download_does_not_retry_a_moved_url(tmp_path, monkeypatch):
+    """A moved URL is an answer. Re-asking a question already answered only
+    delays the report of the answer."""
+    calls = {"n": 0}
+
+    def moved(url, dest):
+        calls["n"] += 1
+        raise cs.SourceMoved("landing page")
+
+    monkeypatch.setattr(cs, "_download_once", moved)
+    with pytest.raises(cs.SourceMoved):
+        cs._download("https://example.invalid/x.csv", tmp_path / "x.csv", attempts=4)
+    assert calls["n"] == 1
+
+
+def test_snapshot_reports_moved_url_distinctly(tmp_path, monkeypatch):
+    def moved(url, dest):
+        raise cs.SourceMoved("HTTP 200 with an HTML page")
+
+    monkeypatch.setattr(cs, "_download", moved)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=True)
+    assert r.status == "failed"
+    assert r.failure_kind == cs.MOVED
+    assert "URL MOVED" in r.errors[0]
+    assert "indexes.morningstar.com" in r.errors[0]
+
+
+def test_snapshot_reports_transient_network_distinctly(tmp_path, monkeypatch):
+    """Same exit code, opposite response — so the message must differ. A
+    transient failure must NOT tell the operator to go hunt for a new URL."""
+    def flaky(url, dest):
+        raise cs.TransientDownload("4 attempts failed; last error: URLError")
+
+    monkeypatch.setattr(cs, "_download", flaky)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=True)
+    assert r.status == "failed"
+    assert r.failure_kind == cs.TRANSIENT
+    assert "TRANSIENT NETWORK" in r.errors[0]
+    assert "URL MOVED" not in r.errors[0]
+
+
+def test_snapshot_verification_failure_is_content_not_moved(tmp_path, stub_download):
+    """A file that arrives but is the wrong shape is a third fact, and pinning it
+    to 'moved' would send the reader hunting a URL that is working fine."""
+    stub_download["payload"] = _rows(n_total=5)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=True)
+    assert r.failure_kind == cs.CONTENT
+    assert "SOURCE CHANGED" in r.errors[0]
+
+
+def test_levels_download_failure_is_classified_in_the_warning(tmp_path, monkeypatch):
+    """The levels half is non-fatal, but a permanently moved levels URL is a
+    standing task and a blip is not — so the warning has to say which."""
+    payload = _rows()
+
+    def fake(url, dest):
+        if "daily-index-levels" in url:
+            raise cs.SourceMoved("landing page")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        _write(dest, payload)
+
+    monkeypatch.setattr(cs, "_download", fake)
+    r = cs.snapshot(snapshot_dir=tmp_path, skip_levels=False)
+    assert r.status == "ok"                 # constituents still captured
+    assert any(f"levels download failed [{cs.MOVED}]" in w for w in r.warnings)
+
+
+def test_write_report_records_the_failure_kind(tmp_path):
+    r = cs.SnapshotResult(status="failed", failure_kind=cs.MOVED, errors=["boom"])
+    text = cs.write_report(r, None, reports_dir=tmp_path, today="2026-07-28").read_text(
+        encoding="utf-8"
+    )
+    assert "Failure kind" in text and "URL MOVED" in text
 
 
 def test_write_report_flags_no_prior_snapshot(tmp_path):

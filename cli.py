@@ -515,6 +515,13 @@ def main():
 
         report = crsp_snapshot.write_report(result, recon)
         print(f"status: {result.status}")
+        if result.failure_kind:
+            # Say WHICH kind of failure before the detail. A moved URL needs a
+            # human today; a network blip needs nothing but next Monday. Same
+            # exit code, opposite response — so the distinction has to be in the
+            # message, not inferable only from the traceback.
+            print(f"failure kind: {result.failure_kind}")
+            print(crsp_snapshot.failure_guidance(result.failure_kind))
         if result.trade_date:
             print(f"trade date: {result.trade_date}  constituents: {result.constituent_count:,}")
         if result.prior_trade_date:

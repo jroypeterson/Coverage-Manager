@@ -637,6 +637,60 @@ move.** The module fails loudly (exit 2) rather than silently keeping the last
 snapshot — a 4xx is never retried, precisely so a moved path surfaces instead of
 burning the run.
 
+**Checked live 2026-07-28 — the data URLs did NOT move.** The *website* redirects
+(`https://www.crsp.org/` → `https://indexes.morningstar.com/morningstar-market-indexes`,
+301) but the two CSVs do not:
+
+| URL | Status | Redirects | Content-Type | Last-Modified |
+|---|---|---:|---|---|
+| `…/quarterly-index-constituents/crsp_quarterly_constituents.csv` | 200 | 0 | `text/csv` | Sat, 02 May 2026 01:13:02 GMT |
+| `…/daily-index-levels/crspmi_daily_index_levels.csv` | 200 | 0 | `text/csv` | Tue, 28 Jul 2026 02:13:08 GMT |
+
+Both still serve from the same nginx/Pantheon origin, and the levels file was
+refreshed the morning of the check (last row `2026-07-27`) — so the feed is
+being maintained *behind* the redirect. **A redirecting landing page is not
+evidence that the data path moved**; check the two separately. A full live run
+into a scratch directory returned `ok` / 3,477 constituents / 1,713
+sector-labelled — i.e. the published figures are unchanged post-migration. No
+fetch-path code was changed as a result.
+
+### The failure message says which kind of failure it was
+
+"The download failed" was two operational facts wearing one message, and they
+want opposite responses: a **moved URL** needs a human today (every retry
+returns the same 404 forever), a **transient network** error needs nothing but
+the next scheduled run. Reporting them identically forced the reader into the
+traceback to find out which — costly on a weekly job whose entire premise is
+that a missed quarter is unrecoverable.
+
+`classify_download_failure` now labels every failure and
+`SnapshotResult.failure_kind` carries it into the report, the console, and the
+`[kind]`-tagged error string:
+
+| Kind | Trigger | What it asks of the reader |
+|---|---|---|
+| `moved` | 4xx, **or HTTP 200 whose body/content-type is HTML** | find the new path on `indexes.morningstar.com`, update the two constants. Re-running will not help. |
+| `transient` | 5xx, `URLError`, timeout — after all 4 attempts | re-run. If it repeats next week, re-classify as moved. |
+| `content` | a file arrived, but the schema / index key / row count is wrong | inspect the staged download; the URL itself is working. |
+| `unknown` | anything else | read the error text before re-running. |
+
+Two details are load-bearing:
+
+- **A retired CDN path usually answers 200 with the site's landing page, not a
+  404** — and that page parses as a one-column CSV. `_download_once` now sniffs
+  the first chunk plus the `Content-Type` and raises `SourceMoved` before a byte
+  is written, so the diagnosis stays attached to its evidence (final URL after
+  redirects + content type) instead of resurfacing later as a baffling schema
+  error. A redirect that *does* return CSV is fine and is logged as a warning —
+  it is the first visible sign of the migration and must not pass silently.
+- **`SourceMoved` is never retried.** It is an *answer*; re-asking an answered
+  question only delays reporting the answer.
+
+Guidance strings are **ASCII-only and pinned by a test** (`.encode("ascii")`).
+The old message contained a `→`, which the scheduled task's cp1252 console
+cannot encode — it would have raised `UnicodeEncodeError` at the exact moment
+the job was trying to report why it failed.
+
 ### Two gotchas that will bite
 
 1. **The total-market list is keyed under `CRSPTM1`, not `CRSPTMT`.** Constituents
@@ -724,7 +778,7 @@ around 0.5 and produced 9 cosmetic flags that buried the 3 real ones.
 comparison that cannot be made has no result (the same rule `delisted_check`
 follows).
 
-Module `universe/crsp_snapshot.py`; tests `tests/test_crsp_snapshot.py` (35).
+Module `universe/crsp_snapshot.py`; tests `tests/test_crsp_snapshot.py` (68).
 Non-gating; not part of `weekly-universe`.
 
 ## Historical valuation columns (Phase 2 — full universe, 5Y + 10Y)

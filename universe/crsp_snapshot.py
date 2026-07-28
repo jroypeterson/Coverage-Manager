@@ -22,6 +22,15 @@ late July 2026. `crsp.org` began redirecting to `indexes.morningstar.com` on
 module must fail loudly rather than silently keep the last snapshot (see
 `SnapshotResult.status`).
 
+**Verified live 2026-07-28**: the *website* redirects (`https://www.crsp.org/`
+-> `https://indexes.morningstar.com/morningstar-market-indexes`, 301) but the two
+data files below do NOT — both return HTTP 200, `text/csv`, with **zero**
+redirects, straight from the same nginx/Pantheon origin. The levels file was
+modified that same morning (`Last-Modified: Tue, 28 Jul 2026 02:13:08 GMT`, last
+row `2026-07-27`), so the feed is still being maintained behind the redirect.
+A redirecting landing page is therefore not evidence that the data path moved,
+and the two must be checked separately.
+
 WHAT IT IS NOT
 --------------
 Not a delisting detector for the coverage universe. CRSP excludes
@@ -133,6 +142,92 @@ WEIGHT_SUM_TOLERANCE = 0.02
 USER_AGENT = "CoverageManager/1.0 (research; contact via repo owner)"
 TIMEOUT_SECONDS = 300
 
+# Where to look when the paths do move. Kept ASCII: this string is printed to a
+# cp1252 Windows console by the scheduled task, and a non-ASCII character in the
+# *error* path would raise UnicodeEncodeError at the exact moment the job is
+# trying to report why it failed.
+MORNINGSTAR_INDEX_PAGE = (
+    "https://indexes.morningstar.com/indexes/details/"
+    "morningstar-us-total-market-FS00009VTK"
+)
+
+
+# ── Failure classification ───────────────────────────────────────────────────
+#
+# "The download failed" is two different operational facts wearing one message,
+# and they want opposite responses. A moved URL needs a human to find the new
+# path — every retry from here to the heat death of the universe returns the
+# same 404. A transient network error needs nothing but the next scheduled run.
+# Reporting them identically means the reader has to open the traceback to learn
+# which one happened, and on a weekly job whose whole purpose is that a missed
+# quarter is unrecoverable, that lag is the expensive part.
+
+MOVED = "moved"            # the server answered, but not with the file
+TRANSIENT = "transient"    # the server could not be reached
+CONTENT = "content"        # a file arrived; it is not the file we asked for
+UNKNOWN = "unknown"
+
+
+class SourceMoved(RuntimeError):
+    """The URL resolved and answered — with something that is not the data file.
+
+    Raised for a 4xx and, importantly, for the *200-with-HTML* case: a CDN whose
+    path has been retired commonly serves the site's landing page rather than a
+    404, and a landing page parses as a one-column CSV. Catching it here rather
+    than in `verify_total_market` keeps the diagnosis ("the URL moved") attached
+    to the evidence (the final URL after redirects and the content type).
+    """
+
+
+class TransientDownload(RuntimeError):
+    """Every attempt failed to reach the server. The URL is probably fine."""
+
+    def __init__(self, message: str, cause: BaseException | None = None):
+        super().__init__(message)
+        self.cause = cause
+
+
+def classify_download_failure(exc: BaseException) -> str:
+    """Map a download exception to one of MOVED / TRANSIENT / CONTENT / UNKNOWN."""
+    if isinstance(exc, SourceMoved):
+        return MOVED
+    if isinstance(exc, TransientDownload):
+        return TRANSIENT
+    # HTTPError subclasses URLError, so it must be tested first.
+    if isinstance(exc, urllib.error.HTTPError):
+        return MOVED if exc.code < 500 else TRANSIENT
+    if isinstance(exc, (urllib.error.URLError, TimeoutError, OSError)):
+        return TRANSIENT
+    return UNKNOWN
+
+
+def failure_guidance(kind: str) -> str:
+    """One ASCII line telling the reader what this failure requires of them."""
+    if kind == MOVED:
+        return (
+            "URL MOVED: the server answered but did not return the data file. "
+            "The CRSP -> Morningstar site migration began 2026-07-28 and is the "
+            f"likely cause; find the new download path at {MORNINGSTAR_INDEX_PAGE} "
+            "and update CONSTITUENTS_URL / LEVELS_URL. Re-running will NOT help."
+        )
+    if kind == TRANSIENT:
+        return (
+            "TRANSIENT NETWORK: the server could not be reached after every "
+            "retry, so nothing was learned about the URL itself. Re-run. If it "
+            "repeats on the next scheduled run, re-classify it as a moved URL "
+            f"and check {MORNINGSTAR_INDEX_PAGE}."
+        )
+    if kind == CONTENT:
+        return (
+            "SOURCE CHANGED: the URL returned a file, but not the file this job "
+            "expects (schema, index key, or row count is wrong). Inspect the "
+            "staged download before assuming the path moved."
+        )
+    return (
+        "UNKNOWN FAILURE: could not classify this as a moved URL or a network "
+        "problem. Read the error text before re-running."
+    )
+
 
 # ── Results ──────────────────────────────────────────────────────────────────
 
@@ -149,6 +244,7 @@ class SnapshotResult:
     """
 
     status: str
+    failure_kind: str | None = None
     trade_date: str | None = None
     constituent_count: int = 0
     path: Path | None = None
@@ -181,6 +277,9 @@ def _download(url: str, dest: Path, *, attempts: int = 4) -> None:
     `StartWhenAvailable`, which fires as soon as the machine wakes — routinely
     before DNS is up. A first-attempt `URLError` there means "the laptop just
     woke", not "CRSP is gone", and this job only gets one shot a week.
+
+    A `SourceMoved` is never retried: it is an *answer*, and repeating a question
+    that has already been answered only delays the report of the answer.
     """
     import time
 
@@ -198,7 +297,21 @@ def _download(url: str, dest: Path, *, attempts: int = 4) -> None:
                 wait = 5 * (2 ** i)
                 log.warning("download failed (%s); retrying in %ds", exc, wait)
                 time.sleep(wait)
-    raise RuntimeError(f"{url}: {attempts} attempts failed; last error: {last}")
+    raise TransientDownload(
+        f"{url}: {attempts} attempts failed; last error: {last}", last
+    )
+
+
+# A retired CDN path very often serves the site's landing page with HTTP 200
+# rather than a 404. That page parses as a CSV with one useless column, so the
+# 200 has to be checked, not trusted.
+_HTML_MARKERS = (b"<!doctype", b"<html", b"<?xml", b"<head")
+
+
+def _looks_like_html(head: bytes, content_type: str) -> bool:
+    if "html" in content_type.lower():
+        return True
+    return head.lstrip()[:64].lower().startswith(_HTML_MARKERS)
 
 
 def _download_once(url: str, dest: Path) -> None:
@@ -211,8 +324,26 @@ def _download_once(url: str, dest: Path) -> None:
             with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
                 if resp.status != 200:
                     raise RuntimeError(f"HTTP {resp.status} from {url}")
-                while chunk := resp.read(1 << 20):
-                    out.write(chunk)
+                final_url = resp.geturl()
+                content_type = resp.headers.get("Content-Type", "")
+                if final_url != url:
+                    # Not fatal on its own — a 301 to a renamed CSV is a perfectly
+                    # good outcome — but it is the first visible sign of the
+                    # migration, so it must never pass silently.
+                    log.warning(
+                        "download redirected: %s -> %s (content-type %s)",
+                        url, final_url, content_type or "unset",
+                    )
+                head = resp.read(1 << 20)
+                if _looks_like_html(head, content_type):
+                    raise SourceMoved(
+                        f"{url} answered HTTP 200 with an HTML page "
+                        f"(final URL {final_url}, content-type "
+                        f"{content_type or 'unset'}) -- the data path has moved"
+                    )
+                while head:
+                    out.write(head)
+                    head = resp.read(1 << 20)
         if tmp.stat().st_size == 0:
             raise RuntimeError(f"empty response from {url}")
         _replace_with_retry(tmp, dest)
@@ -369,13 +500,13 @@ def snapshot(
     try:
         _download(CONSTITUENTS_URL, staging)
     except (urllib.error.URLError, OSError, RuntimeError) as exc:
+        kind = classify_download_failure(exc)
         return SnapshotResult(
             status="failed",
+            failure_kind=kind,
             errors=[
-                f"constituents download failed: {exc}. The CRSP→Morningstar site "
-                f"migration began 2026-07-28 and may have moved this URL; check "
-                f"https://indexes.morningstar.com/indexes/details/"
-                f"morningstar-us-total-market-FS00009VTK"
+                f"constituents download failed [{kind}]: {exc}. "
+                f"{failure_guidance(kind)}"
             ],
         )
 
@@ -384,7 +515,13 @@ def snapshot(
         trade_date, tm_rows, warnings = verify_total_market(rows)
     except (ValueError, KeyError) as exc:
         _remove_quietly(staging)
-        return SnapshotResult(status="failed", errors=[f"verification failed: {exc}"])
+        return SnapshotResult(
+            status="failed",
+            failure_kind=CONTENT,
+            errors=[
+                f"verification failed [{CONTENT}]: {exc}. {failure_guidance(CONTENT)}"
+            ],
+        )
 
     dest = snapshot_dir / f"constituents_{trade_date}.csv"
     already = dest.exists()
@@ -444,8 +581,13 @@ def snapshot(
         except (urllib.error.URLError, OSError, RuntimeError) as exc:
             # Non-fatal: levels are cumulative from inception, so the previous
             # copy stays valid and only loses recent days. The constituent
-            # archive is the irreplaceable half of this job.
-            result.warnings.append(f"levels download failed (prior copy retained): {exc}")
+            # archive is the irreplaceable half of this job. Still classified —
+            # a moved levels URL is a standing task, a blip is not.
+            kind = classify_download_failure(exc)
+            result.warnings.append(
+                f"levels download failed [{kind}] (prior copy retained): {exc}. "
+                f"{failure_guidance(kind)}"
+            )
         else:
             # Archive a dated, compressed copy when a new quarter lands (or on
             # demand). The working file is refreshed in place every run, which is
@@ -738,6 +880,8 @@ def write_report(
 
     L = [f"# CRSP US Total Market snapshot — {today}", ""]
     L.append(f"**Status:** `{result.status}`")
+    if result.failure_kind:
+        L.append(f"**Failure kind:** `{result.failure_kind}` — {failure_guidance(result.failure_kind)}")
     if result.trade_date:
         L.append(f"**Index TradeDate:** {result.trade_date}")
         L.append(f"**Constituents:** {result.constituent_count:,}")
