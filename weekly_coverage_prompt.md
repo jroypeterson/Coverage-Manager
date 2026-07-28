@@ -194,6 +194,45 @@ A bulleted list of all report files saved this week with their filenames and a o
 - `coverage_consolidated_2026-04-03.html` — Consolidated HTML performance report (all sectors)
 - (etc. for each HTML sector report generated)
 
+## Structured output (required every run)
+
+The markdown report is for JP to read. **The ledger is what the system remembers.** Write
+both.
+
+**1. Write `data/discovery_output_<date>.json`** conforming to
+`discovery/discovery_output_schema.json`:
+
+```json
+{"date": "YYYY-MM-DD",
+ "candidates": [
+   {"company": "...", "ticker": "...", "exchange": "...", "market_cap": 3300000000,
+    "sector": "...", "subsector": "...", "listing_date": "YYYY-MM-DD",
+    "trigger": "IPO", "peers": ["..."], "reason": "...", "business_summary": "..."}]}
+```
+
+`trigger` is a **strict enum** — exactly one of `IPO`, `Direct listing`, `Spin-off`,
+`Carve-out`, `New candidate`, `Russell addition`. Put the nuance ("US ADR uplisting",
+"Russell 1000") in `reason`, not in `trigger`; a non-enum value is rejected. `sector` must
+be a valid `Sector (JP)`. Never set `approved` — approval is JP's, and only via the
+`#ipo` thread.
+
+Write the file even in a quiet week: `{"date": "...", "candidates": []}`.
+
+**2. Then run:**
+
+```
+python scripts/sync_candidate_ledger.py --date YYYY-MM-DD --thread-ts <ts from the #ipo post>
+```
+
+It validates the output, folds new names into `data/candidate_ledger.csv` as `pending`,
+bumps `last_seen` on ones already there, leaves decided rows alone, and expires anything
+pending more than 60 days. **Report any expiries in the Slack post** — "3 expired: X, Y, Z
+— reply `revive X` to restore."
+
+**Read the pending backlog from the ledger** (`python -m universe.candidate_ledger
+pending`), not by re-reading last week's report. Re-deriving it from prose is what let 15
+names accumulate unnoticed between 2026-06-19 and 2026-07-28.
+
 ## Slack notification — post to #ipo
 
 After the email draft is created and all reports are generated, post a summary to the Slack
@@ -397,7 +436,8 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 10. Move old report files (including company_backgrounds_*.md) to Coverage Manager/reports/old reports/.
 11. Draft the Gmail email and save the dated markdown report (with Company Summaries section).
 12. For each recommended company, use web search to research and generate a full company background briefing following the Full Company Background Report template above. Compile all briefings into a single file and save as Coverage Manager/reports/company_backgrounds_YYYY-MM-DD.md.
-13. Ask me which additions (if any) I want to add to the CSV. **On the scheduled headless run there is no one to ask** — so instead carry the recommendation forward as pending, and report the full pending backlog in the Slack post (see "Slack notification"). Never add a name to the CSV unapproved.
+12b. **Write the structured discovery output** — see "Structured output" below. Do this before the Slack post; the post's pending-backlog section is read from the ledger, not re-derived from last week's prose.
+13. Ask me which additions (if any) I want to add to the CSV. **On the scheduled headless run there is no one to ask** — so instead leave the candidate `pending` in the ledger and report the full pending backlog in the Slack post (see "Slack notification"). Never add a name to the CSV unapproved.
 14. For any I approve, append them to Coverage Manager/data/coverage_universe_tickers.csv with the correct Ticker, Exchange, Company Name, Sector, and Subsector fields. Match the naming conventions already used in the file. **Write the CSV via `ticker_utils.read_universe_csv` / `write_universe_csv`** — a bare pandas round-trip float-ifies `CIK` and `Year Listed` and corrupts the published exports.
 15. **Publish the regenerated exports (see "Publish exports" below) — do this EVERY run, even in a quiet week with zero additions.**
 
