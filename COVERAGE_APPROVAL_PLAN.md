@@ -112,21 +112,59 @@ scheduled task, no new battery-kill surface. A standalone daily task is the fall
 
 ### S4 — Aging / expiry (~half session)
 
-A candidate pending 60 days is a decline nobody made. Auto-expire to `declined`, and report it in
-the weekly post: *"3 expired: X, Y, Z — reply `revive X` to restore."* Without this, S2's ledger
-becomes the new immortal backlog and we have rebuilt the problem in a better file format.
+**Confirmed: expire at 60 days pending → `declined`.** Report it in the weekly post: *"3 expired:
+X, Y, Z — reply `revive X` to restore."* Without this, S2's ledger becomes the new immortal
+backlog and we have rebuilt the problem in a better file format.
+
+Expiry is a ledger status change only — it never touches the universe CSV, so it is safe to run
+unattended.
+
+**One-time on first run:** the 15 names already queued (SKHY, MBGL, BSP, DPC, RKLB, SNDK, EROC,
+PBLS, FPS, MANE, MWH, KARD, CSQR, STDN, 2475.HK) predate the ledger and several are already past
+60 days. Do **not** silently expire them on import — they were never actually put to JP. Import
+them all as `pending` with their true `first_proposed` date and post one catch-up thread to
+`#ipo` asking for a decision, with the clock starting from import.
 
 ---
 
-## 3. Decisions needed from JP
+## 3. Decisions — settled by JP 2026-07-28
 
-1. **Expiry default** — expire to `declined` (revivable), or keep pending forever?
-   *Recommend `declined`:* silence is not approval for adding coverage, and `revive` loses nothing.
-2. **Does approval set `Core = Y`?**
-   *Recommend no* — adding a row is tracking; `Core` is an analytic commitment (and 3 sibling
-   projects gate their call budgets on it).
-3. **Does an approved IPO also enter `positions_and_researching.csv`?**
-   *Recommend no by default*, opt-in via `add TICKER following` → `Following for Interest`.
+1. **Expiry: expire.** A candidate pending 60 days becomes `declined`, revivable with
+   `revive TICKER`. Silence is not approval.
+2. **`Core` stays blank.** JP sets `Core` himself, separately. **Approval means "add to Coverage
+   Manager"** — see §3a, which is the substantive half of this decision.
+3. **No `positions_and_researching.csv` row by default.** Opt-in via `add TICKER following` →
+   `Following for Interest`.
+
+### 3a. What "approval" must actually do
+
+JP: *"approval just means add to coverage manager, which means I want you to get all the
+appropriate metadata to track the name — and at some point I may track it via Sigma Alerts."*
+
+So an approved candidate is **not** an append of ticker + name. It must land as a fully
+populated row across all 28 universe columns, then propagate. Every piece of this already
+exists — chain the existing entry points, do not write new fetchers:
+
+| Step | Call | Fills |
+|---|---|---|
+| 1 | `universe/enrich.py:enrich_single_ticker(ticker, sector_jp, exchange_hint)` | Exchange / Code / Full Name, Listing Type, Other Listings, Year Listed, ISIN, FIGI ×3, CIK, Country ×3, Currency, Website, YF Sector / Industry |
+| 2 | `cli.py ipo-backfill --tickers <T>` | **`IPO Date`, `Est Lockup 90d`, `Est Lockup 180d`** — verified offer date from Renaissance. Highest-value step for an IPO add: yfinance/FMP report first-trade, not offer, and the lockup dates are a real forward signal. Watch the 120-calls/month cap. |
+| 3 | `cli.py backfill-lei` (if an ISIN resolved) | `LEI` (GLEIF, ~46% hit rate) |
+| 4 | `Sector (JP)` / `Subsector (JP)` / `Sub-subsector (JP)` | From the candidate record — the classification is the analyst judgment the weekly report already made. Must validate against `ALLOWED_SECTORS_JP`. |
+| 5 | `Core` | **Left blank** (decision 2) |
+| 6 | `ticker_utils.write_universe_csv` | never a bare pandas round-trip |
+| 7 | `cli.py weekly-universe --skip-discovery` | republishes `exports/*` **and runs `sigma_export`** |
+
+**Step 7 is what makes the name Sigma-trackable, and it is automatic.** `sigma_export` pushes
+`ticker_metadata.json` into the sigma-alert clone, and sigma screens the full universe for 2σ
+moves (Core/position lists only get the extra 1σ cut). So "add to coverage" already means
+"appears in Sigma Alerts" — no separate opt-in, and no work beyond not skipping step 7.
+
+**Enrichment failure must block the add, not half-write it.** A row with a blank CIK is invisible
+to `insider_ownership` and `earnings_agent`; a wrong one is worse (see `cik_backfill`'s
+name-similarity gate — it deliberately skips rather than guesses). If step 1 can't resolve the
+identity, reply in-thread with what failed and leave the candidate `pending`. Do not append a
+stub and call it added.
 
 ---
 
