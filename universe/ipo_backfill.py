@@ -54,10 +54,26 @@ def _ensure_ipo_columns(df):
 
 
 def _default_fetcher(api_key, use_cache):
-    """Build a (ticker, cik) -> result-dict|None fetcher bound to the API key."""
+    """Build a (ticker, cik) -> (status, result-dict|None) fetcher bound to the key."""
     def _fetch(ticker, cik):
-        return renaissance_ipo.fetch_ipo_date(ticker, api_key, cik=cik, use_cache=use_cache)
+        return renaissance_ipo.fetch_ipo_date_ex(
+            ticker, api_key, cik=cik, use_cache=use_cache)
     return _fetch
+
+
+def _normalize_fetch_result(res):
+    """Accept either the (status, payload) pair or a legacy bare payload.
+
+    Injected test fetchers (and any older caller) may still return just the dict
+    or None. A bare None is the ambiguous legacy form, so it is reported as
+    `no_data` — the historical behaviour — while the real provider now
+    distinguishes it properly.
+    """
+    if isinstance(res, tuple):
+        return res
+    if res:
+        return renaissance_ipo.STATUS_OK, res
+    return renaissance_ipo.STATUS_NO_DATA, None
 
 
 def _year_sort_key(year_str):
@@ -126,7 +142,7 @@ def backfill(csv_path=None, use_cache=True, limit=None, us_only=True,
         int(missing.sum()), len(candidate_idx), us_only, min_year, len(todo_idx),
     )
 
-    filled = no_data = attempted = 0
+    filled = no_data = inconclusive = attempted = 0
     budget_exhausted = False
     for n, i in enumerate(todo_idx, start=1):
         ticker = (df.at[i, "Ticker"] or "").strip()
@@ -138,15 +154,20 @@ def backfill(csv_path=None, use_cache=True, limit=None, us_only=True,
             budget_exhausted = True
             break
         attempted += 1
-        if res and res.get("offer_date"):
-            offer = res["offer_date"]
+        status, payload = _normalize_fetch_result(res)
+        if status == renaissance_ipo.STATUS_OK and payload and payload.get("offer_date"):
+            offer = payload["offer_date"]
             d90, d180 = renaissance_ipo.lockup_dates(offer)
             df.at[i, IPO_DATE_COL] = offer
             df.at[i, LOCKUP_90_COL] = d90
             df.at[i, LOCKUP_180_COL] = d180
             filled += 1
-        else:
+        elif status == renaissance_ipo.STATUS_NO_DATA:
             no_data += 1
+        else:
+            # Throttled / offline / no key: we learned nothing about this name.
+            # Counted separately so a bad run cannot read as a complete one.
+            inconclusive += 1
         if n % 25 == 0:
             logger.info("  progress: %d/%d (%d filled)", n, len(todo_idx), filled)
         if _fetcher is None:
@@ -161,6 +182,7 @@ def backfill(csv_path=None, use_cache=True, limit=None, us_only=True,
         "attempted": attempted,
         "filled": filled,
         "no_data": no_data,
+        "inconclusive": inconclusive,
         "still_missing": still_missing,
         "budget_exhausted": budget_exhausted,
         "calls_this_month": renaissance_ipo.calls_this_month(),
@@ -171,10 +193,19 @@ def backfill(csv_path=None, use_cache=True, limit=None, us_only=True,
 def main(use_cache=True, limit=None, us_only=True, min_year=None):
     result = backfill(use_cache=use_cache, limit=limit, us_only=us_only, min_year=min_year)
     logger.info(
-        "IPO backfill done: filled %d (no IPO on record: %d) of %d attempted; "
-        "%d row(s) still blank. Calls this month: %d/%d.%s",
-        result["filled"], result["no_data"], result["attempted"],
-        result["still_missing"], result["calls_this_month"], result["monthly_cap"],
+        "IPO backfill done: filled %d, no IPO on record %d, INCONCLUSIVE %d "
+        "of %d attempted; %d row(s) still blank. Calls this month: %d/%d.%s",
+        result["filled"], result["no_data"], result["inconclusive"],
+        result["attempted"], result["still_missing"],
+        result["calls_this_month"], result["monthly_cap"],
         " BUDGET EXHAUSTED — rerun next month to continue." if result["budget_exhausted"] else "",
     )
+    if result["inconclusive"]:
+        # Never let a throttled run read as a finished one.
+        logger.warning(
+            "%d lookup(s) were INCONCLUSIVE (throttled/offline) — these learned "
+            "nothing, were not cached, and WILL be retried on the next run. Do not "
+            "read them as 'no IPO on record'.",
+            result["inconclusive"],
+        )
     return result

@@ -154,3 +154,62 @@ def test_stops_on_budget_exhaustion(tmp_path):
     res = B.backfill(csv_path=csv, _fetcher=fake)
     assert res["budget_exhausted"] is True
     assert res["filled"] == 0 and res["attempted"] == 0
+
+
+# ── inconclusive is counted separately from no_data ───────────────────────────
+#
+# Regression for 2026-07-28: six HTTP 429s were folded into "no IPO on record",
+# so a throttled run reported as a complete one.
+
+from providers import renaissance_ipo as R  # noqa: E402
+
+
+def test_inconclusive_is_not_counted_as_no_data(tmp_path):
+    csv = _write(tmp_path, [
+        ["AAA", "2026", "1", "Filled Co"],
+        ["BBB", "2026", "2", "Genuinely No IPO Co"],
+        ["CCC", "2026", "3", "Throttled Co"],
+    ])
+
+    def fake(ticker, cik):
+        if ticker == "AAA":
+            return R.STATUS_OK, {"ticker": "AAA", "company_name": "Filled Co",
+                                 "offer_date": "2026-03-20"}
+        if ticker == "BBB":
+            return R.STATUS_NO_DATA, None
+        return R.STATUS_INCONCLUSIVE, None
+
+    res = B.backfill(csv_path=csv, _fetcher=fake)
+    assert res["filled"] == 1
+    assert res["no_data"] == 1
+    assert res["inconclusive"] == 1
+    assert res["attempted"] == 3
+
+
+def test_throttled_row_is_left_blank_for_the_next_run(tmp_path):
+    csv = _write(tmp_path, [["CCC", "2026", "3", "Throttled Co"]])
+    res = B.backfill(csv_path=csv,
+                     _fetcher=lambda t, c: (R.STATUS_INCONCLUSIVE, None))
+    df = pd.read_csv(csv, dtype=str, keep_default_na=False)
+    assert df.loc[0, "IPO Date"] == ""
+    assert res["still_missing"] == 1
+    assert res["no_data"] == 0
+
+
+def test_legacy_bare_payload_fetcher_still_works(tmp_path):
+    """Injected fetchers predating the (status, payload) pair must keep working."""
+    csv = _write(tmp_path, [
+        ["AAA", "2026", "1", "Filled Co"],
+        ["BBB", "2026", "2", "No IPO Co"],
+    ])
+
+    def legacy(ticker, cik):
+        if ticker == "AAA":
+            return {"ticker": "AAA", "company_name": "Filled Co",
+                    "offer_date": "2026-03-20"}
+        return None
+
+    res = B.backfill(csv_path=csv, _fetcher=legacy)
+    assert res["filled"] == 1
+    assert res["no_data"] == 1
+    assert res["inconclusive"] == 0

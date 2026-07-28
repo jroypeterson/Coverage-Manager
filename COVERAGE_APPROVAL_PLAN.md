@@ -148,7 +148,7 @@ exists — chain the existing entry points, do not write new fetchers:
 | Step | Call | Fills |
 |---|---|---|
 | 1 | `universe/enrich.py:enrich_single_ticker(ticker, sector_jp, exchange_hint)` | Exchange / Code / Full Name, Listing Type, Other Listings, Year Listed, ISIN, FIGI ×3, CIK, Country ×3, Currency, Website, YF Sector / Industry |
-| 2 | `cli.py ipo-backfill --tickers <T>` | **`IPO Date`, `Est Lockup 90d`, `Est Lockup 180d`** — verified offer date from Renaissance. Highest-value step for an IPO add: yfinance/FMP report first-trade, not offer, and the lockup dates are a real forward signal. Watch the 120-calls/month cap. |
+| 2 | `cli.py ipo-backfill --min-year <YYYY> [--limit N]` | **`IPO Date`, `Est Lockup 90d`, `Est Lockup 180d`** — verified offer date from Renaissance. Highest-value step for an IPO add: yfinance/FMP report first-trade, not offer, and the lockup dates are a real forward signal. **There is no `--tickers` flag** — targeting is by year, most-recently-listed first, which sweeps up other recent names missing an offer date (usually a bonus, but it spends quota). Watch the 115-calls/month cap. |
 | 3 | `cli.py backfill-lei` (if an ISIN resolved) | `LEI` (GLEIF, ~46% hit rate) |
 | 4 | `Sector (JP)` / `Subsector (JP)` / `Sub-subsector (JP)` | From the candidate record — the classification is the analyst judgment the weekly report already made. Must validate against `ALLOWED_SECTORS_JP`. |
 | 5 | `Core` | **Left blank** (decision 2) |

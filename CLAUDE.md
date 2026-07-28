@@ -408,6 +408,17 @@ key `RENAISSANCE_API_KEY` in `.env`).
   on read by `providers.renaissance_ipo.ipo_age(offer_date)` → `(age_days, bucket)`
   (`<30d/30-90d/90-180d/180-365d/1-2y/>2y`); never stored (it's date-relative). Lockup
   dates + IPO date are immutable so they live in the CSV.
+- **Three outcomes, not two (2026-07-28).** `providers.renaissance_ipo.fetch_ipo_date_ex`
+  returns `(status, payload)` with status `ok` / `no_data` / **`inconclusive`**. A 404 is an
+  *answer* ("no IPO on record") — counted against quota and cached forever. A 429/5xx/transport
+  error or a missing key is **not an answer**: never counted, never cached, retried next run.
+  The bare `fetch_ipo_date` wrapper remains for back-compat but collapses the two and should
+  not be used in new code. `backfill()` now reports `inconclusive` separately and logs a warning
+  when it is non-zero. **Why:** on 2026-07-28 a burst of 429s was summarised as "no IPO on
+  record: 9" when only 3 were real; the cache was correct throughout (nothing was poisoned) but
+  the operator-facing count was not, and a rerun 40 seconds later filled 6 of the 9. Same class
+  as `delisted_check`'s found/clean/inconclusive split. Tests: `tests/test_renaissance_ipo.py`,
+  `tests/test_ipo_backfill.py`.
 - **Hard quota guard:** the FREE tier is **120 calls/MONTH** (no remaining-count header),
   so `providers/renaissance_ipo.py` tracks spend in `cache/ipo_renaissance/_usage.json`
   keyed by month and **raises `RenaissanceBudgetError` at `MONTHLY_CALL_CAP` (115)** —

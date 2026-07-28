@@ -112,3 +112,78 @@ def test_no_api_key_returns_none():
 
 def test_blank_ticker_returns_none():
     assert R.fetch_ipo_date("", api_key="k") is None
+
+
+# ── status distinction: "no IPO on record" vs "we were throttled" ──────────────
+#
+# Regression for 2026-07-28: a burst of HTTP 429s was reported to the operator as
+# "no IPO on record: 9" when only 3 were real. Nothing was mis-cached, but a
+# summary that under-reports its own ignorance means a name silently never gets
+# an offer date. Same class as delisted_check's found/clean/inconclusive split.
+
+def test_404_is_no_data_and_is_cached():
+    with patch.object(R, "_request", return_value=_FakeResp(404)), \
+         patch.object(R, "_record_call"), \
+         patch.object(R, "cache_get", return_value=None), \
+         patch.object(R, "cache_set") as cset:
+        status, payload = R.fetch_ipo_date_ex("DEAD", "key")
+    assert status == R.STATUS_NO_DATA
+    assert payload is None
+    assert cset.called, "an authoritative 404 must be cached so it is never re-hit"
+
+
+def test_429_is_inconclusive_and_is_never_cached_or_counted():
+    with patch.object(R, "_request", return_value=_FakeResp(429)), \
+         patch.object(R, "_record_call") as rec, \
+         patch.object(R, "cache_get", return_value=None), \
+         patch.object(R, "cache_set") as cset:
+        status, payload = R.fetch_ipo_date_ex("SKHY", "key")
+    assert status == R.STATUS_INCONCLUSIVE
+    assert payload is None
+    assert not cset.called, "a throttled lookup must not be cached"
+    assert not rec.called, "a throttled lookup must not burn quota"
+
+
+def test_transport_exception_is_inconclusive():
+    with patch.object(R, "_request", side_effect=OSError("dns")), \
+         patch.object(R, "cache_get", return_value=None), \
+         patch.object(R, "cache_set") as cset:
+        status, _ = R.fetch_ipo_date_ex("BSP", "key")
+    assert status == R.STATUS_INCONCLUSIVE
+    assert not cset.called
+
+
+def test_missing_api_key_is_inconclusive_not_no_data():
+    status, _ = R.fetch_ipo_date_ex("BSP", "")
+    assert status == R.STATUS_INCONCLUSIVE
+
+
+def test_200_without_offer_date_is_a_real_answer():
+    """The API knows the company and has no offer date -> that IS no_data."""
+    with patch.object(R, "_request",
+                      return_value=_FakeResp(200, {"companyName": "X", "offerDate": ""})), \
+         patch.object(R, "_record_call"), \
+         patch.object(R, "cache_get", return_value=None), \
+         patch.object(R, "cache_set"):
+        status, payload = R.fetch_ipo_date_ex("X", "key")
+    assert status == R.STATUS_NO_DATA
+    assert payload is None
+
+
+def test_cached_empty_replays_as_no_data_not_inconclusive():
+    empty = {"ticker": "D", "company_name": "", "offer_date": None}
+    with patch.object(R, "cache_get", return_value=empty):
+        assert R.fetch_ipo_date_ex("D", "key")[0] == R.STATUS_NO_DATA
+
+
+def test_legacy_wrapper_still_returns_payload_or_none():
+    with patch.object(R, "_request",
+                      return_value=_FakeResp(200, {"companyName": "SK hynix",
+                                                   "offerDate": "3/20/2024"})), \
+         patch.object(R, "_record_call"), \
+         patch.object(R, "cache_get", return_value=None), \
+         patch.object(R, "cache_set"):
+        assert R.fetch_ipo_date("SKHY", "key")["offer_date"] == "2024-03-20"
+    with patch.object(R, "_request", return_value=_FakeResp(429)), \
+         patch.object(R, "cache_get", return_value=None):
+        assert R.fetch_ipo_date("SKHY", "key") is None

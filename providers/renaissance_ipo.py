@@ -161,28 +161,45 @@ def _request(params, api_key):
     )
 
 
-def fetch_ipo_date(ticker, api_key, cik=None, use_cache=True):
-    """Return {"ticker", "company_name", "offer_date"} for a name, or None.
+#: Lookup outcomes. `no_data` is an ANSWER (Renaissance has no IPO on record for
+#: this name); `inconclusive` means we never got one — throttled, offline, no key.
+#: Collapsing the two is the "absent data is not a finding" trap the sibling
+#: delisted_check was hardened against on 2026-07-25: on 2026-07-28 a burst of
+#: HTTP 429s was reported to the operator as "no IPO on record: 9" when only 3
+#: of those were real. The cache was always right — it never stored a 429 — but
+#: the summary was not, and a summary that under-reports its own ignorance is how
+#: a name silently never gets an offer date.
+STATUS_OK = "ok"
+STATUS_NO_DATA = "no_data"
+STATUS_INCONCLUSIVE = "inconclusive"
 
-    ``offer_date`` is an ISO 'YYYY-MM-DD' string (the immutable fact). Prefers the
-    CIK query when a CIK is supplied (the API's most reliable key), else ticker.
-    Results are cached by **ticker** (the stable universe key) effectively forever,
-    INCLUDING an authoritative 404 ("no IPO on record") so it is never re-hit.
+
+def fetch_ipo_date_ex(ticker, api_key, cik=None, use_cache=True):
+    """Return ``(status, payload)`` — the honest form of :func:`fetch_ipo_date`.
+
+    ``status`` is one of ``STATUS_OK`` / ``STATUS_NO_DATA`` / ``STATUS_INCONCLUSIVE``.
+    ``payload`` is the result dict when ``ok``, else ``None``.
+
+    Prefers the CIK query when a CIK is supplied (the API's most reliable key).
+    Results are cached by **ticker** effectively forever, INCLUDING an authoritative
+    404, so a resolved-or-known-empty ticker is never re-hit. An ``inconclusive``
+    result is never cached and never counted against quota, so the next run retries.
 
     Raises RenaissanceBudgetError if a network call would exceed the monthly cap.
-    A transient failure returns None and is NOT cached (so the next run retries).
     """
     ticker = (ticker or "").strip()
     if not ticker:
-        return None
+        return STATUS_INCONCLUSIVE, None
     if not api_key:
         logger.warning("RENAISSANCE_API_KEY not set — skipping IPO-date lookup for %s", ticker)
-        return None
+        return STATUS_INCONCLUSIVE, None
 
     if use_cache:
         cached = cache_get(IPO_CACHE_NS, ticker, IPO_CACHE_TTL_HOURS)
         if cached is not None:
-            return cached if cached.get("offer_date") else None
+            if cached.get("offer_date"):
+                return STATUS_OK, cached
+            return STATUS_NO_DATA, None
 
     if calls_this_month() >= MONTHLY_CALL_CAP:
         raise RenaissanceBudgetError(
@@ -197,7 +214,7 @@ def fetch_ipo_date(ticker, api_key, cik=None, use_cache=True):
         resp = _request(params, api_key)
     except Exception as e:  # noqa: BLE001 — transient; surface and keep going, don't cache
         log_exception(logger, f"Renaissance IPO lookup failed for {ticker}", e)
-        return None
+        return STATUS_INCONCLUSIVE, None
 
     # 404 = authenticated "no IPO on record" -> counts against quota AND is cached.
     if resp.status_code == 404:
@@ -205,19 +222,20 @@ def fetch_ipo_date(ticker, api_key, cik=None, use_cache=True):
         empty = {"ticker": ticker, "company_name": "", "offer_date": None}
         if use_cache:
             cache_set(IPO_CACHE_NS, ticker, empty)
-        return None
+        return STATUS_NO_DATA, None
 
     if resp.status_code != 200:
-        # 401/403/429/5xx — treat as transient: don't count, don't cache.
+        # 401/403/429/5xx — we learned nothing: don't count, don't cache, don't
+        # let it masquerade as an answer.
         logger.warning("Renaissance IPO lookup for %s returned HTTP %s", ticker, resp.status_code)
-        return None
+        return STATUS_INCONCLUSIVE, None
 
     _record_call()
     try:
         body = resp.json()
     except ValueError:
         logger.warning("Renaissance IPO lookup for %s returned non-JSON 200", ticker)
-        return None
+        return STATUS_INCONCLUSIVE, None
 
     offer = _parse_offer_date(body.get("offerDate"))
     result = {
@@ -227,4 +245,16 @@ def fetch_ipo_date(ticker, api_key, cik=None, use_cache=True):
     }
     if use_cache:
         cache_set(IPO_CACHE_NS, ticker, result)
-    return result if result["offer_date"] else None
+    # A 200 whose offerDate is absent/unparseable IS an answer: the API knows the
+    # company and has no offer date for it.
+    return (STATUS_OK, result) if result["offer_date"] else (STATUS_NO_DATA, None)
+
+
+def fetch_ipo_date(ticker, api_key, cik=None, use_cache=True):
+    """Return {"ticker", "company_name", "offer_date"} for a name, or None.
+
+    Back-compat wrapper over :func:`fetch_ipo_date_ex`. Prefer ``_ex`` in new code —
+    this form cannot distinguish "no IPO on record" from "we were throttled".
+    """
+    _status, payload = fetch_ipo_date_ex(ticker, api_key, cik=cik, use_cache=use_cache)
+    return payload
