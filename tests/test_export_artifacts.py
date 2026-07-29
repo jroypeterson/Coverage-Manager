@@ -745,3 +745,55 @@ def test_acceptance_catches_a_ticker_in_two_position_states(tmp_path):
     assert any("AAPL" in p and "in 2 position states" in p for p in problems), problems
     with pytest.raises(ExportAcceptanceError):
         check_exports(tmp_path)
+
+
+def test_acceptance_never_raises_on_a_malformed_position_state_shape(tmp_path):
+    """check_exports(strict=False) is called by the weekly pipeline and must
+    NEVER raise - a diagnostic that crashes is an outage, not a diagnostic.
+
+    Found by probing shapes rather than reading code: `null` and a bare JSON
+    number both raised TypeError from `{str(t) for t in entries}`, and a bare
+    JSON string iterated into individual CHARACTERS, silently producing a
+    plausible-looking ticker set."""
+    import json
+
+    from universe.export_acceptance import check_exports
+
+    for payload, label in [("null", "null"), ("42", "number"),
+                           (json.dumps("AAPL"), "bare string"),
+                           (json.dumps([1, 2]), "list of ints")]:
+        d = tmp_path / label.replace(" ", "_")
+        d.mkdir()
+        (d / "universe.csv").write_text(
+            "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+        (d / "positions_and_researching.csv").write_text(
+            "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+        (d / "portfolio.json").write_text(payload, encoding="utf-8")
+        for f in ("researching.json", "following_for_interest.json",
+                  "ready_to_buy.json", "ready_to_short.json"):
+            (d / f).write_text("[]", encoding="utf-8")
+        problems = check_exports(d, strict=False)   # must not raise
+        assert problems, f"{label} produced no problem at all"
+        assert any("portfolio.json" in p for p in problems), (label, problems)
+
+
+def test_acceptance_accepts_both_production_and_list_state_shapes(tmp_path):
+    """Production writes {TICKER: {...}}; some fixtures use a plain list. Both
+    are legitimate and must yield the same ticker set."""
+    import json
+
+    from universe.export_acceptance import check_exports
+
+    for payload, label in [(json.dumps({"AAPL": {"position": "Portfolio"}}), "dict"),
+                           (json.dumps(["AAPL"]), "list")]:
+        d = tmp_path / label
+        d.mkdir()
+        (d / "universe.csv").write_text(
+            "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+        (d / "positions_and_researching.csv").write_text(
+            "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+        (d / "portfolio.json").write_text(payload, encoding="utf-8")
+        for f in ("researching.json", "following_for_interest.json",
+                  "ready_to_buy.json", "ready_to_short.json"):
+            (d / f).write_text("[]", encoding="utf-8")
+        assert check_exports(d) == [], label

@@ -210,7 +210,25 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
             except (OSError, ValueError) as e:
                 problems.append(f"{fname}: unreadable as JSON ({e})")
                 continue
-            tickers = {str(t).strip() for t in entries} - {""}
+            # Only a dict (the production shape, {TICKER: {...}}) or a list of
+            # tickers is meaningful. Iterating anything else either RAISES -
+            # breaking the non-gating contract, turning a diagnostic into an
+            # outage - or silently succeeds on nonsense: a bare JSON string
+            # iterates into individual CHARACTERS and yields a plausible-looking
+            # ticker set. Both were live before this guard.
+            if not isinstance(entries, (dict, list)):
+                problems.append(
+                    f"{fname}: expected a JSON object or array of tickers, got "
+                    f"{type(entries).__name__} - the position-state partition "
+                    f"cannot be verified from this shape")
+                continue
+            tickers = {str(t).strip() for t in entries if isinstance(t, str)} - {""}
+            non_str = [t for t in entries if not isinstance(t, str)]
+            if non_str:
+                problems.append(
+                    f"{fname}: {len(non_str)} entry key(s) are not strings "
+                    f"(first is {type(non_str[0]).__name__}) - these cannot be "
+                    f"tickers, so the partition check would silently under-count")
             state_sets[fname] = tickers
             for t in tickers:
                 seen_in.setdefault(t, []).append(fname)
