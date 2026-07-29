@@ -36,15 +36,21 @@ class ExportAcceptanceError(RuntimeError):
 
 
 # (filename, join column, status file, status field holding the expected row
-#  count, minimum row count). `min_rows=1` marks artifacts that can never be
-#  legitimately empty: a header-only universe.csv has no BOM and no blank keys —
-#  it is simply EMPTY, and every consumer joining on it gets nothing.
+#  count, minimum row count, REQUIRED). `min_rows=1` marks artifacts that can
+#  never be legitimately empty: a header-only universe.csv has no BOM and no
+#  blank keys — it is simply EMPTY, and every consumer joining on it gets
+#  nothing. `required` is a SEPARATE fact from `min_rows`: "may not be empty"
+#  and "may not be absent" are different contracts, and inferring one from the
+#  other is how an absent universe.csv slipped through every check below
+#  (Codex round 1, 2026-07-28).
+#
 #  watchlist.csv is a deprecated filtered subset (Portfolio ∪ Researching), so
-#  zero rows there is unlikely but not a contract violation by itself.
-CHECKS: tuple[tuple[str, str, str | None, str | None, int], ...] = (
-    ("universe.csv", "Ticker", "universe_status.json", "row_count", 1),
-    ("positions_and_researching.csv", "Ticker", "positions_status.json", "entry_count", 1),
-    ("watchlist.csv", "Ticker", "watchlist_status.json", "entry_count", 0),
+#  it may legitimately be both empty and absent.
+CHECKS: tuple[tuple[str, str, str | None, str | None, int, bool], ...] = (
+    ("universe.csv", "Ticker", "universe_status.json", "row_count", 1, True),
+    ("positions_and_researching.csv", "Ticker", "positions_status.json",
+     "entry_count", 1, True),
+    ("watchlist.csv", "Ticker", "watchlist_status.json", "entry_count", 0, False),
 )
 
 # JSON artifact -> status file + field that claims its entry count.
@@ -98,12 +104,20 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
     # Ticker sets collected for the cross-artifact checks below. `None` means
     # the artifact is absent — a comparison that cannot be made has no result.
     csv_tickers: dict[str, set[str] | None] = {}
-    csv_rowcounts: dict[str, int] = {}
 
-    for fname, key, status_file, count_field, min_rows in CHECKS:
+    for fname, key, status_file, count_field, min_rows, required in CHECKS:
         p = exports_dir / fname
         if not p.exists():
             csv_tickers[fname] = None
+            if required:
+                # An absent required artifact is the worst state, not a neutral
+                # one: there is nothing to misread, so consumers silently keep
+                # using whatever stale copy is already on their disk. Skipping
+                # quietly here also skipped every downstream check.
+                problems.append(
+                    f"{fname}: MISSING from the published exports - consumers will "
+                    f"silently read a stale copy, and every check that depends on "
+                    f"this artifact was skipped")
             continue                      # optional/deprecated artifacts may be absent
 
         parsed = _read_csv_strict(p, problems)
@@ -126,7 +140,6 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
             problems.append(f"{fname}: {blank} of {len(rows)} rows have a blank '{key}' - "
                             f"every consumer joining on it gets nothing")
         csv_tickers[fname] = {(r.get(key) or "").strip() for r in rows} - {""}
-        csv_rowcounts[fname] = len(rows)
 
         if status_file and count_field:
             sp = exports_dir / status_file
@@ -175,34 +188,56 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
     # The five per-state JSONs partition positions_and_researching.csv.
     pos_tickers = csv_tickers.get("positions_and_researching.csv")
     if pos_tickers is not None:
-        state_counts: dict[str, int] = {}
-        all_present = True
+        # A partition must be checked AS a partition. The previous version
+        # compared a SUM of counts against the row count, which two different
+        # breakages can satisfy by coincidence: put one ticker in two states and
+        # drop another, and the total still matches while a name has silently
+        # vanished (Codex round 1, 2026-07-28). Set equality plus pairwise
+        # disjointness cannot be fooled that way, and it can name the offenders.
+        state_sets: dict[str, set[str]] = {}
+        seen_in: dict[str, list[str]] = {}
         for fname in POSITION_STATE_FILES:
             p = exports_dir / fname
             if not p.exists():
-                all_present = False
+                # Never let "I could not check" read as "I checked and it is
+                # fine" - inconclusive is not clean.
+                problems.append(
+                    f"{fname}: MISSING - the position-state partition cannot be "
+                    f"verified, so a lost or duplicated position would go unseen")
                 continue
             try:
                 entries = json.loads(p.read_text(encoding="utf-8"))
             except (OSError, ValueError) as e:
                 problems.append(f"{fname}: unreadable as JSON ({e})")
-                all_present = False
                 continue
-            state_counts[fname] = len(entries)
-            extras = sorted(set(entries) - pos_tickers)
+            tickers = {str(t).strip() for t in entries} - {""}
+            state_sets[fname] = tickers
+            for t in tickers:
+                seen_in.setdefault(t, []).append(fname)
+            extras = sorted(tickers - pos_tickers)
             if extras:
                 problems.append(
                     f"{fname}: {len(extras)} ticker(s) not in "
                     f"positions_and_researching.csv: {extras[:10]}")
-        if all_present:
-            total = sum(state_counts.values())
-            pos_rows = csv_rowcounts.get("positions_and_researching.csv", 0)
-            if total != pos_rows:
-                detail = ", ".join(f"{k}={v}" for k, v in sorted(state_counts.items()))
+
+        # Only assert the partition when every state file was actually read;
+        # otherwise the gaps above are the finding.
+        if len(state_sets) == len(POSITION_STATE_FILES):
+            union = set().union(*state_sets.values()) if state_sets else set()
+            missing = sorted(pos_tickers - union)
+            if missing:
                 problems.append(
-                    f"position-state JSONs sum to {total} entries ({detail}) but "
-                    f"positions_and_researching.csv has {pos_rows} rows - at "
-                    f"least one state file lost or duplicated rows")
+                    f"{len(missing)} ticker(s) in positions_and_researching.csv are "
+                    f"missing from every position-state JSON - they exist in the CSV "
+                    f"but no state file claims them: {missing[:10]}")
+            duped = sorted(t for t, files in seen_in.items() if len(files) > 1)
+            if duped:
+                detail = "; ".join(
+                    f"{t} in {len(seen_in[t])} position states "
+                    f"({', '.join(sorted(seen_in[t]))})" for t in duped[:5])
+                problems.append(
+                    f"{len(duped)} ticker(s) appear in more than one position-state "
+                    f"JSON - the states must be mutually exclusive: {detail}")
 
     if problems and strict:
         raise ExportAcceptanceError(

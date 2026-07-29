@@ -1356,8 +1356,31 @@ five per-state position JSONs must partition `positions_and_researching.csv` (ke
 of its tickers, counts summing to its row count). The module stays stdlib-csv/json only and
 imports nothing from the writers — keep it that way, so it cannot share a bug with them.
 
-**When adding an export:** add it to `CHECKS` in `export_acceptance.py` with its join key.
-An artifact nothing validates is an artifact that will eventually ship empty.
+**Hardened again the same day (Codex adversarial round 1).** The extension above shipped with
+three defects **of the exact class the module exists to catch** — acceptance reporting clean while
+the exports were broken. All three fixed, each pinned by a test written first and confirmed failing:
+
+1. **A missing required artifact was treated as optional.** An absent `universe.csv` or
+   `positions_and_researching.csv` recorded `None` and `continue`d, so every downstream check was
+   skipped and `check_exports(strict=False)` — the mode the weekly pipeline calls — returned `[]`.
+   An absent required artifact is the *worst* state, not a neutral one: there is nothing to misread,
+   so consumers silently keep using whatever stale copy is on their disk. `CHECKS` now carries an
+   explicit **`required`** flag, deliberately separate from `min_rows` — "may not be empty" and "may
+   not be absent" are different contracts, and inferring one from the other is what hid this.
+   `watchlist.csv` stays optional (deprecated filtered subset, legitimately absent or empty).
+2. **A missing position-state JSON was silently ignored** — it set `all_present = False`, appended
+   no problem, and skipped the partition check entirely. Now reported: *"I could not check"* must
+   never read as *"I checked and it is fine."*
+3. **The partition check was fooled by duplicate membership.** It compared a **sum of counts**
+   against the row count, which two breakages satisfy by coincidence: put `AAPL` in two states and
+   drop `MRNA`, and the total still matches while a name has silently vanished. A partition is now
+   verified **as a partition** — set equality in both directions plus pairwise disjointness — and
+   it *names* the missing and double-assigned tickers rather than reporting a totals mismatch.
+
+**When adding an export:** add it to `CHECKS` in `export_acceptance.py` with its join key **and its
+`required` flag**. An artifact nothing validates is an artifact that will eventually ship empty —
+and a check that can be skipped, short-circuited, or satisfied by a coincidence is not validation
+either.
 
 ## Case-only ticker collisions (validation warning, 2026-07-16)
 

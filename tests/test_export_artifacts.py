@@ -462,10 +462,20 @@ def test_acceptance_catches_a_row_count_that_contradicts_its_status_file(tmp_pat
 
 
 def test_acceptance_passes_on_a_healthy_export(tmp_path):
+    """Fixture completed 2026-07-28: positions_and_researching.csv is now an
+    explicitly REQUIRED artifact, so a fixture carrying only universe.csv is an
+    incomplete publish, not a healthy one. The check is right; the old fixture
+    was under-specified."""
     from universe.export_acceptance import check_exports
 
     (tmp_path / "universe.csv").write_text(
         "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+    for f in ("researching.json", "following_for_interest.json",
+              "ready_to_buy.json", "ready_to_short.json"):
+        (tmp_path / f).write_text("[]", encoding="utf-8")
     assert check_exports(tmp_path) == []
 
 
@@ -559,7 +569,12 @@ def test_acceptance_catches_a_positions_ticker_missing_from_the_universe(tmp_pat
 
 def test_acceptance_catches_position_jsons_that_do_not_partition_the_csv(tmp_path):
     """The five per-state JSON files partition positions_and_researching.csv.
-    A sum that disagrees means at least one state file lost rows."""
+
+    Assertion updated 2026-07-28 (Codex round 1): the check was count-based
+    ("sums to N but the CSV has M"), which two breakages could satisfy by
+    coincidence. It is now set-based, so this scenario is reported by NAMING the
+    ticker that vanished (MRNA) rather than by a totals mismatch. Strictly more
+    informative, and it cannot be fooled by a duplicate covering a loss."""
     import json
 
     import pytest
@@ -576,7 +591,7 @@ def test_acceptance_catches_position_jsons_that_do_not_partition_the_csv(tmp_pat
     (tmp_path / "following_for_interest.json").write_text(json.dumps({}), encoding="utf-8")
     (tmp_path / "ready_to_buy.json").write_text(json.dumps({}), encoding="utf-8")
     (tmp_path / "ready_to_short.json").write_text(json.dumps({}), encoding="utf-8")
-    with pytest.raises(ExportAcceptanceError, match="1 .*positions_and_researching.csv has 2"):
+    with pytest.raises(ExportAcceptanceError, match=r"MRNA"):
         check_exports(tmp_path)
 
 
@@ -639,3 +654,94 @@ def test_acceptance_passes_on_a_fully_consistent_export_set(tmp_path):
     (tmp_path / "watchlist_status.json").write_text(
         json.dumps({"entry_count": 1}), encoding="utf-8")
     assert check_exports(tmp_path) == []
+
+
+# --- acceptance: Codex adversarial round 1, 2026-07-28 -----------------------
+# Three High findings, all the same class: the module that exists to catch a
+# broken publish reporting success could ITSELF report clean while the exports
+# were broken. Each test below was written first and confirmed failing.
+
+
+def test_acceptance_catches_a_MISSING_required_export(tmp_path):
+    """An absent required artifact is worse than a malformed one: there is
+    nothing to misread, so consumers silently use whatever stale copy is on
+    disk. Previously the loop recorded None and continued, so every downstream
+    check was skipped and check_exports returned []."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    # positions + its status file exist; universe.csv does not.
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match=r"universe\.csv: MISSING"):
+        check_exports(tmp_path)
+
+    # And it must be reported in non-strict mode too - that is the mode the
+    # weekly pipeline calls, where silence reads as success.
+    (tmp_path / "positions_and_researching.csv").unlink()
+    problems = check_exports(tmp_path, strict=False)
+    assert any("universe.csv: MISSING" in p for p in problems)
+    assert any("positions_and_researching.csv: MISSING" in p for p in problems)
+
+
+def test_acceptance_tolerates_a_missing_OPTIONAL_export(tmp_path):
+    """watchlist.csv is a deprecated filtered subset and may legitimately be
+    absent or empty. Requiredness must be explicit, not inferred."""
+    from universe.export_acceptance import check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+    for f in ("researching.json", "following_for_interest.json",
+              "ready_to_buy.json", "ready_to_short.json"):
+        (tmp_path / f).write_text("[]", encoding="utf-8")
+    assert check_exports(tmp_path) == []
+
+
+def test_acceptance_catches_a_missing_position_state_file(tmp_path):
+    """researching.json absent set all_present=False, appended NO problem, and
+    skipped the total check - so a broken partition passed acceptance."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+    # researching.json deliberately absent
+    for f in ("following_for_interest.json", "ready_to_buy.json",
+              "ready_to_short.json"):
+        (tmp_path / f).write_text("[]", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match=r"researching\.json: MISSING"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_ticker_in_two_position_states(tmp_path):
+    """The count-based partition check was fooled by duplicate membership:
+    AAPL in two states made the sum match while MRNA had vanished. A partition
+    must be verified as a partition - set equality plus pairwise disjointness."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+    (tmp_path / "researching.json").write_text('["AAPL"]', encoding="utf-8")
+    for f in ("following_for_interest.json", "ready_to_buy.json",
+              "ready_to_short.json"):
+        (tmp_path / f).write_text("[]", encoding="utf-8")
+    problems = check_exports(tmp_path, strict=False)
+    # Both halves must be named: the vanished ticker AND the double-assignment.
+    assert any("MRNA" in p and "missing from every position-state" in p
+               for p in problems), problems
+    assert any("AAPL" in p and "in 2 position states" in p for p in problems), problems
+    with pytest.raises(ExportAcceptanceError):
+        check_exports(tmp_path)
