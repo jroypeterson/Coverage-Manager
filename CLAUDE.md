@@ -1377,10 +1377,58 @@ the exports were broken. All three fixed, each pinned by a test written first an
    verified **as a partition** — set equality in both directions plus pairwise disjointness — and
    it *names* the missing and double-assigned tickers rather than reporting a totals mismatch.
 
+**Fixed AS A CLASS 2026-07-29 (Codex adversarial round 3).** The unifying finding: the five
+defects above were each fixed only on the artifact class that *exposed* them — the position-state
+JSONs — while the identical bug classes stayed live on the **CSV and status-file siblings**. Three
+rules now govern the module, stated in its docstring so the next fix cannot land on one sibling and
+miss four:
+
+1. **`check_exports(dir, strict=False)` must NEVER raise** — it is what the weekly pipeline calls,
+   and a diagnostic that crashes is an outage. Four confirmed crashes are now findings: a
+   `universe.csv` that is **locked, permission-denied, or a directory** (`exists()` is true for all
+   three; **`exports/` lives in Dropbox, which briefly locks files mid-sync**, so this was the
+   likeliest of the lot), a **CSV field over csv's 131,072-char limit** (one bloated `Notes` cell —
+   reported, not worked around, because every consumer using stock csv hits the same wall),
+   **deeply-nested JSON** (`RecursionError` is neither `OSError` nor `ValueError`, so it escaped
+   every `json.loads` site), and a **non-object status file**. The BOM is now sniffed with
+   `open('rb').read(3)` instead of `read_bytes()[:3]`, which loaded a multi-MB file to inspect three
+   bytes.
+2. **A wrong SHAPE is a recorded problem naming the shape** — never a crash, never a silent skip.
+   `positions_status.json` containing `null` (the classic truncated/failed atomic write) raised
+   `AttributeError`; `universe_metadata.json` as a bare number raised `TypeError`, and as a bare
+   *string* silently measured its **character count** against `ticker_count`.
+3. **"I could not check" must never read as "I checked and it is fine."** Deleting
+   `universe_metadata.json` returned `[]` (so `JSON_COUNT_CHECKS` grew a `required` flag mirroring
+   `CHECKS`); an absent `universe_status.json` silently skipped the row-count cross-check; and a
+   **BOM'd `positions_status.json` claiming 84 entries against a 1-row CSV shipped CLEAN** — the
+   parse failure was swallowed with no problem recorded, which is the founding incident's own
+   failure mode on the status side. A **fourth** instance of the class, found while in there: a
+   status file that parses fine but whose count field is **absent or non-numeric** (`"84"`, `null`,
+   `true`) disabled the cross-check with nothing said. Parses were also **split per file** — both
+   were done in one `try`, so a corrupt `universe_status.json` was reported as
+   *"universe_metadata.json: unreadable as JSON"*, sending the operator to the wrong file.
+
+Two further changes: the **duplicate half** of the partition check moved *outside* the
+"all five state files parsed" gate — a ticker in two files that **both parsed** is double-assigned
+whatever the unreadable file contains, so there is zero false-positive risk (the missing half stays
+gated, and `NOT VERIFIED` is unchanged); and every problem string is **ASCII-sanitized at the exit**
+(`_ascii`), because company names and tickers from a global universe reach these messages and a
+cp1252 console would die at the moment it is reporting why the publish is broken.
+
+`reporting_calendar.json` was added to `JSON_COUNT_CHECKS` **but not marked required**, deliberately:
+every `required=True` artifact shares the property that its absence makes a consumer silently serve
+**wrong** data from a stale copy, whereas transcripts' documented contract for the calendar is
+zero-false-skip — an absent calendar degrades to a normal fetch (correct, merely expensive). What it
+must never do is *disagree with its status file* while present, and that is now checked. Flip one
+flag if the owner rules otherwise. `watchlist.json` / `manifest.json` stay unchecked (deprecated /
+directory file).
+
 **When adding an export:** add it to `CHECKS` in `export_acceptance.py` with its join key **and its
 `required` flag**. An artifact nothing validates is an artifact that will eventually ship empty —
 and a check that can be skipped, short-circuited, or satisfied by a coincidence is not validation
-either.
+either. A published artifact's **status file is part of the same contract**: if the artifact is
+present, an absent status file is a finding (`CsvCheck` deliberately has no separate
+`status_required` field), and an absent *optional* artifact takes its status file with it.
 
 ## Case-only ticker collisions (validation warning, 2026-07-16)
 

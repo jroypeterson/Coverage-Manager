@@ -465,13 +465,26 @@ def test_acceptance_passes_on_a_healthy_export(tmp_path):
     """Fixture completed 2026-07-28: positions_and_researching.csv is now an
     explicitly REQUIRED artifact, so a fixture carrying only universe.csv is an
     incomplete publish, not a healthy one. The check is right; the old fixture
-    was under-specified."""
+    was under-specified.
+
+    Completed again 2026-07-29 (round 3) for the same reason on the JSON side:
+    a published CSV without the status file that describes it, and a publish
+    without universe_metadata.json, are both now findings — every consumer's
+    read pattern starts by asserting on those files."""
+    import json
+
     from universe.export_acceptance import check_exports
 
     (tmp_path / "universe.csv").write_text(
         "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    (tmp_path / "universe_status.json").write_text(
+        json.dumps({"row_count": 1, "ticker_count": 1}), encoding="utf-8")
+    (tmp_path / "universe_metadata.json").write_text(
+        json.dumps({"AAPL": {}}), encoding="utf-8")
     (tmp_path / "positions_and_researching.csv").write_text(
         "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "positions_status.json").write_text(
+        json.dumps({"entry_count": 1}), encoding="utf-8")
     (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
     for f in ("researching.json", "following_for_interest.json",
               "ready_to_buy.json", "ready_to_short.json"):
@@ -687,13 +700,25 @@ def test_acceptance_catches_a_MISSING_required_export(tmp_path):
 
 def test_acceptance_tolerates_a_missing_OPTIONAL_export(tmp_path):
     """watchlist.csv is a deprecated filtered subset and may legitimately be
-    absent or empty. Requiredness must be explicit, not inferred."""
+    absent or empty. Requiredness must be explicit, not inferred.
+
+    An absent optional artifact takes its status file with it - that is why
+    watchlist_status.json is not required here either, while the two status
+    files below (whose artifacts ARE published) are."""
+    import json
+
     from universe.export_acceptance import check_exports
 
     (tmp_path / "universe.csv").write_text(
         "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    (tmp_path / "universe_status.json").write_text(
+        json.dumps({"row_count": 1, "ticker_count": 1}), encoding="utf-8")
+    (tmp_path / "universe_metadata.json").write_text(
+        json.dumps({"AAPL": {}}), encoding="utf-8")
     (tmp_path / "positions_and_researching.csv").write_text(
         "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "positions_status.json").write_text(
+        json.dumps({"entry_count": 1}), encoding="utf-8")
     (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
     for f in ("researching.json", "following_for_interest.json",
               "ready_to_buy.json", "ready_to_short.json"):
@@ -790,8 +815,16 @@ def test_acceptance_accepts_both_production_and_list_state_shapes(tmp_path):
         d.mkdir()
         (d / "universe.csv").write_text(
             "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+        # Status + metadata files added 2026-07-29 (round 3): a published CSV
+        # without the status file describing it is now a finding.
+        (d / "universe_status.json").write_text(
+            json.dumps({"row_count": 1, "ticker_count": 1}), encoding="utf-8")
+        (d / "universe_metadata.json").write_text(
+            json.dumps({"AAPL": {}}), encoding="utf-8")
         (d / "positions_and_researching.csv").write_text(
             "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+        (d / "positions_status.json").write_text(
+            json.dumps({"entry_count": 1}), encoding="utf-8")
         (d / "portfolio.json").write_text(payload, encoding="utf-8")
         for f in ("researching.json", "following_for_interest.json",
                   "ready_to_buy.json", "ready_to_short.json"):
@@ -848,3 +881,288 @@ def test_partition_not_verified_also_fires_for_a_missing_or_malformed_state_file
             (d / "researching.json").write_text(payload, encoding="utf-8")
         problems = check_exports(d, strict=False)
         assert any("NOT VERIFIED" in p for p in problems), (label, problems)
+
+
+# --- acceptance: Codex adversarial round 3, 2026-07-29 -----------------------
+# The unifying finding: five earlier defects were fixed only on the artifact
+# class that exposed them (the position-state JSONs), and the identical bug
+# classes were still live on the CSV and status-file siblings. They are fixed
+# here AS A CLASS. Every test below was written first and confirmed failing
+# against b50f0b5.
+#
+# Three contracts are under test, and only the last is about a wrong answer:
+#   F1  check_exports(strict=False) must NEVER raise. It is the mode the weekly
+#       pipeline calls; a diagnostic that crashes is an outage.
+#   F2  A payload of the wrong SHAPE is a recorded problem naming the shape -
+#       never a crash, never a silent skip.
+#   F3  "I could not check" must never read as "I checked and it is fine."
+
+
+def _healthy_exports(d):
+    """Write a complete, mutually consistent published export set into `d`.
+
+    One helper, because the module's whole contract is that a HEALTHY publish
+    reports NOTHING: each test below perturbs exactly one file of this set, so
+    any problem it reports can only have come from that perturbation.
+
+    watchlist.* is deliberately absent - it is the deprecated optional artifact.
+    """
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (d / "universe_status.json").write_text(
+        json.dumps({"row_count": 2, "ticker_count": 2}), encoding="utf-8")
+    (d / "universe_metadata.json").write_text(
+        json.dumps({"AAPL": {}, "MRNA": {}}), encoding="utf-8")
+    (d / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (d / "positions_status.json").write_text(
+        json.dumps({"entry_count": 2}), encoding="utf-8")
+    (d / "portfolio.json").write_text(json.dumps({"AAPL": {}}), encoding="utf-8")
+    (d / "researching.json").write_text(json.dumps({"MRNA": {}}), encoding="utf-8")
+    for f in ("following_for_interest.json", "ready_to_buy.json",
+              "ready_to_short.json"):
+        (d / f).write_text("{}", encoding="utf-8")
+    (d / "reporting_calendar.json").write_text(
+        json.dumps({"AAPL": {}, "MRNA": {}}), encoding="utf-8")
+    (d / "reporting_calendar_status.json").write_text(
+        json.dumps({"ticker_count": 2}), encoding="utf-8")
+    return d
+
+
+def test_the_healthy_fixture_reports_nothing(tmp_path):
+    """The control. A fix that false-alarms on a healthy publish is worse than
+    the bug it fixes: a weekly non-gating alarm that cries wolf gets ignored,
+    which silently undoes this module's whole value."""
+    from universe.export_acceptance import check_exports
+
+    assert check_exports(_healthy_exports(tmp_path)) == []
+
+
+# --- F1: strict=False must never raise ---------------------------------------
+
+
+def test_acceptance_never_raises_when_a_published_csv_cannot_be_OPENED(tmp_path):
+    """exports/ lives in Dropbox, which briefly LOCKS files mid-sync, so the
+    weekly pipeline racing a sync turns the diagnostic into an outage.
+
+    `exists()` is true for a locked file, a permission-denied file, and a
+    directory alike; only the open tells them apart. A directory is the
+    portable stand-in - it raises PermissionError from the same call.
+    """
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "universe.csv").unlink()
+    (d / "universe.csv").mkdir()
+
+    problems = check_exports(d, strict=False)       # must not raise
+    assert any("universe.csv" in p for p in problems), problems
+
+
+def test_acceptance_never_raises_on_an_oversized_csv_field(tmp_path):
+    """One bloated `Notes` cell (>131,072 chars) makes `list(reader)` raise
+    csv.Error - which `_read_csv_strict` caught nothing of."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "positions_and_researching.csv").write_text(
+        "Ticker,Position,Notes\nAAPL,Portfolio," + ("x" * 200000) +
+        "\nMRNA,Researching,ok\n", encoding="utf-8")
+
+    problems = check_exports(d, strict=False)       # must not raise
+    assert any("positions_and_researching.csv" in p for p in problems), problems
+
+
+def test_acceptance_never_raises_on_deeply_nested_json(tmp_path):
+    """RecursionError is neither OSError nor ValueError, so every json.loads
+    site in the module was unguarded against it. All three classes of JSON
+    artifact - state, status, metadata - are exercised."""
+    from universe.export_acceptance import check_exports
+
+    bomb = "[" * 100000 + "]" * 100000
+    for fname in ("portfolio.json", "positions_status.json",
+                  "universe_metadata.json"):
+        d = _healthy_exports(tmp_path / fname.replace(".", "_"))
+        (d / fname).write_text(bomb, encoding="utf-8")
+        problems = check_exports(d, strict=False)   # must not raise
+        assert any(fname in p for p in problems), (fname, problems)
+
+
+# --- F2: a wrong-shaped status/metadata payload is a finding, not a crash -----
+
+
+def test_acceptance_never_crashes_on_a_non_object_status_file(tmp_path):
+    """`positions_status.json` containing `null` is the classic truncated or
+    failed atomic write, and `.get(...)` on it raised AttributeError. The
+    isinstance guard added for the STATE files was never applied here."""
+    from universe.export_acceptance import check_exports
+
+    for status_file in ("positions_status.json", "universe_status.json"):
+        for payload, label in [("null", "null"), ("[]", "array"),
+                               ("42", "number"), (json.dumps("AAPL"), "string")]:
+            stem = status_file.split(".")[0]
+            d = _healthy_exports(tmp_path / (stem + "_" + label))
+            (d / status_file).write_text(payload, encoding="utf-8")
+            problems = check_exports(d, strict=False)   # must not raise
+            assert any(status_file in p for p in problems), (
+                status_file, label, problems)
+
+
+def test_acceptance_never_crashes_on_a_non_object_metadata_file(tmp_path):
+    """`universe_metadata.json` as a bare number raised TypeError from len();
+    as a bare STRING it silently measured its CHARACTER COUNT against
+    ticker_count - the character-iteration cousin the state-file guard exists
+    to prevent. Here "AA" has len 2 and ticker_count is 2, so it passed."""
+    from universe.export_acceptance import check_exports
+
+    for payload, label in [("42", "number"), ('"AA"', "string"),
+                           ("null", "null"), ("true", "bool")]:
+        d = _healthy_exports(tmp_path / ("meta_" + label))
+        (d / "universe_metadata.json").write_text(payload, encoding="utf-8")
+        problems = check_exports(d, strict=False)       # must not raise
+        assert any("universe_metadata.json" in p for p in problems), (
+            label, problems)
+
+
+# --- F3: clean-while-broken on the JSON / status side -------------------------
+
+
+def test_acceptance_catches_a_MISSING_universe_metadata(tmp_path):
+    """Three siblings key their whole run on this file. Deleting it returned
+    [] - `if not (p.exists() and sp.exists()): continue` treated the absence of
+    the artifact as nothing to say."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "universe_metadata.json").unlink()
+
+    problems = check_exports(d, strict=False)
+    assert any("universe_metadata.json" in p and "MISSING" in p
+               for p in problems), problems
+
+
+def test_acceptance_catches_a_MISSING_status_file(tmp_path):
+    """Every consumer's documented read pattern STARTS by asserting on the
+    status file. Absent, the row-count cross-check silently skipped (`if
+    sp.exists():` with no else)."""
+    from universe.export_acceptance import check_exports
+
+    for status_file in ("universe_status.json", "positions_status.json"):
+        d = _healthy_exports(tmp_path / status_file.split(".")[0])
+        (d / status_file).unlink()
+        problems = check_exports(d, strict=False)
+        assert any(status_file in p and "MISSING" in p for p in problems), (
+            status_file, problems)
+
+
+def test_acceptance_catches_a_BOM_prefixed_status_file(tmp_path):
+    """The founding incident was a BOM, and consumers do
+    `json.loads(path.read_text())` on this file - which chokes on a BOM. Yet a
+    BOM'd status file claiming entry_count 84 against a 2-row CSV shipped
+    CLEAN: the parse failure was swallowed by `except (OSError, ValueError):
+    expected = None` with no problem recorded."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "positions_status.json").write_bytes(
+        b"\xef\xbb\xbf" + json.dumps({"entry_count": 84}).encode("utf-8"))
+
+    problems = check_exports(d, strict=False)
+    assert any("positions_status.json" in p and "BOM" in p
+               for p in problems), problems
+
+
+def test_a_corrupt_status_file_names_the_STATUS_file_not_the_metadata(tmp_path):
+    """Misattribution sends the operator to the wrong file. Both files were
+    parsed inside ONE try, so a corrupt universe_status.json with a perfectly
+    healthy metadata file reported 'universe_metadata.json: unreadable as
+    JSON'."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "universe_status.json").write_text("{oops", encoding="utf-8")
+
+    problems = check_exports(d, strict=False)
+    assert any("universe_status.json" in p for p in problems), problems
+    assert not any("universe_metadata.json" in p for p in problems), problems
+
+
+def test_acceptance_catches_a_status_count_field_it_cannot_use(tmp_path):
+    """FOURTH instance of the same class, found while fixing the other three:
+    a status file that parses perfectly but whose count field is ABSENT or is
+    not a number silently disabled the cross-check - `if isinstance(expected,
+    int)` with no else. A count of "84" (string) is exactly what a hand-edited
+    or schema-drifted status file looks like, and it reported nothing at all.
+
+    `True` is an int in Python, so a boolean must be rejected explicitly."""
+    from universe.export_acceptance import check_exports
+
+    for payload, label in [('{"schema_version": 3}', "absent"),
+                           ('{"entry_count": "2"}', "string"),
+                           ('{"entry_count": null}', "null"),
+                           ('{"entry_count": true}', "bool")]:
+        d = _healthy_exports(tmp_path / ("count_" + label))
+        (d / "positions_status.json").write_text(payload, encoding="utf-8")
+        problems = check_exports(d, strict=False)
+        assert any("positions_status.json" in p and "entry_count" in p
+                   for p in problems), (label, problems)
+
+
+# --- design change: prove what can be proved ---------------------------------
+
+
+def test_a_double_assignment_is_reported_even_when_a_state_file_is_unreadable(
+        tmp_path):
+    """The all-five gate is right for the MISSING half - a ticker absent from
+    four readable files may sit in the fifth - but wrong for the DUPLICATE
+    half: a ticker present in two files that BOTH parsed is double-assigned
+    whatever the unreadable file contains. Zero false-positive risk.
+
+    Report what it can prove; stay silent only about what it cannot know."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "researching.json").write_text("{oops", encoding="utf-8")
+    (d / "ready_to_buy.json").write_text(json.dumps({"AAPL": {}}), encoding="utf-8")
+
+    problems = check_exports(d, strict=False)
+    assert any("AAPL" in p and "in 2 position states" in p
+               for p in problems), problems
+    # NOT VERIFIED still fires, and the missing-half stays suppressed.
+    assert any("NOT VERIFIED" in p for p in problems), problems
+    assert not any("missing from every position-state" in p
+                   for p in problems), problems
+
+
+def test_reporting_calendar_count_is_cross_checked(tmp_path):
+    """`reporting_calendar.json` gates transcripts' fetch-skip logic and was in
+    no check at all. Same free count-vs-status cross-check as
+    universe_metadata.json."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "reporting_calendar_status.json").write_text(
+        json.dumps({"ticker_count": 287}), encoding="utf-8")
+
+    problems = check_exports(d, strict=False)
+    assert any("reporting_calendar.json" in p and "claims 287" in p
+               for p in problems), problems
+
+
+def test_every_problem_string_is_ascii(tmp_path):
+    """The console this runs on is cp1252 and the universe is global: a
+    non-ASCII byte in the DATA kills the run at the moment it is trying to
+    report why. Sanitize the data, not just the format string."""
+    from universe.export_acceptance import check_exports
+
+    d = _healthy_exports(tmp_path)
+    (d / "universe.csv").write_text(
+        "Tick\xe9r,Name\nAAPL,Apple\n", encoding="utf-8")   # header lost 'Ticker'
+    (d / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nR\xd8DE,Portfolio\n", encoding="utf-8")
+
+    problems = check_exports(d, strict=False)
+    assert problems
+    for p in problems:
+        p.encode("ascii")       # raises UnicodeEncodeError if data leaked through
