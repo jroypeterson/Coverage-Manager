@@ -238,8 +238,23 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
                     f"{fname}: {len(extras)} ticker(s) not in "
                     f"positions_and_researching.csv: {extras[:10]}")
 
-        # Only assert the partition when every state file was actually read;
-        # otherwise the gaps above are the finding.
+        # Only assert the partition when every state file was actually read: a
+        # ticker "missing from every state file" would otherwise be a FALSE
+        # POSITIVE, since it may well be sitting in the file we could not parse.
+        #
+        # But staying silent about that is finding #2 in a new costume, which is
+        # exactly what an adversarial re-test found: with one state file corrupt
+        # AND a ticker genuinely unaccounted for, the only problem reported was
+        # "unreadable as JSON" - the partition simply went unverified and nothing
+        # said so. Suppressing a false positive is right; suppressing the fact
+        # that the check did not run is not. Inconclusive is not clean.
+        unread = [f for f in POSITION_STATE_FILES if f not in state_sets]
+        if unread:
+            problems.append(
+                f"position-state partition NOT VERIFIED - {len(unread)} of "
+                f"{len(POSITION_STATE_FILES)} state file(s) could not be read "
+                f"({', '.join(unread)}), so a lost or double-assigned position "
+                f"would go unseen. Fix those file(s) and re-run acceptance.")
         if len(state_sets) == len(POSITION_STATE_FILES):
             union = set().union(*state_sets.values()) if state_sets else set()
             missing = sorted(pos_tickers - union)

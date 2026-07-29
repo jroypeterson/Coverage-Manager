@@ -797,3 +797,54 @@ def test_acceptance_accepts_both_production_and_list_state_shapes(tmp_path):
                   "ready_to_buy.json", "ready_to_short.json"):
             (d / f).write_text("[]", encoding="utf-8")
         assert check_exports(d) == [], label
+
+
+def test_acceptance_says_so_when_the_partition_could_not_be_verified(tmp_path):
+    """Adversarial round 2: one unreadable state file silently disabled the
+    partition check - round 1's finding #2 in a new costume.
+
+    Suppressing the per-ticker "missing" report is CORRECT here (the ticker may
+    be inside the file we cannot parse, so naming it would be a false positive).
+    What was wrong is going quiet about the check not having run at all."""
+    from universe.export_acceptance import check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+    (tmp_path / "researching.json").write_text("{oops", encoding="utf-8")
+    for f in ("following_for_interest.json", "ready_to_buy.json",
+              "ready_to_short.json"):
+        (tmp_path / f).write_text("[]", encoding="utf-8")
+
+    problems = check_exports(tmp_path, strict=False)
+    assert any("unreadable as JSON" in p for p in problems), problems
+    assert any("NOT VERIFIED" in p and "researching.json" in p
+               for p in problems), problems
+    # And it must NOT claim MRNA vanished - it may be in the unreadable file.
+    assert not any("MRNA" in p and "missing from every" in p
+                   for p in problems), problems
+
+
+def test_partition_not_verified_also_fires_for_a_missing_or_malformed_state_file(tmp_path):
+    """The same 'could not verify' signal must cover all three skip paths:
+    absent, unparseable, and wrong-shape."""
+    import json
+
+    from universe.export_acceptance import check_exports
+
+    for label, payload in [("absent", None), ("wrong shape", json.dumps(42))]:
+        d = tmp_path / label.replace(" ", "_")
+        d.mkdir()
+        (d / "universe.csv").write_text("Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+        (d / "positions_and_researching.csv").write_text(
+            "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+        (d / "portfolio.json").write_text('["AAPL"]', encoding="utf-8")
+        for f in ("following_for_interest.json", "ready_to_buy.json",
+                  "ready_to_short.json"):
+            (d / f).write_text("[]", encoding="utf-8")
+        if payload is not None:
+            (d / "researching.json").write_text(payload, encoding="utf-8")
+        problems = check_exports(d, strict=False)
+        assert any("NOT VERIFIED" in p for p in problems), (label, problems)
