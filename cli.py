@@ -121,6 +121,29 @@ def build_parser():
         help="Bypass the 7-day source cache and refetch.",
     )
 
+    vii_parser = subparsers.add_parser(
+        "verify-isin-issuers",
+        help=(
+            "Identity-check every stored ISIN against the issuer name OpenFIGI "
+            "maps it to (the prefix guard is a country check, not an identity "
+            "check). Read-only; conflicts are evidence for a human call. "
+            "Verdicts are ok / conflict / inconclusive - an unreachable API is "
+            "inconclusive, never clean."
+        ),
+    )
+    vii_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the ISIN->name cache and refetch from OpenFIGI.",
+    )
+    vii_parser.add_argument(
+        "--sample", type=int, default=None,
+        help="Check only the first N ISIN-bearing rows (bounds a first run).",
+    )
+    vii_parser.add_argument(
+        "--tickers", nargs="*", default=None,
+        help="Restrict the check to these tickers.",
+    )
+
     crsp_parser = subparsers.add_parser(
         "crsp-snapshot",
         help=(
@@ -491,6 +514,33 @@ def main():
         # Exit 2 on a real conflict OR on a run that learned nothing, so a
         # scheduled invocation cannot report silence as agreement.
         raise SystemExit(2 if (result.conflicts or not result.ok) else 0)
+    elif args.command == "verify-isin-issuers":
+        from universe import isin_identity
+
+        result = isin_identity.main(
+            tickers=args.tickers, sample=args.sample,
+            use_cache=not args.no_cache,
+        )
+
+        def _a(text):
+            # The universe is global and this console is cp1252 — sanitize
+            # the DATA, not just the format string.
+            return str(text).encode("ascii", "backslashreplace").decode("ascii")
+
+        print(f"checked: {result['checked']:,} ISIN-bearing rows "
+              f"({result['no_isin']:,} rows carry no ISIN)")
+        print(f"ok: {result['ok']:,}  conflicts: {len(result['conflicts'])}  "
+              f"inconclusive: {len(result['inconclusive'])}")
+        for r in result["conflicts"]:
+            print(_a(f"CONFLICT {r['ticker']}: '{r['company']}' vs "
+                     f"{r['isin']} -> {'; '.join(r['openfigi_names'])}"))
+        for r in result["inconclusive"]:
+            print(_a(f"inconclusive {r['ticker']}: {r['isin']} ({r['reason']})"))
+        print(f"report: {result['report_path']}")
+        # Exit 2 on any conflict OR when nothing was learned at all — an
+        # unreachable API must never exit 0 and read as a clean universe.
+        learned_nothing = result["checked"] > 0 and result["ok"] == 0 and not result["conflicts"]
+        raise SystemExit(2 if (result["conflicts"] or learned_nothing) else 0)
     elif args.command == "crsp-snapshot":
         import csv as _csv
 

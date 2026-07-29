@@ -11,6 +11,18 @@ from universe.enrich import (
     validate_isin_for_row,
     validate_sector_jp,
 )
+from universe.isin_identity import VERDICT_OK, IsinIdentityResult
+
+
+@pytest.fixture(autouse=True)
+def _identity_check_offline():
+    """`enrich_single_ticker` now runs an OpenFIGI ISIN->issuer identity
+    check (universe/isin_identity.py). Default it to `ok` here so these
+    tests stay offline; the identity behavior itself is covered by
+    tests/test_isin_identity.py, which patches this explicitly."""
+    with patch("universe.enrich.verify_isin_identity",
+               return_value=IsinIdentityResult(VERDICT_OK, "issuer-name-match")):
+        yield
 
 
 def test_isin_country_match_accepted():

@@ -21,6 +21,7 @@ from ticker_utils import (
 )
 from logging_utils import configure_logging, get_logger, log_exception
 from providers.fmp_provider import fetch_profile as _fmp_fetch_profile
+from universe.isin_identity import VERDICT_OK, verify_isin_identity
 
 
 class EnrichError(Exception):
@@ -360,6 +361,21 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
         except Exception as e:
             log_exception(logger, f"SEC CIK lookup failed for {ticker}", e)
 
+    # ── 5b. ISIN identity cross-check (OpenFIGI) ─────────────────────────
+    # The prefix guard above is a COUNTRY check; this is the IDENTITY check.
+    # Nipro (8086.T) carried NMS Holdings' JP-prefixed ISIN and passed the
+    # prefix rule — any non-`ok` verdict (conflict OR inconclusive) defers
+    # the write. A blank ISIN is refilled by the next enrich run; an
+    # unverified one must never read as validated (found/clean/inconclusive).
+    if row["ISIN"] and row["Company Name"]:
+        identity = verify_isin_identity(row["ISIN"], row["Company Name"])
+        if identity.verdict != VERDICT_OK:
+            logger.warning(
+                "dropping ISIN %s for %s: identity %s (%s)",
+                row["ISIN"], ticker, identity.verdict, identity.reason,
+            )
+            row["ISIN"] = ""
+
     logger.info(
         "enrich_single_ticker(%s): sources=%s",
         ticker, ",".join(sources_used) or "none",
@@ -402,11 +418,27 @@ def fetch_yfinance_identifiers(df):
         try:
             t = yf.Ticker(yf_ticker)
 
-            # ISIN — sanity-checked against the row's listing country.
+            # ISIN — prefix-checked against the row's listing country, then
+            # identity-checked against the issuer's name (OpenFIGI). The
+            # identity call runs ONLY when the row's ISIN cell is blank —
+            # `enrich_dataframe` fills blanks only, so checking rows that
+            # already carry an ISIN would burn an API call per row for a
+            # value that will never be written.
             try:
                 checked = validate_isin_for_row(t.isin, row, ticker=orig_ticker)
-                if checked:
-                    data["ISIN"] = checked
+                if checked and not cell_is_empty(row.get("ISIN")):
+                    data["ISIN"] = checked  # never written; kept for parity
+                elif checked:
+                    identity = verify_isin_identity(
+                        checked, str(row.get("Company Name", "") or ""))
+                    if identity.verdict == VERDICT_OK:
+                        data["ISIN"] = checked
+                    else:
+                        logger.warning(
+                            "not writing ISIN %s for %s: identity %s (%s)",
+                            checked, orig_ticker, identity.verdict,
+                            identity.reason,
+                        )
             except Exception as e:
                 log_exception(logger, f"ISIN lookup failed for {orig_ticker}", e)
 

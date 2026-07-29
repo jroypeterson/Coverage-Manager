@@ -580,18 +580,28 @@ Group AG, DE*) → `353800X4VR3BHEUCJB42` (*HOYA, JP*); `FAGR.BR`
 `3157004AQG2TA4ZS7Y94` (*FAGRON a.s., CZ*) → `549300TRKRUFK2RRG779` (*Fagron,
 BE*). Nipro's LEI was already right — only its ISIN was another issuer's.
 
-**`ZEN` needed more than an ISIN.** Correcting only the identifier would have
-left a row that still lied: its **three Bloomberg FIGIs were Zen Technologies'
-too** (`BBG000BTLY23` resolves to `ZEN TECHNOLOGIES LTD` on OpenFIGI). Fixed as a
-set — `FIGI` → `BBG0018QK5P0` (ZEN on TSXV), `Composite FIGI` → `BBG0018QK5L4`,
-`Share Class FIGI` → `BBG001TFBYY8`. The `Company Name` was already correct.
-**Still open, deliberately not guessed:** `ZEN`'s `Sector (JP)` is **`SaaS`**,
-which fits neither Zentek (graphene / nanotech materials) nor Zen Technologies —
-it reads as a leftover from **Zendesk**, whose NYSE ticker was `ZEN` until its
-2022 take-private. There is no authoritative source for JP's own taxonomy, so it
-needs JP's call rather than a guess.
+**`ZEN` needed more than an ISIN — and was then REMOVED entirely (JP,
+2026-07-28: "remove it. it was an old company").** Correcting only the
+identifier would have left a row that still lied: its **three Bloomberg FIGIs
+were Zen Technologies' too** (`BBG000BTLY23` resolves to `ZEN TECHNOLOGIES LTD`
+on OpenFIGI); they were fixed as a set the same day. But the row's stale
+`Sector (JP) = SaaS` exposed the real story: the row was created for
+**Zendesk** (NYSE ticker `ZEN` until its 2022 take-private) and later repointed
+by ticker to **Zentek Ltd** — a TSXV graphene/nanomaterials IP company
+(zentek.com: Albany graphite, ZenGUARD coatings, aptamer biosciences; also
+Nasdaq `ZTEK`) that was never a deliberate pick and fits neither SaaS nor the
+HC-focused universe. The earliest record in this repo (pre-enrichment backup,
+2026-03-16) already reads `ZEN,,Zentek Ltd,SaaS,` — name refreshed, sector
+never revisited: the "a ticker is not an identity" failure mode end to end.
+At deletion time the row described **Zentek** (Company Name `Zentek Ltd`, ISIN
+`CA98942X1024`, Exchange `TSXV`, Canada/CAD — all verified Zentek's own), not
+Zendesk. Removal is **reversible**: the full entry lives in
+`data/delisted_tickers.csv` (Reason: "Removed from universe - Zendesk-era
+artifact row"; Notes flag it is NOT delisted — Zentek still trades). Pinned by
+`test_zen_removed_and_quarantined`. Exports republished the same day
+(delta: +0/−1).
 
-### Why the guard did not block them — and the hole that is still open
+### Why the guard did not block them — and the hole (CLOSED 2026-07-28)
 
 All seven arrived with the **initial universe CSV import** (`3ac4425`,
 2026-04-03); `enrich.validate_isin_for_row` landed eight days later (`ce3cf91`,
@@ -608,14 +618,15 @@ collisions — which is why "three Indian ISINs" was **one** bad source, not thr
 slips.
 
 **A prefix check is a country check, not an identity check.** Six of the seven
-are caught by the guard today. `8086.T` is **not**: `JP3750800009` is NMS
+are caught by the prefix guard today. `8086.T` is **not**: `JP3750800009` is NMS
 Holdings', also Japanese, so the prefix matches and the guard accepts it — and
-yfinance still serves it. Any future row that enriches with a blank ISIN on a
-Japanese/US/etc. line can take a same-country wrong-issuer value. Closing it
-needs an identity cross-check (ISIN → issuer name, e.g. OpenFIGI, compared to
-`Company Name`), not a tighter prefix rule. Pinned by
-`test_guard_does_NOT_catch_a_same_country_wrong_issuer_isin` so the limitation is
-not mistaken for coverage.
+yfinance still serves it. That same-country wrong-issuer hole is **closed as of
+2026-07-28** by the ISIN → issuer-name identity check
+(`universe/isin_identity.py`, section below): the enrich write path now drops
+any ISIN whose OpenFIGI issuer name does not match the row's `Company Name`.
+`test_guard_does_NOT_catch_a_same_country_wrong_issuer_isin` still pins the
+prefix layer's limitation (that function alone remains a country check);
+`tests/test_isin_identity.py` pins the closure at the write path.
 
 **Post-fix acceptance:** `crosscheck-foreign` returns **4 conflicts, all
 `listing-mismatch`** (`AZN`, `FER`, `MDA`, `2359.HK`) — the ADR-vs-ordinary
@@ -662,6 +673,99 @@ that learned nothing must not report agreement. Report:
 `reports/foreign_crosscheck_<date>.md`. Module `universe/foreign_crosscheck.py`;
 tests `tests/test_foreign_crosscheck.py` (20). Non-gating, read-only, not wired
 into the weekly pipeline.
+
+## ISIN → issuer-name identity check (`verify-isin-issuers`)
+
+`python cli.py verify-isin-issuers [--no-cache] [--sample N] [--tickers ...]`
+asks OpenFIGI **who each stored ISIN belongs to** and compares that name to the
+row's `Company Name`. This is the closure of the same-country wrong-issuer hole
+above: `validate_isin_for_row` is a country check; this is the identity check.
+Module `universe/isin_identity.py`; tests `tests/test_isin_identity.py` (82 —
+every name pair in them was captured live from OpenFIGI against real universe
+rows on 2026-07-28, not invented).
+
+**Where it runs, and why.** Two places, deliberately:
+
+1. **The enrich write path** (`enrich_single_ticker` + the bulk
+   `fetch_yfinance_identifiers`) — this is the guard. Any ISIN that survives
+   the prefix check is identity-checked before it can land in a row, and any
+   non-`ok` verdict (**conflict OR inconclusive**) drops the write with a
+   loud warning. An unreachable API must never read as validated; a blank
+   cell is refilled by the next run, a wrong value looks like data forever.
+   Cost control: the bulk path calls OpenFIGI **only for rows whose ISIN
+   cell is blank** — filled cells are never written by `enrich_dataframe`,
+   so checking them would burn an API call per row for nothing.
+2. **The on-demand audit** (`verify-isin-issuers`) — read-only sweep of every
+   ISIN-bearing row, exit 2 on any conflict or on a run that learned nothing
+   (all-inconclusive), mirroring `crosscheck-foreign`. Not wired into the
+   weekly pipeline yet (same posture as `backfill-lei`).
+
+Write-path-only would leave the stock of already-stored ISINs unexamined;
+audit-only would leave the front door open. The write path is the part that
+must never be skipped; the audit is cheap because of the cache.
+
+**Three states, never two:** `ok` / `conflict` / `inconclusive`
+(`openfigi-unreachable`, `no-openfigi-coverage`, `no-company-name`).
+Inconclusive is reported as NOT clean, in its own section.
+
+**Matching** (see module docstring for the full design): token cover with
+legal-form/share-class stripping, truncation-tolerant prefix equality
+(OpenFIGI truncates names at ~28 chars — "SUN PHARMACEUTICAL INDUS";
+minimum 4-char stem so "zen" can never match "zentek"), vowel-less
+abbreviation matching ("Lbrtrs" ~ "Laboratories" — a real stored name), and a
+0.85 difflib floor. **Not a finding by design:** same issuer on a different
+line — PharmaEssentia's GDR and Alphabet's Canadian CDR both pass; that class
+is `crosscheck-foreign`'s `listing-mismatch`.
+
+**Rate limits / cache (observed live 2026-07-28):** keyless OpenFIGI returns
+`ratelimit-policy: 25;w=60` (25 req/min), 10 mapping jobs per request; a full
+794-ISIN pass is ~80 requests ≈ 4 minutes. Deterministic outcomes (names and
+explicit "No identifier found") are cached in
+`cache/openfigi_isin_names.json`; transient failures are never cached.
+
+### First full-universe run (2026-07-28): 794 checked → 742 ok, 21 conflicts, 31 inconclusive
+
+**None of these were auto-applied** — same protocol as the first seven: they
+await JP's call. Evidence classes (SEC bulk-map cross-checked where noted):
+
+- **Wrong-issuer ISIN, same disease as the corrected seven** (recycled/collided
+  tickers; several also predate the prefix guard and are cross-country):
+  `BOI.PA` Boiron→WINGARA AG (AU), `CPH` Cipher Pharmaceuticals→CPH Chemie &
+  Papier (CH), `CROX` Crocs→CROSSWOOD (FR), `EVO` Evotec→EKOTECHNIKA (DE — real
+  Evotec ISIN `DE0005664809` verified live), `GALD.SW` Galderma→GALADA FINANCE
+  (IN), `GNFT` Genfit→GIFT HOLDINGS (JP), `GXI` Gerresheimer→GUIZHOU GUIHANG
+  (CN), `MDLA` →MALARASEN AB (SE), `OPT` Optima Health→OPT MACHINE VISION (CN),
+  `SDZ` Sandoz→SDM SE (DE), `SOON` Sonova→SOON LIAN (SG), `TUB` Financière de
+  Tubize→TUBACEX (ES), `2715.HK` Estun→ELKOP ESTONIA (EE), `DIA.MI`
+  DiaSorin→**the DIA ETF** (SPDR DJIA Trust).
+- **Multi-field contamination (the ZEN pattern — fix as a SET, not one cell):**
+  `MED` (name Medartis/SIX but ISIN+CIK 910329+medifastinc.com = **Medifast**),
+  `MOVE` (name Medacta/SIX but ISIN+CIK 1734750+movano.com = **Corvex, ex-
+  Movano**), `UCB` (name UCB SA/Brussels but ISIN+CIK 857855+ucbi.com+"Banks -
+  Regional" = **United Community Banks**), `ICAD` (chimera: name "Icade SA",
+  Euronext Paris, Sector **Biopharma**, ISIN = iCandy Interactive **AU** —
+  which company did JP even mean?). Note `ticker_change_check` cannot catch
+  these: the wrong CIK maps back to the same ticker, so the contamination is
+  self-consistent.
+- **Probable renames (the NAME side may be the stale one — confirm first):**
+  `ALBT` (ISIN is in Avalon GloboCare's own CUSIP space `05344R`; OpenFIGI
+  says CHANGE AGENTS CORP, SEC bulk map still says Avalon GloboCare),
+  `FGEN` (ISIN in FibroGen's own `31572Q` space; OpenFIGI says KYNTRA BIO;
+  `FGEN` is GONE from SEC's ticker map), `CBIO` (universe name Crescent
+  Biopharma is CURRENT per SEC CIK 1253689; the stored ISIN is the
+  pre-merger GlycoMimetics line — universe ahead of OpenFIGI on the name,
+  behind on the ISIN; PXMD-precedent).
+- **Inconclusive, 31** — mostly US micro-caps OpenFIGI has no ISIN mapping
+  for (several look like post-reverse-split ISINs). Three are also
+  prefix-implausible and deserve suspicion despite the inconclusive verdict:
+  `BAVA.CO` Bavarian Nordic carrying `SGXZ32918005` (real BN ISIN
+  `DK0015998017` verified live), `SAAS` Microlise (LSE) carrying
+  `AU0000297590`, `CSU` Constellation Software carrying `NET000CLBR01`
+  (not even a structurally valid ISIN).
+
+Report: `reports/isin_identity_<date>.md`. The 24→21 delta from the first
+pass to the committed one is three matcher fixes on real rows (`TEVA`/`TSM`
+sponsored-ADR line names, `CRL` vowel-dropped stored name), pinned in tests.
 
 ## CRSP / Morningstar US Total Market snapshot
 

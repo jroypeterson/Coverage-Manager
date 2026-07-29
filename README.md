@@ -77,6 +77,7 @@ python cli.py performance --refresh     # Bypass cache, refetch all data
 python cli.py cross-check               # Cross-check overlapping fields across providers
 python cli.py cross-check --sample      # Quick validation run on the sample set
 python cli.py validate                  # Validate the coverage CSV
+python cli.py verify-isin-issuers       # Identity-check stored ISINs against OpenFIGI issuer names (read-only; ok/conflict/inconclusive)
 python cli.py cleanup                   # Dedup and normalize tickers
 python cli.py enrich                    # Identifier enrichment (Finnhub/FMP)
 python cli.py add-exchanges             # Populate Exchange column via yfinance
