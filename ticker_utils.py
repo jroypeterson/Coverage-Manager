@@ -194,11 +194,21 @@ COUNTRY_TO_ISO = {
     "United Arab Emirates": "ARE", "Luxembourg": "LUX",
 }
 
-# Country full name → ISO 3166-1 alpha-2 (the prefix an ISIN uses).
-# Used by enrich to sanity-check ISINs against the row's listing country —
-# yfinance occasionally returns a wrong-country ISIN for rebranded tickers
-# (e.g. "FI" returned a Swiss ISIN for Fiserv after the FISV→FI rebrand).
-COUNTRY_TO_ISIN_PREFIX = {
+# Country full name → ISO 3166-1 alpha-2 code. This is the COUNTRY's identity
+# code, 1:1 by construction — used to normalize vendor country fields (FMP
+# sometimes returns "US" for "United States") and to compare against the
+# alpha-2 incorporation codes in SEC N-PORT filings. It is NOT the set of ISIN
+# prefixes a country's issuers may use; that is a different fact and lives in
+# COUNTRY_TO_ISIN_PREFIXES below. Conflating the two is how Jersey issuers
+# using GB-prefixed ISINs would break either map.
+#
+# Completed 2026-07-28 (Codex R3): previously missing Ireland, Netherlands,
+# Israel, Singapore, the offshore incorporation set (Cayman/Bermuda/BVI/
+# Jersey/Guernsey/IoM/Panama), Austria, Hungary, Iceland, Indonesia and
+# Estonia — every one either appears in the live universe's Country columns
+# or its prefix appears in a stored ISIN. `validate_country_prefix_coverage`
+# (universe/validation.py) warns when the live CSV outgrows this map again.
+COUNTRY_TO_ISO2 = {
     "United States": "US", "United Kingdom": "GB", "Germany": "DE",
     "France": "FR", "Belgium": "BE", "Switzerland": "CH",
     "Italy": "IT", "Spain": "ES", "Japan": "JP",
@@ -209,9 +219,85 @@ COUNTRY_TO_ISIN_PREFIX = {
     "Norway": "NO", "Poland": "PL", "Mexico": "MX",
     "South Africa": "ZA", "Saudi Arabia": "SA",
     "United Arab Emirates": "AE", "Luxembourg": "LU",
+    # Added 2026-07-28 — present in the live universe's country columns:
+    "Austria": "AT", "Hungary": "HU", "Iceland": "IS", "Indonesia": "ID",
+    "Ireland": "IE", "Israel": "IL", "Netherlands": "NL", "Singapore": "SG",
+    "Cayman Islands": "KY",
+    # Added 2026-07-28 — offshore incorporation countries whose prefixes
+    # appear in stored ISINs (or, for Panama/BVI/IoM, in the standard
+    # offshore set the crosscheck's incorporation notes report):
+    "Bermuda": "BM", "British Virgin Islands": "VG", "Jersey": "JE",
+    "Guernsey": "GG", "Isle of Man": "IM", "Panama": "PA", "Estonia": "EE",
+}
+
+# Extra ISIN prefixes a country's issuers legitimately use BEYOND the
+# country's own ISO code. The known case is the Crown dependencies:
+# Channel-Islands/Isle-of-Man issuers commonly issue under GB as well as
+# their own JE/GG/IM. The reverse is deliberately NOT loosened — United
+# Kingdom stays {GB}, because accepting JE/GG/IM on every UK row would
+# weaken the guard for the whole UK book; a Guernsey-incorporated UK
+# company (OKYO's shape) is the `Country (Incorporation)` question, blocked
+# pending JP's taxonomy decision. Euroclear "XS"/"EU" prefixes are debt-
+# market shapes; no equity in the live universe carries one, so they are
+# deliberately not accepted anywhere.
+_EXTRA_ISIN_PREFIXES = {
+    "Jersey": frozenset({"GB"}),
+    "Guernsey": frozenset({"GB"}),
+    "Isle of Man": frozenset({"GB"}),
+}
+
+# Country full name → frozenset of acceptable ISIN prefixes. Used by enrich
+# to sanity-check ISINs against the row's countries — yfinance occasionally
+# returns a wrong-country ISIN for rebranded or recycled tickers (e.g. "FI"
+# returned a Swiss ISIN for Fiserv after the FISV→FI rebrand). Set-valued
+# because a country can legitimately map to more than one prefix (see
+# _EXTRA_ISIN_PREFIXES); derived from COUNTRY_TO_ISO2 so the two maps
+# cannot drift apart.
+COUNTRY_TO_ISIN_PREFIXES = {
+    country: frozenset({iso2}) | _EXTRA_ISIN_PREFIXES.get(country, frozenset())
+    for country, iso2 in COUNTRY_TO_ISO2.items()
 }
 
 # ── Functions ───────────────────────────────────────────────────────────────
+
+
+# Structural shape of an ISIN (ISO 6166): 2-letter country/agency code,
+# 9 alphanumerics (the NSIN), 1 check digit.
+_ISIN_SHAPE = re.compile(r"[A-Z]{2}[A-Z0-9]{9}[0-9]")
+
+
+def isin_check_digit_ok(isin):
+    """True iff `isin` is a structurally valid ISIN with a correct ISO 6166
+    check digit. Arithmetic only — no vendor, no network, deterministic.
+
+    Promoted from tests/test_foreign_crosscheck.py on 2026-07-28 so the enrich
+    write path can reject a malformed ISIN before any network check, and so a
+    single implementation exists (two copies of a checksum is how they drift).
+
+    Input normalization: case-folded, all whitespace stripped — a hand-edited
+    cell with stray spaces or lower case still carries the same value, so it
+    is judged on the value.
+
+    Contract for everything else: **False.** Blank/None, wrong length,
+    non-alphanumeric characters, a digit where the country code belongs, a
+    letter where the check digit belongs — all False, never an exception and
+    never "unknown". Callers treat False as "do not store this"; a malformed
+    value that cannot be checksummed is exactly a value that must not be
+    stored (the live case: `CSU` carried `NET000CLBR01`, which is not
+    structurally an ISIN at all).
+    """
+    s = "".join(str(isin or "").split()).upper()
+    if not _ISIN_SHAPE.fullmatch(s):
+        return False
+    # ISO 6166 mod-10 (Luhn): letters expand to two digits via base-36, then
+    # double every other digit from the right of the stem.
+    digits = "".join(str(int(c, 36)) if c.isalpha() else c for c in s)
+    total, double = 0, True
+    for ch in reversed(digits[:-1]):
+        d = int(ch) * (2 if double else 1)
+        total += d - 9 if d > 9 else d
+        double = not double
+    return (10 - total % 10) % 10 == int(digits[-1])
 
 
 def read_universe_csv(path=CSV_PATH):

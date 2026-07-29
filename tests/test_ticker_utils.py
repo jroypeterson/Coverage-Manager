@@ -149,3 +149,121 @@ class TestCountryToIso:
         from ticker_utils import EXCHANGE_TO_COUNTRY
         for exchange, country in EXCHANGE_TO_COUNTRY.items():
             assert country in COUNTRY_TO_ISO, f"Missing ISO mapping for {country} (exchange: {exchange})"
+
+
+class TestIsinCheckDigit:
+    """ISO 6166 mod-10 check digit — promoted from tests/test_foreign_crosscheck.py
+    (2026-07-28). Arithmetic only: no vendor, no network, so it runs before any
+    network check on the enrich write path."""
+
+    def test_real_isins_pass(self):
+        from ticker_utils import isin_check_digit_ok
+        # Apple, Roche, AstraZeneca (London ordinary), Innovent (Cayman), Astellas
+        for isin in ("US0378331005", "CH0012032048", "GB0009895292",
+                     "KYG4818G1010", "JP3942400007"):
+            assert isin_check_digit_ok(isin), isin
+
+    def test_a_one_digit_typo_fails(self):
+        from ticker_utils import isin_check_digit_ok
+        assert not isin_check_digit_ok("US0378331004")   # Apple, last digit off by one
+        assert not isin_check_digit_ok("US0378331015")   # Apple, one interior digit changed
+
+    def test_the_live_csu_value_fails(self):
+        """`CSU` carries `NET000CLBR01` — the value tonight's audit flagged as not
+        structurally an ISIN. Its check digit is wrong too (the stem computes 9)."""
+        from ticker_utils import isin_check_digit_ok
+        assert not isin_check_digit_ok("NET000CLBR01")
+
+    def test_case_and_embedded_whitespace_are_tolerated(self):
+        """Hand-edited cells arrive with stray spaces and lower case; the VALUE is
+        still the same ISIN, so normalize before judging."""
+        from ticker_utils import isin_check_digit_ok
+        assert isin_check_digit_ok("us0378331005")
+        assert isin_check_digit_ok(" US0378331005 ")
+        assert isin_check_digit_ok("US 0378 331 005")
+
+    def test_malformed_nonblank_values_return_false(self):
+        """Documented contract: anything that is not a structurally valid ISIN
+        (2 letters + 9 alphanumerics + 1 digit) returns False — malformed is
+        never 'unknown', because the caller treats False as 'do not store'."""
+        from ticker_utils import isin_check_digit_ok
+        assert not isin_check_digit_ok("US03783310")        # too short
+        assert not isin_check_digit_ok("US03783310055")     # too long
+        assert not isin_check_digit_ok("0S0378331005")      # digit where the country code goes
+        assert not isin_check_digit_ok("US037833100A")      # letter where the check digit goes
+        assert not isin_check_digit_ok("US03783-1005")      # non-alphanumeric
+        assert not isin_check_digit_ok("error: not found")
+
+    def test_empty_and_none_return_false(self):
+        from ticker_utils import isin_check_digit_ok
+        assert not isin_check_digit_ok("")
+        assert not isin_check_digit_ok(None)
+        assert not isin_check_digit_ok("   ")
+
+
+class TestCountryIsinPrefixes:
+    """R3: the prefix map must cover every country the universe actually
+    contains, and countries with more than one legitimate prefix map to a SET."""
+
+    def test_values_are_frozensets(self):
+        from ticker_utils import COUNTRY_TO_ISIN_PREFIXES
+        for country, prefixes in COUNTRY_TO_ISIN_PREFIXES.items():
+            assert isinstance(prefixes, frozenset), country
+            assert prefixes, f"{country} maps to an empty set"
+
+    def test_previously_missing_countries_are_mapped(self):
+        """The Codex R3 list: every one of these was silently unvalidatable."""
+        from ticker_utils import COUNTRY_TO_ISIN_PREFIXES as M
+        assert "IE" in M["Ireland"]
+        assert "NL" in M["Netherlands"]
+        assert "KY" in M["Cayman Islands"]
+        assert "BM" in M["Bermuda"]
+        assert "VG" in M["British Virgin Islands"]
+        assert "JE" in M["Jersey"]
+        assert "GG" in M["Guernsey"]
+        assert "IM" in M["Isle of Man"]
+        assert "PA" in M["Panama"]
+        assert "IL" in M["Israel"]
+        assert "SG" in M["Singapore"]
+        assert "EE" in M["Estonia"]
+
+    def test_channel_islands_and_iom_also_accept_gb(self):
+        """The trap the map's shape exists for: Channel-Islands/IoM issuers
+        commonly issue under GB as well as their own prefix. The reverse is NOT
+        loosened — United Kingdom stays {GB} so the guard on UK rows keeps its
+        teeth (a Guernsey-incorporated UK company is the Country (Incorporation)
+        question, blocked pending JP's taxonomy decision)."""
+        from ticker_utils import COUNTRY_TO_ISIN_PREFIXES as M
+        assert M["Jersey"] == frozenset({"JE", "GB"})
+        assert M["Guernsey"] == frozenset({"GG", "GB"})
+        assert M["Isle of Man"] == frozenset({"IM", "GB"})
+        assert M["United Kingdom"] == frozenset({"GB"})
+
+    def test_every_live_universe_country_is_mapped_except_known_bad_values(self):
+        """Coverage against the LIVE data — the gap this map had was invisible
+        precisely because nothing measured it. `NL` (on MICC) is an alpha-2 code
+        stored where a country name belongs: a data defect for JP to fix, not a
+        mapping to add."""
+        from ticker_utils import COUNTRY_TO_ISIN_PREFIXES, read_universe_csv
+        df = read_universe_csv()
+        known_bad = {"NL"}
+        unmapped = set()
+        for col in ("Country (HQ)", "Country (Listing)"):
+            for v in df[col]:
+                s = str(v).strip()
+                if s and s not in COUNTRY_TO_ISIN_PREFIXES:
+                    unmapped.add(s)
+        assert unmapped <= known_bad, f"unmapped live countries: {sorted(unmapped)}"
+
+    def test_iso2_map_agrees_with_iso3_map_on_shared_countries(self):
+        """COUNTRY_TO_ISO2 (identity code, 1:1) and COUNTRY_TO_ISO (alpha-3)
+        must describe the same countries the same way."""
+        from ticker_utils import COUNTRY_TO_ISO, COUNTRY_TO_ISO2
+        # Every alpha-3 country has an alpha-2, never the reverse constraint.
+        for country in COUNTRY_TO_ISO:
+            assert country in COUNTRY_TO_ISO2, country
+
+    def test_every_prefix_set_contains_the_countrys_own_iso2(self):
+        from ticker_utils import COUNTRY_TO_ISIN_PREFIXES, COUNTRY_TO_ISO2
+        for country, iso2 in COUNTRY_TO_ISO2.items():
+            assert iso2 in COUNTRY_TO_ISIN_PREFIXES[country], country

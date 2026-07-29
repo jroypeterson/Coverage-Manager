@@ -93,35 +93,36 @@ class CrosscheckResult:
 
 def _iso2(country_name: str) -> str:
     """Country NAME -> ISO alpha-2, using the mapping enrich already relies on."""
-    from ticker_utils import COUNTRY_TO_ISIN_PREFIX
+    from ticker_utils import COUNTRY_TO_ISO2
 
-    return COUNTRY_TO_ISIN_PREFIX.get((country_name or "").strip(), "")
+    return COUNTRY_TO_ISO2.get((country_name or "").strip(), "")
 
 
 def _iso3_to_iso2(code: str) -> str:
-    from ticker_utils import COUNTRY_TO_ISIN_PREFIX, COUNTRY_TO_ISO
+    from ticker_utils import COUNTRY_TO_ISO, COUNTRY_TO_ISO2
 
     code = (code or "").strip().upper()
     if len(code) == 2:
         return code
     for name, iso3 in COUNTRY_TO_ISO.items():
         if iso3 == code:
-            return COUNTRY_TO_ISIN_PREFIX.get(name, "")
+            return COUNTRY_TO_ISO2.get(name, "")
     return ""
 
 
 def _prefix_matches_any_country(row: dict, isin: str) -> bool:
     """True if the ISIN's 2-letter prefix matches HQ or listing country.
 
-    Mirrors `enrich.validate_isin_for_row`'s accept rule, so a False here means
-    the stored value would be rejected by the live enrichment path today.
+    Mirrors `enrich.validate_isin_for_row`'s accept rule (set-valued since
+    2026-07-28 — a country can accept more than one prefix), so a False here
+    means the stored value would be rejected by the live enrichment path today.
     """
-    from ticker_utils import COUNTRY_TO_ISIN_PREFIX
+    from ticker_utils import COUNTRY_TO_ISIN_PREFIXES
 
     prefix = (isin or "")[:2].upper()
     for fld in ("Country (HQ)", "Country (Listing)"):
-        want = COUNTRY_TO_ISIN_PREFIX.get((row.get(fld) or "").strip())
-        if want and want == prefix:
+        want = COUNTRY_TO_ISIN_PREFIXES.get((row.get(fld) or "").strip())
+        if want and prefix in want:
             return True
     return False
 

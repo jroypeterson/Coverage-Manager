@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "dataset_version": "2026-07-28",
-  "generated_at": "2026-07-29T01:54:53Z",
+  "generated_at": "2026-07-29T02:22:29Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1098,
   "ticker_count": 1097,
@@ -12,6 +12,7 @@
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": [
+    "1 country value(s) with no ISIN-prefix mapping - the ISIN prefix guard silently skips these rows; add the country to ticker_utils.COUNTRY_TO_ISO2 or fix the value: 'NL' (1 row(s))",
     "1 possible duplicate company name(s) (normalized): ['shimadzu']",
     "192 ticker(s) missing Subsector (JP) value"
   ],

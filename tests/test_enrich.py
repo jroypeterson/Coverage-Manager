@@ -46,8 +46,26 @@ def test_isin_unknown_country_passes_through():
     # If we don't have a mapping for the row's country, accept the ISIN
     # rather than blocking enrichment — the goal is to catch *known* mismatches,
     # not to gate every row on the map being complete.
+    # (Fixture ISIN made check-digit-valid 2026-07-28: the structural check now
+    # runs before the country check, and the old made-up value failed it.)
     row = {"Country (Listing)": "Liechtenstein", "Country (HQ)": "Liechtenstein"}
-    assert validate_isin_for_row("LI0377700028", row, "VPBN") == "LI0377700028"
+    assert validate_isin_for_row("LI0377700021", row, "VPBN") == "LI0377700021"
+
+
+def test_isin_bad_check_digit_rejected_before_any_country_logic():
+    """The ISO 6166 check digit is offline, free and deterministic, so a
+    structurally invalid ISIN must be rejected BEFORE any network check —
+    including on rows whose countries are blank or unmapped, where the prefix
+    rule alone would wave it through."""
+    us = {"Country (Listing)": "United States", "Country (HQ)": "United States"}
+    assert validate_isin_for_row("US0378331004", us, "AAPL") is None  # one-digit typo of Apple's
+    # The live case from tonight's audit: CSU carries NET000CLBR01, which is not
+    # structurally an ISIN. Blank countries — the prefix rule cannot help here.
+    blank = {"Country (Listing)": "", "Country (HQ)": ""}
+    assert validate_isin_for_row("NET000CLBR01", blank, "CSU") is None
+    # And an unmapped country no longer means "anything goes":
+    li = {"Country (Listing)": "Liechtenstein", "Country (HQ)": "Liechtenstein"}
+    assert validate_isin_for_row("LI0377700028", li, "VPBN") is None
 
 
 def test_isin_blank_row_passes_through():
@@ -207,7 +225,9 @@ def test_enrich_single_ticker_yfinance_fallback_fills_gaps():
         }
 
     class FakeYFTicker:
-        isin = "US1234567890"
+        # Fixture ISIN made check-digit-valid 2026-07-28: validate_isin_for_row
+        # now runs the ISO 6166 checksum before the country check.
+        isin = "US1234567899"
         info = {
             "currency": "USD",
             "sector": "Technology",
@@ -224,7 +244,7 @@ def test_enrich_single_ticker_yfinance_fallback_fills_gaps():
     assert row["Company Name"] == "Example Corp"
     assert row["Exchange"] == "NASDAQ"
     assert row["Currency"] == "USD"         # filled by yfinance
-    assert row["ISIN"] == "US1234567890"    # filled by yfinance, passes guard
+    assert row["ISIN"] == "US1234567899"    # filled by yfinance, passes guard
     assert row["Year Listed"] == "2009"     # filled by yfinance
     assert row["YF Sector"] == "Technology"
     assert row["CIK"] == "1234567"          # filled by SEC fallback

@@ -741,6 +741,59 @@ def _step_ticker_change_check():
     }
 
 
+def _step_crosscheck_foreign():
+    """Cross-check foreign-row identity metadata against SEC N-PORT filings.
+
+    Read-only and NON-GATING (Fable, 2026-07-28): the seven wrong ISINs that
+    survived four months did so because every identity check was run-on-demand;
+    this puts `crosscheck-foreign` on the weekly cadence. A conflict must never
+    fail the build or block exports — `_crosscheck_step_status` marks the step
+    `failed:` so the health heartbeat reads `partial`, and the run summary
+    carries the per-class counts (a counted class, never a boolean).
+    """
+    from universe import foreign_crosscheck
+
+    result = foreign_crosscheck.main()
+    report = foreign_crosscheck.write_report(result)
+    by_kind = {}
+    for c in result.conflicts:
+        by_kind[c.kind] = by_kind.get(c.kind, 0) + 1
+    return {
+        "status": result.status,
+        "ok": result.ok,
+        "checked": result.checked,
+        "matched": result.matched,
+        "conflicts": len(result.conflicts),
+        "by_kind": by_kind,
+        "incorporation_notes": len(result.incorporation_notes),
+        "report": str(report),
+    }
+
+
+# The four conflict classes, in severity order. Zero-count classes are still
+# printed: "4 listing-mismatch, 0 isin-conflict" is actionable, "conflicts:
+# yes" is not — and an absent count is indistinguishable from an unchecked one.
+_CROSSCHECK_KINDS = ("isin-conflict", "lei-conflict", "name-divergence",
+                     "listing-mismatch")
+
+
+def _crosscheck_step_status(cf_result):
+    """Render the crosscheck step's status string (ASCII-only by construction —
+    counts and fixed labels; no company names, whose non-ASCII characters have
+    twice killed a cp1252 console mid-run)."""
+    if not cf_result.get("ok"):
+        return "failed: every source failed - nothing checked"
+    kinds = cf_result.get("by_kind", {})
+    counts = ", ".join(f"{kinds.get(k, 0)} {k}" for k in _CROSSCHECK_KINDS)
+    summary = (
+        f"{counts}; {cf_result.get('incorporation_notes', 0)} incorporation note(s) "
+        f"({cf_result.get('matched', 0)} matched of {cf_result.get('checked', 0)} "
+        f"foreign rows)")
+    if cf_result.get("conflicts"):
+        return f"failed: {cf_result['conflicts']} conflict(s) - {summary}"
+    return summary
+
+
 def _step_cik_backfill():
     """Fill blank CIKs from SEC's bulk map before anything reads the exports.
 
@@ -1106,6 +1159,28 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                     )
         else:
             steps["ticker_change_check"] = status
+
+    # Step 4c: Foreign metadata cross-check vs SEC N-PORT (read-only). Wired
+    # weekly on 2026-07-28 (Fable): the seven wrong ISINs corrected that day
+    # survived four months because every identity check was run-on-demand.
+    # NON-GATING — a conflict marks the step `failed:` (so the heartbeat reads
+    # `partial` and the run summary carries per-class counts) but never blocks
+    # the exports; the fix is always a human decision on the CSV.
+    if dry_run:
+        logger.info("[4c/6] Foreign crosscheck... SKIPPED (dry run)")
+        steps["crosscheck_foreign"] = "skipped (dry run)"
+    else:
+        logger.info("[4c/6] Cross-checking foreign rows against SEC N-PORT...")
+        status, cf_result = run_step("crosscheck_foreign", _step_crosscheck_foreign)
+        if cf_result:
+            steps["crosscheck_foreign"] = _crosscheck_step_status(cf_result)
+            if cf_result["conflicts"]:
+                logger.warning(
+                    "  %d conflict(s) between the universe and filed documents - "
+                    "see %s", cf_result["conflicts"], cf_result["report"],
+                )
+        else:
+            steps["crosscheck_foreign"] = status
 
     # Step 5: Export artifacts (the new published contract)
     if dry_run:

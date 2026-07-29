@@ -377,11 +377,11 @@ def _hq_prefix_diverges(row: dict, isin: str) -> bool:
     operating issuer is ordinary and the ISIN is still right. Reported so an
     unexpected divergence is seen rather than silently written.
     """
-    from ticker_utils import COUNTRY_TO_ISIN_PREFIX
+    from ticker_utils import COUNTRY_TO_ISIN_PREFIXES
 
     hq = (row.get("Country (HQ)") or "").strip()
-    want = COUNTRY_TO_ISIN_PREFIX.get(hq)
-    return bool(want and isin[:2].upper() != want)
+    want = COUNTRY_TO_ISIN_PREFIXES.get(hq)
+    return bool(want and isin[:2].upper() not in want)
 
 
 # ── main ─────────────────────────────────────────────────────────────────────

@@ -671,8 +671,66 @@ correct outcome. Regression tests: `tests/test_foreign_crosscheck.py`
 Exit code `2` on any conflict **or** on a run where every source failed — a run
 that learned nothing must not report agreement. Report:
 `reports/foreign_crosscheck_<date>.md`. Module `universe/foreign_crosscheck.py`;
-tests `tests/test_foreign_crosscheck.py` (20). Non-gating, read-only, not wired
-into the weekly pipeline.
+tests `tests/test_foreign_crosscheck.py`. Non-gating and read-only.
+
+**Wired into `weekly-universe` as step `[4c/6]` (2026-07-28).** The seven wrong
+ISINs survived four months because every identity check was run-on-demand; the
+crosscheck now runs on the weekly cadence. Still NON-GATING: a conflict never
+fails the build or blocks exports, but the step status is `failed:`-prefixed so
+`collect_non_successes` catches it and the health heartbeat reads `partial`.
+The run summary reports **counted classes, never a boolean** — e.g.
+`failed: 4 conflict(s) - 0 isin-conflict, 0 lei-conflict, 0 name-divergence,
+4 listing-mismatch; 6 incorporation note(s) (72 matched of 349 foreign rows)` —
+because "4 listing-mismatch" is actionable and "conflicts: yes" is not. The
+status string is counts + fixed ASCII labels only (no company names — non-ASCII
+names have twice killed the cp1252 console mid-run). Step logic:
+`weekly_universe._step_crosscheck_foreign` + `_crosscheck_step_status`; the fund
+sources are cached 7 days, so the weekly step is usually cache-warm. Until JP
+rules on the ADR/ordinary `Listing Type` taxonomy question, the 4 standing
+`listing-mismatch` rows (`AZN`, `FER`, `MDA`, `2359.HK`) will keep the weekly
+heartbeat at `partial` — that visibility is deliberate.
+
+## ISIN structural + prefix validation (write path, offline)
+
+`enrich.validate_isin_for_row` runs **two offline gates, in order, before any network
+check** (the OpenFIGI identity check is downstream of it):
+
+1. **ISO 6166 check digit** — `ticker_utils.isin_check_digit_ok(isin)`, promoted
+   2026-07-28 from a test-local helper in `tests/test_foreign_crosscheck.py` (which now
+   imports it — one implementation, on purpose). Arithmetic only: no vendor, no network,
+   deterministic. Input is case-folded and whitespace-stripped; **everything malformed
+   returns False** (wrong length, non-alphanumeric, digit in the country code, letter in
+   the check digit, blank/None) — the caller treats False as "do not store", and a value
+   that cannot be checksummed is exactly a value that must not be stored. Catches typos in
+   a column humans hand-edit, and structurally-bogus vendor values, on rows whose countries
+   are blank or unmapped — where the prefix rule cannot help. Live sweep 2026-07-28:
+   **794 ISIN-bearing rows, exactly 1 failure — `CSU` carrying `NET000CLBR01`** (flagged
+   by the same day's identity audit; awaiting JP, not auto-corrected).
+2. **Country prefix** — the ISIN's 2-letter prefix must be in the acceptable-prefix set of
+   `Country (HQ)` **or** `Country (Listing)`.
+
+The prefix map was restructured 2026-07-28 (Codex R3 — it was missing Ireland,
+Netherlands, Israel, Singapore, the offshore set and more: 10 live country values / 48
+rows the guard silently never validated). Two maps in `ticker_utils`, deliberately
+distinct facts:
+
+- **`COUNTRY_TO_ISO2`** — country name → its ISO 3166-1 alpha-2 identity code, 1:1.
+  Used for normalizing vendor country fields and comparing against N-PORT `invCountry`.
+- **`COUNTRY_TO_ISIN_PREFIXES`** — country name → **frozenset** of acceptable ISIN
+  prefixes, derived from `COUNTRY_TO_ISO2` plus `_EXTRA_ISIN_PREFIXES` so the two cannot
+  drift. Set-valued because Channel-Islands/IoM issuers legitimately use `GB` as well as
+  `JE`/`GG`/`IM`. The reverse is NOT loosened: United Kingdom stays `{GB}` — accepting
+  JE/GG/IM on every UK row would weaken the whole UK book, and a Guernsey-incorporated
+  UK company (OKYO's shape) is the `Country (Incorporation)` question, blocked pending
+  JP. Euroclear `XS`/`EU` prefixes are debt-market shapes and deliberately not accepted.
+  The old string-valued `COUNTRY_TO_ISIN_PREFIX` is **gone**; nothing outside this repo
+  imported it.
+
+**`validate_country_prefix_coverage`** (`universe/validation.py`, in
+`run_all_validations`, warning-only like the case-collision check) flags any populated
+country value with no prefix mapping, so the next map gap is visible instead of a silent
+no-op. Live: 1 warning — `MICC` carries `Country (HQ) = "NL"`, an alpha-2 code where a
+country name belongs (a row defect for JP to fix, not a mapping to add).
 
 ## ISIN → issuer-name identity check (`verify-isin-issuers`)
 
@@ -1284,6 +1342,19 @@ reported before it propagates to the sibling repo. Deliberately dumb and deliber
 it shares no code with the writer, so it cannot share a bug with it. Non-gating — the universe
 CSV update is still the real product — but it turns a silent green zero-ticker export into a
 visible failure in the run summary and the health heartbeat.
+
+**Extended 2026-07-28 (Codex R5).** The acceptance step now also fails on: an **empty**
+universe/positions CSV (a header-only file has no BOM and no blank keys — it is simply empty,
+and previously passed vacuously); bytes that are **not valid UTF-8** (reported as a problem
+naming the artifact and offset, never an unhandled decode crash); a `watchlist.csv` row count
+contradicting `watchlist_status.json.entry_count` (that file previously had NO status
+cross-check — the 66-blank-row incident went undetected until an audit);
+`universe_metadata.json` entry count contradicting `universe_status.json.ticker_count`; and
+two **cross-artifact** consistency rules — every positions/watchlist `Ticker` must exist in
+`universe.csv` (a ticker that doesn't is a hollow row with blank universe columns), and the
+five per-state position JSONs must partition `positions_and_researching.csv` (keys a subset
+of its tickers, counts summing to its row count). The module stays stdlib-csv/json only and
+imports nothing from the writers — keep it that way, so it cannot share a bug with them.
 
 **When adding an export:** add it to `CHECKS` in `export_acceptance.py` with its join key.
 An artifact nothing validates is an artifact that will eventually ship empty.

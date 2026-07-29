@@ -9,7 +9,7 @@ import statistics
 import pandas as pd
 
 from config import CSV_PATH, REQUIRED_COLUMNS, EXPECTED_COLUMNS, ALLOWED_SECTORS_JP
-from ticker_utils import normalize_company_for_comparison
+from ticker_utils import COUNTRY_TO_ISIN_PREFIXES, normalize_company_for_comparison
 from logging_utils import get_logger
 
 logger = get_logger("validation")
@@ -92,6 +92,46 @@ def validate_case_only_ticker_collisions(df):
         warnings.append(
             f"{len(collisions)} case-only ticker collision(s) (likely typos; "
             f"dedup at the source): {examples}")
+    return warnings
+
+
+def validate_country_prefix_coverage(df):
+    """Warn on any populated country value with no ISIN-prefix mapping.
+
+    An incomplete `COUNTRY_TO_ISIN_PREFIXES` map does not fail anything — the
+    prefix guard in `enrich.validate_isin_for_row` simply skips rows whose
+    country it does not know, which is the exact silent-no-op class this
+    workspace keeps getting burned by. Codex found the map missing Ireland,
+    Netherlands, Israel, Singapore and the whole offshore incorporation set
+    (2026-07-28) — 10 live country values, ~48 rows the guard silently never
+    validated. The map was completed the same day; THIS check exists so the
+    next gap is visible instead of invisible.
+
+    Two things a warning here can mean, both wanting a human:
+      - a genuinely new country entered the universe -> add it to
+        `ticker_utils.COUNTRY_TO_ISO2` (the prefix map derives from it);
+      - the value is not a country name at all -> fix the row (live case:
+        `MICC` carries `Country (HQ) = "NL"`, an alpha-2 code where a name
+        belongs).
+
+    A warning, never an error, on purpose: it must not gate the weekly build
+    (matches `validate_case_only_ticker_collisions`).
+    """
+    warnings = []
+    unmapped = {}
+    for col in ("Country (HQ)", "Country (Listing)"):
+        if col not in df.columns:
+            continue
+        for v in df[col].fillna("").astype(str):
+            s = v.strip()
+            if s and s not in COUNTRY_TO_ISIN_PREFIXES:
+                unmapped[s] = unmapped.get(s, 0) + 1
+    if unmapped:
+        detail = ", ".join(f"{k!r} ({n} row(s))" for k, n in sorted(unmapped.items()))
+        warnings.append(
+            f"{len(unmapped)} country value(s) with no ISIN-prefix mapping - the "
+            f"ISIN prefix guard silently skips these rows; add the country to "
+            f"ticker_utils.COUNTRY_TO_ISO2 or fix the value: {detail}")
     return warnings
 
 
@@ -296,6 +336,7 @@ def run_all_validations(df):
     errors.extend(validate_sector_taxonomy(df))
 
     warnings.extend(validate_case_only_ticker_collisions(df))
+    warnings.extend(validate_country_prefix_coverage(df))
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))
     warnings.extend(validate_subsector_populated(df))

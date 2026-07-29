@@ -467,3 +467,175 @@ def test_acceptance_passes_on_a_healthy_export(tmp_path):
     (tmp_path / "universe.csv").write_text(
         "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
     assert check_exports(tmp_path) == []
+
+
+# --- acceptance extensions (Codex R5, 2026-07-28) ----------------------------
+# Each of these encodes a failure this workspace has actually shipped, or the
+# nearest structural neighbour of one. Written BEFORE the checks they exercise.
+
+
+def test_acceptance_catches_the_exact_84_blank_ticker_positions_shape(tmp_path):
+    """The known incident shape: positions_and_researching.csv with a `Ticker`
+    HEADER but blank values on all 84 rows (DictWriter dropped the join key)."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    rows = "\n".join(",Portfolio" for _ in range(84))
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\n" + rows + "\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match=r"84 of 84 rows have a blank 'Ticker'"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_an_empty_universe_export(tmp_path):
+    """A header-only universe.csv has no blank keys and no BOM — it is simply
+    EMPTY, and every consumer joining on it gets nothing. Must fail loudly."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_text("Ticker,Name\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="0 rows"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_an_empty_positions_export(tmp_path):
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="0 rows"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_bytes_that_are_not_utf8(tmp_path):
+    """A cp1252-encoded export (or a corrupted one) must be reported as a
+    problem, not crash the acceptance step with an unhandled decode error."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_bytes(
+        b"Ticker,Name\nMOWI,Mowi ASA \xf8\n")   # 0xF8 = 'ø' in cp1252, invalid utf-8
+    with pytest.raises(ExportAcceptanceError, match="not valid UTF-8"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_watchlist_count_that_contradicts_its_status_file(tmp_path):
+    """watchlist.csv previously had NO status cross-check — the 66-blank-row
+    incident went undetected until an audit."""
+    import json
+
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "watchlist.csv").write_text(
+        "Ticker,Buy Price\nAAPL,180\n", encoding="utf-8")
+    (tmp_path / "watchlist_status.json").write_text(
+        json.dumps({"entry_count": 66}), encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="claims 66"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_positions_ticker_missing_from_the_universe(tmp_path):
+    """Cross-artifact consistency: every positions/watchlist row joins back to
+    universe.csv. A ticker that does not is a hollow row — the positions export
+    would carry blank universe columns for it."""
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nMRNA,Portfolio\n", encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match=r"not in universe.csv.*\['MRNA'\]"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_position_jsons_that_do_not_partition_the_csv(tmp_path):
+    """The five per-state JSON files partition positions_and_researching.csv.
+    A sum that disagrees means at least one state file lost rows."""
+    import json
+
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text(
+        json.dumps({"AAPL": {}}), encoding="utf-8")
+    (tmp_path / "researching.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "following_for_interest.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "ready_to_buy.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "ready_to_short.json").write_text(json.dumps({}), encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="1 .*positions_and_researching.csv has 2"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_a_position_json_ticker_outside_the_positions_csv(tmp_path):
+    import json
+
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\n", encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text(
+        json.dumps({"ZEN": {}}), encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="ZEN"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_catches_metadata_count_disagreeing_with_status(tmp_path):
+    """universe_metadata.json is what three siblings key their whole run on —
+    its entry count must agree with the status file that describes it."""
+    import json
+
+    import pytest
+
+    from universe.export_acceptance import ExportAcceptanceError, check_exports
+
+    (tmp_path / "universe_metadata.json").write_text(
+        json.dumps({"AAPL": {"name": "Apple"}}), encoding="utf-8")
+    (tmp_path / "universe_status.json").write_text(
+        json.dumps({"ticker_count": 1086}), encoding="utf-8")
+    with pytest.raises(ExportAcceptanceError, match="claims 1086"):
+        check_exports(tmp_path)
+
+
+def test_acceptance_passes_on_a_fully_consistent_export_set(tmp_path):
+    """A healthy, mutually consistent artifact set raises nothing — the alarm
+    must not be permanently lit."""
+    import json
+
+    from universe.export_acceptance import check_exports
+
+    (tmp_path / "universe.csv").write_text(
+        "Ticker,Name\nAAPL,Apple\nMRNA,Moderna\n", encoding="utf-8")
+    (tmp_path / "universe_metadata.json").write_text(
+        json.dumps({"AAPL": {}, "MRNA": {}}), encoding="utf-8")
+    (tmp_path / "universe_status.json").write_text(
+        json.dumps({"row_count": 2, "ticker_count": 2}), encoding="utf-8")
+    (tmp_path / "positions_and_researching.csv").write_text(
+        "Ticker,Position\nAAPL,Portfolio\nMRNA,Researching\n", encoding="utf-8")
+    (tmp_path / "positions_status.json").write_text(
+        json.dumps({"entry_count": 2}), encoding="utf-8")
+    (tmp_path / "portfolio.json").write_text(json.dumps({"AAPL": {}}), encoding="utf-8")
+    (tmp_path / "researching.json").write_text(json.dumps({"MRNA": {}}), encoding="utf-8")
+    (tmp_path / "following_for_interest.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "ready_to_buy.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "ready_to_short.json").write_text(json.dumps({}), encoding="utf-8")
+    (tmp_path / "watchlist.csv").write_text(
+        "Ticker,Buy Price\nAAPL,180\n", encoding="utf-8")
+    (tmp_path / "watchlist_status.json").write_text(
+        json.dumps({"entry_count": 1}), encoding="utf-8")
+    assert check_exports(tmp_path) == []

@@ -248,15 +248,10 @@ _ROW_COUNTRIES = {
 _INCORPORATION_EXCEPTIONS = {"9926.HK"}
 
 
-def _isin_check_digit_ok(isin):
-    """ISO 6166 mod-10 (Luhn). Arithmetic only — no vendor, no network."""
-    digits = "".join(str(int(c, 36)) if c.isalpha() else c for c in isin.upper())
-    total, double = 0, True
-    for ch in reversed(digits[:-1]):
-        d = int(ch) * (2 if double else 1)
-        total += d - 9 if d > 9 else d
-        double = not double
-    return (10 - total % 10) % 10 == int(digits[-1])
+# Promoted to ticker_utils.isin_check_digit_ok on 2026-07-28 (it now guards the
+# enrich write path, not just these tests). Imported rather than copied: two
+# implementations of a checksum is how they drift.
+from ticker_utils import isin_check_digit_ok as _isin_check_digit_ok
 
 
 @pytest.fixture(scope="module")

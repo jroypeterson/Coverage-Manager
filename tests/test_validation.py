@@ -9,6 +9,7 @@ from universe.validation import (
     validate_no_blank_tickers,
     validate_no_duplicate_tickers,
     validate_case_only_ticker_collisions,
+    validate_country_prefix_coverage,
     validate_duplicate_companies,
     validate_exchange_populated,
     validate_listing_date_agreement,
@@ -133,6 +134,81 @@ class TestRunAllValidations:
         errors, warnings = run_all_validations(df)
         assert len(errors) >= 1  # duplicate ticker
         assert len(warnings) >= 1  # duplicate company + missing exchange
+
+
+# ── country → ISIN-prefix coverage (Codex R3, 2026-07-28) ─────────────────────
+#
+# An incomplete COUNTRY_TO_ISIN_PREFIXES map means the ISIN prefix guard
+# silently does nothing for rows in the unmapped country - the exact
+# silent-no-op class this workspace keeps getting burned by. This validator
+# makes the NEXT gap visible instead of invisible.
+
+class TestCountryPrefixCoverage:
+    def test_mapped_countries_are_clean(self):
+        df = _make_df({
+            "Ticker": ["A", "B"],
+            "Company Name": ["A Co", "B Co"],
+            "Sector (JP)": ["Tech", "Tech"],
+            "Country (HQ)": ["United States", "Ireland"],
+            "Country (Listing)": ["United States", "United States"],
+        })
+        assert validate_country_prefix_coverage(df) == []
+
+    def test_unmapped_country_warns_with_value_and_row_count(self):
+        df = _make_df({
+            "Ticker": ["A", "B", "C"],
+            "Company Name": ["A Co", "B Co", "C Co"],
+            "Sector (JP)": ["Tech", "Tech", "Tech"],
+            "Country (HQ)": ["Ruritania", "Ruritania", "United States"],
+            "Country (Listing)": ["United States", "", "United States"],
+        })
+        warnings = validate_country_prefix_coverage(df)
+        assert len(warnings) == 1
+        assert "Ruritania" in warnings[0]
+        assert "2 row(s)" in warnings[0]
+
+    def test_the_live_nl_defect_class_is_flagged(self):
+        """An alpha-2 code stored where a country NAME belongs (MICC carries
+        HQ='NL'). Not a mapping to add - a value for a human to fix - but it
+        must be VISIBLE."""
+        df = _make_df({
+            "Ticker": ["MICC"],
+            "Company Name": ["The Magnum Ice Cream Company N.V."],
+            "Sector (JP)": ["Consumer"],
+            "Country (HQ)": ["NL"],
+            "Country (Listing)": ["United States"],
+        })
+        warnings = validate_country_prefix_coverage(df)
+        assert len(warnings) == 1 and "'NL'" in warnings[0]
+
+    def test_blank_is_not_a_finding(self):
+        df = _make_df({
+            "Ticker": ["A"],
+            "Company Name": ["A Co"],
+            "Sector (JP)": ["Tech"],
+            "Country (HQ)": [""],
+            "Country (Listing)": [""],
+        })
+        assert validate_country_prefix_coverage(df) == []
+
+    def test_missing_columns_is_not_a_finding(self):
+        assert validate_country_prefix_coverage(_make_df()) == []
+
+    def test_is_a_warning_in_run_all_validations_never_an_error(self):
+        """Wired like validate_case_only_ticker_collisions: it must not gate
+        the weekly build."""
+        df = _make_df({
+            "Ticker": ["A"],
+            "Company Name": ["A Co"],
+            "Sector (JP)": ["Tech"],
+            "Exchange": ["NASDAQ"],
+            "Subsector (JP)": ["X"],
+            "Country (HQ)": ["Ruritania"],
+            "Country (Listing)": ["Ruritania"],
+        })
+        errors, warnings = run_all_validations(df)
+        assert not any("Ruritania" in e for e in errors)
+        assert any("Ruritania" in w for w in warnings)
 
 
 # ── re-listing detectors (2026-07-28) ─────────────────────────────────────────

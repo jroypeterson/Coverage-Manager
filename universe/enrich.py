@@ -15,7 +15,7 @@ from config import ALLOWED_SECTORS_JP, API_KEYS
 from ticker_utils import (
     CSV_PATH, normalize_ticker, MANUAL_TICKER_MAP,
     EXCHANGE_TO_FIGI, EXCHANGE_TO_COUNTRY, COUNTRY_TO_ISO,
-    COUNTRY_TO_ISIN_PREFIX,
+    COUNTRY_TO_ISIN_PREFIXES, COUNTRY_TO_ISO2, isin_check_digit_ok,
     normalize_company_for_comparison, backup_csv, read_universe_csv,
     write_universe_csv,
 )
@@ -50,36 +50,56 @@ def cell_is_empty(val):
 
 
 def validate_isin_for_row(isin, row, ticker=""):
-    """Return `isin` if its 2-letter country prefix matches the row's listing
-    country (or HQ as fallback), else `None`. Logs a warning on mismatch.
+    """Return `isin` if it is structurally valid AND its 2-letter country
+    prefix matches the row's listing country (or HQ as fallback), else `None`.
+    Logs a warning on rejection.
 
-    yfinance and FMP occasionally return a wrong-country ISIN for rebranded
-    or recycled tickers — observed with the "FI" ticker for Fiserv (Swiss
-    ISIN after the FISV→FI rebrand) and with several biotech tickers that
-    were recycled to unrelated foreign issuers. This guard rejects such
-    mismatches so they don't silently land in the universe CSV.
+    Two gates, both offline, run in this order — BEFORE any network check
+    (the OpenFIGI identity check is downstream of this function):
 
-    The ISIN is accepted if its 2-letter prefix matches the country prefix
-    of EITHER `Country (HQ)` or `Country (Listing)`. ADRs need this looser
-    rule because the underlying foreign ISIN (e.g., CH for a Swiss issuer
-    listed on NASDAQ) is the canonical one, even though the listing country
-    is the US. ADR-specific US-CUSIP ISINs (e.g., US-prefixed) also remain
-    valid via the listing-country branch.
+    1. **ISO 6166 check digit** (`ticker_utils.isin_check_digit_ok`, added
+       2026-07-28). Free, deterministic arithmetic that catches typos and
+       structurally-invalid values regardless of country — including on rows
+       whose countries are blank or unmapped, where the prefix rule cannot
+       help. The live case: `CSU` carried `NET000CLBR01`, which is not
+       structurally an ISIN at all.
+    2. **Country prefix.** yfinance and FMP occasionally return a
+       wrong-country ISIN for rebranded or recycled tickers — observed with
+       the "FI" ticker for Fiserv (Swiss ISIN after the FISV→FI rebrand) and
+       with several biotech tickers that were recycled to unrelated foreign
+       issuers.
+
+    The ISIN is accepted if its 2-letter prefix is in the acceptable-prefix
+    set of EITHER `Country (HQ)` or `Country (Listing)`
+    (`COUNTRY_TO_ISIN_PREFIXES` — set-valued, since e.g. Jersey issuers
+    legitimately use JE or GB). ADRs need this looser rule because the
+    underlying foreign ISIN (e.g., CH for a Swiss issuer listed on NASDAQ)
+    is the canonical one, even though the listing country is the US.
+    ADR-specific US-CUSIP ISINs (e.g., US-prefixed) also remain valid via
+    the listing-country branch.
 
     Behavior when the row has no country info or the country isn't in
-    `COUNTRY_TO_ISIN_PREFIX`: no check is applied, the ISIN is accepted.
+    `COUNTRY_TO_ISIN_PREFIXES`: the prefix check is skipped, the ISIN is
+    accepted (the check-digit gate still applies).
     """
     if not isin:
         return None
     s = str(isin).strip()
     if not s or s == "-" or "error" in s.lower():
         return None
+    if not isin_check_digit_ok(s):
+        logger.warning(
+            "ISIN rejected for %s: %s fails the ISO 6166 check digit "
+            "(structurally invalid or a typo)",
+            ticker or "?", s,
+        )
+        return None
     expected_prefixes = set()
     checked_countries = []
     for country_field in ("Country (HQ)", "Country (Listing)"):
         country = str(row.get(country_field, "") or "").strip()
-        if country and country in COUNTRY_TO_ISIN_PREFIX:
-            expected_prefixes.add(COUNTRY_TO_ISIN_PREFIX[country])
+        if country and country in COUNTRY_TO_ISIN_PREFIXES:
+            expected_prefixes.update(COUNTRY_TO_ISIN_PREFIXES[country])
             checked_countries.append(country)
     isin_prefix = s[:2].upper()
     if expected_prefixes and isin_prefix not in expected_prefixes:
@@ -168,10 +188,12 @@ def _empty_row():
     return {c: "" for c in _UNIVERSE_ROW_COLUMNS}
 
 
-# Reverse of COUNTRY_TO_ISIN_PREFIX, built lazily, for normalizing FMP's
+# Reverse of COUNTRY_TO_ISO2 (1:1 by construction), for normalizing FMP's
 # country field (which sometimes returns ISO 3166 alpha-2 codes like "US"
-# instead of full names like "United States").
-_ISIN_PREFIX_TO_COUNTRY = {v: k for k, v in COUNTRY_TO_ISIN_PREFIX.items()}
+# instead of full names like "United States"). Built from the identity-code
+# map, NOT the ISIN-prefix map: prefix sets are many-to-one (Jersey also
+# accepts GB), so reversing them would map GB to the wrong country.
+_ISO2_TO_COUNTRY = {v: k for k, v in COUNTRY_TO_ISO2.items()}
 
 
 def _normalize_country_name(raw):
@@ -181,8 +203,8 @@ def _normalize_country_name(raw):
     s = str(raw or "").strip()
     if not s:
         return ""
-    if len(s) == 2 and s.upper() in _ISIN_PREFIX_TO_COUNTRY:
-        return _ISIN_PREFIX_TO_COUNTRY[s.upper()]
+    if len(s) == 2 and s.upper() in _ISO2_TO_COUNTRY:
+        return _ISO2_TO_COUNTRY[s.upper()]
     return s
 
 
