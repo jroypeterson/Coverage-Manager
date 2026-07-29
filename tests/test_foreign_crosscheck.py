@@ -269,6 +269,13 @@ def universe_rows():
 
 @pytest.mark.parametrize("ticker", sorted(CORRECTED_ISINS))
 def test_corrected_isin_is_what_the_universe_carries(ticker, universe_rows):
+    if ticker == "ZEN":
+        # Removed entirely on 2026-07-28 (JP: "remove it. it was an old
+        # company") — the row was a Zendesk-era artifact repointed to Zentek.
+        # Its absence IS the corrected state; the quarantine entry is asserted
+        # by test_zen_removed_and_quarantined below.
+        assert "ZEN" not in universe_rows
+        return
     wrong, right, _ = CORRECTED_ISINS[ticker]
     stored = universe_rows[ticker]["ISIN"].strip()
     assert stored == right, f"{ticker} ISIN regressed to {stored}"
@@ -283,14 +290,28 @@ def test_corrected_lei_is_what_the_universe_carries(ticker, universe_rows):
     assert stored != wrong
 
 
-@pytest.mark.parametrize("column", sorted(CORRECTED_ZEN_FIGIS))
-def test_zen_carries_zenteks_figis_not_zen_technologies(column, universe_rows):
-    """Correcting only the ISIN would have left the row still lying: ZEN's three
-    Bloomberg IDs were the Indian company's as well."""
-    wrong, right = CORRECTED_ZEN_FIGIS[column]
-    stored = universe_rows["ZEN"][column].strip()
-    assert stored == right, f"ZEN {column} regressed to {stored}"
-    assert stored != wrong
+def test_zen_removed_and_quarantined(universe_rows):
+    """ZEN was removed from the universe on 2026-07-28 (JP: "remove it. it was
+    an old company"): the row was created for Zendesk (NYSE `ZEN` until the
+    2022 take-private — hence its stale `SaaS` sector) and later repointed by
+    ticker to Zentek Ltd, a graphene/nanomaterials company that was never a
+    deliberate pick. Removal is reversible via the delisted_tickers.csv
+    quarantine ledger, so assert both halves: gone from the universe, present
+    in the ledger."""
+    import csv
+
+    import config
+
+    assert "ZEN" not in universe_rows
+    with open(config.DATA_DIR / "delisted_tickers.csv",
+              encoding="utf-8-sig", newline="") as fh:
+        ledger = {r["Ticker"]: r for r in csv.DictReader(fh)}
+    assert "ZEN" in ledger, "removal must be quarantined, not a hard delete"
+    entry = ledger["ZEN"]
+    assert entry["Company Name"] == "Zentek Ltd"
+    assert entry["ISIN"] == "CA98942X1024"      # Zentek's own, not Zen Technologies'
+    assert "Zendesk-era artifact" in entry["Reason"]
+    assert "NOT delisted" in entry["Notes"]     # Zentek still trades; this is a scope removal
 
 
 def test_no_removed_identifier_survives_anywhere_in_the_universe(universe_rows):
