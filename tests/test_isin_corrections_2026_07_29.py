@@ -1,4 +1,10 @@
-"""Pins for the 14 wrong-issuer ISIN corrections applied 2026-07-29 (#249).
+"""VALUE PINS MOVED TO THE PROVENANCE LEDGER (2026-07-30).
+Literal cell assertions now live in `data/identity_provenance.json` and are
+checked by the single `test_the_universe_agrees_with_every_verified_cell`.
+What remains here is what a ledger cannot express: mechanisms, quarantine
+content, and the narrative of why a decision went the way it did.
+
+Pins for the 14 wrong-issuer ISIN corrections applied 2026-07-29 (#249).
 
 Every replacement cleared the same three-part gate before it was written, per the
 protocol set by the first seven corrections in `03812d5`:
@@ -60,26 +66,6 @@ def universe_rows():
     return {r["Ticker"]: r for _, r in df.iterrows()}
 
 
-@pytest.mark.parametrize("ticker", sorted(CORRECTED))
-def test_corrected_isin_is_what_the_universe_carries(ticker, universe_rows):
-    wrong, right, _who = CORRECTED[ticker]
-    stored = universe_rows[ticker]["ISIN"].strip()
-    assert stored == right, f"{ticker} ISIN regressed to {stored}"
-    assert stored != wrong
-    assert isin_check_digit_ok(stored)
-
-
-def test_no_replaced_identifier_survives_anywhere_in_the_universe(universe_rows):
-    """A wrong ISIN is worse than a blank one, because it looks like data. None of
-    the fourteen replaced values may reappear on ANY row, not merely on its own —
-    the generalized `ZEN` lesson."""
-    removed = {w for w, _r, _n in CORRECTED.values()}
-    cols = ("ISIN", "LEI", "FIGI", "Composite FIGI", "Share Class FIGI")
-    hits = [(t, c, row[c].strip()) for t, row in universe_rows.items()
-            for c in cols if c in row and str(row[c]).strip() in removed]
-    assert hits == [], f"a replaced identifier reappeared: {hits}"
-
-
 def test_evo_carries_the_ADR_isin_because_the_row_is_the_ADR_line(universe_rows):
     """The trap this row nearly walked into, and the reason #250 exists.
 
@@ -97,13 +83,6 @@ def test_evo_carries_the_ADR_isin_because_the_row_is_the_ADR_line(universe_rows)
     assert row["ISIN"].strip() != "DE0005664809", "that is the German ordinary"
     assert "ADR" in str(row.get("Listing Type", "")), (
         "if this row stops being the ADR line, its ISIN must be revisited")
-
-
-@pytest.mark.parametrize("ticker", sorted(HELD))
-def test_held_conflicts_were_not_silently_changed(ticker, universe_rows):
-    """These six stayed as they were ON PURPOSE. Asserting the hold means a later
-    pass cannot quietly 'fix' one without confronting why it was left."""
-    assert universe_rows[ticker]["ISIN"].strip() == HELD[ticker]
 
 
 def test_fgen_became_kynb_and_kept_its_isin(universe_rows):
@@ -196,9 +175,3 @@ def test_cbio_resolved_by_the_merger_cusip(universe_rows):
     assert isin_check_digit_ok(row["ISIN"].strip())
     assert row["CIK"].strip() == "1253689"
 
-
-def test_the_pre_split_cbio_isin_is_gone_from_every_row(universe_rows):
-    cols = ("ISIN", "LEI", "FIGI", "Composite FIGI", "Share Class FIGI")
-    hits = [(t, c) for t, r in universe_rows.items()
-            for c in cols if c in r and str(r[c]).strip() == "US38000Q1022"]
-    assert hits == [], f"the pre-split ISIN reappeared: {hits}"

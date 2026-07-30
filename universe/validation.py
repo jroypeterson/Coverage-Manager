@@ -135,6 +135,39 @@ def validate_country_prefix_coverage(df):
     return warnings
 
 
+def validate_against_provenance_ledger(df):
+    """Warn when the universe drifts from a cell a human verified.
+
+    The ledger (`data/identity_provenance.json`) records what was checked, when,
+    and on what evidence. Drift here means one of two things and BOTH want a
+    human: either the row regressed (a re-enrichment overwrote a verified value),
+    or a real corporate action moved it and the ledger needs a new entry. It is
+    never automatically one or the other, which is exactly why this warns rather
+    than corrects.
+
+    A WARNING, never an error: it must not gate the weekly build. A missing or
+    malformed ledger is itself reported rather than silently skipped — "I could
+    not check" must never read as "I checked and it is fine".
+    """
+    try:
+        from universe.provenance import LedgerError, check_universe, load_ledger
+    except ImportError:
+        return []
+    try:
+        ledger = load_ledger()
+    except LedgerError as e:
+        return [f"provenance ledger unreadable, so verified cells were NOT "
+                f"checked this run: {e}"]
+    problems = check_universe(df, ledger)
+    if not problems:
+        return []
+    return [f"{len(problems)} row(s) drifted from a human-verified value - either "
+            f"the row regressed or a corporate action moved it, and the ledger "
+            f"needs a new entry either way: "
+            + "; ".join(problems[:8])
+            + (f" ... +{len(problems) - 8} more" if len(problems) > 8 else "")]
+
+
 def validate_venue_consistency(df):
     """Warn when a row's Exchange, Country (Listing) and Currency disagree.
 
@@ -433,6 +466,7 @@ def run_all_validations(df):
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))
     warnings.extend(validate_venue_consistency(df))
+    warnings.extend(validate_against_provenance_ledger(df))
     warnings.extend(validate_subsector_populated(df))
     warnings.extend(validate_listing_date_agreement(df))
     warnings.extend(validate_relisting_cik_cohort(df))

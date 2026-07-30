@@ -1,4 +1,10 @@
-"""Pins for the three row defects JP decided on 2026-07-29 (#251, #252).
+"""VALUE PINS MOVED TO THE PROVENANCE LEDGER (2026-07-30).
+Literal cell assertions now live in `data/identity_provenance.json` and are
+checked by the single `test_the_universe_agrees_with_every_verified_cell`.
+What remains here is what a ledger cannot express: mechanisms, quarantine
+content, and the narrative of why a decision went the way it did.
+
+Pins for the three row defects JP decided on 2026-07-29 (#251, #252).
 
 All three are *row* fixes, not code fixes, so nothing but a test keeps them
 fixed — the next enrichment pass or a restored backup can silently undo any of
@@ -37,20 +43,6 @@ def delisted_ledger():
 
 # ── #252 CSU ────────────────────────────────────────────────────────────────
 
-def test_csu_isin_is_constellation_softwares_own(universe_rows):
-    """`NET000CLBR01` is not structurally an ISIN at all — it fails the ISO 6166
-    check digit, the only row of 794 that did. The replacement was verified
-    against two independent sources before writing, per the #249 protocol:
-    OpenFIGI maps CA21037X1006 -> CONSTELLATION SOFTWARE INC trading as `CSU`
-    on Toronto (exchCode CT/CN), and GLEIF corroborates the 21037X CUSIP body
-    as Constellation Software Inc. (LEI 549300B6PYHMCTDWQV29, ACTIVE, CA
-    Toronto) via its bond ISINs US21037XAC48 / US21037XAD21.
-    """
-    stored = universe_rows["CSU"]["ISIN"].strip()
-    assert stored == "CA21037X1006", f"CSU ISIN regressed to {stored!r}"
-    assert stored != "NET000CLBR01"
-    assert isin_check_digit_ok(stored)
-
 
 def test_the_old_csu_value_still_fails_the_check_digit():
     """Guards the premise, not just the outcome: if `isin_check_digit_ok` ever
@@ -60,10 +52,6 @@ def test_the_old_csu_value_still_fails_the_check_digit():
 
 
 # ── #252 MICC ───────────────────────────────────────────────────────────────
-
-def test_micc_country_hq_is_a_country_name_not_a_code(universe_rows):
-    stored = universe_rows["MICC"]["Country (HQ)"].strip()
-    assert stored == "Netherlands", f"MICC Country (HQ) regressed to {stored!r}"
 
 
 def test_country_prefix_coverage_is_quiet(universe_rows):
@@ -129,13 +117,6 @@ def test_neither_icad_contaminant_survives_anywhere_in_the_universe(universe_row
     hits = [(t, c, row[c].strip()) for t, row in universe_rows.items()
             for c in cols if c in row and str(row[c]).strip() in banned]
     assert hits == [], f"removed identifier reappeared: {hits}"
-
-
-def test_universe_row_count_after_the_two_removals(universe_rows):
-    """1098 -> 1097 (ICAD out) -> 1096 (ALBT out; FGEN->KYNB is a rename, so it
-    does not change the count). Cheap tripwire against a restored backup
-    silently reinstating a removed row along with whatever else it predates."""
-    assert len(universe_rows) == 1096
 
 
 def test_albt_removed_as_a_SCOPE_change_not_a_delisting(universe_rows, delisted_ledger):
