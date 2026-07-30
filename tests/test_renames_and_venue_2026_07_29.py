@@ -148,20 +148,93 @@ def test_no_namesake_identifier_survives_anywhere(rows):
     assert cik_hits == [], f"a namesake CIK reappeared: {cik_hits}"
 
 
-def test_the_root_cause_is_recorded_not_just_the_symptoms(rows):
-    """⚑ OPEN, deliberately not fixed here: all six rows are keyed on a BARE
-    foreign ticker, which is exactly why a US namesake's data landed on them.
+def test_these_rows_are_internally_consistent_however_they_are_keyed():
+    """The invariant, replacing an inverted sentinel.
 
-    This file's own convention already supports suffixes -- `GALD.SW`, `BOI.PA`,
-    `DIA.MI`, `2715.HK` all carry one -- and `MED.SW` / `MOVE.SW` / `UCB.BR`
-    would stop the recurrence at the source. Re-keying was NOT done unilaterally
-    because a ticker is the published join key ~20 sibling repos match on.
+    The first version of this test asserted these tickers had NO suffix, framed
+    as "documenting the exposure". An architectural review pointed out it was
+    backwards: it would FAIL the day someone finally re-keyed the rows to
+    `MED.SW` etc. and fixed the root cause. A test that punishes the fix is worse
+    than no test.
 
-    This test documents the exposure rather than asserting the fix: it fails the
-    day someone adds a suffix, which is the moment to delete it and update
-    DEPENDENCIES.md.
+    What actually needs pinning is the invariant, not the key: whatever these
+    rows are called, their Exchange, Country (Listing) and Currency must agree.
+    That is now enforced for the whole file by
+    `validate_venue_consistency`, so this asserts the general property and stops
+    caring about the ticker string.
     """
+    from ticker_utils import read_universe_csv
+    from universe.validation import validate_venue_consistency
+
+    warnings = validate_venue_consistency(read_universe_csv())
+    blob = " ".join(warnings)
     for t in ("GXI", "SDZ", "TUB", "MED", "MOVE", "UCB"):
-        assert "." not in t and t in rows, (
-            f"{t} appears to have been re-keyed -- if a suffix was added, update "
-            f"the consumers and delete this test")
+        assert f"{t} (" not in blob, (
+            f"{t} regressed to an inconsistent venue/currency:\n" + blob[:600])
+
+
+# ── the validator that should have found all six in one pass ────────────────
+
+def test_venue_validator_catches_the_prefix_of_tonights_own_defects():
+    """Regression harness for the mechanism, not the rows.
+
+    `validate_venue_consistency` was added after two reviewers observed that six
+    rows had been corrected ONE AT A TIME by hand when a single offline pass over
+    data already in the file would have surfaced all of them. Prove it actually
+    does, by running it against a synthetic row shaped like the defect.
+    """
+    import pandas as pd
+    from universe.validation import validate_venue_consistency
+
+    bad = pd.DataFrame([{
+        "Ticker": "ZZZ", "Exchange": "SIX", "Country (Listing)": "United States",
+        "Currency": "USD", "Listing Type": "Primary",
+    }])
+    warnings = validate_venue_consistency(bad)
+    blob = " ".join(warnings)
+    assert "ZZZ" in blob
+    assert "Switzerland" in blob                      # names the real venue country
+    assert any("Currency" in w for w in warnings)     # and the currency half
+
+
+def test_venue_validator_does_not_flag_a_legitimate_cross_listing():
+    """`EVO` is a correct NASDAQ/USD row for a German issuer. A validator that
+    flagged every ADR would be turned off within a week."""
+    import pandas as pd
+    from universe.validation import validate_venue_consistency
+
+    adr = pd.DataFrame([{
+        "Ticker": "EVO", "Exchange": "NASDAQ", "Country (Listing)": "United States",
+        "Currency": "USD", "Listing Type": "ADR/Cross-listed",
+    }])
+    assert validate_venue_consistency(adr) == []
+
+
+def test_venue_validator_accepts_minor_currency_units():
+    """The LSE quotes in pence and the JSE in cents. Flagging `GBp`/`ZAc` would
+    plant permanent false positives in a warning, which is how validators die."""
+    import pandas as pd
+    from universe.validation import validate_venue_consistency
+
+    minor = pd.DataFrame([
+        {"Ticker": "AGY.L", "Exchange": "LSE", "Country (Listing)": "United Kingdom",
+         "Currency": "GBp", "Listing Type": ""},
+        {"Ticker": "APN.JO", "Exchange": "JSE", "Country (Listing)": "South Africa",
+         "Currency": "ZAc", "Listing Type": ""},
+    ])
+    assert validate_venue_consistency(minor) == []
+
+
+def test_venue_validator_stays_silent_on_data_it_cannot_judge():
+    """An unmapped exchange or a blank cell is absent information, not a defect --
+    the found/clean/inconclusive discipline applied to a validator."""
+    import pandas as pd
+    from universe.validation import validate_venue_consistency
+
+    unknown = pd.DataFrame([
+        {"Ticker": "AAA", "Exchange": "Some New Bourse",
+         "Country (Listing)": "Ruritania", "Currency": "XYZ", "Listing Type": ""},
+        {"Ticker": "BBB", "Exchange": "", "Country (Listing)": "",
+         "Currency": "", "Listing Type": ""},
+    ])
+    assert validate_venue_consistency(unknown) == []

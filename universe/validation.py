@@ -135,6 +135,99 @@ def validate_country_prefix_coverage(df):
     return warnings
 
 
+def validate_venue_consistency(df):
+    """Warn when a row's Exchange, Country (Listing) and Currency disagree.
+
+    Every cell on a row is supposed to describe ONE security on ONE venue. When a
+    foreign row is keyed on a bare ticker that a US company also uses, the vendor
+    lookup returns the US namesake and stamps its venue over the row -- so the
+    row ends up claiming, say, a SIX-listed Swiss company that trades on NASDAQ
+    in USD. That is detectable OFFLINE, from data already in the file, and this
+    check is the thing that was missing.
+
+    Found by two independent reviews on 2026-07-29, after six such rows
+    (`GXI`, `SDZ`, `TUB`, `MED`, `MOVE`, `UCB`) were corrected ONE AT A TIME by
+    hand. Every one of them would have shown up in a single pass of this
+    function, and it uses only `EXCHANGE_TO_COUNTRY`, which already existed. The
+    lesson worth keeping: the fixes were individually correct and collectively a
+    symptom -- nothing asserted the row-level invariant, so each pass only found
+    the cells someone thought to look at.
+
+    A WARNING, never an error, deliberately: cross-listed rows are legitimately
+    mixed (an ADR row is a US venue for a foreign issuer, and its Currency is
+    correctly USD), so this cannot gate the weekly build. `Listing Type`
+    containing "ADR" or "Cross" suppresses the country check for exactly that
+    reason -- see the `EVO` row, which is a correct NASDAQ/USD line for a German
+    issuer.
+    """
+    from ticker_utils import EXCHANGE_TO_COUNTRY
+
+    # Expected trading currency per venue country. Only unambiguous ones: a
+    # missing entry means "don't judge", not "wrong".
+    COUNTRY_TO_CCY = {
+        "United States": "USD", "United Kingdom": "GBP", "Germany": "EUR",
+        "France": "EUR", "Belgium": "EUR", "Switzerland": "CHF",
+        "Italy": "EUR", "Spain": "EUR", "Japan": "JPY",
+        "Hong Kong": "HKD", "South Korea": "KRW", "Taiwan": "TWD",
+        "Australia": "AUD", "New Zealand": "NZD", "Canada": "CAD",
+        "Brazil": "BRL", "India": "INR", "Sweden": "SEK", "Denmark": "DKK",
+        "Finland": "EUR", "Norway": "NOK", "Poland": "PLN", "Mexico": "MXN",
+        "South Africa": "ZAR", "Saudi Arabia": "SAR",
+    }
+
+    warnings = []
+    country_mismatch = []
+    ccy_mismatch = []
+    for _, row in df.iterrows():
+        ticker = str(row.get("Ticker", "") or "").strip()
+        exch = str(row.get("Exchange", "") or "").strip()
+        if not exch:
+            continue                      # validate_exchange_populated owns that
+        venue_country = EXCHANGE_TO_COUNTRY.get(exch)
+        if not venue_country:
+            continue                      # unmapped venue: absent, not wrong
+        listing = str(row.get("Country (Listing)", "") or "").strip()
+        ccy = str(row.get("Currency", "") or "").strip()
+        listing_type = str(row.get("Listing Type", "") or "").strip().lower()
+        cross_listed = "adr" in listing_type or "cross" in listing_type
+
+        if listing and listing != venue_country:
+            country_mismatch.append(
+                f"{ticker} (Exchange {exch} is in {venue_country}, "
+                f"Country (Listing) says {listing})")
+        # A cross-listed row legitimately trades in its venue's currency, which
+        # is why the currency test keys off the VENUE, not the issuer's home.
+        expected = COUNTRY_TO_CCY.get(venue_country)
+        # MINOR UNITS are not defects. The LSE quotes in pence (`GBp`), the JSE
+        # in cents (`ZAc`), Tel Aviv in agorot (`ILA`) -- vendors return these and
+        # they are the correct quoting convention for that venue. Flagging them
+        # would put ~6 permanent false positives in a warning nobody would then
+        # read, which is how a validator dies.
+        MINOR_UNITS = {"GBP": {"GBX", "GBP"}, "ZAR": {"ZAC", "ZAR"},
+                       "ILS": {"ILA", "ILS"}}
+        accepted = {expected} | MINOR_UNITS.get(expected, set())
+        if expected and ccy and ccy.upper() not in accepted and not cross_listed:
+            ccy_mismatch.append(
+                f"{ticker} (trades on {exch} in {venue_country}, "
+                f"expected {expected}, row says {ccy})")
+
+    if country_mismatch:
+        warnings.append(
+            f"{len(country_mismatch)} row(s) whose Exchange and Country (Listing) "
+            f"disagree - one of the two is wrong, and a bare ticker colliding with "
+            f"a US namesake is the usual cause: "
+            + "; ".join(country_mismatch[:10])
+            + (f" ... +{len(country_mismatch) - 10} more" if len(country_mismatch) > 10 else ""))
+    if ccy_mismatch:
+        warnings.append(
+            f"{len(ccy_mismatch)} row(s) whose Currency does not match the venue "
+            f"they trade on (set Listing Type to an ADR/Cross value if the row is "
+            f"genuinely a cross-listing): "
+            + "; ".join(ccy_mismatch[:10])
+            + (f" ... +{len(ccy_mismatch) - 10} more" if len(ccy_mismatch) > 10 else ""))
+    return warnings
+
+
 def validate_listing_date_agreement(df, max_year_gap=1):
     """Warn when `Year Listed` disagrees with a verified `IPO Date`.
 
@@ -339,6 +432,7 @@ def run_all_validations(df):
     warnings.extend(validate_country_prefix_coverage(df))
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))
+    warnings.extend(validate_venue_consistency(df))
     warnings.extend(validate_subsector_populated(df))
     warnings.extend(validate_listing_date_agreement(df))
     warnings.extend(validate_relisting_cik_cohort(df))
