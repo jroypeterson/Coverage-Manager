@@ -47,7 +47,7 @@ CORRECTED = {
 # universe, see test_row_defects), FGEN is now Kyntra Bio trading as KYNB
 # (remapped). See test_fgen_became_kynb below.
 HELD = {
-    "CBIO": "US38000Q1022",   # GLEIF-only candidate, no OpenFIGI coverage
+    # CBIO was resolved 2026-07-30 -- see test_cbio_resolved_by_the_merger_cusip.
     "CPH":  "CH0001624714",   # no candidate cleared both sources
     "MDLA": "SE0008937411",   # Indonesian; no candidate found at all
     "2715.HK": "EE0000000453",  # no GLEIF record; H-share status unclear
@@ -166,3 +166,39 @@ def test_every_replacement_is_absent_from_the_delisted_ledger():
         ledger_isins = {r["ISIN"].strip() for r in csv.DictReader(fh) if r["ISIN"].strip()}
     new = {r for _w, r, _n in CORRECTED.values()}
     assert not (new & ledger_isins), f"collision with quarantine: {new & ledger_isins}"
+
+
+def test_cbio_resolved_by_the_merger_cusip(universe_rows):
+    """CBIO came off the held list on 2026-07-30 with THREE confirmations, not one.
+
+    It was held because `US38000Q2012` had GLEIF but no OpenFIGI coverage, and one
+    source is not two. A web search settled it: the GlycoMimetics/Crescent reverse
+    merger (closed 2025-06-16) was preceded by a **1-for-100 reverse split**, and
+    the merger release names the post-split CUSIP as **38000Q201**. That composes
+    to exactly one valid ISIN -- `US38000Q2012` -- so:
+
+      1. GLEIF ties US38000Q2012 to Crescent Biopharma's LEI 549300TZ84FFU2J2J459
+      2. the merger release's CUSIP 38000Q201 + the ISO 6166 check digit yields
+         US38000Q2012 uniquely
+      3. the check digit passes
+
+    And it explains the stored value rather than just overruling it: the old
+    `US38000Q1022` embeds CUSIP `38000Q102`, the **pre-split** line -- which is
+    precisely why OpenFIGI still resolves it to GLYCOMIMETICS. Nothing was wrong
+    with that mapping; the row was one corporate action behind.
+
+    The CIK is unchanged (1253689) because the registrant survived the merger --
+    the same reason FGEN kept its LEI through the Kyntra rename.
+    """
+    row = universe_rows["CBIO"]
+    assert row["ISIN"].strip() == "US38000Q2012"
+    assert row["ISIN"].strip() != "US38000Q1022", "that is the pre-reverse-split line"
+    assert isin_check_digit_ok(row["ISIN"].strip())
+    assert row["CIK"].strip() == "1253689"
+
+
+def test_the_pre_split_cbio_isin_is_gone_from_every_row(universe_rows):
+    cols = ("ISIN", "LEI", "FIGI", "Composite FIGI", "Share Class FIGI")
+    hits = [(t, c) for t, r in universe_rows.items()
+            for c in cols if c in r and str(r[c]).strip() == "US38000Q1022"]
+    assert hits == [], f"the pre-split ISIN reappeared: {hits}"

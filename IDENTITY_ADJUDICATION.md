@@ -9,7 +9,7 @@ can be decided in one sitting.
 
 | Measure | Value |
 |---|---:|
-| ISIN → issuer conflicts | **4** (was 21) |
+| ISIN → issuer conflicts | **3** (was 21) |
 | ISIN → issuer inconclusive | ~30 |
 | Venue-consistency warnings | **0** |
 | Country-prefix warnings | **0** |
@@ -25,7 +25,7 @@ re-accumulate: `delisted_check` [4/6], `cik_backfill` [4a/6],
 
 ---
 
-## A. Needs a JP decision (4 items)
+## A. Needs a JP decision (3 open, 1 decided)
 
 ### A1. `Listing Type` — ADR vs interlisted ordinary
 **Status: DECIDED 2026-07-29 — add a separate `Instrument Type` column.** Not yet
@@ -33,19 +33,28 @@ built; it is `#250` on the board. This is the one that unblocks the ADR ISIN rul
 (Rule A), which would otherwise reject 84 legitimate rows. Everything below in
 this section is smaller.
 
-### A2. The 4 remaining ISIN → issuer conflicts
+### A2. The 3 remaining ISIN → issuer conflicts
 None auto-applied; two independent sources could not settle any of them.
 
 | Ticker | Row says | Stored ISIN resolves to | What would settle it |
 |---|---|---|---|
 | `2715.HK` | Estun Automation Co Ltd | ELKOP ESTONIA SE | Is this an H-share line at all? Estun is Shenzhen `002747`. If the row means the A-share, the ticker is wrong, not just the ISIN. |
 | `CPH` | Cipher Pharmaceuticals Inc | CPH CHEMIE & PAPIER / CPH GROUP AG | Cipher's TSX ISIN. GLEIF gives US-prefixed lines (`US17253X2045/3035`) with no OpenFIGI coverage; the CA-prefixed equity line is unconfirmed. |
-| `CBIO` | Crescent Biopharma Inc | GLYCOMIMETICS INC | `US38000Q2012` is confirmed by GLEIF (same `38000Q` CUSIP body — the GlycoMimetics→Crescent reverse merger) but has **no OpenFIGI coverage**, so it is one source, not two. |
 | `MDLA` | Medela Potentia Tbk PT | MALARASEN AB | An Indonesian (`ID…`) ISIN. Neither source produced a candidate. |
 
-**Recommendation:** `CBIO` is the one I would apply on one source — the CUSIP-body
-lineage is strong direct evidence and the current value is provably another
-company's. The other three I would leave and re-probe on the weekly.
+**`CBIO` — RESOLVED 2026-07-30, and on two sources, not one.** A web search settled
+what OpenFIGI could not: the GlycoMimetics/Crescent merger closed 2025-06-16 preceded
+by a **1-for-100 reverse split**, and the merger release names the post-split CUSIP as
+**`38000Q201`** — which composes to exactly one valid ISIN, `US38000Q2012`. With GLEIF
+independently tying that ISIN to Crescent's LEI, it clears the same two-source bar as
+the 14 applied on 07-29. It also *explains* the stored value instead of overruling it:
+`US38000Q1022` embeds CUSIP `38000Q102`, the **pre-split** line, which is precisely why
+OpenFIGI resolved it to GLYCOMIMETICS. The mapping was never wrong — the row was one
+corporate action behind. CIK unchanged (1253689); the registrant survived the merger.
+
+**The remaining three** (`2715.HK`, `CPH`, `MDLA`) stay held and re-probe on the weekly
+`[4d/6]` step. The lesson worth carrying: *a held conflict is often a corporate action
+nobody has looked up yet, not a bad identifier* — the same shape as `FGEN`/`ALBT`.
 
 ### A3. `ALBT` / `FGEN` — name decisions, now resolved
 Closed 2026-07-29 on JP's call: `FGEN`→`KYNB` (Kyntra Bio, same registrant),
