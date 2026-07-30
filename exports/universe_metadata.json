@@ -5585,7 +5585,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "RENB": {
+  "LNAI": {
     "name": "Lunai Bioworks Inc.",
     "sector": "Biopharma",
     "subsector": "",
@@ -6474,7 +6474,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "THAR": {
+  "CNTN": {
     "name": "Canton Strategic Holdings Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
@@ -7202,7 +7202,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "ZOM": {
+  "ZOMDF": {
     "name": "Zomedica Corp.",
     "sector": "Biopharma",
     "subsector": "",
