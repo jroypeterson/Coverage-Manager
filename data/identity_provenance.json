@@ -480,6 +480,51 @@
         "OpenFIGI: HELP/US -> CYBIN INC, Common Stock; the old CYBN/US returns 'No identifier found'"
       ],
       "note": "Found by the name-based resolver simulation, which is the whole argument for building that verb: CYBN was invisible to check-ticker-changes (CIK-keyed, and the CIK was blank) AND to backfill-cik (ticker-keyed, and CYBN had already left SEC's map). Exchange left as NYSE deliberately -- EDGAR reports Nasdaq but OpenFIGI could not corroborate a US venue from the ISIN, and one source is not the bar for a write."
+    },
+    {
+      "ticker": "ADAPY",
+      "field": "Exchange",
+      "value": "OTC",
+      "verified": "2026-07-30",
+      "supersedes": "NASDAQ",
+      "sources": [
+        "Adaptimmune press release: ADSs voluntarily delisted from Nasdaq 2025-10-28 and quoted on the OTC Pink Limited Market as ADAPY",
+        "EDGAR: Adaptimmune Therapeutics PLC, CIK 1621227, ticker ADAPY, exchange OTC"
+      ],
+      "note": "A VENUE move, not a rename -- the company name is unchanged. OpenFIGI types ADAPY as an ADR, and the old ADAP no longer resolves at all. Deregistration under 12(b) was expected ~2026-01-26; the company remains a going concern."
+    },
+    {
+      "ticker": "ADAPY",
+      "field": "CIK",
+      "value": "1621227",
+      "verified": "2026-07-30",
+      "sources": [
+        "EDGAR: Adaptimmune Therapeutics PLC, CIK 1621227",
+        "Found by resolve-cik-by-name, which matched the row's company name to this registrant filing under a different ticker"
+      ]
+    },
+    {
+      "ticker": "CASIF",
+      "field": "Exchange",
+      "value": "OTC",
+      "verified": "2026-07-30",
+      "supersedes": "NASDAQ",
+      "sources": [
+        "EDGAR: CASI Pharmaceuticals, Inc., CIK 1962738, ticker CASIF, exchange OTC; still filing (6-K accepted 2026-07-15)",
+        "OpenFIGI: CASIF -> CASI PHARMACEUTICALS INC, Common Stock; the old CASI no longer resolves"
+      ],
+      "note": "Note EDGAR carries TWO CASI registrants -- 895051 'CASI Pharmaceuticals, Inc (DE)' and the current 1962738, which files 6-K as a foreign private issuer. The row is tagged ADR/Cross-listed with Country (HQ) China, consistent with the redomicile. Still a going concern."
+    },
+    {
+      "ticker": "CASIF",
+      "field": "CIK",
+      "value": "1962738",
+      "verified": "2026-07-30",
+      "sources": [
+        "EDGAR: the CURRENT CASI registrant filing 6-Ks is CIK 1962738",
+        "OpenFIGI: CASIF resolves to CASI PHARMACEUTICALS INC"
+      ],
+      "note": "Deliberately NOT the older DE entity CIK 895051 -- that registrant predates the redomicile and is not the filer today."
     }
   ],
   "removals": [
@@ -518,6 +563,31 @@
       ],
       "quarantined_to": "data/delisted_tickers.csv",
       "note": "Its identifiers were CORRECT -- this was never an identifier defect. The audit flagged it because the NAME was two renames behind."
+    },
+    {
+      "ticker": "APTO",
+      "verified": "2026-07-30",
+      "delisted": true,
+      "reason": "Acquired by Hanmi Pharmaceutical; plan of arrangement closed 2026-06-30 and the company deregistered in both the US and Canada.",
+      "evidence": [
+        "Aptose press release / 8-K: HS North America Ltd (Hanmi subsidiary) acquired all outstanding shares, closing 2026-06-30; TSX delisting ~2026-07-03",
+        "EDGAR CIK 882361: Form 4s accepted 2026-07-01/02, consistent with the closing",
+        "OpenFIGI returns 'No identifier found' for BOTH APTO and APTOF"
+      ],
+      "quarantined_to": "data/delisted_tickers.csv",
+      "note": "The resolver flagged this as a stale US listing (Nasdaq -> OTC, 2025-04-02). The venue move was the visible half; the ACQUISITION was the real event, and only a web search surfaced it."
+    },
+    {
+      "ticker": "LIAN",
+      "verified": "2026-07-30",
+      "delisted": false,
+      "reason": "Wound down - voluntary Nasdaq delisting 2024-03-18 (Form 25), operations wound down through 2024, full dissolution expected H1 2027. Removed for SCOPE: a cash-return vehicle, not an investable healthcare business.",
+      "evidence": [
+        "LianBio press releases: strategic review completed Feb 2024, wind-down initiated, last Nasdaq trading day on or about 2024-03-18",
+        "OpenFIGI: LIANY -> LIANBIO-ADR still resolves, so the ADS remains quotable OTC"
+      ],
+      "quarantined_to": "data/delisted_tickers.csv",
+      "note": "delisted=false is deliberate: it is delisted from NASDAQ but not dissolved, and the ADS still quotes OTC. The removal is a scope judgement, and it should be revisited only if the H1 2027 dissolution does not complete."
     }
   ],
   "renames": [
@@ -569,6 +639,26 @@
         "OpenFIGI: CYBN/US no longer resolves; HELP/US is CYBIN INC"
       ],
       "note": "The live case the resolver plan was written around."
+    },
+    {
+      "from": "ADAP",
+      "to": "ADAPY",
+      "verified": "2026-07-30",
+      "evidence": [
+        "Adaptimmune press release: Nasdaq delisting 2025-10-28, ADSs quoted OTC Pink as ADAPY",
+        "EDGAR + OpenFIGI both resolve ADAPY; ADAP resolves nowhere"
+      ],
+      "note": "Venue move to OTC, not a rebrand."
+    },
+    {
+      "from": "CASI",
+      "to": "CASIF",
+      "verified": "2026-07-30",
+      "evidence": [
+        "EDGAR: CIK 1962738 ticker CASIF, exchange OTC, still filing 6-Ks",
+        "OpenFIGI: CASIF -> CASI PHARMACEUTICALS INC; CASI resolves nowhere"
+      ],
+      "note": "Venue move to OTC."
     }
   ],
   "held": [

@@ -517,7 +517,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "ADAP": {
+  "ADAPY": {
     "name": "Adaptimmune Therapeutics PLC",
     "sector": "Biopharma",
     "subsector": "",
@@ -1004,13 +1004,6 @@
     "name": "Aprea Therapeutics Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
-  "APTO": {
-    "name": "Aptose Biosciences, Inc.",
-    "sector": "Biopharma",
-    "subsector": "",
     "sub_subsector": "",
     "core": ""
   },
@@ -1721,7 +1714,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "CASI": {
+  "CASIF": {
     "name": "CASI Pharmaceuticals Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
@@ -4016,13 +4009,6 @@
     "subsector": "Labs",
     "sub_subsector": "",
     "core": "Y"
-  },
-  "LIAN": {
-    "name": "LianBio",
-    "sector": "Biopharma",
-    "subsector": "",
-    "sub_subsector": "",
-    "core": ""
   },
   "LIN": {
     "name": "Linde plc",
