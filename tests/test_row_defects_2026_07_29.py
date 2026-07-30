@@ -131,7 +131,34 @@ def test_neither_icad_contaminant_survives_anywhere_in_the_universe(universe_row
     assert hits == [], f"removed identifier reappeared: {hits}"
 
 
-def test_universe_row_count_dropped_by_exactly_one(universe_rows):
-    """1098 -> 1097. Cheap tripwire against a restored backup silently
-    reinstating ICAD along with whatever else that backup predates."""
-    assert len(universe_rows) == 1097
+def test_universe_row_count_after_the_two_removals(universe_rows):
+    """1098 -> 1097 (ICAD out) -> 1096 (ALBT out; FGEN->KYNB is a rename, so it
+    does not change the count). Cheap tripwire against a restored backup
+    silently reinstating a removed row along with whatever else it predates."""
+    assert len(universe_rows) == 1096
+
+
+def test_albt_removed_as_a_SCOPE_change_not_a_delisting(universe_rows, delisted_ledger):
+    """ALBT left the universe because the COMPANY left healthcare, not because it
+    stopped trading — and the ledger has to say which, or a future reader will
+    assume delisted.
+
+    JP, 2026-07-29: "You can get rid of ALBT. It used to be a clinical company
+    but then changed." Confirmed three independent ways: SEC's ticker map now
+    titles CIK 1630212 "Change Agents Corporation." (was Avalon GloboCare Corp),
+    OpenFIGI resolves US05344R3021 to CHANGE AGENTS CORP, and EDGAR classifies
+    the registrant as `technology`. It is still filing (8-K accepted 2026-07-29)
+    and still listed — very much alive.
+    """
+    assert "ALBT" not in universe_rows
+    assert "ALBT" in delisted_ledger, "removal must be quarantined, not a hard delete"
+    e = delisted_ledger["ALBT"]
+    assert e["Delisted Date"].strip() == "", "it is NOT delisted; leave the date blank"
+    # Assert the CLAIM, not one phrasing of it: the note must state somewhere that
+    # this is not a delisting, and must say the company is still trading.
+    notes = e["Notes"]
+    assert ("NOT a delisting" in notes) or ("NOT delisted" in notes), notes[:200]
+    assert "ALIVE" in notes or "still filing" in notes, notes[:200]
+    assert "Change Agents" in e["Reason"] or "Change Agents" in notes
+    # Its identifiers were CORRECT — this was never an identifier defect.
+    assert e["ISIN"].strip() == "US05344R3021"

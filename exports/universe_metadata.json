@@ -685,13 +685,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "ALBT": {
-    "name": "Avalon Globocare Corp",
-    "sector": "Biopharma",
-    "subsector": "",
-    "sub_subsector": "",
-    "core": ""
-  },
   "ALC": {
     "name": "Alcon Inc.",
     "sector": "MedTech",
@@ -2827,8 +2820,8 @@
     "sub_subsector": "",
     "core": "Y"
   },
-  "FGEN": {
-    "name": "FibroGen Inc.",
+  "KYNB": {
+    "name": "Kyntra Bio, Inc.",
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",

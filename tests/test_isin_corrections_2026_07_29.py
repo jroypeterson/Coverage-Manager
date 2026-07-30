@@ -40,9 +40,13 @@ CORRECTED = {
 }
 
 # Conflicts left in place, with the reason each could not be settled.
+#
+# ALBT and FGEN were BOTH resolved later the same day, and neither by touching an
+# ISIN -- which was the point of holding them. JP identified both immediately:
+# ALBT "used to be a clinical company but then changed" (removed from the
+# universe, see test_row_defects), FGEN is now Kyntra Bio trading as KYNB
+# (remapped). See test_fgen_became_kynb below.
 HELD = {
-    "ALBT": "US05344R3021",   # ISIN is RIGHT; the stored NAME is stale
-    "FGEN": "US31572Q8814",   # ISIN is RIGHT; the stored NAME is stale
     "CBIO": "US38000Q1022",   # GLEIF-only candidate, no OpenFIGI coverage
     "CPH":  "CH0001624714",   # no candidate cleared both sources
     "MDLA": "SE0008937411",   # Indonesian; no candidate found at all
@@ -102,15 +106,56 @@ def test_held_conflicts_were_not_silently_changed(ticker, universe_rows):
     assert universe_rows[ticker]["ISIN"].strip() == HELD[ticker]
 
 
-def test_albt_and_fgen_are_name_problems_not_isin_problems(universe_rows):
-    """Both were filed as "probable renames — the NAME side may be stale", and
-    that is exactly what the evidence says: GLEIF lists each row's STORED ISIN
-    under the correct issuer's own LEI, while OpenFIGI returns a different name
-    for it (CHANGE AGENTS CORP / KYNTRA BIO INC). So the identifier is right and
-    the name is behind — the opposite of the other twelve. Changing the ISIN here
-    would have introduced an error, not removed one."""
-    assert universe_rows["ALBT"]["ISIN"].strip() == "US05344R3021"
-    assert universe_rows["FGEN"]["ISIN"].strip() == "US31572Q8814"
+def test_fgen_became_kynb_and_kept_its_isin(universe_rows):
+    """FibroGen renamed to Kyntra Bio and the ticker went FGEN -> KYNB.
+
+    This is the vindication of holding it rather than "correcting" the ISIN.
+    OpenFIGI returned KYNTRA BIO INC for the stored `US31572Q8814`, which read as
+    a wrong-issuer conflict; it was actually the register being AHEAD of the row.
+    The ISIN survived the rename intact (OpenFIGI still maps it to KYNTRA BIO
+    INC, Common Stock), so the fix was a ticker+name+CIK remap and NOT an
+    identifier change. Had it been "corrected", a valid identifier would have
+    been overwritten.
+
+    The CIK is the load-bearing part: the row had NO CIK, which is exactly why
+    `check-ticker-changes` never saw this rename -- see
+    test_the_cik_blind_spot_that_hid_this_rename.
+    """
+    assert "FGEN" not in universe_rows, "the old ticker must be gone, not duplicated"
+    row = universe_rows["KYNB"]
+    assert row["Company Name"].strip() == "Kyntra Bio, Inc."
+    assert row["ISIN"].strip() == "US31572Q8814", "the ISIN survived the rename"
+    assert row["CIK"].strip() == "921299"
+    assert row["LEI"].strip() == "549300Q914ULWWY95822", "LEIs persist through renames"
+    assert row["Sector (JP)"].strip() == "Biopharma"
+
+
+def test_the_cik_blind_spot_that_hid_this_rename():
+    """Why FGEN->KYNB went undetected, stated as a test so it is not re-learned.
+
+    Two mechanisms should have caught it and both failed, circularly:
+
+      - `check-ticker-changes` is keyed on CIK. FGEN's CIK was BLANK, so the row
+        was invisible to it.
+      - `backfill-cik` fills a blank CIK by looking the TICKER up in SEC's map.
+        But a renamed company's OLD ticker is no longer IN that map, so the CIK
+        can never be filled -- confirmed live: `backfill-cik --dry-run` reported
+        "would fill 0" with 238 blanks remaining.
+
+    So a row with a changed ticker AND a blank CIK is undetectable by both. The
+    escape hatch is resolving by COMPANY NAME instead, which found three further
+    hidden renames (RENB->LNAI, THAR->CNTN, ZOM->ZOMDF) that remain open.
+    """
+    from ticker_utils import read_universe_csv
+    df = read_universe_csv()
+    blank = [r["Ticker"] for _, r in df.iterrows() if not str(r.get("CIK", "")).strip()]
+    # Not an assertion about the exact number -- it will move as rows are fixed.
+    # The point is that the blind spot is LARGE, so the name-based resolver is
+    # worth building rather than treating FGEN as a one-off.
+    assert len(blank) > 100, (
+        f"only {len(blank)} blank CIKs -- if this has genuinely been fixed, "
+        f"delete this test and say so in the commit")
+    assert "KYNB" not in blank, "the row this test exists for must have its CIK"
 
 
 def test_every_replacement_is_absent_from_the_delisted_ledger():
