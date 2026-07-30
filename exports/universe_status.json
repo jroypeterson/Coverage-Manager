@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "dataset_version": "2026-07-29",
-  "generated_at": "2026-07-30T02:10:21Z",
+  "generated_at": "2026-07-30T02:28:33Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1096,
   "ticker_count": 1095,
@@ -13,8 +13,6 @@
   "validation_errors": [],
   "validation_warnings": [
     "1 possible duplicate company name(s) (normalized): ['shimadzu']",
-    "2 row(s) whose Exchange and Country (Listing) disagree - one of the two is wrong, and a bare ticker colliding with a US namesake is the usual cause: CSL (Exchange ASX is in Australia, Country (Listing) says United States); IPN (Exchange Euronext Paris is in France, Country (Listing) says United States)",
-    "4 row(s) whose Currency does not match the venue they trade on (set Listing Type to an ADR/Cross value if the row is genuinely a cross-listing): BIM (trades on NASDAQ in United States, expected USD, row says EUR); CSL (trades on ASX in Australia, expected AUD, row says USD); DAE (trades on NASDAQ in United States, expected USD, row says CHF); IPN (trades on Euronext Paris in France, expected EUR, row says USD)",
     "190 ticker(s) missing Subsector (JP) value"
   ],
   "last_discovery_run": null

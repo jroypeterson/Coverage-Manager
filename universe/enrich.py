@@ -169,6 +169,106 @@ def _fetch_fmp_profile(ticker):
     return _fmp_fetch_profile(ticker, key)
 
 
+#: Secondary gate only — see `_payload_names_match`, which is TOKEN-based first.
+#: Deliberately stricter than `cik_backfill.NAME_MATCH_THRESHOLD` (0.55) because
+#: it guards a strictly worse failure: that module binds one CIK, this one admits
+#: an entire payload (CIK + FIGI + venue + currency + website + sector).
+#:
+#: 0.55 is provably too loose for the case that motivated this gate.
+#: `SequenceMatcher("medartis", "medifast")` scores ~0.62 — Medartis and Medifast
+#: are genuinely similar STRINGS, and character similarity cannot separate them.
+#: Same for CSL Ltd vs Carlisle. So character distance is the fallback, not the
+#: test.
+PAYLOAD_NAME_THRESHOLD = 0.80
+
+#: Shortest token that may carry a match on its own. Below this, coincidental
+#: overlap dominates ("bio", "med", "pharma" are in half the universe).
+_MIN_SHARED_TOKEN = 4
+
+_LEGAL_FORM_TOKENS = frozenset({
+    "inc", "incorporated", "corp", "corporation", "co", "company", "limited",
+    "ltd", "plc", "sa", "nv", "ag", "se", "spa", "as", "asa", "ab", "oyj",
+    "holdings", "holding", "group", "the", "and", "of", "s", "a", "kgaa",
+    "bv", "gmbh", "pt", "tbk", "psc", "llc", "lp", "trust",
+})
+
+
+def _payload_tokens(s: str) -> frozenset[str]:
+    import re as _re
+    raw = _re.sub(r"[^a-z0-9 ]", " ", str(s or "").lower()).split()
+    return frozenset(t for t in raw if t and t not in _LEGAL_FORM_TOKENS)
+
+
+def _payload_names_match(expected: str, vendor: str) -> bool | None:
+    """Does a vendor payload describe the company this row is for?
+
+    TOKEN-based, because character similarity demonstrably cannot do this job:
+    `Medartis` vs `Medifast` scores 0.62 on difflib and they are different
+    companies whose collision is the entire reason this gate exists. Tokens
+    separate them cleanly — they share none.
+
+    Returns True / False, or **None when the comparison cannot be made** (either
+    side has no comparable token) — a comparison that cannot be made has no
+    result, the rule `delisted_check` and `crsp_snapshot` already follow. The
+    caller must treat None as "unknown", never as agreement.
+    """
+    import difflib
+
+    e, v = _payload_tokens(expected), _payload_tokens(vendor)
+    if not e or not v:
+        return None
+    # Equal, or one name is the other plus qualifiers ("Medacta" ⊂ "Medacta
+    # International"). Subset, NOT raw substring: "ucb" is a literal substring of
+    # "glucberry" and that must not read as a match.
+    if e == v or e <= v or v <= e:
+        return True
+    shared = {t for t in (e & v) if len(t) >= _MIN_SHARED_TOKEN}
+    if not shared:
+        return False
+    return difflib.SequenceMatcher(
+        None, " ".join(sorted(e)), " ".join(sorted(v))
+    ).ratio() >= PAYLOAD_NAME_THRESHOLD
+
+
+def payload_is_for_this_row(expected_name: str, vendor_name: str, ticker: str,
+                            source: str) -> bool:
+    """Gate an ENTIRE vendor payload, not one field at a time.
+
+    Why the whole payload (2026-07-29): the ISIN write path has been identity-
+    gated since `81ada8d`, but every *other* field from the same response — CIK,
+    FIGI, Currency, Exchange, Country, Website, YF Sector/Industry — landed
+    unchecked. So a lookup that resolved to the wrong company was half-rejected:
+    its ISIN was refused while its CIK, website and venue were written. That is
+    exactly the state found on `MED` (Medifast's CIK 910329 + medifastinc.com on
+    a Medartis row), `MOVE` (Corvex's), `UCB` (United Community Banks') and `CSL`
+    (Carlisle's CIK, FIGI and website on CSL Ltd) — nine rows repaired by hand
+    over two days, all of one shape.
+
+    The mechanism behind it: `_fetch_fmp_profile` is called with the RAW ticker
+    while every yfinance call goes through `normalize_ticker`, which appends an
+    exchange suffix. So for a bare foreign symbol FMP answers about the US
+    namesake. Worse, its payload overwrites `Exchange` — and `normalize_ticker`
+    *keys off* `Exchange`, so corrupting it makes the NEXT run's yfinance call go
+    bare too. The loop closes and all four columns agree, which is why the
+    failure is self-concealing.
+
+    Rejecting the payload is better than rewriting the symbol: FMP's foreign
+    symbol conventions differ from yfinance's, and a rejected payload simply
+    falls through to the yfinance path, which IS normalized and resolves the
+    right issuer. A warned skip is resolved by a human in seconds; a wrong value
+    looks like data forever.
+    """
+    verdict = _payload_names_match(expected_name, vendor_name)
+    if verdict is False:
+        logger.warning(
+            "%s: DISCARDING the whole %s payload - it describes %r, not %r. "
+            "A bare foreign ticker resolving to a US namesake is the usual "
+            "cause; the row keeps its existing values.",
+            ticker, source, str(vendor_name), str(expected_name))
+        return False
+    return True
+
+
 def _normalize_fmp_exchange(fmp_exchange_full, fmp_exchange_short):
     """Pick a Coverage-Manager-canonical exchange name from FMP's fields."""
     for candidate in (fmp_exchange_full, fmp_exchange_short):
@@ -208,8 +308,14 @@ def _normalize_country_name(raw):
     return s
 
 
-def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
+def enrich_single_ticker(ticker, sector_jp, exchange_hint=None, company_hint=None):
     """Build a full universe-CSV row for a brand-new ticker.
+
+    Pass `company_hint` whenever the caller knows which company it means — it is
+    what lets the whole vendor payload be identity-gated (see
+    `payload_is_for_this_row`). Without it, a bare foreign ticker that a US
+    company also uses silently populates the row with the namesake's CIK,
+    website, venue and currency. **Strongly recommended for any non-US name.**
 
     Contract:
       - Validates `sector_jp` against the ALLOWED_SECTORS_JP taxonomy.
@@ -249,6 +355,13 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
     # ── 1. FMP /stable/profile ───────────────────────────────────────────
     fmp_isin_candidate = ""
     fmp = _fetch_fmp_profile(ticker)
+    if fmp and company_hint and not payload_is_for_this_row(
+            company_hint, fmp.get("companyName", ""), ticker, "FMP profile"):
+        # Whole payload discarded, not just its ISIN. Falls through to the
+        # yfinance path below, which goes through `normalize_ticker` and so asks
+        # about the right listing.
+        sources_used.append("fmp-rejected(identity)")
+        fmp = {}
     if fmp:
         sources_used.append("fmp")
         row["Company Name"] = str(fmp.get("companyName", "") or "").strip()
@@ -373,13 +486,27 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None):
             log_exception(logger, f"OpenFIGI lookup failed for {ticker}", e)
 
     # ── 5. SEC EDGAR CIK fallback ────────────────────────────────────────
+    # Identity-gated, and via the TITLED loader. This module's own
+    # `fetch_sec_cik_map` returns {TICKER: cik} and throws SEC's `title` away, so
+    # there was nothing to compare and the CIK was bound on a bare ticker match
+    # alone -- the one write `cik_backfill` refuses to make unguarded, for the
+    # documented reason that a wrong CIK silently pulls another company's
+    # filings while a blank one is visibly missing. `load_sec_cik_map` returns
+    # (cik, title) and is 24h-cached, so this also stops a second ~1MB download.
     if not row["CIK"]:
         try:
-            cik_map = fetch_sec_cik_map()
-            cik = cik_map.get(ticker.upper(), "")
-            if cik:
-                row["CIK"] = cik
-                sources_used.append("sec")
+            from universe.cik_backfill import fetch_sec_cik_map as _titled_map
+            titled = _titled_map()
+            hit = titled.get(ticker.upper())
+            expected = company_hint or row.get("Company Name", "")
+            if hit:
+                cik, sec_title = hit[0], (hit[1] if len(hit) > 1 else "")
+                if expected and not payload_is_for_this_row(
+                        expected, sec_title, ticker, "SEC ticker map"):
+                    sources_used.append("sec-rejected(identity)")
+                else:
+                    row["CIK"] = str(cik)
+                    sources_used.append("sec")
         except Exception as e:
             log_exception(logger, f"SEC CIK lookup failed for {ticker}", e)
 
@@ -721,11 +848,31 @@ def enrich_dataframe(df, yf_data, figi_data, cik_map, listing_types, other_listi
                 if val:
                     df.at[idx, field] = val
 
-        # CIK (US tickers only)
+        # CIK (US tickers only) — identity-gated.
+        #
+        # This is the bulk sibling of the single-ticker fallback and it ran over
+        # every row in the universe binding a CIK on a BARE TICKER MATCH alone.
+        # `cik_backfill` refuses to make exactly this write unguarded, for the
+        # reason its docstring gives: a wrong CIK silently pulls another
+        # company's filings, while a blank one is visibly missing. Tickers are
+        # shared between issuers across venues — CSL Ltd / Carlisle Companies,
+        # Medartis / Medifast — so a bare match is not identity.
+        #
+        # `cik_map` here is {TICKER: cik} with no title, so the gate can only run
+        # when a titled map is available; the untitled path is left as-is rather
+        # than silently trusted, and the skip is logged.
         if cell_is_empty(row.get("CIK")):
             cik = cik_map.get(ticker.upper())
             if cik:
-                df.at[idx, "CIK"] = cik
+                stored_name = str(row.get("Company Name", "") or "").strip()
+                sec_title = ""
+                if isinstance(cik, (tuple, list)) and len(cik) > 1:
+                    cik, sec_title = cik[0], cik[1]
+                if sec_title and stored_name and not payload_is_for_this_row(
+                        stored_name, sec_title, ticker, "SEC ticker map (bulk)"):
+                    pass                       # rejected; leave the cell blank
+                else:
+                    df.at[idx, "CIK"] = cik
 
         # Country (Listing) from exchange mapping
         if cell_is_empty(row.get("Country (Listing)")):
@@ -813,7 +960,20 @@ def main():
 
     # Step 3: Fetch SEC CIK (single bulk download, fast)
     print("\n3. Fetching SEC CIK mappings...")
-    cik_map = fetch_sec_cik_map()
+    # TITLED map ({TICKER: (cik, sec_title)}), so `enrich_dataframe`'s identity
+    # gate can actually fire. With the untitled {TICKER: cik} form there is no
+    # name to compare and the gate silently degrades to "write it anyway" — a
+    # guard that cannot fire is decoration, which is the failure mode this repo
+    # keeps paying for. Falls back to the untitled map if the titled loader is
+    # unavailable, so a download failure degrades rather than crashes.
+    try:
+        from universe.cik_backfill import fetch_sec_cik_map as _titled_map
+        cik_map = _titled_map()
+        if not cik_map:
+            cik_map = fetch_sec_cik_map()
+    except Exception as e:  # noqa: BLE001
+        log_exception(logger, "titled SEC map unavailable; falling back", e)
+        cik_map = fetch_sec_cik_map()
 
     # Step 4: Fetch yfinance identifiers
     print(f"\n4. Fetching yfinance identifiers for {len(df)} tickers...")

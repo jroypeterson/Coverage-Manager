@@ -206,7 +206,7 @@ BHVN,NYSE,NYQ,NYSE,Primary,,2022,,,,VGG1110E1079,BBG017BXV3Q9,BBG017BXV3Q9,BBG01
 BIAF,NASDAQ,NCM,NasdaqCM,Primary,,2022,,,,US09076W3079,BBG00H69JDX1,BBG00H69JDX1,BBG00H69JDY0,1712762,,bioAffinity Technologies Inc,United States,United States,USA,USD,https://www.bioaffinitytech.com,Healthcare,Diagnostics & Research,Biopharma,,,
 BIIB,NASDAQ,NMS,NasdaqGS,Primary,,,,,,US09062X1037,BBG000C17X76,BBG000C17X76,BBG001S67826,875045,W8J5WZB5IY3K0NDQT671,Biogen Inc,United States,United States,USA,USD,https://www.biogen.com,Healthcare,Drug Manufacturers - General,Biopharma,Large Pharma,,
 BILL,NYSE,NYQ,NYSE,Primary,,2019,,,,US0900431000,BBG00QVJV6V4,BBG00QVJV6V4,BBG00QVJV7L3,1786352,549300IBF9VZZIGOZW63,BILL Holdings Inc,United States,United States,USA,USD,https://www.bill.com,Technology,Software - Application,SaaS,,,
-BIM,NASDAQ,NMS,NasdaqGS,,,2011,,,,,,,,,,bioMerieux SA,France,United States,FRA,EUR,,,,MedTech,Diagnostics,,Y
+BIM,Euronext Paris,PAR,Paris,,,2011,,,,,BBG000BMX7W1,BBG000BMX6S8,BBG001S9NF71,,,bioMerieux SA,France,France,FRA,EUR,,,,MedTech,Diagnostics,,Y
 BIO,NYSE,NYQ,NYSE,Primary,,,,,,US0905722072,BBG000DY28W5,BBG000DY28W5,BBG001S625W4,12208,549300ZC1GPV35XYDK53,"Bio-Rad Laboratories, Inc. Class A Common Stock",United States,United States,USA,USD,https://www.bio-rad.com,Healthcare,Medical Devices,MedTech,Life Science Tools,,Y
 BIOA,NASDAQ,NMS,NasdaqGS,Primary,,2024,2024-09-25,2024-12-24,2025-03-24,US09077V1008,BBG00HBTB0M9,BBG00HBTB0M9,BBG00HBTB0N8,1709941,,BIOAGE Labs Inc,United States,United States,USA,USD,https://bioagelabs.com,Healthcare,Drug Manufacturers - Specialty & Generic,Biopharma,Specialty & Generic Pharma,,
 BIOA-B.ST,OMX Stockholm,STO,Stockholm,Primary,,2017,,,,,,,,,,BioArctic AB (publ),Sweden,Sweden,SWE,SEK,https://www.bioarctic.se,Healthcare,Biotechnology,Biopharma,Biotech,,
@@ -299,7 +299,7 @@ CRSP,NASDAQ,NGM,NasdaqGM,ADR/Cross-listed,Primary listing likely in Switzerland,
 CRVO,NASDAQ,NCM,NasdaqCM,Primary,,2008,,,,,BBG000N6JH48,BBG000N6JH48,BBG001SD4Z42,1053691,,CervoMed Inc,United States,United States,USA,USD,https://www.cervomed.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 CRVS,NASDAQ,NGM,NasdaqGM,Primary,,2016,,,,US2210151005,BBG009F0TGH8,BBG009F0TGH8,BBG009F0TGJ6,1626971,549300I3AVJ8F75NCX65,Corvus Pharmaceuticals Inc,United States,United States,USA,USD,https://www.corvuspharma.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 CRWD,NASDAQ,NMS,NasdaqGS,Primary,,2019,,,,,BBG00BLYKS03,BBG00BLYKS03,BBG00BLYKRZ7,1535527,,"CrowdStrike Holdings, Inc.",United States,United States,USA,USD,https://www.crowdstrike.com,Technology,Software - Infrastructure,Tech,,,Y
-CSL,ASX,NYQ,NYSE,Primary,,,,,,,BBG000BGGBT8,BBG000BGGBT8,BBG001S5Q6R4,790051,,CSL Ltd,Australia,United States,USA,USD,https://www.carlisle.com/home/default.aspx,Industrials,Building Products & Equipment,Biopharma,,,
+CSL,ASX,ASX,ASX,Primary,,,,,,,BBG000BKBN81,BBG000BKBN81,BBG001S7YNK1,,,CSL Ltd,Australia,Australia,AUS,AUD,https://www.csl.com,,,Biopharma,,,
 CSTL,NASDAQ,NGM,NasdaqGM,Primary,,2019,,,,US14843C1053,BBG006YWVSR3,BBG006YWVSR3,BBG006YWVSS2,1447362,,"Castle Biosciences, Inc.",United States,United States,USA,USD,https://castlebiosciences.com,Healthcare,Diagnostics & Research,MedTech,Diagnostics,,Y
 CSU,TSX,,,,,,,,,CA21037X1006,BBG000BMZ5P1,BBG000BMZ5P1,BBG001S9PLX7,,,Constellation Software Inc.,Canada,Canada,CAN,CAD,,,,Tech,,,Y
 CTEC LN,LSE,LSE,LSE,Primary,,2016,,,,,BBG00DYB1GX6,BBG000TC0LZ6,BBG001SZV8X1,,,ConvaTec Group PLC,United Kingdom,United Kingdom,GBR,GBp,https://www.convatecgroup.com,Healthcare,Medical Instruments & Supplies,MedTech,Urology,,Y
@@ -326,7 +326,7 @@ CYCN,NASDAQ,NCM,NasdaqCM,Primary,,2019,,,,US23255M2044,BBG00KXXHYD9,BBG00KXXHYD9
 CYH,NYSE,NYQ,NYSE,Primary,,,,,,US2036681086,BBG000BDY3Y7,BBG000BDY3Y7,BBG001S89L85,1108109,,Community Health Systems Inc,United States,United States,USA,USD,https://www.chs.net,Healthcare,Medical Care Facilities,Healthcare Services,Hospitals,,Y
 CYTK,NASDAQ,NMS,NasdaqGS,Primary,,2004,,,,,BBG000F0R4N9,BBG000F0R4N9,BBG001SGMVF2,1061983,,"Cytokinetics, Inc.",United States,United States,USA,USD,https://www.cytokinetics.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 CYTO,NASDAQ,NCM,NasdaqCM,,,,,,,BMG0360L2099,,,,,,Cytophage Technologies Ltd,United States,United States,USA,USD,,,,Biopharma,,,
-DAE,NASDAQ,NMS,NasdaqGS,,,2014,,,,,,,,,,Daetwyler Holding AG,Switzerland,United States,CHE,CHF,,,,MedTech,Packaging,,Y
+DAE,SIX,EBS,Swiss,,,2014,,,,,BBG000BBY3P1,BBG000BBY3P1,BBG001S68344,,,Daetwyler Holding AG,Switzerland,Switzerland,CHE,CHF,,,,MedTech,Packaging,,Y
 DARE,NASDAQ,NCM,NasdaqCM,Primary,,2014,,,,US23666P2002,BBG001J2P362,BBG001J2P362,BBG001V0GDP9,1401914,,Dare Bioscience Inc,United States,United States,USA,USD,https://darebioscience.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 DAY,NYSE,NYQ,,Primary,,2018,,,,,,,,,,NASDAQ US Dividend Achievers 50 Index,United States,United States,USA,USD,https://www.dayforce.com,Technology,Software - Application,SaaS,,,
 DBVT,NASDAQ,NCM,NasdaqCM,ADR/Cross-listed,Primary listing likely in France,2014,,,,US23306J3095,BBG0076D3T39,BBG0076D3T39,BBG0076D3TV8,1613780,,DBV Technologies SA - ADR,France,United States,FRA,USD,https://www.dbv-technologies.com,Healthcare,Biotechnology,Biopharma,Biotech,,
@@ -528,7 +528,7 @@ IONS,NASDAQ,NMS,NasdaqGS,Primary,,,,,,US4622221004,BBG000JH6683,BBG000JH6683,BBG
 IOVA,NASDAQ,NGM,NasdaqGM,Primary,,2010,,,,,BBG000FTLBV7,BBG000FTLBV7,BBG001T2PM32,1425205,,Iovance Biotherapeutics Inc,United States,United States,USA,USD,https://www.iovance.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 IPCALAB.NS,NSE,NSI,NSE,Primary,,,,,,INE571A01038,,,,,33580069PZ8ZQVCDBC38,Ipca Laboratories Limited,India,India,IND,INR,https://www.ipca.com,Healthcare,Drug Manufacturers - Specialty & Generic,Biopharma,Specialty & Generic Pharma,,
 IPHA,NASDAQ,NMS,NasdaqGS,ADR/Cross-listed,Primary listing likely in France,2019,,,,,BBG009ZCBVG7,BBG009ZCBVG7,BBG009ZCBWH4,1598599,,Innate Pharma SA,France,United States,FRA,USD,https://www.innate-pharma.com,Healthcare,Biotechnology,Biopharma,Biotech,,
-IPN,Euronext Paris,PCX,NYSEArca,,,,,,,,,,,,,Ipsen SA,France,United States,FRA,USD,,,,Biopharma,,,
+IPN,Euronext Paris,PAR,Paris,,,,,,,,BBG000BWH999,BBG000BWH908,BBG001SFCJ35,,,Ipsen SA,France,France,FRA,EUR,,,,Biopharma,,,
 IQV,NYSE,NYQ,NYSE,Primary,,2013,,,,US46266C1053,BBG00333FYS2,BBG00333FYS2,BBG00333FZ54,1478242,549300W3R20NM4KQPH86,IQVIA Holdings Inc.,United States,United States,USA,USD,https://www.iqvia.com,Healthcare,Diagnostics & Research,Healthcare Services,CRO / Health Data,,Y
 IRON,NASDAQ,NGM,NasdaqGM,Primary,,2020,,,,US2546041011,BBG00W9MJK79,BBG00W9MJK79,BBG00W9MJL04,1816736,,Disc Medicine Inc,United States,United States,USA,USD,https://www.discmedicine.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 IRTC,NASDAQ,NMS,NasdaqGS,Primary,,2016,,,,,BBG001J19V24,BBG001J19V24,BBG001TSQV70,1388658,,"iRhythm Holdings, Inc",United States,United States,USA,USD,https://www.irhythmtech.com,Healthcare,Medical Devices,MedTech,Cardiovascular,,Y

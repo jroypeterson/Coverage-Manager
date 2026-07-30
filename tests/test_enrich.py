@@ -158,7 +158,7 @@ def test_enrich_single_ticker_fmp_only_full_row():
     """Happy path: FMP returns complete data; no yfinance/OpenFIGI needed."""
     with patch("universe.enrich._fetch_fmp_profile", side_effect=_fake_fmp_response), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map", return_value={}), \
          patch("universe.enrich.yf.Ticker") as mock_yf:
         # yfinance shouldn't be called since FMP filled everything — but if
         # it is, return empty so the test still passes and we can detect
@@ -203,7 +203,7 @@ def test_enrich_single_ticker_fails_when_required_metadata_missing():
     """If every source returns empty, raise with a clear error."""
     with patch("universe.enrich._fetch_fmp_profile", return_value={}), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map", return_value={}), \
          patch("universe.enrich.yf.Ticker") as mock_yf:
         mock_yf.return_value.isin = "-"
         mock_yf.return_value.info = {}
@@ -237,7 +237,8 @@ def test_enrich_single_ticker_yfinance_fallback_fills_gaps():
 
     with patch("universe.enrich._fetch_fmp_profile", side_effect=partial_fmp), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={"EXMP": "1234567"}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map",
+               return_value={"EXMP": ("1234567", "Example Corp")}), \
          patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
         row = enrich_single_ticker("EXMP", sector_jp="SaaS")
 
@@ -269,7 +270,8 @@ def test_enrich_single_ticker_rejects_wrong_country_isin_from_yfinance():
 
     with patch("universe.enrich._fetch_fmp_profile", side_effect=partial_fmp), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={"FI": "798354"}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map",
+               return_value={"FI": ("798354", "Fiserv Inc")}), \
          patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
         row = enrich_single_ticker("FI", sector_jp="Fintech")
 
@@ -300,7 +302,8 @@ def test_enrich_single_ticker_rejects_wrong_country_isin_from_fmp():
 
     with patch("universe.enrich._fetch_fmp_profile", side_effect=fmp_with_bad_isin), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={"RPRX": "1802768"}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map",
+               return_value={"RPRX": ("1802768", "Royalty Pharma plc")}), \
          patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
         row = enrich_single_ticker("RPRX", sector_jp="Biopharma")
 
@@ -329,7 +332,8 @@ def test_enrich_single_ticker_accepts_adr_isin_from_fmp():
 
     with patch("universe.enrich._fetch_fmp_profile", side_effect=fmp_adr), \
          patch("universe.enrich.fetch_openfigi_identifiers", return_value={}), \
-         patch("universe.enrich.fetch_sec_cik_map", return_value={"CRSP": "1674416"}), \
+         patch("universe.cik_backfill.fetch_sec_cik_map",
+               return_value={"CRSP": ("1674416", "CRISPR Therapeutics AG")}), \
          patch("universe.enrich.yf.Ticker", return_value=FakeYFTicker()):
         row = enrich_single_ticker("CRSP", sector_jp="Biopharma")
 

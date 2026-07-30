@@ -79,14 +79,23 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  SKIP {ticker}: already in the universe CSV")
             failed.append((ticker, "already present"))
             continue
-        if cl.by_ticker(rows, ticker) is None:
+        ledger_row = cl.by_ticker(rows, ticker)
+        if ledger_row is None:
             print(f"  SKIP {ticker}: not in the candidate ledger - add it there first")
             failed.append((ticker, "not in ledger"))
             continue
 
+        # The ledger's `company` is a REQUIRED field, so we always know which
+        # company this ticker is meant to be. Passing it lets enrich discard a
+        # vendor payload that describes a different issuer -- the bare-foreign-
+        # ticker-hits-a-US-namesake failure that put Medifast's CIK on Medartis
+        # and Carlisle's on CSL Ltd.
+        company_hint = str(ledger_row.get("company", "") or "").strip() or None
+
         try:
             row = enrich_single_ticker(ticker, sector,
-                                       exchange_hint=exchange or a.exchange_hint)
+                                       exchange_hint=exchange or a.exchange_hint,
+                                       company_hint=company_hint)
         except EnrichError as exc:
             # Loud, and the candidate stays pending. Never append a stub.
             print(f"  FAIL {ticker}: enrichment incomplete - {exc}", file=sys.stderr)
