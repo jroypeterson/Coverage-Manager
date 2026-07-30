@@ -328,7 +328,7 @@ CYTK,NASDAQ,NMS,NasdaqGS,Primary,,2004,,,,,BBG000F0R4N9,BBG000F0R4N9,BBG001SGMVF
 CYTO,NASDAQ,NCM,NasdaqCM,,,,,,,BMG0360L2099,,,,,,Cytophage Technologies Ltd,United States,United States,USA,USD,,,,Biopharma,,,
 DAE,SIX,EBS,Swiss,,,2014,,,,,BBG000BBY3P1,BBG000BBY3P1,BBG001S68344,,,Daetwyler Holding AG,Switzerland,Switzerland,CHE,CHF,,,,MedTech,Packaging,,Y
 DARE,NASDAQ,NCM,NasdaqCM,Primary,,2014,,,,US23666P2002,BBG001J2P362,BBG001J2P362,BBG001V0GDP9,1401914,,Dare Bioscience Inc,United States,United States,USA,USD,https://darebioscience.com,Healthcare,Biotechnology,Biopharma,Biotech,,
-DAY,NYSE,NYQ,,Primary,,2018,,,,,,,,,,NASDAQ US Dividend Achievers 50 Index,United States,United States,USA,USD,https://www.dayforce.com,Technology,Software - Application,SaaS,,,
+DAY,NYSE,NYQ,,Primary,,2018,,,,,,,,1725057,,"Dayforce, Inc.",United States,United States,USA,USD,https://www.dayforce.com,Technology,Software - Application,SaaS,,,
 DBVT,NASDAQ,NCM,NasdaqCM,ADR/Cross-listed,Primary listing likely in France,2014,,,,US23306J3095,BBG0076D3T39,BBG0076D3T39,BBG0076D3TV8,1613780,,DBV Technologies SA - ADR,France,United States,FRA,USD,https://www.dbv-technologies.com,Healthcare,Biotechnology,Biopharma,Biotech,,
 DBX,NASDAQ,NMS,NasdaqGS,Primary,,2018,,,,,BBG0018SLDN0,BBG0018SLDN0,BBG001TFLWN3,1467623,,"Dropbox, Inc.",United States,United States,USA,USD,https://www.dropbox.com,Technology,Software - Infrastructure,Tech,,,Y
 DCGO,NASDAQ,NCM,NasdaqCM,Primary,,2020,,,,US2560861096,BBG00YB8JBK8,BBG00YB8JBK8,BBG00YB8JBL7,1822359,,DocGo Inc,United States,United States,USA,USD,https://www.docgo.com,Healthcare,Medical Care Facilities,Healthcare Services,HIT,,Y

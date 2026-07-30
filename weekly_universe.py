@@ -741,6 +741,44 @@ def _step_ticker_change_check():
     }
 
 
+def _step_verify_isin_issuers():
+    """Audit every stored ISIN against the issuer name OpenFIGI maps it to.
+
+    Wired into the weekly 2026-07-29, for the same reason `crosscheck-foreign`
+    was the day before: this check existed and was run-on-demand, so its findings
+    only surfaced when somebody thought to look. The first full pass found 21
+    conflicts that had been live since the 2026-04-03 bulk import — four months.
+    The stock of already-stored identifiers is exactly what no write-path guard
+    can reach, so the audit has to run on a cadence or the backlog silently
+    re-accumulates.
+
+    Read-only and NON-GATING. Cache-warm in the normal case (deterministic
+    OpenFIGI answers are cached), so the weekly cost is small.
+    """
+    from universe import isin_identity
+
+    return isin_identity.main()
+
+
+def _isin_identity_step_status(result):
+    """Counted classes, never a boolean — `4 conflict(s)` is actionable,
+    `conflicts: yes` is not. ASCII-only and no company names: this string reaches
+    a cp1252 console and the universe is global.
+    """
+    checked = result.get("checked", 0)
+    conflicts = len(result.get("conflicts") or [])
+    inconclusive = len(result.get("inconclusive") or [])
+    ok = result.get("ok", 0)
+    tail = (f"{ok} ok / {conflicts} conflict(s) / {inconclusive} inconclusive "
+            f"of {checked} ISIN-bearing row(s)")
+    if checked and ok == 0:
+        # Learned nothing: must not report as clean (the delisted_check rule).
+        return f"failed: audit learned nothing - {tail}"
+    if conflicts:
+        return f"failed: {tail}"
+    return f"ok - {tail}" if not inconclusive else f"ok (with inconclusive) - {tail}"
+
+
 def _step_crosscheck_foreign():
     """Cross-check foreign-row identity metadata against SEC N-PORT filings.
 
@@ -1181,6 +1219,16 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 )
         else:
             steps["crosscheck_foreign"] = status
+
+    # Step [4d/6]: ISIN -> issuer-name identity audit
+    if dry_run:
+        logger.info("[4d/6] ISIN issuer identity audit... SKIPPED (dry run)")
+        steps["verify_isin_issuers"] = "skipped (dry run)"
+    else:
+        logger.info("[4d/6] Auditing stored ISINs against their issuer names...")
+        status, ii_result = run_step("verify_isin_issuers", _step_verify_isin_issuers)
+        steps["verify_isin_issuers"] = (
+            _isin_identity_step_status(ii_result) if ii_result else status)
 
     # Step 5: Export artifacts (the new published contract)
     if dry_run:
