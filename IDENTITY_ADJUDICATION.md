@@ -9,7 +9,7 @@ can be decided in one sitting.
 
 | Measure | Value |
 |---|---:|
-| ISIN → issuer conflicts | **3** (was 21) |
+| ISIN → issuer conflicts | **0** (was 21) |
 | ISIN → issuer inconclusive | ~30 |
 | Venue-consistency warnings | **0** |
 | Country-prefix warnings | **0** |
@@ -33,28 +33,38 @@ built; it is `#250` on the board. This is the one that unblocks the ADR ISIN rul
 (Rule A), which would otherwise reject 84 legitimate rows. Everything below in
 this section is smaller.
 
-### A2. The 3 remaining ISIN → issuer conflicts
-None auto-applied; two independent sources could not settle any of them.
+### A2. ISIN → issuer conflicts — **CLOSED 2026-07-30**
 
-| Ticker | Row says | Stored ISIN resolves to | What would settle it |
-|---|---|---|---|
-| `2715.HK` | Estun Automation Co Ltd | ELKOP ESTONIA SE | Is this an H-share line at all? Estun is Shenzhen `002747`. If the row means the A-share, the ticker is wrong, not just the ISIN. |
-| `CPH` | Cipher Pharmaceuticals Inc | CPH CHEMIE & PAPIER / CPH GROUP AG | Cipher's TSX ISIN. GLEIF gives US-prefixed lines (`US17253X2045/3035`) with no OpenFIGI coverage; the CA-prefixed equity line is unconfirmed. |
-| `MDLA` | Medela Potentia Tbk PT | MALARASEN AB | An Indonesian (`ID…`) ISIN. Neither source produced a candidate. |
+All 21 are resolved. The last three were settled by a research pass with web
+search, which is what the registers alone could not do:
 
-**`CBIO` — RESOLVED 2026-07-30, and on two sources, not one.** A web search settled
-what OpenFIGI could not: the GlycoMimetics/Crescent merger closed 2025-06-16 preceded
-by a **1-for-100 reverse split**, and the merger release names the post-split CUSIP as
-**`38000Q201`** — which composes to exactly one valid ISIN, `US38000Q2012`. With GLEIF
-independently tying that ISIN to Crescent's LEI, it clears the same two-source bar as
-the 14 applied on 07-29. It also *explains* the stored value instead of overruling it:
-`US38000Q1022` embeds CUSIP `38000Q102`, the **pre-split** line, which is precisely why
-OpenFIGI resolved it to GLYCOMIMETICS. The mapping was never wrong — the row was one
-corporate action behind. CIK unchanged (1253689); the registrant survived the merger.
+| Ticker | Resolution | Key source |
+|---|---|---|
+| `2715.HK` | `EE0000000453` → **`CNE100007F15`** | **HKEX's own List of Securities** — Estun completed an H-share IPO listing 2026-03-09 as code 2715, so the answer to "is there an HK line at all?" is yes. ⚠ The A-share line is `CNE100001X35`; do not let a future issuer-level check "correct" the HK row to it (the `EVO` instrument trap). |
+| `CPH` | `CH0001624714` → **`CA17253X1050`**, **and the LEI too** | Cipher Pharmaceuticals (TSX: CPH, dermatology). The wrong ISIN and wrong LEI arrived as a **matched pair** both pointing at CPH Group AG, the Swiss namesake — the `7741.T`/`FAGR.BR` pattern. LEI → `213800T44AN9XSAOY605` (GLEIF: CIPHER PHARMACEUTICALS INC., verified live). |
+| `MDLA` | `SE0008937411` → **`ID1000209901`** | PT Medela Potentia Tbk, Indonesian healthcare distributor, IDX IPO 2025-04-15. TradingView + KSEI (Indonesia's numbering agency). |
 
-**The remaining three** (`2715.HK`, `CPH`, `MDLA`) stay held and re-probe on the weekly
-`[4d/6]` step. The lesson worth carrying: *a held conflict is often a corporate action
-nobody has looked up yet, not a bad identifier* — the same shape as `FGEN`/`ALBT`.
+**The generalisable lesson, now three-for-three:** a held conflict is usually a
+*corporate action or a listing nobody had looked up*, not a bad identifier.
+`FGEN` (rename), `CBIO` (reverse split), and now `2715.HK` (a brand-new listing
+that post-dated the cell). Search before escalating.
+
+### ⚑ Two SCOPE questions this surfaced — genuinely JP's call
+
+Neither is an identifier fact, and both come from the 2026-04-03 bulk import.
+
+1. **`CPH` is a dermatology pharma carrying `Sector (JP) = MedTech`,
+   `Subsector = Hearing Aid`, `Core = Y`.** Cochlear is already in the universe
+   separately (`COH Au`, Core=Y, Hearing Aid), so the Hearing-Aid tag looks
+   inherited rather than chosen. Was Cipher ever a deliberate pick? If yes, the
+   sector should be Biopharma; if no, the row is a contaminated artifact.
+   (`Exchange Code = YHD` is a Yahoo placeholder and junk either way.)
+2. **`MDLA` carries `Sector (JP) = SaaS`** — which betrays its origin as
+   **Medallia**, the US SaaS company that traded as NYSE `MDLA` until its Thoma
+   Bravo take-private in Oct 2021. The exact `ZEN` shape. The Indonesian
+   distributor that now owns the ticker plausibly *fits* an HC universe as
+   Healthcare Services / distribution, but was almost certainly never a
+   deliberate pick. Keep-and-reclassify, or quarantine?
 
 ### A3. `ALBT` / `FGEN` — name decisions, now resolved
 Closed 2026-07-29 on JP's call: `FGEN`→`KYNB` (Kyntra Bio, same registrant),

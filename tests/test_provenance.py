@@ -42,7 +42,13 @@ def test_the_universe_agrees_with_every_verified_cell(ledger):
 
 def test_the_shipped_ledger_is_valid_and_non_trivial(ledger):
     assert len(ledger["entries"]) >= 30
-    assert ledger["removals"] and ledger["renames"] and ledger["held"]
+    assert ledger["removals"] and ledger["renames"]
+    # `held` is deliberately NOT required to be non-empty. An empty held list is
+    # the GOOD state -- it means every known conflict has been settled, which
+    # became true on 2026-07-30 when the last three (2715.HK, CPH, MDLA) were
+    # resolved. A test that required a permanent backlog would have to be
+    # weakened every time the backlog was cleared.
+    assert isinstance(ledger["held"], list)
 
 
 def _write(tmp_path, obj):
@@ -174,17 +180,27 @@ def test_triage_recognises_a_value_we_already_rejected(ledger):
     assert "already made" in why
 
 
-def test_triage_recognises_a_held_dead_end(ledger):
+def test_triage_recognises_a_held_dead_end():
     """'We looked and could not settle it' is expensive knowledge. Without it the
-    next audit re-derives the same dead end."""
-    verdict, why = P.triage(ledger, "2715.HK", "ISIN", "ELKOP ESTONIA SE")
+    next audit re-derives the same dead end.
+
+    Uses a SYNTHETIC ledger rather than a live held row. The original version
+    keyed off `2715.HK`, which was genuinely held until 2026-07-30 -- so
+    resolving it broke a test of the triage MECHANISM, which has nothing to do
+    with whether anything is currently held. Coupling a mechanism test to live
+    data state is what made clearing the backlog look like a regression."""
+    synthetic = {"entries": [], "removals": [], "renames": [],
+                 "held": [{"ticker": "ZZZ", "field": "ISIN", "value": "XX0000000000",
+                           "reviewed": "2026-07-30",
+                           "why_unresolved": "neither source produced a candidate."}]}
+    verdict, why = P.triage(synthetic, "ZZZ", "ISIN", "SOMEONE ELSE")
     assert verdict == P.ROW_HELD
     assert "could NOT be settled" in why
 
 
 def test_every_triage_verdict_is_actionable_prose(ledger):
     """A verdict a reader cannot act on is a verdict that gets ignored."""
-    for tkr, field in (("KYNB", "ISIN"), ("AAPL", "ISIN"), ("2715.HK", "ISIN")):
+    for tkr, field in (("KYNB", "ISIN"), ("AAPL", "ISIN"), ("CPH", "ISIN")):
         _v, why = P.triage(ledger, tkr, field, "x")
         assert len(why) > 40 and why.strip().endswith((".", "!"))
 

@@ -525,6 +525,54 @@
         "OpenFIGI: CASIF resolves to CASI PHARMACEUTICALS INC"
       ],
       "note": "Deliberately NOT the older DE entity CIK 895051 -- that registrant predates the redomicile and is not the filer today."
+    },
+    {
+      "ticker": "2715.HK",
+      "field": "ISIN",
+      "value": "CNE100007F15",
+      "verified": "2026-07-30",
+      "supersedes": "EE0000000453",
+      "sources": [
+        "HKEX official List of Securities (ListOfSecurities.xlsx, fetched live): stock code 2715 = ESTUN, Equity Securities Main Board, ISIN CNE100007F15, board lot 200, HKD -- the listing venue's own registry",
+        "Investfunds / Investing.com both key their Estun HK page to CNE100007F15"
+      ],
+      "note": "The held question was whether an H-share line existed at all. It does: Estun Automation (Shenzhen A-share 002747) completed an HKEX Main Board H-share IPO listing 2026-03-09 as code 2715. The row's ticker, exchange and Year Listed 2026 were all already correct -- the ISIN cell simply predated a March-2026 listing. INSTRUMENT TRAP (the EVO precedent): the A-share line is CNE100001X35. This row is the HK line, so a future issuer-level check must NOT 'correct' it to the A-share."
+    },
+    {
+      "ticker": "CPH",
+      "field": "ISIN",
+      "value": "CA17253X1050",
+      "verified": "2026-07-30",
+      "supersedes": "CH0001624714",
+      "sources": [
+        "TradingView TSX:CPH, MarketScreener and DivvyDiary all key Cipher Pharmaceuticals to CA17253X1050 (WKN A0B85L)",
+        "GLEIF corroborates the issuer via the CUSIP body (the CSU precedent): Cipher's own LEI 213800T44AN9XSAOY605 publishes US17253X2045 / US17253X3035 -- the same 17253X issuer space. GLEIF's filter on CA17253X1050 itself is empty: absent, not contradicting"
+      ],
+      "note": "Cipher Pharmaceuticals Inc., Mississauga -- specialty DERMATOLOGY pharma (Epuris), TSX: CPH in CAD, OTCQX: CPHRF. The superseded value belonged to CPH Chemie & Papier / CPH Group AG, the Swiss namesake that also trades as CPH (on SIX)."
+    },
+    {
+      "ticker": "CPH",
+      "field": "LEI",
+      "value": "213800T44AN9XSAOY605",
+      "verified": "2026-07-30",
+      "supersedes": "506700O001G9RW029H49",
+      "sources": [
+        "GLEIF: 213800T44AN9XSAOY605 = CIPHER PHARMACEUTICALS INC., CA, entity status ACTIVE (registration LAPSED -- a renewal lapse, still the correct entity)",
+        "GLEIF: the superseded 506700O001G9RW029H49 = CPH Group AG, CH -- verified live, the Swiss namesake"
+      ],
+      "note": "FIXED AS A SET. The wrong ISIN and wrong LEI arrived as a MATCHED PAIR, both pointing at the Swiss CPH -- the 7741.T (Hoya/Homag) and FAGR.BR (Fagron NV / Fagron a.s.) pattern. Correcting only the ISIN would have left a row that still lied."
+    },
+    {
+      "ticker": "MDLA",
+      "field": "ISIN",
+      "value": "ID1000209901",
+      "verified": "2026-07-30",
+      "supersedes": "SE0008937411",
+      "sources": [
+        "TradingView IDX:MDLA (fetched): ISIN ID1000209901, PT Medela Potentia Tbk, IPO 2025-04-15",
+        "KSEI (Indonesia's central securities depository and numbering agency) registered-securities page for MDLA, plus Investing.com as a third carrier"
+      ],
+      "note": "PT Medela Potentia Tbk -- Indonesian pharmaceutical and healthcare DISTRIBUTION holding company (Anugrah Argon Medica group), IPO'd on IDX 2025-04-15. The superseded value was Malarasen AB's (Sweden). See the open scope question about this row's Sector (JP)."
     }
   ],
   "removals": [
@@ -661,33 +709,5 @@
       "note": "Venue move to OTC."
     }
   ],
-  "held": [
-    {
-      "ticker": "2715.HK",
-      "field": "ISIN",
-      "value": "EE0000000453",
-      "reviewed": "2026-07-30",
-      "why_unresolved": "OpenFIGI resolves the stored value to ELKOP ESTONIA SE and GLEIF has no record for 'Estun Automation Co Ltd', so no candidate emerged from either source.",
-      "what_would_settle_it": "Whether an H-share line exists at all. Estun trades in Shenzhen as 002747; if the row means the A-share then the TICKER is wrong, not just the ISIN -- which is a different fix.",
-      "vendor_says": "ELKOP ESTONIA SE"
-    },
-    {
-      "ticker": "CPH",
-      "field": "ISIN",
-      "value": "CH0001624714",
-      "reviewed": "2026-07-30",
-      "why_unresolved": "GLEIF publishes only US-prefixed lines for Cipher Pharmaceuticals (US17253X2045 / US17253X3035) and OpenFIGI has no coverage for either, so the TSX equity ISIN could not be confirmed by two sources.",
-      "what_would_settle_it": "Cipher's CA-prefixed TSX equity ISIN from a Canadian source (SEDAR+ or TMX).",
-      "vendor_says": "CPH CHEMIE & PAPIER HLDG-REG; CPH GROUP AG"
-    },
-    {
-      "ticker": "MDLA",
-      "field": "ISIN",
-      "value": "SE0008937411",
-      "reviewed": "2026-07-30",
-      "why_unresolved": "An Indonesian issuer (IDX). Neither OpenFIGI nor GLEIF produced any candidate ID-prefixed ISIN.",
-      "what_would_settle_it": "An IDX or KSEI source for Medela Potentia's ISIN.",
-      "vendor_says": "MALARASEN AB"
-    }
-  ]
+  "held": []
 }
