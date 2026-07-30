@@ -19,7 +19,12 @@ logger = get_logger("universe.artifacts")
 
 
 def _normalize_ticker(raw):
-    """Strip exchange suffixes (e.g. 'ROG SW' -> 'ROG', 'FRE.DE' -> 'FRE')."""
+    """Strip exchange suffixes (e.g. 'ROG SW' -> 'ROG', 'FRE.DE' -> 'FRE').
+
+    RETAINED FOR THE CASE-COLLISION CHECK ONLY. As of schema v4 the published
+    metadata is keyed by the RAW ticker — see `build_universe_metadata_with_stats`
+    for why. Do not reintroduce this into the key path.
+    """
     ticker = (raw or "").strip().upper()
     if not ticker or ticker == "#N/A":
         return None
@@ -28,14 +33,45 @@ def _normalize_ticker(raw):
     return plain or None
 
 
+def _publish_key(raw):
+    """The published metadata key: the ticker EXACTLY as the universe CSV holds it.
+
+    Schema v4 (2026-07-30). Previously the key was suffix-stripped, and that
+    silently destroyed data and broke joins:
+
+      - **It lost a company.** `ROG` (Rogers Corporation, `Core=Y`) and `ROG.SW`
+        (Roche) both normalized to `ROG`, later-row-wins, so the published
+        metadata said `ROG` was Roche and Rogers Corporation had no entry at all.
+        The exporter had been reporting `normalization_collisions: 1` on every
+        run for months.
+      - **It broke the obvious join for 183 of 1,096 rows.** `exports/universe.csv`
+        carries `Ticker = DIA.MI`, but the metadata key was `DIA`, so any consumer
+        doing `metadata[row["Ticker"]]` missed every suffixed row. `transcripts`
+        iterates these keys AS tickers (`load_all_universe`) and `focus_today`
+        keys its own map by them while positions use the raw ticker — both were
+        being handed a symbol that is not the one the universe uses.
+
+    The raw ticker is already unique (`validate_no_duplicate_tickers` is an ERROR-
+    level check), so keying by it makes collisions structurally impossible rather
+    than merely counted.
+
+    The one consumer that RELIED on stripping is `sigma-alert`, which built
+    `to_metadata_key()` / `foreign_collision_bases()` to compensate; it is updated
+    in the same release.
+    """
+    ticker = (raw or "").strip()
+    if not ticker or ticker.upper() == "#N/A":
+        return None
+    return ticker
+
+
 def build_universe_metadata(csv_path):
     """Read the coverage CSV and return a `{TICKER: {name, sector, subsector, sub_subsector}}` dict.
 
     This is the **generic** builder: no ETFs, no consumer-specific augmentation.
-    Every key in the returned dict corresponds to one or more rows in the source
-    CSV; multiple rows can collapse to a single key when their tickers normalize
-    to the same root (e.g. ``ROG SW`` and ``ROG.DE`` both become ``ROG``).
-    Use `build_universe_metadata_with_stats` if you need the collision count.
+    Keyed by the RAW ticker as of schema v4, so the map is exactly 1:1 with the
+    CSV's rows and `metadata[row["Ticker"]]` is the correct join. See
+    `_publish_key` for what changed and why.
 
     Args:
         csv_path: Path to a coverage universe CSV (must have columns
@@ -43,7 +79,7 @@ def build_universe_metadata(csv_path):
             'Sub-subsector (JP)', 'Core').
 
     Returns:
-        Dict keyed by normalized ticker (exchange suffix stripped). Each value
+        Dict keyed by the RAW ticker (``DIA.MI`` stays ``DIA.MI``). Each value
         has fields: name, sector, subsector, sub_subsector, core. The `core`
         field is the raw value of the `Core` column ("Y" for analytically-
         covered names, blank otherwise).
@@ -58,8 +94,10 @@ def build_universe_metadata_with_stats(csv_path):
     The stats dict has:
       - rows_seen: total CSV rows processed (including skipped/blank)
       - rows_kept: rows that produced a metadata entry
-      - normalization_collisions: rows whose normalized ticker collided with
-        an earlier row's (the later row wins, the earlier is overwritten)
+      - normalization_collisions: rows whose published key collided with an
+        earlier row's. Always 0 under schema v4 (raw tickers are unique); the
+        field is kept so the status file's shape is unchanged, and a non-zero
+        value now means a DUPLICATE ROW reached the exporter.
       - collision_examples: up to 10 sample collided ticker keys for debugging
     """
     metadata = {}
@@ -75,10 +113,14 @@ def build_universe_metadata_with_stats(csv_path):
         reader = csv.DictReader(f)
         for row in reader:
             rows_seen += 1
-            plain = _normalize_ticker(row.get("Ticker", ""))
+            plain = _publish_key(row.get("Ticker", ""))
             if not plain:
                 continue
             if plain in metadata:
+                # Structurally impossible now (raw tickers are unique, enforced by
+                # validate_no_duplicate_tickers at ERROR level), but counted rather
+                # than assumed: if it ever fires, a duplicate row reached the
+                # exporter and one company is being silently dropped again.
                 collisions += 1
                 if len(collision_examples) < 10:
                     collision_examples.append(plain)

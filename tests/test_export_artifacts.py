@@ -105,7 +105,7 @@ def test_status_file_schema(monkeypatch, tmp_path, fixture_csv):
         "last_discovery_run",
     }
     assert required_fields.issubset(status.keys())
-    assert status["schema_version"] == 3
+    assert status["schema_version"] == 4
     assert status["validation_passed"] is True
     assert status["row_count"] == 2
     # Generic contract: for a fixture without ticker normalization collisions,
@@ -179,9 +179,14 @@ def test_metadata_excludes_sigma_alert_etfs(monkeypatch, tmp_path, fixture_csv):
 
 
 def test_normalization_collisions_are_surfaced(monkeypatch, tmp_path):
-    """When two CSV rows normalize to the same ticker (e.g. 'ROG SW' and
-    'ROG.DE' both → 'ROG'), the later row wins, ticker_count drops below
-    row_count, and the status file reports the collision count + examples."""
+    """Schema v4: rows that USED to collide now each keep their own key.
+
+    This test previously asserted the defect as correct — that `ROG SW` and
+    `ROG.DE` collapse to one key, the later row wins, and `ticker_count` drops
+    below `row_count`. That behaviour silently deleted a company from the
+    published contract (live case: Rogers Corporation, `Core=Y`, erased by
+    Roche). Keying by the raw ticker makes the collapse impossible, so the
+    assertion is inverted: three rows in, three keys out, zero collisions."""
     csv_path = tmp_path / "collision.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
@@ -203,9 +208,16 @@ def test_normalization_collisions_are_surfaced(monkeypatch, tmp_path):
 
     status = json.loads((exports_dir / "universe_status.json").read_text(encoding="utf-8"))
     assert status["row_count"] == 3
-    assert status["ticker_count"] == 2  # ROG collapses, AAPL standalone
-    assert status["normalization_collisions"] == 1
-    assert "ROG" in status["collision_examples"]
+    assert status["ticker_count"] == 3  # nothing collapses under v4
+    assert status["normalization_collisions"] == 0
+    assert status["collision_examples"] == []
+
+    # Both listings survive, under the keys the universe CSV actually uses.
+    meta = json.loads((exports_dir / "universe_metadata.json").read_text(encoding="utf-8"))
+    assert meta["ROG SW"]["name"] == "Roche Swiss"
+    assert meta["ROG.DE"]["name"] == "Roche Germany"
+    assert meta["AAPL"]["name"] == "Apple Inc"
+    assert "ROG" not in meta, "the stripped base must not be invented"
 
 
 def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
@@ -292,7 +304,7 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
 
     # Status file
     status = json.loads((exports_dir / "positions_status.json").read_text(encoding="utf-8"))
-    assert status["schema_version"] == 3
+    assert status["schema_version"] == 4
     assert status["entry_count"] == 2
     assert status["portfolio_count"] == 1
     assert status["researching_count"] == 1
@@ -398,7 +410,7 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
     )
 
     manifest = json.loads((exports_dir / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 4
     listed_names = {f["name"] for f in manifest["files"]}
     assert listed_names == {
         "universe.csv",
