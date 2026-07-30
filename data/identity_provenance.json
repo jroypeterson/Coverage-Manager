@@ -469,6 +469,17 @@
         "OpenFIGI ticker ZOMDF/US -> ZOMEDICA CORP, Common Stock; ZOMDF is a 5-letter OTC-style symbol"
       ],
       "note": "NOT a rename -- the company NAME is unchanged. A move OFF an exchange to OTC, which filing as a rebrand would have hidden."
+    },
+    {
+      "ticker": "HELP",
+      "field": "CIK",
+      "value": "1833141",
+      "verified": "2026-07-30",
+      "sources": [
+        "EDGAR: CYBIN INC., CIK 1833141, ticker HELP, Nasdaq, healthcare; still filing (6-K accepted 2026-07-21)",
+        "OpenFIGI: HELP/US -> CYBIN INC, Common Stock; the old CYBN/US returns 'No identifier found'"
+      ],
+      "note": "Found by the name-based resolver simulation, which is the whole argument for building that verb: CYBN was invisible to check-ticker-changes (CIK-keyed, and the CIK was blank) AND to backfill-cik (ticker-keyed, and CYBN had already left SEC's map). Exchange left as NYSE deliberately -- EDGAR reports Nasdaq but OpenFIGI could not corroborate a US venue from the ISIN, and one source is not the bar for a write."
     }
   ],
   "removals": [
@@ -548,6 +559,16 @@
         "OpenFIGI: ZOMDF/US -> ZOMEDICA CORP, Common Stock"
       ],
       "note": "A VENUE move, not a rebrand: the company name is unchanged. Found by resolving CIK-blank rows by company NAME, because a row with a changed ticker AND a blank CIK is invisible to both check-ticker-changes (CIK-keyed) and backfill-cik (current-ticker-keyed)."
+    },
+    {
+      "from": "CYBN",
+      "to": "HELP",
+      "verified": "2026-07-30",
+      "evidence": [
+        "EDGAR: CYBIN INC. CIK 1833141 now trades as HELP on Nasdaq",
+        "OpenFIGI: CYBN/US no longer resolves; HELP/US is CYBIN INC"
+      ],
+      "note": "The live case the resolver plan was written around."
     }
   ],
   "held": [

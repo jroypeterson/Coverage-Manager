@@ -144,6 +144,23 @@ def build_parser():
         help="Restrict the check to these tickers.",
     )
 
+    rcn_parser = subparsers.add_parser(
+        "resolve-cik-by-name",
+        help=(
+            "Find blank-CIK rows whose COMPANY NAME matches an SEC registrant "
+            "filing under a DIFFERENT ticker. Closes the circular blind spot "
+            "where backfill-cik (keyed on the current ticker) and "
+            "check-ticker-changes (keyed on the CIK) both miss a renamed row. "
+            "REPORT-ONLY - it never writes."
+        ),
+    )
+    rcn_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Check only the first N blank-CIK rows.")
+    rcn_parser.add_argument(
+        "--tickers", nargs="*", default=None,
+        help="Restrict the sweep to these tickers.")
+
     crsp_parser = subparsers.add_parser(
         "crsp-snapshot",
         help=(
@@ -514,6 +531,20 @@ def main():
         # Exit 2 on a real conflict OR on a run that learned nothing, so a
         # scheduled invocation cannot report silence as agreement.
         raise SystemExit(2 if (result.conflicts or not result.ok) else 0)
+    elif args.command == "resolve-cik-by-name":
+        from universe import cik_name_resolver as rcn
+        result, report = rcn.main(tickers=args.tickers, limit=args.limit)
+        print(f"checked {result.checked} blank-CIK row(s)")
+        for verdict in (rcn.STALE_US_LISTING, rcn.AMBIGUOUS_NAME,
+                        rcn.LEDGER_CONFLICT, rcn.SEC_REGISTERED_OTHER_LINE,
+                        rcn.SHORT_NAME_SUPPRESSED, rcn.NO_MATCH):
+            print(f"  {verdict:28} {len(result.by_verdict(verdict))}")
+        print(f"report: {report}")
+        if not result.fetched_ok:
+            print("SEC map unavailable - this run learned NOTHING, not 'clean'")
+            return 2
+        return 2 if result.needs_review else 0
+
     elif args.command == "verify-isin-issuers":
         from universe import isin_identity
 

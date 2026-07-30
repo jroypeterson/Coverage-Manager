@@ -36,6 +36,8 @@ UNIVERSE_ARCHIVE_PATTERNS = [
     "delisted_check_*.csv",
     "ticker_change_check_*.md",
     "ticker_change_check_*.csv",
+    "cik_name_resolution_*.md",
+    "cik_name_resolution_*.csv",
 ]
 
 
@@ -741,6 +743,36 @@ def _step_ticker_change_check():
     }
 
 
+def _step_resolve_cik_by_name():
+    """Find blank-CIK rows whose COMPANY NAME matches an SEC registrant filing
+    under a DIFFERENT ticker.
+
+    Report-only. Closes the circular blind spot where `backfill-cik` (keyed on
+    the current ticker) and `check-ticker-changes` (keyed on the CIK) both miss a
+    renamed row -- `FGEN` and `CYBN` were both found this way, by hand, after the
+    fact.
+    """
+    from universe import cik_name_resolver as rcn
+
+    result, report = rcn.main()
+    return {"checked": result.checked, "report": str(report),
+            "fetched_ok": result.fetched_ok,
+            "stale_us": len(result.by_verdict(rcn.STALE_US_LISTING)),
+            "ambiguous": len(result.by_verdict(rcn.AMBIGUOUS_NAME)),
+            "other_line": len(result.by_verdict(rcn.SEC_REGISTERED_OTHER_LINE)),
+            "needs_review": len(result.needs_review)}
+
+
+def _cik_resolver_step_status(r):
+    """Counted classes, ASCII-only, no company names -- this string reaches a
+    cp1252 console mid-run."""
+    if not r.get("fetched_ok", True):
+        return "failed: SEC map unavailable - resolver learned nothing"
+    tail = (f"{r['checked']} blank-CIK row(s) checked; {r['stale_us']} stale US "
+            f"listing(s), {r['ambiguous']} ambiguous, {r['other_line']} other-line")
+    return f"failed: review needed - {tail}" if r["needs_review"] else f"ok - {tail}"
+
+
 def _step_verify_isin_issuers():
     """Audit every stored ISIN against the issuer name OpenFIGI maps it to.
 
@@ -1219,6 +1251,16 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 )
         else:
             steps["crosscheck_foreign"] = status
+
+    # Step [4e/6]: blank-CIK resolution by company name
+    if dry_run:
+        logger.info("[4e/6] Blank-CIK name resolution... SKIPPED (dry run)")
+        steps["resolve_cik_by_name"] = "skipped (dry run)"
+    else:
+        logger.info("[4e/6] Resolving blank CIKs by company name...")
+        status, rc_res = run_step("resolve_cik_by_name", _step_resolve_cik_by_name)
+        steps["resolve_cik_by_name"] = (
+            _cik_resolver_step_status(rc_res) if rc_res else status)
 
     # Step [4d/6]: ISIN -> issuer-name identity audit
     if dry_run:
