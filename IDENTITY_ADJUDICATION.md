@@ -63,11 +63,19 @@ that post-dated the cell). Search before escalating.
    *and* Core all matched Cochlear's exactly, and `COH`/`CPH` sort adjacently, so
    this was a three-cell fill-down in the 2026-04-03 import.
 
-   ⚑ **`Core = Y` left in place, deliberately.** It is very likely part of that
-   same fill-down, but Core is a *coverage* assertion — three sibling projects
-   (`forensic_triage`, `analyst-days`, `earnings_agent`) filter on it — and JP
-   asked me to fix the tag, not to change what he covers. Clearing it is a
-   one-line change if he wants it.
+   ✅ **`Core = Y` CLEARED 2026-07-31.** JP: *"Remove Y from CPH and keep on
+   cochlear."* That completes the three-cell fill-down repair — Sector, Subsector
+   and now Core, all three of which had been Cochlear's. Core=Y count 257 → 256.
+
+   **Downstream effect, stated so it is not a surprise:** three sibling projects
+   filter `Core == "Y"` — `forensic_triage`'s call-budget gate, `analyst-days`'
+   `load_core_watchlist`, and `earnings_agent`'s coverage — so CPH drops out of
+   all three. That is the intent.
+
+   *Not recorded in the provenance ledger, deliberately:* `Core` is a coverage
+   assertion, not part of the identity surface (`TRACKED_FIELDS`) that ledger
+   exists to pin. No register can corroborate whether JP follows a name. The
+   decision lives here, which is where scope decisions belong.
 
 2. **`COH Au` → `COH.AX`.** JP: *"Cochlear should probably be core with the right
    ticker."* It was **already** `Core = Y`, so the actionable half was the key:
