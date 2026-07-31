@@ -563,16 +563,26 @@
       "note": "FIXED AS A SET. The wrong ISIN and wrong LEI arrived as a MATCHED PAIR, both pointing at the Swiss CPH -- the 7741.T (Hoya/Homag) and FAGR.BR (Fagron NV / Fagron a.s.) pattern. Correcting only the ISIN would have left a row that still lied."
     },
     {
-      "ticker": "MDLA",
-      "field": "ISIN",
-      "value": "ID1000209901",
-      "verified": "2026-07-30",
-      "supersedes": "SE0008937411",
+      "ticker": "CPH",
+      "field": "Company Name",
+      "value": "Cipher Pharmaceuticals Inc",
+      "verified": "2026-07-31",
       "sources": [
-        "TradingView IDX:MDLA (fetched): ISIN ID1000209901, PT Medela Potentia Tbk, IPO 2025-04-15",
-        "KSEI (Indonesia's central securities depository and numbering agency) registered-securities page for MDLA, plus Investing.com as a third carrier"
+        "Cipher's own IR page (cipherpharma.com): specialty DERMATOLOGY pharma, Mississauga ON, TSX: CPH (CAD) and OTCQX: CPHRF",
+        "OpenFIGI: CPH on exchCode CT (Toronto) -> CIPHER PHARMACEUTICALS INC, Common Stock"
       ],
-      "note": "PT Medela Potentia Tbk -- Indonesian pharmaceutical and healthcare DISTRIBUTION holding company (Anugrah Argon Medica group), IPO'd on IDX 2025-04-15. The superseded value was Malarasen AB's (Sweden). See the open scope question about this row's Sector (JP)."
+      "note": "RECLASSIFIED 2026-07-31 on JP's call ('Keep CPH but update the tag to whatever you think'). Sector (JP) MedTech -> Biopharma and Subsector Hearing Aid -> Specialty & Generic Pharma: Cipher licenses and markets branded dermatology products (Epuris), which is not MedTech and is certainly not hearing aids. The wrong tags were inherited wholesale from COCHLEAR -- Sector, Subsector AND Core matched Cochlear's exactly, and COH/CPH sort adjacently, so this was a three-cell fill-down in the 2026-04-03 bulk import. Exchange Code / Full Name were 'YHD', a Yahoo placeholder rather than an exchange; corrected to TOR / Toronto per the TSX peer convention."
+    },
+    {
+      "ticker": "COH.AX",
+      "field": "Company Name",
+      "value": "Cochlear Limited",
+      "verified": "2026-07-31",
+      "sources": [
+        "OpenFIGI: COH on exchCode AU -> COCHLEAR LTD, Common Stock, FIGI BBG000FT0MR1",
+        "Universe convention: all seven other ASX rows are keyed dotted (BOT.AX, CUV.AX, IMU.AX, MYX.AX, NEU.AX, RAC.AX, TLX.AX), and ticker_utils.normalize_ticker already resolves 'COH Au' to 'COH.AX'"
+      ],
+      "note": "RE-KEYED 2026-07-31 on JP's call ('Cochlear should probably be core with the right ticker'). It was already Core=Y, so the actionable half was the KEY: the row was the sole ASX outlier carrying the Bloomberg space form 'COH Au'. Under exports schema v4 the published metadata key is the RAW ticker, so a space-form key would have been published verbatim and no consumer would have joined to it."
     }
   ],
   "removals": [
@@ -636,6 +646,18 @@
       ],
       "quarantined_to": "data/delisted_tickers.csv",
       "note": "delisted=false is deliberate: it is delisted from NASDAQ but not dissolved, and the ADS still quotes OTC. The removal is a scope judgement, and it should be revisited only if the H1 2027 dissolution does not complete."
+    },
+    {
+      "ticker": "MDLA",
+      "verified": "2026-07-31",
+      "delisted": false,
+      "reason": "Out of scope - a Medallia-era artifact row repointed by ticker to an unrelated Indonesian company; never a deliberate pick.",
+      "evidence": [
+        "Sector (JP)=SaaS is the tell: the row was created for Medallia, Inc., NYSE 'MDLA' until its Thoma Bravo take-private in October 2021",
+        "The symbol was later reused on the IDX by PT Medela Potentia Tbk (IPO 2025-04-15), correct ISIN ID1000209901 per TradingView + KSEI"
+      ],
+      "quarantined_to": "data/delisted_tickers.csv",
+      "note": "delisted=false: Medela Potentia is alive and trades on the IDX. This is a SCOPE removal of a row that followed a recycled ticker between two unrelated companies -- the ZEN pattern. Medallia is private and cannot return; Medela Potentia must be added deliberately under its own identity if ever wanted, never inherited from this ticker. Its verified ISIN is preserved in the quarantine note so the research is not lost."
     }
   ],
   "renames": [

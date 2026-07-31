@@ -49,22 +49,44 @@ search, which is what the registers alone could not do:
 `FGEN` (rename), `CBIO` (reverse split), and now `2715.HK` (a brand-new listing
 that post-dated the cell). Search before escalating.
 
-### ⚑ Two SCOPE questions this surfaced — genuinely JP's call
+### Two scope questions — **DECIDED BY JP 2026-07-31**
 
-Neither is an identifier fact, and both come from the 2026-04-03 bulk import.
+1. **`CPH` — kept and reclassified.** JP: *"Keep CPH but update the tag to
+   whatever you think."* Cipher Pharmaceuticals is a specialty **dermatology**
+   pharma (Epuris; TSX `CPH` in CAD, OTCQX `CPHRF`), so
+   `Sector (JP)` MedTech → **Biopharma** and `Subsector` Hearing Aid →
+   **Specialty & Generic Pharma**. `Exchange Code`/`Full Name` were `YHD`, a
+   Yahoo placeholder rather than an exchange → **TOR / Toronto**, the TSX peer
+   convention. FIGIs filled from OpenFIGI.
 
-1. **`CPH` is a dermatology pharma carrying `Sector (JP) = MedTech`,
-   `Subsector = Hearing Aid`, `Core = Y`.** Cochlear is already in the universe
-   separately (`COH Au`, Core=Y, Hearing Aid), so the Hearing-Aid tag looks
-   inherited rather than chosen. Was Cipher ever a deliberate pick? If yes, the
-   sector should be Biopharma; if no, the row is a contaminated artifact.
-   (`Exchange Code = YHD` is a Yahoo placeholder and junk either way.)
-2. **`MDLA` carries `Sector (JP) = SaaS`** — which betrays its origin as
-   **Medallia**, the US SaaS company that traded as NYSE `MDLA` until its Thoma
-   Bravo take-private in Oct 2021. The exact `ZEN` shape. The Indonesian
-   distributor that now owns the ticker plausibly *fits* an HC universe as
-   Healthcare Services / distribution, but was almost certainly never a
-   deliberate pick. Keep-and-reclassify, or quarantine?
+   The wrong tags were inherited **wholesale from Cochlear** — Sector, Subsector
+   *and* Core all matched Cochlear's exactly, and `COH`/`CPH` sort adjacently, so
+   this was a three-cell fill-down in the 2026-04-03 import.
+
+   ⚑ **`Core = Y` left in place, deliberately.** It is very likely part of that
+   same fill-down, but Core is a *coverage* assertion — three sibling projects
+   (`forensic_triage`, `analyst-days`, `earnings_agent`) filter on it — and JP
+   asked me to fix the tag, not to change what he covers. Clearing it is a
+   one-line change if he wants it.
+
+2. **`COH Au` → `COH.AX`.** JP: *"Cochlear should probably be core with the right
+   ticker."* It was **already** `Core = Y`, so the actionable half was the key:
+   this was the sole ASX row still carrying the Bloomberg space form, while all
+   seven others are dotted (`BOT.AX`, `CUV.AX`, `TLX.AX`, …) and
+   `normalize_ticker` already resolved it to `COH.AX`. This mattered more under
+   exports schema v4 than it used to: the published metadata key is now the RAW
+   ticker, so `COH Au` would have been published verbatim and no consumer would
+   have joined to it.
+
+3. **`MDLA` — quarantined.** JP: *"quarantine. Probably should be dropped."*
+   The `ZEN` pattern exactly: the row was created for **Medallia, Inc.** (NYSE
+   `MDLA` until its Thoma Bravo take-private, Oct 2021 — hence the stale
+   `Sector (JP) = SaaS`), and the recycled symbol was later taken on the IDX by
+   **PT Medela Potentia Tbk**, an unrelated Indonesian healthcare distributor,
+   which the row silently followed. Medela Potentia is alive and its verified
+   ISIN (`ID1000209901`) is preserved in the quarantine note so the research
+   isn't lost — but it must be **added deliberately** under its own identity if
+   ever wanted, never inherited from this ticker. `delisted = false`.
 
 ### A3. `ALBT` / `FGEN` — name decisions, now resolved
 Closed 2026-07-29 on JP's call: `FGEN`→`KYNB` (Kyntra Bio, same registrant),
