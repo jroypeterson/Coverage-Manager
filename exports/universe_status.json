@@ -1,7 +1,7 @@
 {
   "schema_version": 4,
-  "dataset_version": "2026-07-30",
-  "generated_at": "2026-07-30T21:27:24Z",
+  "dataset_version": "2026-07-31",
+  "generated_at": "2026-07-31T12:15:42Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1094,
   "ticker_count": 1094,
@@ -13,5 +13,5 @@
     "1 possible duplicate company name(s) (normalized): ['shimadzu']",
     "188 ticker(s) missing Subsector (JP) value"
   ],
-  "last_discovery_run": null
+  "last_discovery_run": "2026-07-31"
 }

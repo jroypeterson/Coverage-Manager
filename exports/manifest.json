@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "generated_at": "2026-07-30T21:27:24Z",
+  "generated_at": "2026-07-31T12:15:42Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
