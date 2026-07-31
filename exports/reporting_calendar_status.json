@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "dataset_version": "2026-07-31",
-  "generated_at": "2026-07-31T12:18:00Z",
+  "generated_at": "2026-07-31T15:58:57Z",
   "universe": "positions_union_core",
-  "ticker_count": 288,
+  "ticker_count": 287,
   "us_filer_count": 230,
-  "non_us_or_uncovered_count": 58,
+  "non_us_or_uncovered_count": 57,
   "gating_eligible_count": 208,
   "generated_for": "2026-07-31"
 }

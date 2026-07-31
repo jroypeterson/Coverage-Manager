@@ -86,6 +86,23 @@ def build_parser():
         help="Only look up the first N missing rows (for a test pass).",
     )
 
+    itype_parser = subparsers.add_parser(
+        "instrument-type",
+        help=(
+            "Fill the Instrument Type column (Depositary Receipt vs Ordinary Share) "
+            "from OpenFIGI securityType2. Primary listings decide for free; only "
+            "cross-listed rows with an ISIN cost a call. Never overwrites a value."
+        ),
+    )
+    itype_parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Report what would be filled without writing the CSV.",
+    )
+    itype_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the OpenFIGI cache and refetch.",
+    )
+
     fid_parser = subparsers.add_parser(
         "backfill-foreign-ids",
         help=(
@@ -490,6 +507,13 @@ def main():
         # Exit 2 when the SEC fetch failed: a silent no-op here would let the
         # very gap this step closes reopen unnoticed.
         raise SystemExit(0 if result["fetched_ok"] else 2)
+    elif args.command == "instrument-type":
+        from universe import instrument_type
+        res = instrument_type.main(use_cache=not args.no_cache, dry_run=args.dry_run)
+        # Exit 2 when rows are left undecided -- same posture as the sibling
+        # identity lanes: a run that could not answer must not report success.
+        return 2 if res.undecided else 0
+
     elif args.command == "backfill-lei":
         from universe import lei_backfill
 

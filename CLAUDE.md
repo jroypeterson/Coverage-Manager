@@ -768,6 +768,65 @@ country value with no prefix mapping, so the next map gap is visible instead of 
 no-op. Live: 1 warning — `MICC` carries `Country (HQ) = "NL"`, an alpha-2 code where a
 country name belongs (a row defect for JP to fix, not a mapping to add).
 
+## `Instrument Type` — depositary receipt vs the actual share (2026-07-31)
+
+`python cli.py instrument-type [--dry-run] [--no-cache]` fills the **`Instrument Type`**
+column, inserted immediately after `Listing Type`. They are **two different facts** and one
+column cannot carry both without lying about one (JP's call, 2026-07-29):
+
+| Column | Answers |
+|---|---|
+| `Listing Type` | is this the **home** listing, or a secondary one? |
+| `Instrument Type` | is this a **depositary receipt**, or the **actual share**? |
+
+Medtronic is a *secondary* listing of the *actual ordinary share*; AstraZeneca's NYSE line is
+a *secondary* listing of a *receipt*. Both read `ADR/Cross-listed`, which is exactly why
+**Rule A could not be written**: tightening a row's ISIN to its listing country's prefix would
+reject **84 legitimate rows** (`ALKS` IE, `CRSP` CH, `BLCO` CA, `CP` CA, `MDT`, `ICLR`) because
+an interlisted ordinary correctly carries its foreign ISIN. **This column is what unblocks it** —
+verified on the live universe: all six named false-rejections classify `Ordinary Share`, while
+`ARGX`/`ASML`/`GSK`/`NVO`/`TEVA`/`SNY` classify `Depositary Receipt`.
+
+**The source is OpenFIGI `securityType2`, not the ISIN-prefix heuristic in the plan.** The
+planned rule — *"ISIN prefix equals the listing country ⇒ ordinary; US-prefixed on a US line ⇒
+receipt"* — was measured against the 138 cross-listed rows and decides only 65 of them, then
+breaks twice: **ISIN follows incorporation, not listing** (12 Cayman-incorporated China
+operators on HKEX carry `KYG…`, matching neither country, and all are ordinaries), and **a US
+ISIN on a US line is genuinely ambiguous** (33 rows, containing both real ADRs and
+US-incorporated foreign operators). OpenFIGI returns literally `"Depositary Receipt"` or
+`"Common Stock"`, and CM already trusts it as the authority for the ISIN→issuer identity gate,
+so this adds a field to an existing call rather than a new dependency.
+
+**Live result (2026-07-31): 1,093 rows → 1,002 `Ordinary Share`, 26 `Depositary Receipt`,
+65 blank.** Blanks are `no-isin` (57) and `no-openfigi-coverage` (8) — reported by name, never
+guessed. The 57 no-ISIN rows are the **same population as the `#220` residual**, so closing the
+foreign-ISIN coverage gap closes most of these for free.
+
+**Cost is ~10 requests, not 80.** A *primary* listing is the actual share by definition — there
+is no such thing as a primary listing of a receipt — so 915 of 1,093 rows decide locally for
+free and only cross-listed rows with an ISIN cost a call.
+
+**Three states, never two** (same discipline as `delisted_check` / `ipo_backfill`): `ok`,
+plus `no-isin` / `no-openfigi-coverage` / `openfigi-unreachable` / `ambiguous` / `unmapped-type`,
+all of which leave the cell **blank**. `ambiguous` means the FIGIs for one ISIN disagree across
+venues — resolving that by majority vote would be a coin toss dressed as data. An unrecognised
+`securityType2` (preferred stock, units, warrants) is **reported, never folded into the common
+case**. Fills blanks only; never overwrites, because a human may have adjudicated exactly the
+rows OpenFIGI could not.
+
+**What it deliberately does NOT do:** it describes the **stored ISIN's** instrument, not the
+venue. `AZN` is a NYQ/USD line carrying `GB0009895292` (the London ordinary), so it reads
+`Ordinary Share` while the ticker actually trades as a receipt. That disagreement is already a
+finding — `crosscheck-foreign`'s standing `listing-mismatch` on `AZN`/`FER`/`MDA`/`2359.HK` —
+and this column makes it machine-readable rather than papering over it.
+
+Additive, **no schema bump** (the `LEI` / `IPO Date` precedent); surfaced in `exports/universe.csv`
+via the snapshot. Verified no consumer couples to column count or position. Exit code `2` when any
+row is left undecided. Module `universe/instrument_type.py`; the OpenFIGI fetch gained
+`fetch_isin_security_types` alongside `fetch_isin_names` (shared cache; entries predating the
+`types` field count as a **miss**, so an older cache cannot answer a newer question with silence).
+Tests `tests/test_instrument_type.py` (16) — every OpenFIGI value in them was captured live.
+
 ## ISIN → issuer-name identity check (`verify-isin-issuers`)
 
 `python cli.py verify-isin-issuers [--no-cache] [--sample N] [--tickers ...]`

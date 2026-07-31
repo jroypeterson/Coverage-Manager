@@ -256,14 +256,19 @@ def _post_batch(post, payload):
     return resp.json()
 
 
-def fetch_isin_names(isins, *, use_cache=True, cache_path=None, post=None,
-                     sleep=time.sleep):
-    """Map ISINs to their OpenFIGI issuer names.
+def _fetch_isin_records(isins, *, use_cache=True, cache_path=None, post=None,
+                        sleep=time.sleep, need="names"):
+    """Core OpenFIGI mapping loop.
 
-    Returns ``{isin: list_of_names | [] | None}`` — ``[]`` means OpenFIGI
-    explicitly knows nothing (deterministic, cached), ``None`` means the
-    lookup failed in transit (transient, NEVER cached, so the next run
-    retries instead of trusting a blackout).
+    Returns ``{isin: {"names": [...], "types": [...]} | None}`` — ``None`` means
+    the lookup failed in transit (transient, NEVER cached).
+
+    ``need`` names the cache field the caller actually requires. A cached entry
+    that predates that field counts as a **miss**, so an older cache cannot
+    answer a newer question with silence: the name cache shipped 2026-07-28,
+    ``securityType2`` was only captured on 2026-07-31, and every pre-existing
+    entry would otherwise have reported "no security type" — which reads exactly
+    like "OpenFIGI has no coverage" and is the module's own founding mistake.
     """
     cache_path = Path(cache_path) if cache_path else CACHE_PATH
     post = post or requests.post
@@ -273,8 +278,9 @@ def fetch_isin_names(isins, *, use_cache=True, cache_path=None, post=None,
     out = {}
     to_fetch = []
     for isin in unique:
-        if use_cache and isin in cache:
-            out[isin] = list(cache[isin].get("names", []))
+        if use_cache and isin in cache and need in cache[isin]:
+            out[isin] = {"names": list(cache[isin].get("names", [])),
+                         "types": list(cache[isin].get("types", []))}
         else:
             to_fetch.append(isin)
 
@@ -305,10 +311,16 @@ def fetch_isin_names(isins, *, use_cache=True, cache_path=None, post=None,
         else:
             now = datetime.now(timezone.utc).isoformat(timespec="seconds")
             for isin, entry in zip(batch, data):
-                names = sorted({(d.get("name") or "").strip()
-                                for d in entry.get("data", [])} - {""})
-                out[isin] = names
-                cache[isin] = {"names": names, "fetched_at": now}
+                rows = entry.get("data", [])
+                names = sorted({(d.get("name") or "").strip() for d in rows} - {""})
+                # securityType2 is the coarse instrument class -- "Depositary
+                # Receipt" vs "Common Stock" -- which is exactly the question
+                # `Instrument Type` asks. Kept as a SET because one ISIN maps to
+                # many FIGIs (one per venue) and they must agree for the answer
+                # to be usable; disagreement is a finding, not a coin toss.
+                types = sorted({(d.get("securityType2") or "").strip() for d in rows} - {""})
+                out[isin] = {"names": names, "types": types}
+                cache[isin] = {"names": names, "types": types, "fetched_at": now}
                 wrote = True
 
         if bi + 1 < len(batches):
@@ -317,6 +329,32 @@ def fetch_isin_names(isins, *, use_cache=True, cache_path=None, post=None,
     if wrote:
         _save_cache(cache_path, cache)
     return out
+
+
+def fetch_isin_names(isins, *, use_cache=True, cache_path=None, post=None,
+                     sleep=time.sleep):
+    """Map ISINs to their OpenFIGI issuer names.
+
+    Returns ``{isin: list_of_names | [] | None}`` — ``[]`` means OpenFIGI
+    explicitly knows nothing (deterministic, cached), ``None`` means the
+    lookup failed in transit (transient, NEVER cached, so the next run
+    retries instead of trusting a blackout).
+    """
+    recs = _fetch_isin_records(isins, use_cache=use_cache, cache_path=cache_path,
+                               post=post, sleep=sleep, need="names")
+    return {k: (None if v is None else v["names"]) for k, v in recs.items()}
+
+
+def fetch_isin_security_types(isins, *, use_cache=True, cache_path=None,
+                              post=None, sleep=time.sleep):
+    """Map ISINs to their OpenFIGI ``securityType2`` values.
+
+    Same three-state contract as :func:`fetch_isin_names`: ``[]`` is an
+    authoritative "no coverage", ``None`` is a transient failure.
+    """
+    recs = _fetch_isin_records(isins, use_cache=use_cache, cache_path=cache_path,
+                               post=post, sleep=sleep, need="types")
+    return {k: (None if v is None else v["types"]) for k, v in recs.items()}
 
 
 def verify_isin_identity(isin, company_name, *, use_cache=True, fetch=None):

@@ -11471,7 +11471,7 @@
       "gating_eligible": true
     }
   },
-  "COH AU": {
+  "COH.AX": {
     "fye_month": null,
     "calendar_aligned": null,
     "filer_type": "non_us_or_unknown",
@@ -11483,7 +11483,7 @@
       "dates": {
         "provider": "api_ninjas",
         "fetched_at": "2026-07-31",
-        "n_rows": 0,
+        "n_rows": 50,
         "error": null
       },
       "anchor": {
@@ -12591,38 +12591,6 @@
       "source": "finnhub",
       "gating_eligible": true
     }
-  },
-  "CPH": {
-    "fye_month": null,
-    "calendar_aligned": null,
-    "filer_type": "non_us_or_unknown",
-    "typical_lag_days": null,
-    "report_cadence_months": null,
-    "monotonic": true,
-    "last_report_date": null,
-    "sources": {
-      "dates": {
-        "provider": "api_ninjas",
-        "fetched_at": "2026-07-03",
-        "n_rows": 0,
-        "error": null
-      },
-      "anchor": {
-        "provider": "finnhub",
-        "fetched_at": "2026-07-03",
-        "n_events": 0,
-        "error": null
-      },
-      "sec_label": {
-        "provider": "sec_xbrl",
-        "fetched_at": "2026-07-03",
-        "covered": false,
-        "error": null
-      }
-    },
-    "cross_checks": {},
-    "recent_quarters": [],
-    "next_expected": null
   },
   "CPRT": {
     "fye_month": 6,
