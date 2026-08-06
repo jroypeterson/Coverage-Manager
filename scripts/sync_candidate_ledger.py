@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="sync_candidate_ledger")
     ap.add_argument("--date", required=True, help="discovery run date, YYYY-MM-DD")
     ap.add_argument("--thread-ts", default="",
-                    help="#ipo thread ts for this week's post, recorded on new rows")
+                    help="#ipo-spinoffs-newissues thread ts for this week's post, recorded on new rows")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
 
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  EXPIRED {r['ticker']} ({r['company'][:40]}) - "
               f"pending since {r['pending_since']}")
     if expired:
-        print(f"  -> report these in the #ipo post: reply `revive TICKER` to restore")
+        print(f"  -> report these in the #ipo-spinoffs-newissues post: reply `revive TICKER` to restore")
 
     if a.dry_run:
         print("(dry run - ledger not written)")

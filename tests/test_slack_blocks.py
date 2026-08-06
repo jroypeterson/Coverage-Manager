@@ -1,0 +1,213 @@
+"""Tests for the Slack Block Kit renderer and the report router.
+
+The founding defect these guard against is not a crash — it is a post that ships
+looking fine and is unreadable, or worse, one that silently drops a section. Both
+happened: the 2026-07-31 post fenced an 11-column table into pipe-soup, and the
+router's first draft filed `### Pending approval backlog` (the decision itself)
+under "Notes" because it split on H2 only.
+"""
+from __future__ import annotations
+
+import importlib.util
+import re
+import sys
+from pathlib import Path
+
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from reporting import slack_blocks as sb  # noqa: E402
+
+
+def _load_poster():
+    spec = importlib.util.spec_from_file_location(
+        "post_coverage_to_ipo", PROJECT_ROOT / "scripts" / "post_coverage_to_ipo.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+poster = _load_poster()
+
+
+# ------------------------------------------------------------------ inline text
+
+
+def test_escape_order_does_not_double_escape():
+    # `&` must be replaced first or `<` becomes `&amp;lt;`.
+    assert sb.escape("a < b & c > d") == "a &lt; b &amp; c &gt; d"
+
+
+def test_bold_and_links_convert():
+    assert sb.inline("**hi**") == "*hi*"
+    assert sb.inline("[docs](http://x.co)") == "<http://x.co|docs>"
+
+
+def test_plain_strips_emphasis_for_header_blocks():
+    assert sb._plain("**Shein** `X`") == "Shein X"
+
+
+# ---------------------------------------------------------------- table routing
+
+
+NARROW = [
+    ["Ticker", "Company", "Pending since", "Trigger"],
+    ["688825.SS", "Changxin Technology Group (CXMT)", "2026-07-31", "IPO"],
+    ["MU", "Micron Technology, Inc.", "2026-07-31", "New candidate"],
+]
+
+WIDE = [
+    ["#", "Company", "Ticker", "Exchange", "Market Cap", "Reason to add"],
+    ["1", "Changxin Technology Group (CXMT)", "688825.SS", "Shanghai STAR",
+     "~$484B", "Mandatory Bucket 2 add. " * 12],
+]
+
+
+def test_narrow_table_stays_monospace_and_aligns():
+    assert sb.is_narrow(NARROW)
+    block = sb.render_aligned(NARROW)
+    body = block["elements"][0]["elements"][0]["text"].splitlines()
+    # Every column starts at the same offset on every line -> it actually aligns.
+    starts = [ln.index("2026-07-31") for ln in body if "2026-07-31" in ln]
+    assert len(set(starts)) == 1
+
+
+def test_aligned_tables_use_rich_text_so_slack_cannot_linkify_tickers():
+    """`.SS` / `.HK` / `.BR` are live ccTLDs; a mrkdwn code fence still links them."""
+    block = sb.render_aligned(NARROW)
+    assert block["type"] == "rich_text"
+    assert block["elements"][0]["type"] == "rich_text_preformatted"
+
+
+def test_wide_table_becomes_cards_not_a_code_fence():
+    assert not sb.is_narrow(WIDE)
+    blocks = sb.render_cards(WIDE)
+    assert len(blocks) == 1
+    assert "```" not in blocks[0]["text"]["text"]
+    assert blocks[0]["text"]["text"].startswith("*1.*")
+
+
+def test_card_promotes_ticker_and_index_and_keeps_reason():
+    blocks = sb.render_cards(WIDE)
+    text = blocks[0]["text"]["text"]
+    assert "`688825.SS`" in text
+    assert "Mandatory Bucket 2 add." in text
+
+
+def test_card_meta_goes_to_a_two_column_field_grid():
+    fields = sb.render_cards(WIDE)[0]["fields"]
+    labels = [f["text"].split("\n")[0] for f in fields]
+    assert "*Exchange*" in labels and "*Market Cap*" in labels
+    assert len(fields) <= sb.MAX_FIELDS
+
+
+def test_already_bold_title_is_not_double_wrapped():
+    rows = [["Company", "Why it matters"],
+            ["**Shein**", "x" * 200]]
+    text = sb.render_cards(rows)[0]["text"]["text"]
+    assert text.startswith("*Shein*")
+    assert "**Shein**" not in text
+
+
+@pytest.mark.parametrize("blank", ["-", "--", "—", "", "n/a", "N/A"])
+def test_placeholder_cells_are_dropped_not_rendered_as_facts(blank):
+    rows = [["Company", "Listing Date", "Why"],
+            ["Micron", blank, "y" * 200]]
+    block = sb.render_cards(rows)[0]
+    assert all("Listing Date" not in f["text"] for f in block.get("fields", []))
+
+
+def test_separator_row_is_not_data():
+    rows = sb.parse("| A | B |\n|---|---|\n| 1 | 2 |")[0][1]
+    assert rows == [["A", "B"], ["1", "2"]]
+
+
+# --------------------------------------------------------------- block hygiene
+
+
+REPORT = PROJECT_ROOT / "reports" / "weekly_coverage_universe_additions_2026-07-31.md"
+
+
+def _all_messages(md: str) -> list[list[dict]]:
+    lead, thread, footer = poster.route(md)
+    msgs = [sb.markdown_to_blocks(lead)]
+    msgs += [sb.markdown_to_blocks(b) for b in thread]
+    msgs += [[sb.context_block(b[:2900]) for b in footer]] if footer else []
+    return msgs
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="sample report not present")
+def test_live_report_respects_every_slack_limit():
+    md = REPORT.read_text(encoding="utf-8")
+    for msg in _all_messages(md):
+        assert len(msg) <= sb.MAX_BLOCKS
+        for b in msg:
+            if b["type"] == "section":
+                assert len(b["text"]["text"]) <= 3000
+                assert len(b.get("fields", [])) <= 10
+            if b["type"] == "header":
+                assert len(b["text"]["text"]) <= 150
+            if b["type"] == "context":
+                assert b["elements"], "context blocks require elements[]"
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="sample report not present")
+def test_no_code_fence_survives_for_the_wide_recommendations_table():
+    md = REPORT.read_text(encoding="utf-8")
+    lead, _, _ = poster.route(md)
+    rendered = "\n".join(
+        b["text"]["text"] for b in sb.markdown_to_blocks(lead)
+        if b["type"] == "section")
+    assert "| Changxin" not in rendered      # the pipe-soup that started this
+    assert "Changxin Technology Group" in rendered
+
+
+# ------------------------------------------------------------------- no loss
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="sample report not present")
+def test_every_section_is_routed_exactly_once():
+    """A heading that reaches no bucket is a section that silently vanished.
+
+    This is the Jersey Mike's failure mode in miniature: the report said the
+    right thing and the reader never saw it.
+    """
+    md = REPORT.read_text(encoding="utf-8")
+    titles = [m.group(2).strip()
+              for m in re.finditer(r"^(#{2,3}) +(.+?)\s*$", md, flags=re.M)]
+    lead, thread, footer = poster.route(md)
+    routed = "\n".join([lead] + thread + footer)
+    for title in titles:
+        assert routed.count(title) >= 1, f"section vanished: {title}"
+
+
+@pytest.mark.skipif(not REPORT.exists(), reason="sample report not present")
+def test_routing_preserves_every_non_blank_line():
+    md = REPORT.read_text(encoding="utf-8")
+    lead, thread, footer = poster.route(md)
+    routed = {ln.strip() for ln in "\n".join([lead] + thread + footer).splitlines()}
+    for line in md.splitlines():
+        if line.strip():
+            assert line.strip() in routed, f"line dropped in routing: {line[:70]}"
+
+
+def test_pending_backlog_reaches_the_lead_even_when_nested_under_notes():
+    md = ("# Title\n\nintro\n\n## Notes\n\nsome note\n\n"
+          "### Pending approval backlog\n\n`add MU` to approve.\n")
+    lead, thread, _ = poster.route(md)
+    assert "add MU" in lead
+    assert "some note" in "\n".join(thread)
+
+
+def test_unrecognised_section_goes_to_the_thread_not_the_bin():
+    md = "# T\n\nx\n\n## Something Nobody Anticipated\n\nbody text\n"
+    lead, thread, footer = poster.route(md)
+    assert "body text" in "\n".join(thread)
+    assert "body text" not in lead and not footer
+
+
+def test_chunk_never_loses_characters():
+    text = "\n\n".join("para %d %s" % (i, "z" * 400) for i in range(30))
+    assert "".join(sb._chunk(text)).replace("\n", "") == text.replace("\n", "")

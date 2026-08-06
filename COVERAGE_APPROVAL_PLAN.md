@@ -1,9 +1,9 @@
 # Coverage candidate approval loop — plan
 
-**Status:** scoped 2026-07-28, not started. Prerequisite (route the weekly post to `#ipo`)
+**Status:** scoped 2026-07-28, not started. Prerequisite (route the weekly post to `#ipo-spinoffs-newissues`)
 shipped in `bf3840c`.
 
-**The ask (JP, 2026-07-24):** new IPOs post to `#ipo`; a message asks whether to add the name
+**The ask (JP, 2026-07-24):** new IPOs post to `#ipo-spinoffs-newissues`; a message asks whether to add the name
 to coverage; JP answers **yes/no in-thread** and the universe CSV updates. The
 add-to-coverage decision is explicitly **independent of whether JP wants to participate in the
 IPO itself** — the thread must never read as "should I buy this?"
@@ -74,7 +74,7 @@ bumped, decided rows never touched.
 
 ### S3 — In-thread approval (~1–2 sessions) — *the actual ask*
 
-1. Post the weekly summary to `#ipo` via `scripts/post_coverage_to_ipo.py`; capture the returned
+1. Post the weekly summary to `#ipo-spinoffs-newissues` via `scripts/post_coverage_to_ipo.py`; capture the returned
    `ts` and write it to `slack_thread_ts` on this week's ledger rows.
 
    **The thread already carries each company's full briefing** (shipped 2026-07-28) — business
@@ -95,7 +95,7 @@ is the fetch primitive.
 
 **Scopes: already confirmed sufficient (2026-07-28).** ClaudeBot holds
 `chat:write, channels:history, channels:read, users:read, im:read, im:history, incoming-webhook,
-files:write`, and `conversations.replies` was verified live against the thread posted to `#ipo`
+files:write`, and `conversations.replies` was verified live against the thread posted to `#ipo-spinoffs-newissues`
 (`ts 1785262763.598659`). **No new Slack app configuration is required.**
 
 **Where it runs.** Replies arrive whenever JP reads Slack, so the poll needs a schedule.
@@ -123,7 +123,7 @@ unattended.
 PBLS, FPS, MANE, MWH, KARD, CSQR, STDN, 2475.HK) predate the ledger and several are already past
 60 days. Do **not** silently expire them on import — they were never actually put to JP. Import
 them all as `pending` with their true `first_proposed` date and post one catch-up thread to
-`#ipo` asking for a decision, with the clock starting from import.
+`#ipo-spinoffs-newissues` asking for a decision, with the clock starting from import.
 
 ---
 

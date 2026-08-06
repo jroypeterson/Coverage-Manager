@@ -214,14 +214,14 @@ both.
 `Carve-out`, `New candidate`, `Russell addition`. Put the nuance ("US ADR uplisting",
 "Russell 1000") in `reason`, not in `trigger`; a non-enum value is rejected. `sector` must
 be a valid `Sector (JP)`. Never set `approved` — approval is JP's, and only via the
-`#ipo` thread.
+`#ipo-spinoffs-newissues` thread.
 
 Write the file even in a quiet week: `{"date": "...", "candidates": []}`.
 
 **2. Then run:**
 
 ```
-python scripts/sync_candidate_ledger.py --date YYYY-MM-DD --thread-ts <ts from the #ipo post>
+python scripts/sync_candidate_ledger.py --date YYYY-MM-DD --thread-ts <ts from the #ipo-spinoffs-newissues post>
 ```
 
 It validates the output, folds new names into `data/candidate_ledger.csv` as `pending`,
@@ -233,10 +233,10 @@ pending more than 60 days. **Report any expiries in the Slack post** — "3 expi
 pending`), not by re-reading last week's report. Re-deriving it from prose is what let 15
 names accumulate unnoticed between 2026-06-19 and 2026-07-28.
 
-## Slack notification — post to #ipo
+## Slack notification — post to #ipo-spinoffs-newissues
 
 After the email draft is created and all reports are generated, post a summary to the Slack
-channel **#ipo**.
+channel **#ipo-spinoffs-newissues**.
 
 **Do not hand-roll the Slack payload. Run the script:**
 
@@ -245,10 +245,30 @@ python scripts/post_coverage_to_ipo.py --date YYYY-MM-DD
 ```
 
 It reads `reports/weekly_coverage_universe_additions_<date>.md` and
-`reports/company_backgrounds_<date>.md` (falling back to `reports/old reports/`), posts the
-summary to #ipo, and posts **each company's full briefing as a threaded reply** to that
-summary. It handles the markdown→mrkdwn conversion, fences the financial tables so the columns
-stay aligned, chunks under Slack's 3,000-char block cap, and raises on any non-`ok` response.
+`reports/company_backgrounds_<date>.md` (falling back to `reports/old reports/`) and splits
+them across a channel-level lead message and its thread:
+
+| Where | What |
+|---|---|
+| channel | title, this week's framing, the **Recommendations**, the **pending-approval backlog**, and how to reply |
+| thread | every other section in report order, then one message per company briefing, then a files footer |
+
+Rendering is `reporting/slack_blocks.py`. **Do not try to make tables render by hand.** Slack
+has no table primitive, and the previous approach — fencing every markdown table in a ``` block
+— produced the 2026-07-31 post JP called unreadable: an 11-column table whose last column is a
+paragraph wrapped into pipe-soup. The renderer now routes each table by shape (narrow ones
+become aligned monospace; wide ones become one card per row with a two-column fact grid), so
+**your job is to write good markdown and nothing else**.
+
+Two things you control that the renderer depends on:
+
+- **Keep the section headings.** Sections are routed by title. `Recommendations` and
+  `Pending approval backlog` go to the lead message; anything else goes to the thread. An
+  unrecognised heading is threaded, never dropped — but a *renamed* one silently changes
+  where JP reads it.
+- **Keep tables narrow when they are genuinely tabular.** A table stays monospace at up to 6
+  columns / 36-char cells / 88 chars total. Past that it becomes cards, which is right for a
+  reason column and wrong for a financial series.
 
 **The threaded briefings are required, not optional.** JP must be able to read the whole case
 — business description, financial snapshot, bull/bear, key swing factor, what to watch — in
@@ -258,10 +278,10 @@ non-zero; **produce the backgrounds file first**, then re-run.
 
 The script exits non-zero on failure. **If it fails, say so explicitly in your final summary —
 do not report the run as clean.** A post that silently failed is worse than no post, because
-the report is otherwise invisible (see "Why #ipo" below).
+the report is otherwise invisible (see "Why #ipo-spinoffs-newissues" below).
 
 Credentials are `SLACK_BOT_TOKEN` + `SLACK_IPO_CHANNEL_ID` (`C0BKLC32EHK`) in
-`Coverage Manager/.env` — #ipo has **no webhook**, so this posts via `chat.postMessage`.
+`Coverage Manager/.env` — #ipo-spinoffs-newissues has **no webhook**, so this posts via `chat.postMessage`.
 ClaudeBot is already a member of the channel.
 
 The summary report (which the script posts verbatim as the thread parent) must include:
@@ -284,7 +304,34 @@ The summary report (which the script posts verbatim as the thread parent) must i
 The script renders all of this as Block Kit with a plain-text fallback — you do not need to
 build blocks yourself. Write good markdown; the script does the rest.
 
-### Why #ipo, and what NOT to do
+### If you excluded a name a prior report promised to add, SAY SO
+
+`scripts/post_coverage_to_ipo.py` runs `reporting/pipeline_reversals.py` over the last eight
+reports before it posts. Any company that an earlier report committed to adding — *"would be
+a Consumer add at pricing"*, *"will be a mandatory Bucket 2 add the moment it prices"* — and
+that this report puts under **Considered and excluded** is flagged in the thread as an
+**unexplained reversal**, quoting both lines side by side.
+
+This exists because of Jersey Mike's. The 2026-07-24 report promised it at pricing; the
+07-31 report excluded it as "not universe-relevant" and cited the 07-24 report while doing
+so. **Citing the earlier report is not the same as withdrawing its promise** — the check
+treats a bare date reference as silence, and `test_citing_the_prior_report_date_is_not_an_acknowledgement`
+pins that. JP noticed the name never came through; nothing in the system did.
+
+So when you reverse an earlier call, write what changed: *"reverses the 07-24 call, which
+misjudged this as Consumer-relevant"*. Words the check accepts include **reverses**,
+**supersedes**, **previously said**, **no longer**, **on reflection**, **retract**. The point
+is not the keyword — it is that a reader sees the call changed.
+
+### Approvals are applied automatically — the reply instruction is real now
+
+End the post with `add TICKER` / `decline TICKER` / `add all` as before. Since 2026-08-05
+`CoverageManager-IpoReplyPoll` (09:20 / 13:20 / 18:20 daily) reads the thread, applies the
+decision to `data/candidate_ledger.csv`, enriches and appends approved names to the universe
+CSV, republishes `exports/`, and answers in-thread. Before that, nothing read the thread and
+every one of those instructions was a dead end.
+
+### Why #ipo-spinoffs-newissues, and what NOT to do
 
 Do **not** post to `#all-jp-personal-hub` — no webhook for it exists in this workspace, and
 earlier runs silently fell back to `SLACK_WEBHOOK_URL`, landing this report in

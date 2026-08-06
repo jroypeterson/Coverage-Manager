@@ -27,3 +27,6 @@ data/crsp/
 # If tracked/untracked, each review appears in the next review's working-tree
 # diff and pollutes it with hundreds of KB of prior review text (2026-07-20).
 codex_feedback/
+
+# Local runtime state for the #ipo reply poller (timestamps only).
+data/ipo_reply_state.json
