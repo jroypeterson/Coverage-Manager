@@ -34,3 +34,6 @@ data/ipo_reply_state.json
 # Symbol-directory snapshots: the weekly archive (Nasdaq keeps none).
 # Tracked deliberately - the diff is the product and it needs history.
 !data/symbol_directory/
+
+# One-off enrich log for the 2026-08-06 biopharma batch.
+.health/enrich_*.log*
