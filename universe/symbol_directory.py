@@ -348,8 +348,15 @@ def render_report(rec: Reconciliation, fetched: FetchResult, when: date,
                        if "no CIK" in v.detail]
                 if noc:
                     out += [f"**{len(noc)} could not be adjudicated for want of a "
-                            f"CIK** — run `python cli.py backfill-cik` and re-run "
-                            f"this check.", ""]
+                            f"CIK.** Measured 2026-08-06: `backfill-cik` does NOT "
+                            f"clear these — it filled 0 of 233 blank CIKs, because "
+                            f"it reads SEC's bulk `company_tickers.json`, which "
+                            f"omits them, and SEC's company search matches on NAME "
+                            f"not ticker (querying `CYBR` returns two unrelated "
+                            f"registrants). A US-listed row absent from the exchange "
+                            f"directory AND carrying no CIK is a strong delisting "
+                            f"candidate, but confirming it needs a source this repo "
+                            f"does not have. Left inconclusive deliberately.", ""]
         else:
             out += ["A delisting, an uplisting to a venue not in these files, or "
                     "a symbol-format mismatch. Not a verdict on its own — pair "
