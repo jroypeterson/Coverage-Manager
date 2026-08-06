@@ -279,6 +279,20 @@ def check_universe(df, ledger=None) -> list[str]:
     return problems
 
 
+
+def removed_tickers(ledger=None) -> set[str]:
+    """Tickers deliberately removed from the universe, for PRE-filtering adds.
+
+    `check_universe` already catches a resurrected row, but only after it is
+    back in the CSV. Any bulk add sourced from a vendor screener must consult
+    this FIRST: a vendor has no idea the row was removed for scope reasons and
+    will keep proposing it forever. Live case 2026-08-06 — an FMP biopharma
+    screen re-proposed ALBT, removed eight days earlier because Avalon GloboCare
+    had become Change Agents Corp and left healthcare entirely.
+    """
+    ledger = ledger or load_ledger()
+    return {str(r["ticker"]).strip().upper() for r in ledger.get("removals", [])}
+
 def triage(ledger, ticker: str, field: str, vendor_value: str = "") -> tuple[str, str]:
     """Given an audit disagreement, say which side to suspect.
 
