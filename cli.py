@@ -178,6 +178,23 @@ def build_parser():
         "--tickers", nargs="*", default=None,
         help="Restrict the sweep to these tickers.")
 
+    symdir_parser = subparsers.add_parser(
+        "symbol-directory",
+        help=(
+            "Snapshot the free Nasdaq Trader US symbol directories "
+            "(nasdaqlisted.txt + otherlisted.txt, covering Nasdaq/NYSE/Arca/"
+            "American/Cboe/IEX) and diff against the prior snapshot. Reports new "
+            "listings, removals, covered names absent from the exchange's own "
+            "record (adjudicated against SEC submissions), and Nasdaq financial-"
+            "status flags. Nasdaq keeps no archive, so a missed week is a diff "
+            "that can never be computed."
+        ),
+    )
+    symdir_parser.add_argument("--dry-run", action="store_true",
+                               help="Report only; write no snapshot or report file.")
+    symdir_parser.add_argument("--no-confirm", action="store_true",
+                               help="Skip the SEC submissions adjudication step.")
+
     crsp_parser = subparsers.add_parser(
         "crsp-snapshot",
         help=(
@@ -596,6 +613,24 @@ def main():
         # unreachable API must never exit 0 and read as a clean universe.
         learned_nothing = result["checked"] > 0 and result["ok"] == 0 and not result["conflicts"]
         raise SystemExit(2 if (result["conflicts"] or learned_nothing) else 0)
+    elif args.command == "symbol-directory":
+        from pathlib import Path as _Path
+        from universe import symbol_directory as _sd
+        from universe.ticker_change_check import _EDGAR_UA as identity
+        status, rec, report = _sd.run(
+            _Path(__file__).resolve().parent, dry_run=args.dry_run,
+            confirm=not args.no_confirm, identity=identity)
+        if status != "ok":
+            print("ERROR: symbol directory unavailable - reported as INCONCLUSIVE, "
+                  "not as a quiet week", file=sys.stderr)
+            raise SystemExit(2)
+        print(report)
+        # `raise SystemExit`, not `return` -- cli.py calls main() bare, so a
+        # returned code is discarded. Exit 2 on a covered name the exchange no
+        # longer lists, so the run goes amber rather than reporting a clean
+        # universe (matches check-delisted / check-ticker-changes).
+        raise SystemExit(2 if (rec.universe_removed or rec.universe_missing) else 0)
+
     elif args.command == "crsp-snapshot":
         import csv as _csv
 

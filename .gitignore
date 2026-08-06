@@ -30,3 +30,7 @@ codex_feedback/
 
 # Local runtime state for the #ipo reply poller (timestamps only).
 data/ipo_reply_state.json
+
+# Symbol-directory snapshots: the weekly archive (Nasdaq keeps none).
+# Tracked deliberately - the diff is the product and it needs history.
+!data/symbol_directory/
