@@ -88,7 +88,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "2269.HK": {
     "name": "WuXi Biologics (Cayman) Inc.",
@@ -102,7 +102,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "2715.HK": {
     "name": "Estun Automation Co Ltd",
@@ -312,7 +312,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "6446.TW": {
     "name": "PharmaEssentia Corporation",
@@ -2930,7 +2930,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "GALE.SW": {
     "name": "Galenica AG",
@@ -6262,7 +6262,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "SUPN": {
     "name": "Supernus Pharmaceuticals Inc",
@@ -6444,7 +6444,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "TFX": {
     "name": "Teleflex Incorporated",
@@ -6724,7 +6724,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "UFPT": {
     "name": "UFP Technologies, Inc.",
