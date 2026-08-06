@@ -829,7 +829,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -857,7 +857,7 @@
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "Large Pharma",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "OPCH": {
     "position": "Portfolio",
@@ -1001,7 +1001,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NASDAQ",
     "Exchange Code": "NMS",
     "Exchange Full Name": "NasdaqGS",
@@ -1029,7 +1029,7 @@
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "Biotech",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "RPD": {
     "position": "Portfolio",

@@ -186,7 +186,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "4527.T": {
     "name": "Rohto Pharmaceutical Co.,Ltd.",
@@ -403,7 +403,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ABCL": {
     "name": "AbCellera Biologics Inc",
@@ -781,7 +781,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ALOPM.PA": {
     "name": "Oncodesign Precision Medicine Soci\u00e9t\u00e9 anonyme",
@@ -823,7 +823,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "AMLX": {
     "name": "Amylyx Pharmaceuticals Inc",
@@ -1047,7 +1047,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ARMP": {
     "name": "Armata Pharmaceuticals Inc",
@@ -1271,7 +1271,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "AZTR": {
     "name": "Azitra Inc",
@@ -1320,7 +1320,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "BBIO": {
     "name": "BridgeBio Pharma Inc",
@@ -1432,7 +1432,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "BILL": {
     "name": "BILL Holdings Inc",
@@ -1551,7 +1551,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "BNTC": {
     "name": "Benitec Biopharma Inc",
@@ -1565,7 +1565,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "BOI.PA": {
     "name": "Boiron SA",
@@ -2097,7 +2097,7 @@
     "sector": "Biopharma",
     "subsector": "",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "CSTL": {
     "name": "Castle Biosciences, Inc.",
@@ -3035,7 +3035,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "GKOS": {
     "name": "Glaukos Corporation",
@@ -3203,7 +3203,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "GTLB": {
     "name": "GitLab Inc.",
@@ -3588,7 +3588,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "INDOCO.NS": {
     "name": "Indoco Remedies Limited",
@@ -3637,7 +3637,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "INSP": {
     "name": "Inspire Medical Systems, Inc.",
@@ -4036,7 +4036,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "LNTH": {
     "name": "Lantheus Holdings, Inc.",
@@ -4421,14 +4421,14 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "MRNA": {
     "name": "Moderna Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "MRSN": {
     "name": "Mersana Therapeutics Inc",
@@ -4750,14 +4750,14 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "NVS": {
     "name": "Novartis AG",
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "NVST": {
     "name": "Envista Holdings Corporation",
@@ -4918,7 +4918,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ONCY": {
     "name": "Oncolytics Biotech Inc",
@@ -5149,7 +5149,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "PGEN": {
     "name": "Precigen Inc",
@@ -5562,7 +5562,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "LNAI": {
     "name": "Lunai Bioworks Inc.",
@@ -5695,14 +5695,14 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ROIV": {
     "name": "Roivant Sciences Ltd",
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ROVI.MC": {
     "name": "Laboratorios Farmaceuticos Rovi, S.A.",
@@ -5730,7 +5730,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "RPTX": {
     "name": "Repare Therapeutics Inc.",
@@ -5744,7 +5744,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "RVTY": {
     "name": "Revvity, Inc.",
@@ -6101,7 +6101,7 @@
     "sector": "Biopharma",
     "subsector": "Large Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "SOBI.ST": {
     "name": "Swedish Orphan Biovitrum AB (publ)",
@@ -6339,7 +6339,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "TALK": {
     "name": "Talkspace Inc",
@@ -6787,7 +6787,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "V": {
     "name": "Visa Inc",
@@ -6934,7 +6934,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "VSTM": {
     "name": "Verastem Inc",

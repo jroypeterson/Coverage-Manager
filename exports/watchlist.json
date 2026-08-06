@@ -1292,7 +1292,7 @@
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "Large Pharma",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "MA": {
     "buy_price": null,
@@ -1884,7 +1884,7 @@
     "Sector (JP)": "Biopharma",
     "Subsector (JP)": "Biotech",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "RPD": {
     "buy_price": null,
