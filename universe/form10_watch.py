@@ -95,6 +95,18 @@ PARENT_PATTERNS = [
 NOISE = re.compile(r"^(the|this|our|its|a|an|such|record|common|class)\b", re.I)
 
 
+# A 10-12B registers securities for listing on a national exchange. That covers
+# TWO different events, and calling both "spin-off" mislabels half of them:
+#   - a SpinCo separating from a parent (FedEx Freight, Honeywell Aerospace)
+#   - an existing OTC company UPLISTING to Nasdaq/NYSE (BSEM, 2026-08-06)
+# Both are Bucket 1 new listings, so the catch is right either way. The tell is
+# whether the registrant already trades: SEC `exchanges` reads ["OTC"] and there
+# is no parent to resolve.
+LISTING_SPINOFF = "spin-off"
+LISTING_UPLIST = "uplisting"
+LISTING_UNKNOWN = "new registration"
+
+
 @dataclass
 class Filing:
     cik: str
@@ -113,6 +125,7 @@ class Filing:
     doc_rank: int = 9
     parent_ticker: str = ""
     parent_cap: float | None = None
+    listing_kind: str = LISTING_UNKNOWN
 
 
 @dataclass
@@ -447,14 +460,16 @@ def render_report(filings: list[Filing], window: tuple[str, str],
            f"({len(fresh)} new since the last run) - "
            f"{len(rel)} relevant | {len(inc)} inconclusive | {len(non)} not relevant",
            "",
-           "A Form 10-12B registers a subsidiary's shares for distribution onto a "
-           "US exchange, typically one to three months before separation. It is "
-           "the earliest structured public signal of a spin-off, and the one "
-           "class of listing the IPO calendar structurally cannot see.", ""]
+           "A Form 10-12B registers securities for listing on a US national "
+           "exchange. That covers two events, both of them Bucket 1 new "
+           "listings: a **spin-off** separating from a parent (named in the "
+           "information statement), and an **uplisting** of a company that "
+           "already trades OTC. Neither has an offering, so the IPO calendar "
+           "is structurally blind to both.", ""]
     if rel:
         out += ["## For the pipeline", "",
-                "| Filed | Registrant | Ticker | SIC | Parent | Why |",
-                "|---|---|---|---|---|---|"]
+                "| Filed | Kind | Registrant | Ticker | SIC | Parent | Why |",
+                "|---|---|---|---|---|---|---|"]
         for f in rel:
             par = f.parent or "_unresolved_"
             if f.parent_cap:
@@ -462,7 +477,8 @@ def render_report(filings: list[Filing], window: tuple[str, str],
             # ASCII only: this string reaches a cp1252 console on the
             # scheduled run, and an emoji there raises UnicodeEncodeError at the
             # exact moment the job is trying to report what it found.
-            out.append(f"| {f.filed} | {f.registrant[:38]}{' (new)' if f.cik in fresh else ''} "
+            out.append(f"| {f.filed} | {f.listing_kind} "
+                       f"| {f.registrant[:38]}{' (new)' if f.cik in fresh else ''} "
                        f"| `{f.ticker or '-'}` | {f.sic} | {par} | {f.reason} |")
         out += ["", "**Sizes are unknown by construction.** No shares trade before "
                 "separation, so these are pipeline entries to monitor, not adds.", ""]
@@ -515,6 +531,8 @@ def run(root: Path, *, ua: str, api_key: str = "", days: int = 10,
                 f.parent, f.parent_cik, f.parent_ticker = title, cik, tick
                 f.parent_cap = parent_market_cap(tick, api_key)
                 apply_size_proxy(f)
+        if resolve_parents:
+            classify_listing_kind(f, ua=ua)
 
     report = render_report(res.filings, (start, end), fresh)
     if not dry_run:
@@ -528,3 +546,48 @@ def run(root: Path, *, ua: str, api_key: str = "", days: int = 10,
         rp.parent.mkdir(parents=True, exist_ok=True)
         rp.write_text(report, encoding="utf-8")
     return "ok", res.filings, report
+
+
+def classify_listing_kind(f: Filing, *, ua: str, opener=None) -> Filing:
+    """Spin-off vs uplisting. Call AFTER parent resolution -- it uses the result.
+
+    The obvious discriminator does not work: SEC's `exchanges` is non-empty for
+    BOTH, because a SpinCo that has been certified for listing already shows its
+    destination venue. Honeywell Aerospace reads ["Nasdaq"] with ticker HONA
+    while being a textbook spin-off.
+
+    What actually separates them:
+      - a resolved PARENT in the information statement -> spin-off. Nothing
+        else produces one, and it is the definition of the event.
+      - `OTC` among SEC's exchanges -> uplisting. The registrant already trades
+        over the counter and is moving venue (BSEM: OTC since 2016, Form Ds,
+        10-12B attempts since 2024, CERT filed 2026-08-06).
+
+    Unknown otherwise, and unknown is reported as unknown. Both kinds are Bucket
+    1 new listings, so this is descriptive -- it changes what the report SAYS,
+    never what it routes.
+    """
+    import json as _json
+    if f.parent:
+        f.listing_kind = LISTING_SPINOFF
+        return f
+    opener = opener or (lambda u: _get(u, ua, timeout=25))
+    try:
+        data = _json.loads(opener(
+            f"https://data.sec.gov/submissions/CIK{f.cik.zfill(10)}.json").read())
+    except Exception:                              # noqa: BLE001
+        f.listing_kind = LISTING_UNKNOWN
+        return f
+    exchanges = [str(e).upper() for e in (data.get("exchanges") or []) if e]
+    forms = set((data.get("filings", {}).get("recent", {}) or {}).get("form", []))
+    if any("OTC" in e for e in exchanges):
+        f.listing_kind = LISTING_UPLIST
+        f.reason += (" | UPLISTING, not a spin-off: SEC already lists this "
+                     "registrant OTC"
+                     + (" and a CERT (exchange listing certification) is filed"
+                        if "CERT" in forms else ""))
+    else:
+        f.listing_kind = LISTING_UNKNOWN
+        f.reason += (" | listing kind unresolved: no parent named in the "
+                     "information statement and SEC shows no OTC quotation")
+    return f

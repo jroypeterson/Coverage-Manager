@@ -210,3 +210,54 @@ def test_inconclusive_filings_appear_in_the_report():
     f = f10.classify(_f(sic="", registrant="Mystery Corp"))
     report = f10.render_report([f], ("2026-01-01", "2026-08-06"), set())
     assert "Mystery Corp" in report and "Inconclusive" in report
+
+
+# ------------------------------------------------------- spin-off vs uplisting
+
+
+def _sec_sub(exchanges, forms=("D",)):
+    import json as _j
+    def open_url(url):
+        return io.BytesIO(_j.dumps(
+            {"exchanges": list(exchanges),
+             "filings": {"recent": {"form": list(forms)}}}).encode())
+    return open_url
+
+
+def test_a_resolved_parent_means_spin_off():
+    f = _f(parent="HONEYWELL INTERNATIONAL INC")
+    f10.classify_listing_kind(f, ua="ua", opener=_sec_sub(["Nasdaq"]))
+    assert f.listing_kind == f10.LISTING_SPINOFF
+
+
+def test_an_otc_registrant_with_no_parent_is_an_uplisting():
+    """BSEM: OTC since 2016, 10-12B attempts since 2024, CERT filed 2026-08-06."""
+    f = _f(parent="")
+    f10.classify_listing_kind(f, ua="ua",
+                              opener=_sec_sub(["OTC"], ("D", "CERT", "10-12B/A")))
+    assert f.listing_kind == f10.LISTING_UPLIST
+    assert "UPLISTING" in f.reason and "CERT" in f.reason
+
+
+def test_a_certified_spinco_is_not_mistaken_for_an_uplisting():
+    """The obvious discriminator fails: SEC shows Honeywell Aerospace on Nasdaq
+    with ticker HONA while it is a textbook spin-off, because a certified SpinCo
+    already advertises its destination venue."""
+    f = _f(parent="HONEYWELL INTERNATIONAL INC")
+    f10.classify_listing_kind(f, ua="ua", opener=_sec_sub(["Nasdaq"]))
+    assert f.listing_kind != f10.LISTING_UPLIST
+
+
+def test_neither_signal_yields_unknown_not_a_guess():
+    f = _f(parent="")
+    f10.classify_listing_kind(f, ua="ua", opener=_sec_sub([]))
+    assert f.listing_kind == f10.LISTING_UNKNOWN
+    assert "unresolved" in f.reason
+
+
+def test_an_unreachable_endpoint_yields_unknown():
+    def boom(url):
+        raise OSError("timeout")
+    f = _f(parent="")
+    f10.classify_listing_kind(f, ua="ua", opener=boom)
+    assert f.listing_kind == f10.LISTING_UNKNOWN
