@@ -1332,6 +1332,29 @@ non-US name, verify `normalize_ticker` returns a suffixed symbol** — a bare on
 for a foreign company is the tell. Poisoned `cache/fundamentals/yf_<T>.json`
 entries must be deleted when fixing one, or the wrong data is reused.
 
+## Two known data facts that look like bugs (2026-08-06)
+
+**`PBLS` market cap is wrong at the VENDOR, not in this repo.** FMP returns
+~$0.12B for Parabilis Medicines against a price of $34.66 and
+`sharesOutstanding: null` — i.e. ~3.5M shares for a company whose IPO raised
+$670M upsized. The candidate ledger recorded ~$3.7B at IPO, which is the
+credible figure. **It is not verifiable from SEC**: PBLS IPO'd 2026-06 and has
+not filed a 10-Q, so `dei:EntityCommonStockSharesOutstanding` 404s. The CIK
+(1657677) IS correct — checked against SEC submissions, which returns
+"Parabilis Medicines, Inc.", ticker PBLS, Nasdaq. Nothing in the universe CSV
+stores market cap, so there is nothing here to fix; the consequence is that
+PBLS sorts near the BOTTOM of every cap-ranked screen and chart until FMP's
+share count is right or the first 10-Q lands. Do not "correct" it by hand —
+recheck after the first quarterly filing.
+
+**`KRC` under `Healthcare Services / Healthcare Real Estate` is a judgement
+call, not a misclassification.** FMP classifies Kilroy Realty as `REIT - Office`
+and on that alone it looks wrong. It is in the universe on its life-science lab
+exposure — the same rationale that puts Alexandria (`ARE`) there, and ARE is
+classified identically. Reclassifying KRC without also revisiting ARE would make
+the taxonomy less consistent, not more. Left as-is deliberately; if the HC-REIT
+sub-universe is ever revisited, revisit both together.
+
 ## Key conventions
 - Sector classification uses `Sector (JP)` and `Subsector (JP)` columns (user-defined taxonomy)
 - Market cap, EV, and Net Debt are converted to USD at report time
