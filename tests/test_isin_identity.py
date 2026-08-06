@@ -420,3 +420,27 @@ def test_bulk_enrich_checks_identity_only_for_blank_isin_cells():
     assert identity_calls == [("JP3750800009", "Nipro Corporation")]
     assert "ISIN" not in results.get("8086.T", {})      # conflict: not written
     assert results.get("4543.T", {}).get("ISIN") == "JP3750800009"  # parity value; never written to a filled cell
+
+
+def test_cache_write_failure_is_a_warning_not_an_exception(tmp_path, monkeypatch, caplog):
+    """A cache is reconstructible; an approved company's row is not.
+
+    Live 2026-08-06: Dropbox held openfigi_isin_names.json mid-sync, os.replace
+    raised PermissionError, and it propagated out of verify_isin_identity ->
+    enrich_single_ticker and aborted adding an approved candidate to the
+    universe. _load_cache had always degraded gracefully; the write side had not.
+    """
+    import os as _os
+    from universe import isin_identity as ii
+
+    target = tmp_path / "c.json"
+
+    def boom(src, dst):
+        raise PermissionError(5, "Access is denied")
+
+    monkeypatch.setattr(ii.os, "replace", boom)
+    with caplog.at_level("WARNING"):
+        ii._save_cache(target, {"US0378331005": ["APPLE INC"]})   # must not raise
+
+    assert any("cache not written" in r.message for r in caplog.records)
+    assert not list(tmp_path.glob("*.tmp.json")), "orphan tmp file left behind"

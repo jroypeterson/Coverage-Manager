@@ -54,9 +54,15 @@ STATE_PATH = PROJECT_ROOT / "data" / "ipo_reply_state.json"
 DEFAULT_APPROVER = "U0ALRRASV6X"          # Jason Peterson
 HISTORY_LIMIT = 40                        # ~3 months of weekly posts
 
-ADD_ALL = re.compile(r"^\s*add\s+all\s*$", re.I)
-DECIDE = re.compile(r"^\s*(add|approve|decline|reject|skip)\s+([A-Za-z0-9._-]{1,15})\s*$",
-                    re.I)
+# The grammar has to survive how a person actually types, not how the help text
+# reads. JP replied "Add all 3" on 2026-08-06; the original `^add all$` anchor
+# matched neither that nor the per-ticker form, and the poller printed "no
+# command replies found" — indistinguishable from him never having replied.
+VERBS = r"add|approve|decline|reject|skip"
+ATTEMPT = re.compile(rf"^\s*(?:{VERBS})\b", re.I)
+ADD_ALL = re.compile(rf"^\s*(?:add|approve)\s+all\b.*$", re.I)
+DECIDE = re.compile(rf"^\s*({VERBS})\s+(.+?)\s*$", re.I)
+TICKER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.\-]{0,14}$")
 APPROVE_WORDS = {"add", "approve"}
 
 
@@ -131,20 +137,49 @@ def first_line(text: str) -> str:
     return ""
 
 
-def parse_reply(text: str) -> tuple[str, str] | None:
-    """-> ('approve'|'decline', TICKER) or ('approve','ALL'), else None."""
+def parse_reply(text: str) -> tuple[str, list[str]] | None:
+    """-> (action, [TICKER, ...]) or (action, ['ALL']); None if not a command.
+
+    Returns None only for text that does not even *attempt* a command. A message
+    that starts with a command verb but does not parse is a different thing —
+    see `looks_like_command`, which is what stops an unparsed instruction from
+    reading as silence.
+    """
     line = first_line(text)
     if not line:
         return None
     # Strip Slack's leading @-mention so "@ClaudeBot add MU" works.
     line = re.sub(r"^<@[A-Z0-9]+>\s*", "", line).strip()
     if ADD_ALL.match(line):
-        return ("approve", "ALL")
+        return ("approve", ["ALL"])
     m = DECIDE.match(line)
     if not m:
         return None
-    verb, ticker = m.group(1).lower(), m.group(2).upper()
-    return ("approve" if verb in APPROVE_WORDS else "decline", ticker)
+    verb = m.group(1).lower()
+    # "add MU, APMD and CXMT." -> three tickers. Trailing punctuation is
+    # stripped per token; no ticker ends in a dot or comma.
+    raw = re.split(r"[,\s]+|\band\b", m.group(2), flags=re.I)
+    tickers = []
+    for tok in raw:
+        tok = tok.strip().strip(".,;:!?").upper()
+        if tok and TICKER.match(tok):
+            tickers.append(tok)
+    if not tickers:
+        return None
+    action = "approve" if verb in APPROVE_WORDS else "decline"
+    return (action, list(dict.fromkeys(tickers)))
+
+
+def looks_like_command(text: str) -> bool:
+    """True when the message opens with a command verb, parseable or not.
+
+    An approver message that tries to be an instruction and fails to parse must
+    be reported, never skipped. "Add all 3" was the live case: it reached no
+    branch and the run printed "no command replies found", which is exactly what
+    a run with no reply at all prints.
+    """
+    line = re.sub(r"^<@[A-Z0-9]+>\s*", "", first_line(text)).strip()
+    return bool(ATTEMPT.match(line))
 
 
 def collect_replies(token: str, channel: str, approver: str,
@@ -192,17 +227,34 @@ def _spec_for(row: dict) -> str:
 
 
 def republish() -> tuple[bool, str]:
-    """Regenerate exports/ so the approval reaches the downstream consumers."""
-    cmd = [sys.executable, "cli.py", "weekly-universe", "--skip-discovery"]
+    """Regenerate exports/ so the approval reaches the downstream consumers.
+
+    Runs the export + acceptance steps directly rather than shelling
+    `cli.py weekly-universe --skip-discovery`. That command also runs
+    `delisted_check`, which probes yfinance for all 1,093 names and hits
+    rate-limit backoff hard — measured 2026-08-06, it was still in step 4 of 6
+    when the run was killed at ~4 minutes, and the export steps it was blocking
+    take under two. A poller that runs three times a day must not carry a
+    40-minute weekly audit to publish a one-cell change; the weekly job still
+    runs the full pipeline on Fridays.
+    """
     try:
-        proc = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True,
-                              text=True, timeout=1800)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"republish could not start: {exc}"
-    if proc.returncode != 0:
-        tail = (proc.stdout or proc.stderr or "").strip().splitlines()[-3:]
-        return False, f"republish exited {proc.returncode}: {' | '.join(tail)}"
-    return True, "exports republished"
+        import weekly_universe as wu
+        from pipeline_utils import run_step
+        statuses = []
+        _, validation = run_step("validate", wu._step_validate)
+        for name, fn, args in (
+            ("export_artifacts", wu._step_export_artifacts, (validation,)),
+            ("export_positions", wu._step_export_positions, ()),
+            ("check_published_exports", wu._step_check_published_exports, ()),
+        ):
+            status, _ = run_step(name, fn, *args)
+            statuses.append(f"{name}={status}")
+            if not str(status).startswith(("ok", "unchanged", "skipped")):
+                return False, f"republish failed: {'; '.join(statuses)}"
+    except Exception as exc:                       # noqa: BLE001 - report, never crash the poll
+        return False, f"republish raised: {type(exc).__name__}: {exc}"
+    return True, "exports republished (artifacts + positions, acceptance ok)"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -243,24 +295,45 @@ def main(argv: list[str] | None = None) -> int:
     ignored: list[str] = []
     handled: list[dict] = []
 
+    unparsed: list[str] = []
     for msg in messages:
         parsed = parse_reply(msg["text"])
         if not parsed:
+            if looks_like_command(msg["text"]):
+                # Tried to be an instruction and wasn't understood. Reported,
+                # never silently skipped -- and NOT marked handled, so fixing
+                # the parser lets the next run pick it up.
+                unparsed.append(first_line(msg["text"])[:120])
             continue                      # ordinary conversation, not a command
-        action, ticker = parsed
+        action, tickers = parsed
         handled.append(msg)
-        if ticker == "ALL":
-            approvals.extend(sorted(pending - set(approvals)))
-            continue
-        if ticker not in pending:
-            ignored.append(f"{ticker} ({action}) - not pending in the ledger")
-            continue
-        (approvals if action == "approve" else declines).append(ticker)
+        for ticker in tickers:
+            if ticker == "ALL":
+                approvals.extend(sorted(pending - set(approvals)))
+                continue
+            if ticker not in pending:
+                ignored.append(f"{ticker} ({action}) - not pending in the ledger")
+                continue
+            (approvals if action == "approve" else declines).append(ticker)
+
+    if unparsed:
+        for line in unparsed:
+            print("UNPARSED COMMAND: " + line.encode("ascii", "replace").decode())
+        if not handled and not a.dry_run:
+            _api("chat.postMessage", {
+                "channel": channel, "thread_ts": messages[-1]["thread_ts"],
+                "text": "Reply not understood",
+                "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text":
+                    ":grey_question: *I could not parse that reply, so nothing was "
+                    "applied.*\n" + "\n".join("> " + u for u in unparsed) +
+                    "\n\nTry `add TICKER`, `decline TICKER`, or `add all`."}}]},
+                token, post=True)
 
     if not handled:
-        print("no command replies found")
+        print("no command replies found"
+              + (f" ({len(unparsed)} unparsed)" if unparsed else ""))
         save_state(state)
-        return 0
+        return 1 if unparsed else 0
 
     approvals = [t for t in dict.fromkeys(approvals) if t not in declines]
     declines = list(dict.fromkeys(declines))

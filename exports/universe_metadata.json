@@ -7649,5 +7649,26 @@
     "subsector": "Electrical Equipment",
     "sub_subsector": "",
     "core": ""
+  },
+  "688825.SS": {
+    "name": "CXMT Corp.",
+    "sector": "Tech",
+    "subsector": "Semiconductors / Memory",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "APMD": {
+    "name": "Apnimed, Inc.",
+    "sector": "Biopharma",
+    "subsector": "Sleep",
+    "sub_subsector": "",
+    "core": "Y"
+  },
+  "MU": {
+    "name": "Micron Technology, Inc.",
+    "sector": "Tech",
+    "subsector": "Semiconductors / Memory",
+    "sub_subsector": "",
+    "core": ""
   }
 }

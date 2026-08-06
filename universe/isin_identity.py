@@ -235,11 +235,33 @@ def _load_cache(cache_path: Path) -> dict:
 
 
 def _save_cache(cache_path: Path, cache: dict) -> None:
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = cache_path.with_name(cache_path.name + ".tmp.json")
-    tmp.write_text(json.dumps(cache, indent=1, ensure_ascii=True),
-                   encoding="utf-8")
-    os.replace(tmp, cache_path)
+    """Persist the cache. A failure here is a WARNING, never an exception.
+
+    `_load_cache` has always degraded gracefully on an unreadable cache; the
+    write side did not, and the asymmetry cost a real run. On 2026-08-06 the
+    `os.replace` raised `PermissionError [WinError 5]` — Dropbox holding the
+    file mid-sync, the same transient that intermittently locks `.git/index`
+    in this repo — and it propagated out of `verify_isin_identity`, out of
+    `enrich_single_ticker`, and aborted an approved candidate's addition to the
+    universe.
+
+    A cache is reconstructible by definition: failing to write one costs the
+    next run some API calls. Failing to ADD AN APPROVED COMPANY costs a
+    coverage gap that nothing detects. Those must not share a failure mode.
+    """
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache_path.with_name(cache_path.name + ".tmp.json")
+        tmp.write_text(json.dumps(cache, indent=1, ensure_ascii=True),
+                       encoding="utf-8")
+        os.replace(tmp, cache_path)
+    except OSError as e:
+        logger.warning("ISIN-name cache not written (%s) — continuing; the next "
+                       "run refetches what this one could not cache", e)
+        try:
+            tmp.unlink(missing_ok=True)   # never leave an orphan .tmp behind
+        except (OSError, NameError):
+            pass
 
 
 def _post_batch(post, payload):
