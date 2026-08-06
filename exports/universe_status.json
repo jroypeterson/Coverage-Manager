@@ -1,17 +1,18 @@
 {
   "schema_version": 4,
   "dataset_version": "2026-08-06",
-  "generated_at": "2026-08-06T15:24:18Z",
+  "generated_at": "2026-08-06T16:00:05Z",
   "source_path": "data/coverage_universe_tickers.csv",
-  "row_count": 1096,
-  "ticker_count": 1096,
+  "row_count": 1086,
+  "ticker_count": 1086,
   "normalization_collisions": 0,
   "collision_examples": [],
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": [
     "1 possible duplicate company name(s) (normalized): ['shimadzu']",
-    "187 ticker(s) missing Subsector (JP) value"
+    "1 row(s) drifted from a human-verified value - either the row regressed or a corporate action moved it, and the ledger needs a new entry either way: DAY: verified Company Name on a row that is no longer in the universe (was it removed without updating the ledger?)",
+    "185 ticker(s) missing Subsector (JP) value"
   ],
   "last_discovery_run": "2026-07-31"
 }

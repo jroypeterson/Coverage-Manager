@@ -482,13 +482,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "ACLX": {
-    "name": "Arcellx Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": "Y"
-  },
   "ACRS": {
     "name": "Aclaris Therapeutics Inc",
     "sector": "Biopharma",
@@ -2001,13 +1994,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "CPRX": {
-    "name": "Catalyst Pharmaceuticals Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
   "CRBP": {
     "name": "Corbus Pharmaceuticals Holdings Inc",
     "sector": "Biopharma",
@@ -2292,13 +2278,6 @@
     "name": "Dare Bioscience Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
-  "DAY": {
-    "name": "Dayforce, Inc.",
-    "sector": "SaaS",
-    "subsector": "",
     "sub_subsector": "",
     "core": ""
   },
@@ -3933,13 +3912,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "KZR": {
-    "name": "Kezar Life Sciences Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
   "LABB.MX": {
     "name": "Genomma Lab Internacional, S.A.B. de C.V.",
     "sector": "Biopharma",
@@ -4117,13 +4089,6 @@
   },
   "LYEL": {
     "name": "Lyell Immunopharma Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
-  "LYRA": {
-    "name": "Lyra Therapeutics Inc",
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
@@ -4661,13 +4626,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "NOTV": {
-    "name": "Inotiv Inc",
-    "sector": "Biopharma",
-    "subsector": "",
-    "sub_subsector": "",
-    "core": ""
-  },
   "NOVT": {
     "name": "Novanta Inc.",
     "sector": "MedTech",
@@ -4716,13 +4674,6 @@
     "subsector": "Biotech",
     "sub_subsector": "",
     "core": ""
-  },
-  "NUVL": {
-    "name": "Nuvalent Inc",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": "Y"
   },
   "NVAX": {
     "name": "Novavax Inc",
@@ -5342,13 +5293,6 @@
   },
   "PRTA": {
     "name": "Prothena Corporation PLC",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
-  "PRTC": {
-    "name": "PureTech Health PLC",
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
@@ -7111,13 +7055,6 @@
     "sub_subsector": "",
     "core": ""
   },
-  "XOMA": {
-    "name": "XOMA Royalty Corp",
-    "sector": "Biopharma",
-    "subsector": "Biotech",
-    "sub_subsector": "",
-    "core": ""
-  },
   "XRAY": {
     "name": "DENTSPLY SIRONA Inc.",
     "sector": "MedTech",
@@ -7290,13 +7227,6 @@
     "name": "Novocure Limited",
     "sector": "MedTech",
     "subsector": "Diversified MedTech",
-    "sub_subsector": "",
-    "core": "Y"
-  },
-  "CCRN": {
-    "name": "Cross Country Healthcare, Inc.",
-    "sector": "Healthcare Services",
-    "subsector": "Nurse staffing",
     "sub_subsector": "",
     "core": "Y"
   },
