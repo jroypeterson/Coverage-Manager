@@ -127,7 +127,26 @@ def test_separator_row_is_not_data():
 # --------------------------------------------------------------- block hygiene
 
 
-REPORT = PROJECT_ROOT / "reports" / "weekly_coverage_universe_additions_2026-07-31.md"
+REPORTS = PROJECT_ROOT / "reports"
+
+def _find_report(date: str) -> Path:
+    """Resolve a dated report from either location.
+
+    The weekly `archive` step sweeps dated reports into `reports/old reports/`,
+    so pinning the live directory made all six corpus-backed tests skip the
+    moment a weekly run archived -- silently, which is the exact
+    "absent data is not a finding" failure these tests exist to guard against.
+    `load_prior_reports` already searched both; its tests did not.
+    """
+    name = f"weekly_coverage_universe_additions_{date}.md"
+    for folder in (REPORTS, REPORTS / "old reports"):
+        p = folder / name
+        if p.exists():
+            return p
+    return REPORTS / name
+
+
+REPORT = _find_report("2026-07-31")
 
 
 def _all_messages(md: str) -> list[list[dict]]:
