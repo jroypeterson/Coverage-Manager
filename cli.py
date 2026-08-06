@@ -178,6 +178,23 @@ def build_parser():
         "--tickers", nargs="*", default=None,
         help="Restrict the sweep to these tickers.")
 
+    form10_parser = subparsers.add_parser(
+        "form10-watch",
+        help=(
+            "Discover US spin-offs from SEC Form 10-12B registrations, one to "
+            "three months BEFORE they list. A spin-off has no offering, so the "
+            "Finnhub IPO calendar is structurally blind to it. Routes on the "
+            "registrant's own SIC (Bucket 1) and on the parent's market cap as "
+            "a size proxy (Bucket 3, which is sector-agnostic)."
+        ),
+    )
+    form10_parser.add_argument("--days", type=int, default=10,
+                               help="Look-back window in days (default 10).")
+    form10_parser.add_argument("--dry-run", action="store_true",
+                               help="Report only; write no seen-ledger or report file.")
+    form10_parser.add_argument("--no-parents", action="store_true",
+                               help="Skip parent resolution (disables the Bucket 3 size proxy).")
+
     symdir_parser = subparsers.add_parser(
         "symbol-directory",
         help=(
@@ -613,6 +630,25 @@ def main():
         # unreachable API must never exit 0 and read as a clean universe.
         learned_nothing = result["checked"] > 0 and result["ok"] == 0 and not result["conflicts"]
         raise SystemExit(2 if (result["conflicts"] or learned_nothing) else 0)
+    elif args.command == "form10-watch":
+        from pathlib import Path as _Path
+        from universe import form10_watch as _f10
+        from universe.ticker_change_check import _EDGAR_UA as _ua
+        from config import API_KEYS as _keys
+        status, filings, report = _f10.run(
+            _Path(__file__).resolve().parent, ua=_ua,
+            api_key=_keys.get("FMP_API_KEY", ""), days=args.days,
+            dry_run=args.dry_run, resolve_parents=not args.no_parents)
+        if status != "ok":
+            print("ERROR: Form 10 search unavailable - INCONCLUSIVE, not "
+                  "'no spin-offs this week'", file=sys.stderr)
+            raise SystemExit(2)
+        print(report)
+        # Exit 2 when there is something to act on OR something we could not
+        # classify -- an unclassifiable registrant is where a miss would hide.
+        actionable = [f for f in filings if f.verdict in ("relevant", "inconclusive")]
+        raise SystemExit(2 if actionable else 0)
+
     elif args.command == "symbol-directory":
         from pathlib import Path as _Path
         from universe import symbol_directory as _sd

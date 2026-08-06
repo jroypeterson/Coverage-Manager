@@ -1,0 +1,37 @@
+{
+ "1347491": {
+  "accession": "0001347491-26-000004",
+  "filed": "2026-07-30",
+  "first_seen": "2026-08-06",
+  "registrant": "ALEXANDER TECH CORP",
+  "verdict": "not-relevant"
+ },
+ "1658678": {
+  "accession": "0001213900-26-081252",
+  "filed": "2026-07-24",
+  "first_seen": "2026-08-06",
+  "registrant": "BioStem Technologies, Inc.",
+  "verdict": "relevant"
+ },
+ "1705284": {
+  "accession": "0001193125-26-302001",
+  "filed": "2026-07-13",
+  "first_seen": "2026-08-06",
+  "registrant": "Private Bancorp of America, Inc.",
+  "verdict": "not-relevant"
+ },
+ "2105139": {
+  "accession": "0001213900-26-071535",
+  "filed": "2026-06-24",
+  "first_seen": "2026-08-06",
+  "registrant": "ADI GLOBAL DISTRIBUTION INC.",
+  "verdict": "not-relevant"
+ },
+ "2128626": {
+  "accession": "0001193125-26-288697",
+  "filed": "2026-06-29",
+  "first_seen": "2026-08-06",
+  "registrant": "Vylor Inc.",
+  "verdict": "not-relevant"
+ }
+}
