@@ -487,7 +487,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ACRS": {
     "name": "Aclaris Therapeutics Inc",
@@ -963,7 +963,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "APLLTD.NS": {
     "name": "Alembic Pharmaceuticals Limited",
@@ -1082,7 +1082,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "ASAN": {
     "name": "Asana Inc",
@@ -1327,7 +1327,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "BBNX": {
     "name": "Beta Bionics, Inc.",
@@ -2055,7 +2055,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "CROX": {
     "name": "Crocs Inc",
@@ -2069,7 +2069,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "CRVO": {
     "name": "CervoMed Inc",
@@ -2272,7 +2272,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "CYTO": {
     "name": "Cytophage Technologies Ltd",
@@ -3567,7 +3567,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "INBX": {
     "name": "Inhibrx Biosciences Inc",
@@ -3672,7 +3672,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "IOVA": {
     "name": "Iovance Biotherapeutics Inc",
@@ -3924,7 +3924,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "KYTX": {
     "name": "Kyverna Therapeutics Inc",
@@ -4218,7 +4218,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "MDLN": {
     "name": "Medline Inc",
@@ -4722,7 +4722,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "NVAX": {
     "name": "Novavax Inc",
@@ -5114,7 +5114,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "PD": {
     "name": "Pagerduty Inc",
@@ -5772,7 +5772,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "RZLT": {
     "name": "Rezolute Inc",
@@ -6038,7 +6038,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "SMWB": {
     "name": "Similarweb Ltd",
@@ -6192,7 +6192,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "SRT.DE": {
     "name": "Sartorius AG",
@@ -7578,7 +7578,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "2475.HK": {
     "name": "Luxshare Precision Industry Co., Ltd.",
@@ -7627,7 +7627,7 @@
     "sector": "Biopharma",
     "subsector": "Biotech",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "MWH": {
     "name": "SOLV Energy, Inc.",
