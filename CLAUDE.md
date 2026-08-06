@@ -1332,6 +1332,17 @@ non-US name, verify `normalize_ticker` returns a suffixed symbol** — a bare on
 for a foreign company is the tell. Poisoned `cache/fundamentals/yf_<T>.json`
 entries must be deleted when fixing one, or the wrong data is reused.
 
+**`enrich` is a SCHEDULED lane as of 2026-08-06** (`CoverageManager-EnrichWeekly`,
+Sun 03:00) and is deliberately NOT a step of `weekly-universe`. The weekly pipeline
+runs `cik_backfill` but not `enrich`, which was invisible while the universe was
+static — and became a real gap the moment JP's decision made it *grow* (1,086 →
+1,328 on 2026-08-06): the 242 new rows got CIKs automatically on Friday, while
+ISIN, Country (HQ) and Currency only filled when a human remembered. It is off the
+Friday critical path on purpose: it fetches all ~1,330 tickers from yfinance,
+took ~1.5h at 30s-per-ticker timeouts, and Friday's build is the publish contract
+that has already been killed mid-run once. Sunday 03:00 cannot collide with the
+Friday build or the reply-poller, which write the same CSV.
+
 ## Two known data facts that look like bugs (2026-08-06)
 
 **`PBLS` market cap is wrong at the VENDOR, not in this repo.** FMP returns
