@@ -223,6 +223,11 @@ COUNTRY_TO_ISO2 = {
     "Austria": "AT", "Hungary": "HU", "Iceland": "IS", "Indonesia": "ID",
     "Ireland": "IE", "Israel": "IL", "Netherlands": "NL", "Singapore": "SG",
     "Cayman Islands": "KY",
+    # Added 2026-08-06 — arrived with the exhaustive-biopharma batch's
+    # enrichment. Both are US-listed with a foreign HQ (COSM, BGMS), which is
+    # exactly the shape the prefix guard exists for, and an unmapped country
+    # makes that guard skip the row SILENTLY rather than fail it.
+    "Greece": "GR", "Malaysia": "MY",
     # Added 2026-07-28 — offshore incorporation countries whose prefixes
     # appear in stored ISINs (or, for Panama/BVI/IoM, in the standard
     # offshore set the crosscheck's incorporation notes report):
