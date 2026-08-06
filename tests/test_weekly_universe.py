@@ -68,6 +68,8 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "crosscheck_foreign",
         "verify_isin_issuers",   # [4d/6], wired 2026-07-29
         "resolve_cik_by_name",   # [4e/6], wired 2026-07-30
+        "symbol_directory",      # [4f/6], wired 2026-08-06
+        "form10_watch",          # [4g/6], wired 2026-08-06
         "export_artifacts",
         "export_watchlist",
         "export_reporting_calendar",

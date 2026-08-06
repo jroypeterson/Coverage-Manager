@@ -724,6 +724,58 @@ def _step_delisted_check():
     }
 
 
+
+def _step_symbol_directory():
+    """Weekly snapshot + diff of the US exchange symbol directories.
+
+    Non-gating. Its value is the DIFF, so it must run on the weekly cadence and
+    commit its snapshot -- Nasdaq keeps no archive, and a week not captured is a
+    diff that can never be computed.
+    """
+    from pathlib import Path as _P
+    from universe import symbol_directory as sd
+    from universe.ticker_change_check import _EDGAR_UA as _ua
+
+    status, rec, _ = sd.run(_P(__file__).resolve().parent, identity=_ua)
+    if status != "ok" or rec is None:
+        # INCONCLUSIVE, never "no changes" -- a failed download reported as a
+        # quiet week is how a watchdog stops watching.
+        raise RuntimeError("symbol directory unavailable (inconclusive, not clean)")
+    return {
+        "added": len(rec.added),
+        "removed": len(rec.removed),
+        "universe_removed": rec.universe_removed,
+        "universe_missing": len(rec.universe_missing),
+        "deficient": len(rec.universe_deficient),
+        "checked": rec.checked_us_rows,
+    }
+
+
+def _step_form10_watch():
+    """Form 10-12B registrations -- spin-offs and uplistings, before they list.
+
+    Non-gating. Feeds the report's forward section, which is the only place a
+    pre-listing signal can usefully land.
+    """
+    from pathlib import Path as _P
+    from universe import form10_watch as f10
+    from universe.ticker_change_check import _EDGAR_UA as _ua
+
+    from config import API_KEYS as _keys
+
+    status, filings, _ = f10.run(_P(__file__).resolve().parent, ua=_ua,
+                                 api_key=_keys.get("FMP_API_KEY", ""), days=14)
+    if status != "ok":
+        raise RuntimeError("Form 10 search unavailable (inconclusive, not clean)")
+    rel = [f for f in filings if f.verdict == "relevant"]
+    return {
+        "registrants": len(filings),
+        "relevant": [f"{f.registrant} ({f.listing_kind}"
+                     + (f", parent {f.parent}" if f.parent else "") + ")"
+                     for f in rel],
+        "inconclusive": len([f for f in filings if f.verdict == "inconclusive"]),
+    }
+
 def _step_ticker_change_check():
     """Discover ticker changes (renames) + SEC deregistrations via the stable
     CIK->ticker map. Companion to _step_delisted_check (price-feed based).
@@ -1214,6 +1266,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
     else:
         logger.info("[4b/6] Checking universe for ticker changes / deregistrations...")
         status, tc_result = run_step("ticker_change_check", _step_ticker_change_check)
+
         if tc_result:
             if not tc_result["sec_fetched_ok"]:
                 steps["ticker_change_check"] = "SEC data unavailable — not checked"
@@ -1229,6 +1282,54 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                     )
         else:
             steps["ticker_change_check"] = status
+
+    # Step 4f: US exchange symbol-directory snapshot + diff. Wired weekly
+    # 2026-08-06 alongside the Form 10 watch. Both were built as standalone
+    # scheduled tasks that wrote reports/*.md -- and nothing read them, so two
+    # correct lanes reached nobody. The DIFF is the product here: Nasdaq keeps
+    # no archive, so a missed week is a diff that can never be computed.
+    if dry_run:
+        logger.info("[4f/6] US symbol-directory... SKIPPED (dry run)")
+        steps["symbol_directory"] = "skipped (dry run)"
+    else:
+        logger.info("[4f/6] US symbol-directory snapshot + diff...")
+        status, sd_result = run_step("symbol_directory", _step_symbol_directory)
+        if sd_result:
+            steps["symbol_directory"] = (
+                f"{sd_result['added']} new listings, {sd_result['removed']} removed; "
+                f"{len(sd_result['universe_removed'])} covered name(s) removed, "
+                f"{sd_result['universe_missing']} absent, "
+                f"{sd_result['deficient']} financial-status flag(s) "
+                f"of {sd_result['checked']} US rows"
+            )
+            if sd_result["universe_removed"]:
+                logger.warning(
+                    "  COVERED NAMES REMOVED FROM THE EXCHANGE: %s",
+                    ", ".join(sd_result["universe_removed"]),
+                )
+        else:
+            steps["symbol_directory"] = status
+
+    # Step 4g: Form 10-12B watch -- spin-offs and OTC uplistings, 1-3 months
+    # BEFORE they list. A spin-off has no offering, so the Finnhub IPO calendar
+    # is structurally blind to it; this is the only forward signal for that
+    # class. Feeds the report's "Pipeline / filings to monitor" section.
+    if dry_run:
+        logger.info("[4g/6] Form 10 watch... SKIPPED (dry run)")
+        steps["form10_watch"] = "skipped (dry run)"
+    else:
+        logger.info("[4g/6] Form 10 spin-off / uplisting watch...")
+        status, f10_result = run_step("form10_watch", _step_form10_watch)
+        if f10_result:
+            steps["form10_watch"] = (
+                f"{len(f10_result['relevant'])} relevant, "
+                f"{f10_result['inconclusive']} inconclusive "
+                f"of {f10_result['registrants']} registrants"
+            )
+            for name in f10_result["relevant"]:
+                logger.warning("  FORWARD LISTING: %s", name)
+        else:
+            steps["form10_watch"] = status
 
     # Step 4c: Foreign metadata cross-check vs SEC N-PORT (read-only). Wired
     # weekly on 2026-07-28 (Fable): the seven wrong ISINs corrected that day

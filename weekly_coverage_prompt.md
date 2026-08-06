@@ -233,6 +233,45 @@ pending more than 60 days. **Report any expiries in the Slack post** — "3 expi
 pending`), not by re-reading last week's report. Re-deriving it from prose is what let 15
 names accumulate unnoticed between 2026-06-19 and 2026-07-28.
 
+
+### Two lanes now hand you findings — READ THEIR REPORTS
+
+The weekly pipeline runs two discovery lanes before you write. Both write a
+dated report into `reports/`, and **their findings belong in your report** —
+they are not decoration, they are the two classes of listing event the Finnhub
+IPO calendar structurally cannot see.
+
+**1. `reports/form10_watch_<date>.md` — Form 10-12B registrations.**
+A 10-12B registers securities for listing on a US national exchange, one to
+three months before the event. It covers two things, and the report labels
+which: a **spin-off** separating from a parent (the parent is named), and an
+**uplisting** of a company that already trades OTC. Neither has an offering, so
+neither appears on any IPO calendar.
+
+- Every row marked `relevant` goes in **"Pipeline / filings to monitor"**, with
+  its kind, its parent (if any) and its SIC.
+- **Sizes are unknown by construction** — no shares trade before separation.
+  Say "size unknown until it trades"; do not invent or estimate a market cap.
+- Rows marked `inconclusive` are registrants whose SIC is missing. Mention the
+  count. That bucket is where a missed listing hides.
+
+**2. `reports/symbol_directory_<date>.md` — the exchange's own record.**
+A weekly diff of `nasdaqlisted.txt` + `otherlisted.txt` (Nasdaq, NYSE, Arca,
+American, Cboe, IEX).
+
+- **Covered names removed from the exchange this period** is the highest-value
+  line in either report. Put it in the report body, not a footnote — it means a
+  name in the universe has stopped trading.
+- **New listings** in the diff are a completeness check on your own IPO sweep:
+  anything there that you did not surface from Finnhub or Gmail is a measured
+  miss, and worth saying so explicitly.
+- **Nasdaq financial-status flags** (`D` deficient / `E` delinquent / `Q`
+  bankrupt and combinations) on covered names are the exchange's own view that
+  something is wrong with a listing. Surface new ones.
+
+If either report is absent, say so — do not write the section as though the lane
+found nothing. A missing report and a quiet week are different facts.
+
 ## Slack notification — post to #ipo-spinoffs-newissues
 
 After the email draft is created and all reports are generated, post a summary to the Slack
@@ -473,6 +512,7 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 ## Working method
 1. Read Coverage Manager/data/coverage_universe_tickers.csv and extract all tickers and company names.
 2. Pull the Finnhub IPO calendar for the last 10 days (primary IPO source).
+2b. **Read `reports/form10_watch_<date>.md` and `reports/symbol_directory_<date>.md`** — the pipeline wrote them before you started. They carry the two listing classes the IPO calendar cannot see (spin-offs and OTC uplistings) and the exchange's own record of what stopped trading. See "Two lanes now hand you findings" below.
 3. Search Gmail for IPO summary emails and related new-listing emails from the last 7-10 days.
 4. Extract candidate newly public companies and relevant listing events from both sources.
 5. Augment with web search for major IPOs / direct listings / spin-offs / Russell additions.
