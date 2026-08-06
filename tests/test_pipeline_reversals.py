@@ -137,3 +137,20 @@ def test_load_prior_reports_searches_the_archive_folder_too():
     found = pr.load_prior_reports(REPORTS, "2026-07-31")
     assert any(d == "2026-07-24" for d, _ in found), (
         "07-24 lives in 'old reports/'; missing it makes the check silently blind")
+
+
+def test_the_quoted_promise_is_the_committing_sentence_not_the_line_head():
+    """Jersey Mike's ran 190 chars of deal terms before the promise.
+
+    Trimming from the front cut off the only words that make it a reversal,
+    leaving a warning whose own evidence was missing.
+    """
+    line = ("- **Jersey Mike's Subs (JMKE)** - roadshow launched 7/20; 43.5M shares "
+            "at $21-25, implying $6.7-7.9B valuation; ~68% secondary. Expected to "
+            "price ~week of 7/27. Would be a Consumer add at pricing.")
+    assert pr._commitment_sentence(line) == "Would be a Consumer add at pricing."
+
+
+def test_a_quoted_exclusion_drops_its_table_pipes():
+    row = "| Jersey Mike's Subs | JMKE | Restaurant franchisor - not relevant. |"
+    assert pr._trim(row) == "Restaurant franchisor - not relevant."

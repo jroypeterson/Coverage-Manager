@@ -66,13 +66,44 @@ class Reversal:
 
     def as_line(self) -> str:
         return (f"*{self.company}* - the {self.prior_date} report said "
-                f"“{_trim(self.promise)}”, and this week's exclusion "
-                f"(“{_trim(self.exclusion)}”) does not say what changed.")
+                f"“{_commitment_sentence(self.promise)}”. This report excludes it "
+                f"(“{_trim(self.exclusion)}”) without saying the call changed.")
 
 
 def _trim(text: str, limit: int = 150) -> str:
-    text = re.sub(r"\s+", " ", re.sub(r"[*`]", "", text)).strip()
+    """Reduce a source line to the sentence a human needs to read.
+
+    The raw line is a markdown bullet or a table row, so it arrives carrying `- `,
+    `|` separators and the company name already stated in the label above it. Left
+    in, the quote reads as debris and the reader skips the warning.
+    """
+    text = re.sub(r"[*`]", "", text).strip()
+    text = re.sub(r"^\s*[-*]\s+", "", text)          # bullet marker
+    if text.startswith("|"):                          # table row -> its last cell
+        cells = [c.strip() for c in text.strip("|").split("|") if c.strip()]
+        text = cells[-1] if cells else text
+    text = re.sub(r"\s+", " ", text).strip()
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _commitment_sentence(text: str, limit: int = 150) -> str:
+    """Quote the sentence that made the promise, not the head of the line.
+
+    The promise is usually the *last* clause of a long pipeline entry — Jersey
+    Mike's ran 190 characters of deal terms before "Would be a Consumer add at
+    pricing". Trimming from the front cut off the only words that make it a
+    reversal, leaving a warning whose evidence was missing.
+    """
+    flat = re.sub(r"\s+", " ", re.sub(r"[*`|]", " ", text)).strip()
+    match = COMMITMENT.search(flat)
+    if not match:
+        return _trim(text, limit)
+    starts = [m.end() for m in re.finditer(r"(?<=[.;!?])\s+", flat[: match.start()])]
+    start = starts[-1] if starts else 0
+    end = re.search(r"[.;!?]", flat[match.end():])
+    stop = match.end() + (end.end() if end else 0) or len(flat)
+    sentence = flat[start:stop].strip(" -–—")
+    return sentence if len(sentence) <= limit else sentence[: limit - 1] + "…"
 
 
 def _norm(value: str) -> str:

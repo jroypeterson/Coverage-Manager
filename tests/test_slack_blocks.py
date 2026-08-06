@@ -211,3 +211,16 @@ def test_unrecognised_section_goes_to_the_thread_not_the_bin():
 def test_chunk_never_loses_characters():
     text = "\n\n".join("para %d %s" % (i, "z" * 400) for i in range(30))
     assert "".join(sb._chunk(text)).replace("\n", "") == text.replace("\n", "")
+
+
+def test_context_blocks_convert_markdown_rather_than_posting_it_raw():
+    """`context` parses mrkdwn, so raw `###` and `**bold**` post literally.
+
+    This shipped live on 2026-08-06: the report-files footer showed a literal
+    `### CSV Changes` and literal double asterisks.
+    """
+    text = sb.context_block("### CSV Changes\n\n**No changes** here\n\n- one")["elements"][0]["text"]
+    assert "###" not in text
+    assert "**" not in text
+    assert "*CSV Changes*" in text and "*No changes*" in text
+    assert "\u2022 one" in text

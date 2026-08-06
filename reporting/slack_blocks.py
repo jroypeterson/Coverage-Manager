@@ -435,7 +435,26 @@ def inline_paragraph(text: str) -> str:
     return "\n".join(out)
 
 
-def context_block(text: str) -> dict:
+def to_mrkdwn(md: str) -> str:
+    """Convert a markdown fragment to flat Slack mrkdwn (no blocks).
+
+    For the places that need text rather than a block list — chiefly the footer,
+    which is one `context` element. Passing raw markdown straight in was a live
+    bug: `context` parses mrkdwn, so `### CSV Changes` and `**No changes**` posted
+    as a literal `###` and literal asterisks.
+    """
+    out = []
+    for line in md.splitlines():
+        heading = re.fullmatch(r"\s*#{1,6}\s+(.*)", line)
+        if heading:
+            out.append(f"*{inline(heading.group(1).strip())}*")
+        else:
+            out.append(inline_paragraph(line))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def context_block(text: str, *, convert: bool = True) -> dict:
     """A small grey footer. `elements` is required - a bare `text` key 400s."""
+    body = to_mrkdwn(text) if convert else text
     return {"type": "context",
-            "elements": [{"type": "mrkdwn", "text": text[:MRKDWN_LIMIT]}]}
+            "elements": [{"type": "mrkdwn", "text": body[:MRKDWN_LIMIT]}]}
