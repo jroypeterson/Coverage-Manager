@@ -19,7 +19,12 @@ echo   %date% %time%
 echo ============================================
 echo.
 
-"%PYTHON_EXE%" cli.py watchlist-report
+REM Wrapped by run_guarded (board #287): measured BLIND -- ran every week and
+REM never heartbeated, so a failure was invisible until the weekly monitor
+REM noticed, up to 7 days later. Posts an error health/v1 heartbeat on a
+REM non-zero exit and re-exits with python's own code, so RC below is unchanged.
+set "GUARD=%USERPROFILE%\Dropbox\Claude Folder\scheduled_jobs_monitor\run_guarded.py"
+"%PYTHON_EXE%" "%GUARD%" --lane "WatchlistMondayReport" --project "Coverage Manager" --cadence weekly -- "%PYTHON_EXE%" cli.py watchlist-report
 set "RC=%errorlevel%"
 
 echo.
