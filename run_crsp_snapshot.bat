@@ -29,7 +29,13 @@ echo   %date% %time%
 echo ============================================
 echo.
 
-"%PYTHON_EXE%" cli.py crsp-snapshot
+REM Wrapped by run_guarded (board #287): this lane was measured BLIND -- it ran
+REM every week and never heartbeated, so a failure stayed invisible until the
+REM weekly monitor noticed, up to 7 days later. The wrapper posts an `error`
+REM health/v1 heartbeat to #status-reports on a non-zero exit and re-exits with
+REM the payload's own code, so a red task stays red. A healthy run is silent.
+set "GUARD=%USERPROFILE%\Dropbox\Claude Folder\scheduled_jobs_monitor\run_guarded.py"
+"%PYTHON_EXE%" "%GUARD%" --lane "CrspQuarterlySnapshot" --project "Coverage Manager" --cadence weekly -- "%PYTHON_EXE%" cli.py crsp-snapshot
 set "RC=%errorlevel%"
 
 echo.
