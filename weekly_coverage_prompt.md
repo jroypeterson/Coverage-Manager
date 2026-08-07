@@ -234,6 +234,28 @@ pending`), not by re-reading last week's report. Re-deriving it from prose is wh
 names accumulate unnoticed between 2026-06-19 and 2026-07-28.
 
 
+
+### Some names are now ADDED WITHOUT ASKING — report them first
+
+`sync_candidate_ledger.py` auto-adds two buckets, because JP's own rules already
+make them mandatory (his decision, 2026-08-06):
+
+- **Bucket 2** — any IPO / direct listing **≥ $25B, any sector**
+- **Bucket 3** — spin-off / carve-out / separation **> $10B**
+
+Everything else still queues as `pending` and waits for his `add TICKER` reply,
+**including Buckets 1 and 5**, which are undecided.
+
+The script prints `AUTO-ADDED <TICKER>: <reason>` for each. **Those go at the TOP
+of your report, in their own section, before the recommendations** — with the
+bucket, the market cap and the rule that fired. An add JP was never asked about
+must be the most visible line in the report, not the quietest; he has to be able
+to reverse it, and he cannot reverse what he did not see.
+
+Say explicitly that they are already in the universe, so he does not reply `add`
+for a name that is already there. If the script auto-added nothing, say nothing —
+an empty section is noise.
+
 ### Two lanes now hand you findings — READ THEIR REPORTS
 
 The weekly pipeline runs two discovery lanes before you write. Both write a
