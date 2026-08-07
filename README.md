@@ -13,8 +13,10 @@ Script-driven tooling for maintaining a coverage universe CSV, discovering new t
 
 - Maintains the master coverage universe at `data/coverage_universe_tickers.csv`
 - Cleans, deduplicates, validates, and enriches identifiers
-- Discovers new candidate tickers via an external Claude prompt and a staging workflow
-- **Publishes a versioned, generic artifact contract under `exports/`** (schema v3) for downstream projects (forensic_triage, biotech_triage, screens_equity/quantitative_screens, 13F analyzer, sigma-alert, earnings_agent, analyst-days, sa-monitor, catalyst_watch) to consume
+- Discovers new candidate tickers via **three** feeds, not one: the Claude discovery prompt (Finnhub IPO calendar + Gmail), a weekly **US exchange symbol-directory diff** (`universe/symbol_directory.py`), and a **Form 10-12B watch** for spin-offs and OTC uplistings 1-3 months before they list (`universe/form10_watch.py`). A spin-off has no offering, so no IPO calendar can see one.
+- **Auto-adds the mandatory-by-rule buckets** (`universe/auto_add.py`): Bucket 2 (IPO >= $25B, any sector) and Bucket 3 (spin-off > $10B) enter the universe without being asked; Buckets 1, 4 and 5 still queue in `data/candidate_ledger.csv` for a Slack `add TICKER` reply
+- **Applies those Slack replies automatically** (`scripts/poll_ipo_replies.py`, 3x daily) — enriches, writes the universe row, republishes `exports/` and answers in-thread
+- **Publishes a versioned, generic artifact contract under `exports/`** (schema v4) for downstream projects (forensic_triage, biotech_triage, screens_equity/quantitative_screens, 13F analyzer, sigma-alert, earnings_agent, analyst-days, sa-monitor, catalyst_watch) to consume
 - Generates Excel and HTML performance reports segmented by `Sector (JP)` / `Subsector (JP)`
 - **Posts a weekly After/Before/Delta summary to Slack `#coverage`** (`SLACK_WEBHOOK_COVERAGE`). The Friday email transport is currently off (`EMAIL_ENABLED = False` in `config.py`); revisit 2026-06-29.
 - Posts a movers summary to `#stock-price-alerts` and a workspace-standard health heartbeat to `#status-reports`
