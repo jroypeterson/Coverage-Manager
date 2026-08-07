@@ -701,10 +701,17 @@ def main():
         if result.trade_date:
             print(f"trade date: {result.trade_date}  constituents: {result.constituent_count:,}")
         if result.prior_trade_date:
-            print(
+            # Net of ticker changes, from the same properties the report uses.
+            # A rename is not a drop, and this line is what an operator reads
+            # first — if it disagrees with the report, the report loses.
+            summary = (
                 f"delta vs {result.prior_trade_date}: "
-                f"+{len(result.added)} added, -{len(result.dropped)} dropped"
+                f"+{len(result.net_added)} added, "
+                f"-{len(result.net_dropped)} dropped"
             )
+            if result.renames:
+                summary += f", {len(result.renames)} ticker change(s)"
+            print(summary)
         if result.levels_archive:
             print(f"levels archived: {result.levels_archive.name}")
         for w in result.warnings:

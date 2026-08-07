@@ -201,6 +201,137 @@ def test_diff_constituents():
     assert dropped == ["AAA"]
 
 
+def test_detect_ticker_changes_pairs_a_drop_with_its_add():
+    """A ticker change is one company, not a delisting plus a new listing.
+
+    Live 2026-06-30: BK -> BNY (Bank of New York Mellon). Reported as a plain
+    drop it reads as "delisting, acquisition, or a fall below the investable
+    threshold", which is what the report says a drop means. It is none of them.
+    """
+    prior = [{"Ticker": "BK", "Company": "BANK NEW YORK MELLON CORP"},
+             {"Ticker": "GONE", "Company": "ACQUIRED CO"}]
+    current = [{"Ticker": "BNY", "Company": "BANK NEW YORK MELLON CORP"},
+               {"Ticker": "NEW", "Company": "GENUINELY NEW CO"}]
+    added, dropped = cs.diff_constituents(prior, current)
+    changes = cs.detect_ticker_changes(prior, current, added, dropped)
+    assert changes == [("BK", "BNY", "BANK NEW YORK MELLON CORP")]
+
+
+def test_detect_ticker_changes_ignores_genuine_drops_and_adds():
+    prior = [{"Ticker": "GONE", "Company": "ACQUIRED CO"}]
+    current = [{"Ticker": "NEW", "Company": "GENUINELY NEW CO"}]
+    added, dropped = cs.diff_constituents(prior, current)
+    assert cs.detect_ticker_changes(prior, current, added, dropped) == []
+
+
+def test_detect_ticker_changes_refuses_an_ambiguous_name():
+    """Two dropped tickers sharing one company name cannot be paired 1:1.
+
+    Share classes do exactly this. Guessing a direction would invent a
+    corporate action; the pair is left in the plain drop/add lists instead.
+    """
+    prior = [{"Ticker": "AAA", "Company": "DUAL CLASS CO"},
+             {"Ticker": "AAB", "Company": "DUAL CLASS CO"}]
+    current = [{"Ticker": "ZZZ", "Company": "DUAL CLASS CO"}]
+    added, dropped = cs.diff_constituents(prior, current)
+    assert cs.detect_ticker_changes(prior, current, added, dropped) == []
+
+
+def test_detect_ticker_changes_needs_a_real_name():
+    """A blank company name on both sides is not evidence of anything."""
+    prior = [{"Ticker": "AAA", "Company": ""}]
+    current = [{"Ticker": "BBB", "Company": ""}]
+    added, dropped = cs.diff_constituents(prior, current)
+    assert cs.detect_ticker_changes(prior, current, added, dropped) == []
+
+
+def test_report_separates_ticker_changes_from_drops():
+    r = cs.SnapshotResult(
+        status="ok", trade_date="2026-06-30", constituent_count=2,
+        prior_trade_date="2026-03-31",
+        added=["BNY", "NEW"], dropped=["BK", "GONE"],
+        renames=[("BK", "BNY", "BANK NEW YORK MELLON CORP")],
+    )
+    md = cs.render_report(r)
+    assert "BK" in md and "BNY" in md
+    # the net counts exclude the rename on both sides
+    assert "**Added:** 1" in md
+    assert "**Dropped:** 1" in md
+    assert "Ticker changes" in md
+    # and the renamed ticker is no longer sitting in the plain drop list
+    # (split on the LAST "**Dropped:**" — the count line above uses it too)
+    drop_block = md.rsplit("**Dropped:**", 1)[1].split("```")[1]
+    assert "BK" not in drop_block
+    assert "GONE" in drop_block
+    add_block = md.rsplit("**Added:**", 1)[1].split("```")[1]
+    assert "BNY" not in add_block
+    assert "NEW" in add_block
+
+
+def test_ticker_change_matching_stays_exact_not_fuzzy():
+    """Pins the decision NOT to fuzzy-match names, with the evidence for it.
+
+    `_name_similarity` is token-COVER based, so a single shared distinctive
+    token scores 1.00. Measured on the 2026-03-31 -> 2026-06-30 delta, a 0.85
+    threshold produced 4 candidates of which 3 were false. Each false pair
+    below would have netted a GENUINE drop out of the report as a rename —
+    hiding a delisting, which is the one outcome this report must never
+    produce. If someone relaxes the matcher, these must still not pair.
+    """
+    false_pairs = [
+        # different companies since 1989; share the "DEL MONTE" tokens
+        ("FDP", "FRESH DEL MONTE PROD ORD", "DMC", "DEL MONTE CORP"),
+        ("USEG", "US ENERGY CORP", "EFOI", "ENERGY FOCUS INC"),
+        ("HOTH", "HOTH THERAPEUTICS INC", "FTH", "FAETH THERAPEUTICS INC"),
+    ]
+    for old_t, old_n, new_t, new_n in false_pairs:
+        prior = [{"Ticker": old_t, "Company": old_n}]
+        current = [{"Ticker": new_t, "Company": new_n}]
+        added, dropped = cs.diff_constituents(prior, current)
+        assert cs.detect_ticker_changes(prior, current, added, dropped) == [], (
+            f"{old_t}->{new_t} must NOT be treated as a ticker change"
+        )
+        # and the similarity helper really does score them high — i.e. the test
+        # above is guarding a live hazard, not an imaginary one
+        assert cs._name_similarity(old_n, new_n) >= 0.85
+
+
+def test_a_rename_that_also_changed_its_name_is_a_known_miss():
+    """KFS -> KWY (Kingsway Finl Svcs -> Kingsway Corp) is deliberately missed.
+
+    Nothing in the CRSP file links those rows; resolving it needs SEC data
+    (`ticker_change_check` / `symbol_directory`). Documented so the gap is a
+    recorded decision rather than a surprise.
+    """
+    prior = [{"Ticker": "KFS", "Company": "KINGSWAY FINL SVCS INC"}]
+    current = [{"Ticker": "KWY", "Company": "KINGSWAY CORP"}]
+    added, dropped = cs.diff_constituents(prior, current)
+    assert cs.detect_ticker_changes(prior, current, added, dropped) == []
+    assert dropped == ["KFS"]  # stays visible as a drop, which is the safe side
+
+
+def test_net_counts_are_one_source_of_truth():
+    """The console line and the report must never disagree about the delta."""
+    r = cs.SnapshotResult(
+        status="ok", trade_date="2026-06-30", prior_trade_date="2026-03-31",
+        added=["BNY", "NEW"], dropped=["BK", "GONE"],
+        renames=[("BK", "BNY", "BANK NEW YORK MELLON CORP")],
+    )
+    assert r.net_added == ["NEW"]
+    assert r.net_dropped == ["GONE"]
+    md = cs.render_report(r)
+    assert f"**Added:** {len(r.net_added)}" in md
+    assert f"**Dropped:** {len(r.net_dropped)}" in md
+
+
+def test_net_counts_are_identity_when_nothing_was_renamed():
+    r = cs.SnapshotResult(
+        status="ok", prior_trade_date="2026-03-31",
+        added=["A"], dropped=["B"], renames=[],
+    )
+    assert r.net_added == ["A"] and r.net_dropped == ["B"]
+
+
 def test_find_prior_snapshot_ignores_same_and_future(tmp_path):
     for d in ("2025-09-30", "2025-12-31", "2026-03-31", "2026-06-30"):
         (tmp_path / f"constituents_{d}.csv").write_text("x", encoding="utf-8")

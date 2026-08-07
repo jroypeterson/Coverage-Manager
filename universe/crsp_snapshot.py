@@ -253,6 +253,10 @@ class SnapshotResult:
     sector_labelled: int = 0
     added: list[str] = field(default_factory=list)
     dropped: list[str] = field(default_factory=list)
+    # `(old_ticker, new_ticker, company)`. These tickers ALSO appear in
+    # `added`/`dropped`, which stay the raw ticker-keyed diff — the report nets
+    # them out for presentation. See `detect_ticker_changes`.
+    renames: list[tuple[str, str, str]] = field(default_factory=list)
     prior_trade_date: str | None = None
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -260,6 +264,20 @@ class SnapshotResult:
     @property
     def ok(self) -> bool:
         return self.status in ("ok", "unchanged")
+
+    # `added`/`dropped` stay the raw ticker-keyed diff (that is what the archive
+    # says happened). Everything operator-facing reports the NET, and both the
+    # console line and the report read these same two properties — computing the
+    # net in two places is how a console/report disagreement gets shipped.
+    @property
+    def net_added(self) -> list[str]:
+        renamed = {new for _, new, _ in self.renames}
+        return [t for t in self.added if t not in renamed]
+
+    @property
+    def net_dropped(self) -> list[str]:
+        renamed = {old for old, _, _ in self.renames}
+        return [t for t in self.dropped if t not in renamed]
 
 
 # ── Download ─────────────────────────────────────────────────────────────────
@@ -466,6 +484,85 @@ def diff_constituents(prior: list[dict], current: list[dict]) -> tuple[list[str]
     return sorted(c - p), sorted(p - c)
 
 
+def detect_ticker_changes(
+    prior: list[dict],
+    current: list[dict],
+    added: list[str],
+    dropped: list[str],
+) -> list[tuple[str, str, str]]:
+    """Pair a dropped ticker with the added ticker carrying the SAME company name.
+
+    A ticker change appears in a ticker-keyed diff as a drop **and** an add, and
+    the report tells the reader a drop means "a delisting, acquisition, or a
+    fall below the investable threshold". For a rename all three readings are
+    wrong, and the mistake points the wrong way — it invents a corporate action
+    on a company that merely changed symbol.
+
+    Measured on the first delta this job ever computed (2026-03-31 → 2026-06-30):
+    5 of 95 "drops" were renames, including `BK` → `BNY` (Bank of New York
+    Mellon) and `SATS` → `ECHO` (EchoStar).
+
+    The company name is the stable key here, the way a CIK is for
+    `ticker_change_check` — CRSP carries no identifier, so the name is what
+    there is. Matching is therefore **exact** (case- and whitespace-normalised)
+    and strictly **1:1**: a name held by two dropped or two added tickers is
+    ambiguous — share classes do this routinely — and an ambiguous pair is left
+    in the plain lists rather than resolved by a guess. A blank name matches
+    nothing, since two absent names are not evidence of a shared identity.
+
+    **Do NOT relax this to fuzzy matching.** It was measured on this very
+    quarter, and `_name_similarity` is token-COVER based, so a shared
+    distinctive token scores 1.00 (the trap `form10_watch` documents). At a
+    0.85 threshold the 2026-03-31 → 2026-06-30 delta yields four candidates and
+    **three are false**:
+
+    | Pair | Truth |
+    |---|---|
+    | `KFS`→`KWY` Kingsway Finl Svcs → Kingsway Corp | real rename, MISSED here |
+    | `FDP`→`DMC` Fresh Del Monte Produce → Del Monte Corp | different companies |
+    | `USEG`→`EFOI` US Energy → Energy Focus | shares only "ENERGY" |
+    | `HOTH`→`FTH` Hoth Therapeutics → Faeth Therapeutics | shares only "THERAPEUTICS" |
+
+    A false positive here is the worst outcome the module can produce: it
+    **hides a real delisting inside a rename**, which is the opposite of what
+    this report exists to surface. A false negative merely leaves the name in
+    the drop list, where it was before. So the miss on `KFS` is deliberate.
+
+    A rename where the COMPANY NAME ALSO CHANGED is out of scope by
+    construction — nothing in the CRSP file can link those two rows. The
+    sibling modules answer that properly from SEC data, and are where such a
+    case should be resolved: `ticker_change_check` (CIK is stable across a
+    ticker change) and `symbol_directory` (Form 15 adjudication).
+    """
+    def _norm(s: str) -> str:
+        return " ".join((s or "").split()).upper()
+
+    dropped_set, added_set = set(dropped), set(added)
+
+    def _index(rows: list[dict], keep: set[str]) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for r in rows:
+            tkr = r.get("Ticker", "").strip().upper()
+            if tkr not in keep:
+                continue
+            name = _norm(r.get("Company", ""))
+            if not name:
+                continue
+            if tkr not in out.setdefault(name, []):
+                out[name].append(tkr)
+        return out
+
+    old_by_name = _index(prior, dropped_set)
+    new_by_name = _index(current, added_set)
+
+    changes = []
+    for name, olds in old_by_name.items():
+        news = new_by_name.get(name, [])
+        if len(olds) == 1 and len(news) == 1:
+            changes.append((olds[0], news[0], name))
+    return sorted(changes)
+
+
 def find_prior_snapshot(trade_date: str, snapshot_dir: Path = CRSP_DIR) -> Path | None:
     """Most recent snapshot strictly older than `trade_date`."""
     if not snapshot_dir.exists():
@@ -548,6 +645,9 @@ def snapshot(
             if r["Index Ticker"].strip() == TOTAL_MARKET_KEY
         ]
         result.added, result.dropped = diff_constituents(prior_rows, tm_rows)
+        result.renames = detect_ticker_changes(
+            prior_rows, tm_rows, result.added, result.dropped
+        )
 
     if dry_run:
         _remove_quietly(staging)
@@ -877,6 +977,23 @@ def write_report(
     reports_dir.mkdir(parents=True, exist_ok=True)
     today = today or date.today().strftime("%Y-%m-%d")
     path = reports_dir / f"crsp_snapshot_{today}.md"
+    path.write_text(render_report(result, recon, today=today), encoding="utf-8")
+    return path
+
+
+def render_report(
+    result: SnapshotResult,
+    recon: ReconcileResult | None = None,
+    *,
+    today: str | None = None,
+) -> str:
+    """Pure markdown renderer.
+
+    Split out of `write_report` so the delta presentation can be tested without
+    a filesystem — the ticker-change section below is presentation logic, and
+    getting it wrong is exactly the class of error that ships silently.
+    """
+    today = today or date.today().strftime("%Y-%m-%d")
 
     L = [f"# CRSP US Total Market snapshot — {today}", ""]
     L.append(f"**Status:** `{result.status}`")
@@ -900,20 +1017,45 @@ def write_report(
         L.append("")
 
     if result.prior_trade_date:
+        net_dropped = result.net_dropped
+        net_added = result.net_added
+
         L += [
             f"## Delta vs {result.prior_trade_date}",
             "",
-            f"- **Added:** {len(result.added)}",
-            f"- **Dropped:** {len(result.dropped)}",
+            f"- **Added:** {len(net_added)}",
+            f"- **Dropped:** {len(net_dropped)}",
+        ]
+        if result.renames:
+            L.append(f"- **Ticker changes:** {len(result.renames)}")
+        L += [
             "",
             "A dropped name is a delisting, acquisition, or a fall below the "
-            "investable threshold — it does not say which.",
+            "investable threshold — it does not say which. Ticker changes are "
+            "counted separately below and are **none of those things**.",
             "",
         ]
-        if result.dropped:
-            L += ["**Dropped:**", "", "```", ", ".join(result.dropped), "```", ""]
-        if result.added:
-            L += ["**Added:**", "", "```", ", ".join(result.added), "```", ""]
+        if result.renames:
+            L += [
+                "### Ticker changes",
+                "",
+                "Same company, new symbol — a ticker-keyed diff sees this as a drop "
+                "plus an add. Paired here on an exact company-name match, 1:1 only.",
+                "",
+                "A rename where the **company name also changed** is not detectable "
+                "from this file and is NOT counted here — it stays in the dropped "
+                "list. `ticker_change_check` and `symbol_directory` resolve that "
+                "class from SEC data.",
+                "",
+                "| Was | Now | Company |",
+                "|---|---|---|",
+            ]
+            L += [f"| `{old}` | `{new}` | {name} |" for old, new, name in result.renames]
+            L.append("")
+        if net_dropped:
+            L += ["**Dropped:**", "", "```", ", ".join(net_dropped), "```", ""]
+        if net_added:
+            L += ["**Added:**", "", "```", ", ".join(net_added), "```", ""]
     else:
         L += [
             "## Delta",
@@ -971,5 +1113,4 @@ def write_report(
                 )
             L.append("")
 
-    path.write_text("\n".join(L), encoding="utf-8")
-    return path
+    return "\n".join(L)
