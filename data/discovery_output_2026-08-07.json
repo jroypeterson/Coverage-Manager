@@ -1,0 +1,57 @@
+{
+  "date": "2026-08-07",
+  "candidates": [
+    {
+      "company": "Zhongji Innolight Co., Ltd.",
+      "ticker": "3308.HK",
+      "exchange": "HKEX",
+      "market_cap": 167000000000,
+      "sector": "Tech",
+      "subsector": "Optical Interconnect",
+      "listing_date": "2026-07-30",
+      "trigger": "IPO",
+      "peers": ["2475.HK", "SKHY", "SNDK", "688825.SS", "MU", "TSM", "NVDA"],
+      "reason": "Mandatory Bucket 2 add (>=$25B). H-share secondary listing on HKEX raised US$6.81B at HK$980 - Hong Kong's largest share sale of 2026 and its biggest in nearly seven years - and the stock trades at HK$1,110 for a ~HK$1.30T (~US$167B) market cap. World's #1 optical transceiver maker at 23.4% of global shipments (LightCounting, 2025, ~7pts ahead of Coherent) and the only vendor mass-producing both 800G and 1.6T modules at scale, with >50% of Nvidia's optical-module wallet. Same shape as the Luxshare 2475.HK add on 2026-07-24: an HK secondary listing of a company already public on a mainland exchange (300308.SZ). NOTE: this listed 2026-07-30, inside the prior report's 07-21 to 07-31 window, and that report missed it - a measured miss, not a new event.",
+      "business_summary": "We design and manufacture the high-speed optical transceivers that move data between the GPUs, servers and switches inside AI data centers, with a portfolio running from 10G to 1.6T. We sell modules directly to hyperscalers and networking OEMs - Nvidia, Google, Meta and Huawei among them - and we make money on volume manufacturing at scale, where being first to qualify each new speed generation earns us the highest margins before competitors catch up. In 2025 we generated RMB 38.24B (~US$5.6B) of revenue, up 60% year over year, with net profit up 109%; Q1 2026 revenue was RMB 19.5B, up 192% year over year, at a record 46% gross margin. We are currently the only supplier able to mass-produce both 800G and 1.6T modules, which is why we hold over half of Nvidia's optical-module spend."
+    },
+    {
+      "company": "Jersey Mike's Subs Inc.",
+      "ticker": "JMKE",
+      "exchange": "NYSE",
+      "market_cap": 5329574400,
+      "sector": "Consumer",
+      "subsector": "Restaurants",
+      "listing_date": "2026-07-30",
+      "trigger": "IPO",
+      "peers": ["WMT", "LULU", "CROX", "FIVE", "CVNA"],
+      "reason": "Bucket 4 ($2-20B strategic). Priced 43,478,261 shares at $23.00 on 2026-07-29 for ~$1.0B raised - among the largest restaurant IPOs ever - and trades at $22.89 for a $5.33B market cap ($7.3B on the press's fully-diluted basis). This add reverses the 2026-07-31 report, which excluded it as 'not universe-relevant'; on reflection that call was wrong, because the 2026-07-24 report had already committed to it as 'a Consumer add at pricing' and the pricing is the event that was being waited for. A 99%-franchised, asset-light royalty business at 47% adjusted-EBITDA margin is a different asset from a restaurant operator, and it sits naturally with the existing Consumer sleeve.",
+      "business_summary": "We franchise a chain of more than 3,300 submarine-sandwich shops across all 50 US states and Canada, 99% of which are owned and operated by franchisees rather than by us. We make money primarily by collecting royalties and fees on our franchisees' sales plus margin on the food and supplies we distribute to them, which means our revenue scales with systemwide sales without our funding the stores. In 2025 our franchisees rang up $4.3B of systemwide sales, up 13%, on which we recognised $724M of revenue, $55M of net income and $327-339M of adjusted EBITDA - roughly a 47% margin. Average unit volume is about $1.4M, franchisee cash-on-cash returns run near 42%, and over 1,600 committed new stores are in the pipeline with more than 90% being built by operators who already own one of ours."
+    },
+    {
+      "company": "Latigo Biotherapeutics, Inc.",
+      "ticker": "LTGO",
+      "exchange": "NASDAQ",
+      "market_cap": 1082757438,
+      "sector": "Biopharma",
+      "subsector": "Biotech (Pain)",
+      "listing_date": "2026-08-07",
+      "trigger": "IPO",
+      "peers": ["VRTX", "LLY", "PFE", "JAZZ"],
+      "reason": "Bucket 1 - core sector, relevant regardless of size, and the largest biotech IPO of the window by a wide margin: upsized to 19,200,000 shares at $18.00 for $345.6M gross (filed range $16-18 on 16M shares), pricing 2026-08-06 and trading 2026-08-07. ~$1.08B market cap at the offer on 60.15M shares. LTG-001 is an oral, selective Nav1.8 inhibitor for acute pain with Phase 2 data published in the New England Journal of Medicine - it reads directly against Vertex's Journavx (suzetrigine), and VRTX is Core=Y in the sheet. This clears the biotech bar on the same logic that carried APMD: it is a direct competitive threat to a name already covered, not a standalone platform story.",
+      "business_summary": "We are a clinical-stage pharmaceutical company developing non-opioid pain medicines that block pain signals at the peripheral nerve rather than in the brain, so they relieve pain without the addiction and sedation risk that define opioids. Our approach is to selectively inhibit Nav1.8, a sodium channel expressed almost exclusively on pain-sensing neurons - our lead candidate LTG-001 is an oral inhibitor for acute pain with Phase 2 results published in the New England Journal of Medicine, and LTG-305 is a follow-on in Phase 1 aimed at chronic pain. We have no product revenue and fund ourselves from equity: roughly $321.5M raised privately since 2018, including a $150M Series B led by Blue Owl Capital in March 2025 with Sanofi Ventures, Qatar Investment Authority and Cormorant participating, plus $345.6M gross from this offering. We will make money by selling a branded oral analgesic into the acute-pain market that Vertex's Journavx opened commercially."
+    },
+    {
+      "company": "Fabrinet",
+      "ticker": "FN",
+      "exchange": "NYSE",
+      "market_cap": 19500000000,
+      "sector": "Tech",
+      "subsector": "Optical Interconnect",
+      "listing_date": null,
+      "trigger": "New candidate",
+      "peers": ["3308.HK", "TSM", "NVDA", "2475.HK", "ASML"],
+      "reason": "Coverage gap surfaced by the Innolight add, not a listing event - flagged deliberately rather than left in prose, exactly as MU was on 2026-07-31. Adding the world's #1 Chinese optical-transceiver maker leaves the sheet with no Western optical-interconnect name at all: COHR, LITE, CIEN, AAOI, ANET, CRDO, MRVL and ALAB are all absent. Fabrinet is the one of that set inside the Bucket 4 $2-20B band at ~$19.5B, and it is the closest structural analog to Innolight - the contract manufacturer that actually builds transceivers for the Western supply chain. Q3 FY26 revenue was a record $1.214B (+39% YoY) with optical communications 73.2% of revenue and data-center interconnect up 90.4% YoY. See the note in the report on whether JP wants the above-band names (COHR $65B, LITE $65B, CIEN $57B) as well.",
+      "business_summary": "We are the contract manufacturer the optical-networking industry outsources its hardest hardware to: we build the transceivers, lasers and photonic assemblies that our customers design but do not want to make themselves, mostly out of large campuses in Thailand. We make money on manufacturing services - our customers own the designs and the end-customer relationships, and we earn a margin on precision assembly and test that requires capital and process expertise they would rather not carry. Optical communications is 73.2% of our revenue, and in our fiscal Q3 2026 we delivered a record $1.214B of revenue, up 39% year over year, with data-center interconnect alone up 90.4% to $196.9M. We have launched two datacom transceiver programs with a hyperscale customer and several merchant transceiver programs for data-center scale-out that begin production in early fiscal 2027."
+    }
+  ]
+}

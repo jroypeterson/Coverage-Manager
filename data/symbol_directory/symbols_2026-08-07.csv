@@ -703,8 +703,6 @@ AWX,Avalon Holdings Corporation Common Stock,NYSE American,
 AX,"Axos Financial, Inc. Common Stock",NYSE,
 AXG,Solowin Holdings - Class A Ordinary Share,NASDAQ,N
 AXGN,"Axogen, Inc. - Common Stock",NASDAQ,N
-AXIA,AXIA Energia American Depositary Shares (Each representing one Common Share),NYSE,
-AXIA$C,"AXIA Energia American Depositary Shares, each representing one Preferred Class C Share",NYSE,
 AXIL,"AXIL Brands, Inc. Common Stock",NYSE American,
 AXIN,Axiom Intelligence Acquisition Corp 1 - Class A Ordinary Shares,NASDAQ,N
 AXINR,Axiom Intelligence Acquisition Corp 1 - Right,NASDAQ,N
@@ -1063,8 +1061,6 @@ BNTC,Benitec Biopharma Inc. - Common Stock,NASDAQ,N
 BNTX,BioNTech SE - American Depositary Shares,NASDAQ,N
 BNY,The Bank of New York Mellon Corporation Common Stock,NYSE,
 BNY$K,"The Bank Of New York Mellon Corporation  Depositary Shares, each representing a 1/4,000th interest in a share of Series K Noncumulative Perpetual Preferred Stock",NYSE,
-BNZI,"Banzai International, Inc. - Class A Common Stock",NASDAQ,N
-BNZIW,"Banzai International, Inc. - Warrant",NASDAQ,N
 BOBS,"Bob's Discount Furniture, Inc. Common Stock",NYSE,
 BOC,Boston Omaha Corporation Class A Common Stock,NYSE,
 BODI,"The Beachbody Company, Inc. - Class A Common Stock",NASDAQ,N
@@ -5156,6 +5152,8 @@ PANL,Pangaea Logistics Solutions Ltd. - Common Stock,NASDAQ,N
 PANW,"Palo Alto Networks, Inc. - Common Stock",NASDAQ,N
 PAPL,Pineapple Financial Inc. Common Stock,NYSE American,
 PAR,PAR Technology Corporation Common Stock,NYSE,
+PARA,"Banzai International, Inc. - Class A Common Stock",NASDAQ,N
+PARAW,"Banzai International, Inc. - Warrant",NASDAQ,N
 PARK,"Park Dental Partners, Inc. - Common Stock",NASDAQ,N
 PARR,"Par Pacific Holdings, Inc.  Common Stock",NYSE,
 PASG,"Passage Bio, Inc. - Common Stock",NASDAQ,N
@@ -5386,6 +5384,7 @@ PMTV,PennyMac Mortgage Investment Trust 9.00% Senior Notes due 2030,NYSE,
 PMTW,PennyMac Mortgage Investment Trust 9.00% Senior Notes due 2030,NYSE,
 PMVP,"PMV Pharmaceuticals, Inc. - Common Stock",NASDAQ,N
 PN,PN Smart Energy Limited - Class A Ordinary Shares,NASDAQ,N
+PNAQ.U,"Pinnacle Acquisition Corporation Units, each consisting of one Class A ordinary share and one right",NYSE,
 PNBK,Patriot National Bancorp Inc. - Common Stock,NASDAQ,N
 PNC,"PNC Financial Services Group, Inc. (The) Common Stock",NYSE,
 PNFP,"Pinnacle Financial Partners, Inc. Common stock",NYSE,
@@ -6702,6 +6701,7 @@ TOUR,Tuniu Corporation - American Depositary Shares,NASDAQ,N
 TOVX,"Theriva Biologics, Inc. Common Stock",NYSE American,
 TOWN,Towne Bank - Common Stock,NASDAQ,N
 TOYO,"TOYO Co., Ltd - Ordinary Shares",NASDAQ,N
+TP,Ticketplus Ltd. Ordinary Shares,NYSE American,
 TPB,"Turning Point Brands, Inc. Common Stock",NYSE,
 TPC,Tutor Perini Corporation Common Stock,NYSE,
 TPCS,TechPrecision Corporation - Common stock,NASDAQ,N
