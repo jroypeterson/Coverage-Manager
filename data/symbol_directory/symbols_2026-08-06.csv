@@ -937,8 +937,8 @@ BHRB,Burke & Herbert Financial Services Corp. - Common Stock,NASDAQ,N
 BHST,BioHarvest Sciences Inc. - Common Stock,NASDAQ,N
 BHV,BlackRock Virginia Municipal Bond Trust,NYSE,
 BHVN,Biohaven Ltd. Common Shares,NYSE,
-BIAF,"bioAffinity Technologies, Inc. - Common Stock",NASDAQ,N
-BIAFW,"bioAffinity Technologies, Inc. - Warrant",NASDAQ,N
+BIAF,"bioAffinity Technologies, Inc. - Common Stock",NASDAQ,D
+BIAFW,"bioAffinity Technologies, Inc. - Warrant",NASDAQ,D
 BID,Tribeca Strategic Acquisition Corp. - Class A Ordinary Shares,NASDAQ,N
 BIDU,"Baidu, Inc. - American Depositary Shares, each representing 8 ordinary share",NASDAQ,N
 BIDWR,Tribeca Strategic Acquisition Corp. - Rights,NASDAQ,N
@@ -2357,7 +2357,7 @@ ETO,Eaton Vance Tax-Advantage Global Dividend Opp Common Stock,NYSE,
 ETON,"Eton Pharmaceuticals, Inc. - Common Stock",NASDAQ,N
 ETOR,eToro Group Ltd. - Class A Common Shares,NASDAQ,N
 ETR,Entergy Corporation Common Stock,NYSE,
-ETS,Elite Express Holding Inc. - Class A Common Stock,NASDAQ,D
+ETS,Elite Express Holding Inc. - Class A Common Stock,NASDAQ,N
 ETSS,Energy Transition Special Opportunities Class A Ordinary Shares,NYSE,
 ETSS.U,"Energy Transition Special Opportunities Units, each consisting of one Class A ordinary share and one-half of one redeemable warrant",NYSE,
 ETSS.W,"Energy Transition Special Opportunities Warrants, each whole warrant exercisable for one Class A ordinary share at an exercise price of $11.50",NYSE,
@@ -5231,7 +5231,7 @@ PDM,"Piedmont Realty Trust, Inc. Class A Common Stock",NYSE,
 PDO,PIMCO Dynamic Income Opportunities Fund Common Shares of Beneficial Interest,NYSE,
 PDPA,Pearl Diver Credit Company Inc. 8.00% Series A Preferred Stock Due 2029,NYSE,
 PDS,Precision Drilling Corporation Common Stock,NYSE,
-PDSB,PDS Biotechnology Corporation - Common Stock,NASDAQ,N
+PDSB,PDS Biotechnology Corporation - Common Stock,NASDAQ,D
 PDT,John Hancock Premium Dividend Fund,NYSE,
 PDX,PIMCO Dynamic Income Strategy Fund Common Shares of Beneficial Interest,NYSE,
 PDYN,Palladyne AI Corp. - Common stock,NASDAQ,N
@@ -7329,7 +7329,7 @@ WYFI,"WhiteFiber, Inc. - Ordinary Shares",NASDAQ,N
 WYHG,Wing Yip Food Holdings Group Limited - American Depositary Shares,NASDAQ,N
 WYNN,"Wynn Resorts, Limited - Common Stock",NASDAQ,N
 WYY,WidePoint Corporation Common Stock,NYSE American,
-XAIR,"Beyond Air, Inc. - Common Stock",NASDAQ,D
+XAIR,"Beyond Air, Inc. - Common Stock",NASDAQ,N
 XBIO,"Xenetic Biosciences, Inc. - Common Stock",NASDAQ,N
 XBIT,XBiotech Inc. - Common Stock,NASDAQ,N
 XBP,"XBP Global Holdings, Inc. - Common Stock",NASDAQ,N
