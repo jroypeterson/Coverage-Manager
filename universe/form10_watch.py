@@ -451,7 +451,7 @@ def _ascii(text: str) -> str:
 
 
 def render_report(filings: list[Filing], window: tuple[str, str],
-                  fresh: set[str]) -> str:
+                  fresh: set[str], carried: set[str] | None = None) -> str:
     rel = [f for f in filings if f.verdict == "relevant"]
     inc = [f for f in filings if f.verdict == "inconclusive"]
     non = [f for f in filings if f.verdict == "not-relevant"]
@@ -477,8 +477,10 @@ def render_report(filings: list[Filing], window: tuple[str, str],
             # ASCII only: this string reaches a cp1252 console on the
             # scheduled run, and an emoji there raises UnicodeEncodeError at the
             # exact moment the job is trying to report what it found.
+            mark = " (new)" if f.cik in fresh else (
+                " (still open)" if carried and f.cik in carried else "")
             out.append(f"| {f.filed} | {f.listing_kind} "
-                       f"| {f.registrant[:38]}{' (new)' if f.cik in fresh else ''} "
+                       f"| {f.registrant[:38]}{mark} "
                        f"| `{f.ticker or '-'}` | {f.sic} | {par} | {f.reason} |")
         out += ["", "**Sizes are unknown by construction.** No shares trade before "
                 "separation, so these are pipeline entries to monitor, not adds.", ""]
@@ -535,16 +537,81 @@ def run(root: Path, *, ua: str, api_key: str = "", days: int = 10,
             classify_listing_kind(f, ua=ua)
 
     report = render_report(res.filings, (start, end), fresh)
+    # CARRY FORWARD. A 14-day search window finds new FILINGS; it does not
+    # describe the PIPELINE. FedEx Freight filed 2026-01-16 and Honeywell
+    # Aerospace 2026-03-03 -- both still unlisted, both squarely "filings to
+    # monitor" -- and a 14-day window reports neither, forever. An item stays
+    # open until its ticker turns up in the universe (it listed and was added)
+    # or it ages out.
+    carried = carry_forward(res.filings, seen, root=root, today=today)
+    all_relevant = res.filings + carried
+
+    report = render_report(all_relevant, (start, end), fresh, carried={c.cik for c in carried})
     if not dry_run:
         for f in res.filings:
-            seen[f.cik] = {"registrant": f.registrant, "filed": f.filed,
-                           "accession": f.accession, "verdict": f.verdict,
-                           "first_seen": seen.get(f.cik, {}).get("first_seen",
-                                                                 today.isoformat())}
+            prior = seen.get(f.cik, {})
+            seen[f.cik] = {
+                "registrant": f.registrant, "filed": f.filed,
+                "accession": f.accession, "verdict": f.verdict,
+                "ticker": f.ticker, "sic": f.sic, "sector": f.sector,
+                "parent": f.parent, "listing_kind": f.listing_kind,
+                "reason": f.reason, "doc": f.doc,
+                "first_seen": prior.get("first_seen", today.isoformat()),
+            }
         save_seen(seen_path, seen)
         rp = root / "reports" / f"form10_watch_{end}.md"
         rp.parent.mkdir(parents=True, exist_ok=True)
         rp.write_text(report, encoding="utf-8")
+    return "ok", all_relevant, report
+
+
+CARRY_MAX_AGE_DAYS = 540        # ~18 months; a Form 10 older than that is dead
+
+
+def carry_forward(current: list[Filing], seen: dict, *, root: Path,
+                  today: date) -> list[Filing]:
+    """Still-open relevant filings from prior runs, as Filing objects.
+
+    Closed when the registrant's ticker is in the universe -- it listed and was
+    added, so it is coverage now, not pipeline. Also closed past
+    CARRY_MAX_AGE_DAYS so a withdrawn registration cannot haunt the report
+    forever (BSEM's own 2024 attempt was withdrawn by an `RW` in 2025).
+    """
+    import csv as _csv
+
+    have = {f.cik for f in current}
+    universe: set[str] = set()
+    uni = root / "data" / "coverage_universe_tickers.csv"
+    if uni.exists():
+        try:
+            with open(uni, newline="", encoding="utf-8-sig") as fh:
+                universe = {(r.get("Ticker") or "").strip().upper()
+                            for r in _csv.DictReader(fh)}
+        except OSError:
+            universe = set()      # unreadable universe: carry, do not drop
+
+    out: list[Filing] = []
+    for cik, e in seen.items():
+        if cik in have or e.get("verdict") != "relevant":
+            continue
+        tick = (e.get("ticker") or "").strip().upper()
+        if tick and tick in universe:
+            continue              # it listed and was added
+        filed = e.get("filed") or ""
+        try:
+            age = (today - date.fromisoformat(filed)).days
+        except ValueError:
+            age = 0
+        if age > CARRY_MAX_AGE_DAYS:
+            continue
+        out.append(Filing(
+            cik=cik, registrant=e.get("registrant", ""), ticker=e.get("ticker", ""),
+            accession=e.get("accession", ""), filed=filed, form="10-12B",
+            sic=e.get("sic", ""), sector=e.get("sector", ""),
+            parent=e.get("parent", ""), verdict="relevant",
+            reason=e.get("reason", ""), doc=e.get("doc", ""),
+            listing_kind=e.get("listing_kind", LISTING_UNKNOWN)))
+    return sorted(out, key=lambda f: f.filed)
     return "ok", res.filings, report
 
 

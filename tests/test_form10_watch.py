@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -261,3 +262,68 @@ def test_an_unreachable_endpoint_yields_unknown():
     f = _f(parent="")
     f10.classify_listing_kind(f, ua="ua", opener=boom)
     assert f.listing_kind == f10.LISTING_UNKNOWN
+
+
+# --------------------------------------------------------------- carry forward
+
+
+def _seen(**over):
+    base = {"registrant": "FedEx Freight Holding Company, Inc.", "filed": "2026-01-16",
+            "accession": "a-1", "verdict": "relevant", "ticker": "", "sic": "4513",
+            "sector": "", "parent": "FEDEX CORP", "listing_kind": "spin-off",
+            "reason": "Bucket 3 candidate on size", "doc": "x.htm",
+            "first_seen": "2026-08-06"}
+    base.update(over)
+    return {"999": base}
+
+
+def test_an_unlisted_filing_carries_forward_past_the_search_window(tmp_path):
+    """A 14-day window finds new FILINGS; it does not describe the PIPELINE.
+    FedEx Freight filed 2026-01-16 and Honeywell Aerospace 2026-03-03, both
+    still unlisted -- and a 14-day window reports neither, forever."""
+    out = f10.carry_forward([], _seen(), root=tmp_path, today=date(2026, 8, 7))
+    assert [f.registrant for f in out] == ["FedEx Freight Holding Company, Inc."]
+    assert out[0].parent == "FEDEX CORP"
+
+
+def test_a_filing_already_in_this_run_is_not_duplicated(tmp_path):
+    cur = [_f(cik="999", registrant="FedEx Freight Holding Company, Inc.")]
+    assert f10.carry_forward(cur, _seen(), root=tmp_path, today=date(2026, 8, 7)) == []
+
+
+def test_carrying_stops_once_the_name_is_in_the_universe(tmp_path):
+    """It listed and was added -- that is coverage now, not pipeline."""
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "coverage_universe_tickers.csv").write_text(
+        "Ticker,Company Name\nFDXF,FedEx Freight\n", encoding="utf-8")
+    out = f10.carry_forward([], _seen(ticker="FDXF"), root=tmp_path,
+                            today=date(2026, 8, 7))
+    assert out == []
+
+
+def test_a_not_relevant_filing_is_never_carried(tmp_path):
+    out = f10.carry_forward([], _seen(verdict="not-relevant"), root=tmp_path,
+                            today=date(2026, 8, 7))
+    assert out == []
+
+
+def test_a_stale_registration_ages_out(tmp_path):
+    """BSEM's own 2024 Form 10 attempt was withdrawn by an RW in 2025. A dead
+    registration must not haunt the forward section forever."""
+    out = f10.carry_forward([], _seen(filed="2024-01-01"), root=tmp_path,
+                            today=date(2026, 8, 7))
+    assert out == []
+
+
+def test_an_unreadable_universe_carries_rather_than_drops(tmp_path):
+    """Failing to read the universe must not silently empty the pipeline."""
+    out = f10.carry_forward([], _seen(ticker="FDXF"), root=tmp_path,
+                            today=date(2026, 8, 7))
+    assert len(out) == 1
+
+
+def test_carried_rows_are_marked_distinctly_from_new_ones():
+    f = f10.classify(_f(cik="999", sic="2834", registrant="Old Co"))
+    report = f10.render_report([f], ("2026-07-24", "2026-08-07"),
+                               fresh=set(), carried={"999"})
+    assert "(still open)" in report and "(new)" not in report
