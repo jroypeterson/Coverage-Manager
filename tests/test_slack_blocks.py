@@ -243,3 +243,29 @@ def test_context_blocks_convert_markdown_rather_than_posting_it_raw():
     assert "**" not in text
     assert "*CSV Changes*" in text and "*No changes*" in text
     assert "\u2022 one" in text
+
+
+# ------------------------------------------------- decisions-only Slack post
+
+
+def test_the_auto_add_section_reaches_the_lead_not_the_thread():
+    """An add JP was never asked about must be the most visible line, not the quietest.
+
+    `sync_candidate_ledger` has printed "REPORT THESE IN THE SLACK POST" since the
+    auto-add rule shipped, and the section was being threaded \u2014 the quietest place
+    in the message.
+    """
+    md = ("# T\n\nintro\n\n## Added without asking - already in the universe\n\n"
+          "3308.HK entered by rule.\n\n## Notes\n\nsome note\n")
+    lead, thread, _ = poster.route(md)
+    assert "3308.HK entered by rule." in lead
+    assert "3308.HK entered by rule." not in "\n".join(thread)
+    assert "some note" in "\n".join(thread)
+
+
+def test_reference_sections_still_route_to_a_bucket_so_they_can_be_named():
+    """Deferred to the page, not dropped \u2014 "moved" must not look like "vanished"."""
+    md = "# T\n\nx\n\n## Pipeline / filings to monitor\n\nrows here\n"
+    lead, thread, footer = poster.route(md)
+    assert "rows here" in "\n".join(thread)
+    assert "rows here" not in lead

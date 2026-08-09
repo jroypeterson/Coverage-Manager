@@ -57,7 +57,14 @@ SLACK_API = "https://slack.com/api/"
 
 # H2 sections that belong in the channel-level lead message. Matched as a
 # case-folded prefix so a week titled "Recommendations (3)" still routes right.
-LEAD_SECTION_PREFIXES = ("recommendations", "pending approval")
+#
+# "added without asking" joined this list on 2026-08-09. It is the auto-add
+# report — a name that entered the fleet's most-depended-on artifact without JP
+# being asked — and `sync_candidate_ledger` has always said it "must be the most
+# visible line in the report, not the quietest." It was being threaded, which is
+# the quietest place there is.
+LEAD_SECTION_PREFIXES = ("recommendations", "pending approval",
+                         "added without asking")
 
 # Sections that are pure run-metadata: rendered as a small grey footer at the end
 # of the thread rather than as a full section, because nobody decides from them.
@@ -222,6 +229,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="override SLACK_IPO_CHANNEL_ID (for a test post)")
     ap.add_argument("--no-reversal-check", action="store_true",
                     help="skip the promised-then-excluded cross-check")
+    ap.add_argument("--thread-reference", action="store_true",
+                    help="also post the reference sections as thread replies "
+                         "(pre-2026-08-09 behaviour; they are on the page now)")
     a = ap.parse_args(argv)
 
     reports = Path(a.reports_dir) if a.reports_dir else PROJECT_ROOT / "reports"
@@ -247,23 +257,33 @@ def main(argv: list[str] | None = None) -> int:
     summary_md = summary_p.read_text(encoding="utf-8")
     lead_md, thread_bodies, footer_bodies = route(summary_md)
 
+    # Reference sections moved to the published page (JP 2026-08-08: "the way you
+    # have all of the replies threaded is kind of confusing since there are so many
+    # questions"). Of the eleven thread replies that prompted this, exactly ONE
+    # asked him for anything; the other ten were reference material shaped like a
+    # question. Slack now carries only what needs a reply, plus a link.
+    #
+    # The titles are NAMED in the link block rather than silently disappearing --
+    # "it moved" and "it vanished" must not look the same, which is the standing
+    # rule that `test_every_section_is_routed_exactly_once` exists to enforce.
+    from reporting.weekly_page import PAGES_URL
+
+    deferred = [b.splitlines()[0].lstrip("# ").strip()
+                for b in thread_bodies + footer_bodies]
+    moved = ", ".join(deferred) if deferred else "nothing else this week"
+
     thread_ts = a.thread_ts
     if not thread_ts:
-        # The full report is a page now; the lead carries the decisions and a link.
-        # JP 2026-08-08 on the eleven-reply thread: "kind of confusing since there
-        # are so many questions". Of those eleven replies exactly one asked him for
-        # anything -- the rest were reference material shaped like questions.
-        from reporting.weekly_page import PAGES_URL
-
         lead_blocks = markdown_to_blocks(lead_md) + [context_block(
-            f":page_facing_up: *Full report, formatted and clickable:* {PAGES_URL}\n"
-            "Pipeline, listing-lane findings, exclusions, company briefings and the "
-            "auto-add rules all live there. Reply here to decide -- top-level or in "
-            "thread, either is read.", convert=False)]
+            f":page_facing_up: *Full report:* {PAGES_URL}\n"
+            f"On the page: {moved}, the full company briefings, and the auto-add "
+            "rules.\nReply here to decide -- top-level or in thread, either is read.",
+            convert=False)]
         thread_ts = post(lead_blocks, token=token, channel=channel,
                          fallback=f"Weekly Coverage Universe Additions - {a.date}",
                          dry_run=a.dry_run, preview=a.preview)
         print(f"lead posted: ts={thread_ts}")
+        print(f"  deferred to the page: {len(deferred)} section(s)")
 
     # A name the report promised to add and then quietly excluded is the failure
     # that lost Jersey Mike's. Surface it beside the exclusion, not in a log file.
@@ -280,25 +300,28 @@ def main(argv: list[str] | None = None) -> int:
         context_block(r.as_line()) for r in reversals] if reversals else []
 
     attached = False
-    for body in thread_bodies:
-        title = body.splitlines()[0].lstrip("# ").strip()
-        blocks = markdown_to_blocks(body)
-        if warn_blocks and SECTION_EXCLUDED.search(title):
-            blocks = blocks + warn_blocks
-            attached = True
-        post(blocks, token=token, channel=channel,
-             thread_ts=thread_ts, fallback=title,
-             dry_run=a.dry_run, preview=a.preview)
-        print(f"  threaded section: {title[:60]}")
+    if a.thread_reference:
+        for body in thread_bodies:
+            title = body.splitlines()[0].lstrip("# ").strip()
+            blocks = markdown_to_blocks(body)
+            if warn_blocks and SECTION_EXCLUDED.search(title):
+                blocks = blocks + warn_blocks
+                attached = True
+            post(blocks, token=token, channel=channel,
+                 thread_ts=thread_ts, fallback=title,
+                 dry_run=a.dry_run, preview=a.preview)
+            print(f"  threaded section: {title[:60]}")
 
     if warn_blocks and not attached:
-        # No exclusions section this week, but a reversal still happened. Posting
-        # it standalone rather than dropping it - the whole point is that a
-        # retracted promise must not be able to disappear.
+        # A retracted promise must never be able to disappear. It used to ride
+        # along with the exclusions section; that section is on the page now, so
+        # the warning is posted in its own right rather than going with it. This
+        # is the ONE piece of reference material that stays in Slack, because it
+        # is the failure that lost Jersey Mike's for two weeks.
         post(warn_blocks, token=token, channel=channel, thread_ts=thread_ts,
              fallback="Unexplained reversal", dry_run=a.dry_run,
              preview=a.preview)
-        print("  threaded reversal warning (no exclusions section)")
+        print("  threaded reversal warning")
 
     briefings: list[tuple[str, str]] = []
     if briefs_p.exists():
@@ -307,22 +330,27 @@ def main(argv: list[str] | None = None) -> int:
             print(f"WARNING: {briefs_p} parsed to zero briefings", file=sys.stderr)
     else:
         print(f"WARNING: no briefings file at {briefs_p} - report posted without "
-              f"write-ups; JP cannot decide from the thread alone", file=sys.stderr)
+              f"write-ups; the page will have none either", file=sys.stderr)
 
-    for heading, body in briefings:
-        post(markdown_to_blocks(body), token=token, channel=channel,
-             thread_ts=thread_ts, fallback=heading,
-             dry_run=a.dry_run, preview=a.preview)
-        print(f"  threaded briefing: {heading[:60]}")
+    if a.thread_reference:
+        for heading, body in briefings:
+            post(markdown_to_blocks(body), token=token, channel=channel,
+                 thread_ts=thread_ts, fallback=heading,
+                 dry_run=a.dry_run, preview=a.preview)
+            print(f"  threaded briefing: {heading[:60]}")
 
-    if footer_bodies:
-        blocks = [context_block(b[:2900]) for b in footer_bodies]
-        post(blocks, token=token, channel=channel, thread_ts=thread_ts,
-             fallback="Report files", dry_run=a.dry_run, preview=a.preview)
-        print("  threaded footer")
+        if footer_bodies:
+            blocks = [context_block(b[:2900]) for b in footer_bodies]
+            post(blocks, token=token, channel=channel, thread_ts=thread_ts,
+                 fallback="Report files", dry_run=a.dry_run, preview=a.preview)
+            print("  threaded footer")
 
-    print(f"done - {len(thread_bodies)} section(s), {len(briefings)} briefing(s) "
-          f"in thread {thread_ts}")
+    where = "thread" if a.thread_reference else "on the page"
+    print(f"done - {len(deferred)} section(s) and {len(briefings)} briefing(s) "
+          f"{where}; lead ts {thread_ts}")
+    # Still non-zero when the briefings file is missing: the page renders the
+    # summary either way, but a week with no write-ups is a degraded week and the
+    # caller should see it.
     return 0 if briefings else 1
 
 

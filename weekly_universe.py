@@ -947,9 +947,13 @@ def _step_weekly_page():
         path, stamp = wp.find_report()
     except FileNotFoundError as exc:
         return {"skipped": str(exc)}
+    briefs = wp.find_briefings(stamp)
     result = wp.publish(path.read_text(encoding="utf-8", errors="replace"),
-                        report_date=stamp, thread_ts=wp.thread_ts_for(stamp))
-    logger.info("[page] %s -> docs/ (%s)", path.name, result["url"])
+                        report_date=stamp, thread_ts=wp.thread_ts_for(stamp),
+                        briefings_md=briefs.read_text(encoding="utf-8", errors="replace")
+                        if briefs else "")
+    logger.info("[page] %s -> docs/ (briefings: %s) (%s)", path.name,
+                briefs.name if briefs else "none", result["url"])
     return result
 
 

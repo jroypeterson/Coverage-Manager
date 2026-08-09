@@ -641,9 +641,13 @@ def main():
         from reporting import weekly_page as _wp
         path, stamp = _wp.find_report(args.date)
         ts = args.thread_ts or _wp.thread_ts_for(stamp)
+        briefs = _wp.find_briefings(stamp)
         result = _wp.publish(path.read_text(encoding="utf-8", errors="replace"),
-                             report_date=stamp, thread_ts=ts)
+                             report_date=stamp, thread_ts=ts,
+                             briefings_md=briefs.read_text(encoding="utf-8", errors="replace")
+                             if briefs else "")
         print(f"rendered {path.name} -> docs/index.html + docs/weekly/{stamp}.html")
+        print(f"  briefings: {briefs.name if briefs else 'none for this week'}")
         print(f"  {result['decisions']} decision row(s), {result['open']} awaiting a reply; "
               f"{result['archived']} week(s) archived; {result['bytes']:,} bytes")
         print(f"  {result['url']}")

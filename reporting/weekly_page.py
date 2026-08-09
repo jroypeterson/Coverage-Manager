@@ -418,7 +418,7 @@ def render_body(md: str) -> tuple[str, list[tuple[str, str]]]:
                 parts.append(f'<section id="{anchor}"><h2>{_inline(title)}</h2>')
                 open_section = True
                 continue
-            parts.append(f"<h3>{_inline(title)}</h3>")
+            parts.append(f'<h3 id="{_slug(title)}">{_inline(title)}</h3>')
         elif kind == "table":
             parts.append(_render_table(payload))
         elif kind == "code":
@@ -453,8 +453,19 @@ def _meta(md: str) -> dict:
 
 
 def render(md: str, *, report_date: str, decisions: list[Decision],
-           generated: str = "") -> str:
+           generated: str = "", briefings_md: str = "") -> str:
     body, nav = render_body(md)
+
+    # The full briefings used to be four separate Slack thread replies. They are
+    # reference, not a decision, so they live here — and the page is only "the
+    # whole report" if they are actually on it.
+    if briefings_md.strip():
+        brief_body, brief_nav = render_body(briefings_md)
+        body += ('<section id="briefings"><h2>Company briefings</h2>'
+                 '<p class="sec-lede">Full investment briefings for this week&rsquo;s '
+                 'names &mdash; business, financials, bull and bear, catalysts.</p>'
+                 f"{brief_body}</section>")
+        nav = nav + [("briefings", "Company briefings")] + brief_nav
     meta = _meta(md)
     open_n = sum(1 for d in decisions if d.status == "pending")
 
@@ -522,6 +533,23 @@ def render_archive(dates: list[str]) -> str:
 
 
 _REPORT_GLOB = "weekly_coverage_universe_additions_*.md"
+_BRIEFINGS_GLOB = "company_backgrounds_{date}.md"
+
+
+def find_briefings(report_date: str) -> Path | None:
+    """The full investment briefings for this week, if the session wrote them.
+
+    Optional by design: some weeks the discovery session produces no new names and
+    writes no backgrounds file. A missing one is a quiet week, not a broken run.
+    """
+    from config import REPORTS_DIR  # noqa: PLC0415
+
+    name = _BRIEFINGS_GLOB.format(date=report_date)
+    for root in (Path(REPORTS_DIR), Path(REPORTS_DIR) / "old reports"):
+        candidate = root / name
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def find_report(report_date: str = "") -> tuple[Path, str]:
@@ -571,13 +599,15 @@ def thread_ts_for(report_date: str) -> str:
 
 
 def publish(md: str, *, report_date: str, thread_ts: str = "",
-            docs_dir: Path | None = None, generated: str = "") -> dict:
+            docs_dir: Path | None = None, generated: str = "",
+            briefings_md: str = "") -> dict:
     """Write index.html + weekly/<date>.html + archive.html. Returns what changed."""
     docs = Path(docs_dir) if docs_dir else DOCS_DIR
     (docs / "weekly").mkdir(parents=True, exist_ok=True)
 
     decisions = load_decisions(thread_ts)
     page = render(md, report_date=report_date, decisions=decisions,
+                  briefings_md=briefings_md,
                   generated=generated or date.today().isoformat())
 
     dated = docs / "weekly" / f"{report_date}.html"
@@ -593,6 +623,7 @@ def publish(md: str, *, report_date: str, thread_ts: str = "",
     return {"url": PAGES_URL, "report_date": report_date,
             "open": sum(1 for d in decisions if d.status == "pending"),
             "decisions": len(decisions), "archived": len(archived),
+            "briefings": bool(briefings_md.strip()),
             "bytes": len(page.encode("utf-8"))}
 
 
