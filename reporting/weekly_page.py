@@ -301,6 +301,9 @@ def _render_table(rows: list[list[str]]) -> str:
 
 _BULLET_RE = re.compile(r"^[-*+]\s+(.*)")
 
+# The masthead already shows these. Matched only before the first H2.
+_HEADER_BLOCK_RE = re.compile(r"^\*\*(Review window|Universe checked against):\*\*")
+
 
 def _render_para(text: str) -> str:
     """A parse() paragraph buffer -> HTML paragraphs and lists.
@@ -340,8 +343,18 @@ def render_body(md: str) -> tuple[str, list[tuple[str, str]]]:
     parts: list[str] = []
     nav: list[tuple[str, str]] = []
     open_section = False
+    seen_heading = False
 
     for kind, payload in nodes:
+        # The report's own header block (Review window / Universe checked against /
+        # Recommendations this week) is already in the masthead. Markdown joins those
+        # consecutive lines into ONE paragraph, so leaving it here prints the three
+        # facts run together AND a second time. Only the copy before the first H2 is
+        # dropped; an identical phrase inside a section is that section's content.
+        if kind == "para" and not seen_heading and _HEADER_BLOCK_RE.match(payload.strip()):
+            continue
+        if kind == "heading" and payload[0] == 2:
+            seen_heading = True
         if kind == "heading":
             level, title = payload
             if level == 1:
@@ -379,7 +392,10 @@ def _meta(md: str) -> dict:
     m = re.search(r"\*\*Review window:\*\*\s*(.+)", md)
     if m:
         out["window"] = re.sub(r"[*`]", "", m.group(1)).strip()
-    m = re.search(r"—\s*([\d,]+)\s*rows", md)
+    # Any dash, not just the em dash the report happens to use today. The body
+    # dedup drops this line on the grounds that the masthead carries it, so a
+    # regex that silently misses would delete the fact from BOTH places.
+    m = re.search(r"[—–-]\s*([\d,]+)\s*rows", md)
     if m:
         out["rows"] = m.group(1)
     return out

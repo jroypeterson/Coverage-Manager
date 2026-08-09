@@ -934,6 +934,25 @@ def _step_cik_backfill():
     return cik_backfill.main()
 
 
+def _step_weekly_page():
+    """Render the newest weekly report into `docs/` for GitHub Pages.
+
+    Returns `{"skipped": reason}` when there is no report to render, so the step
+    summary can say *why* nothing was published rather than reporting a bare `ok`
+    over an untouched page.
+    """
+    from reporting import weekly_page as wp
+
+    try:
+        path, stamp = wp.find_report()
+    except FileNotFoundError as exc:
+        return {"skipped": str(exc)}
+    result = wp.publish(path.read_text(encoding="utf-8", errors="replace"),
+                        report_date=stamp, thread_ts=wp.thread_ts_for(stamp))
+    logger.info("[page] %s -> docs/ (%s)", path.name, result["url"])
+    return result
+
+
 def _step_universe_delta_slack(baseline):
     """Post a weekly before/delta/after universe summary to Slack #coverage.
 
@@ -1466,6 +1485,33 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 steps["sigma_export"] = status
         else:
             steps["sigma_export"] = status
+
+    # Render the published weekly page into docs/ for GitHub Pages.
+    #
+    # Deliberately NOT gated on anything above: the page is a rendering of a report
+    # that already exists on disk, so it can and should refresh even on a run where
+    # a lane failed — a stale page is exactly what JP asked to stop reading.
+    # `run_weekly_coverage.bat` does `git add -A` + commit + push with exit-code
+    # gating right after this, so writing the file IS the publish.
+    #
+    # A missing report is `skipped`, not `failed`: the page is downstream of the
+    # discovery session, and a week the session did not run is a week with nothing
+    # new to render, not a broken pipeline.
+    if dry_run:
+        logger.info("[page] Weekly page... SKIPPED (dry run)")
+        steps["weekly_page"] = "skipped (dry run)"
+    else:
+        logger.info("[page] Rendering the published weekly page...")
+        status, page_result = run_step("weekly_page", _step_weekly_page)
+        if page_result is None:
+            steps["weekly_page"] = status
+        elif page_result.get("skipped"):
+            steps["weekly_page"] = f"skipped: {page_result['skipped']}"
+        else:
+            steps["weekly_page"] = (
+                f"ok ({page_result['report_date']}, {page_result['open']} awaiting a "
+                f"reply, {page_result['archived']} week(s) archived)"
+            )
 
     # Post-step: Weekly universe delta -> Slack #coverage
     # Runs AFTER discovery/delisted_check/exports/sigma_export so the diff

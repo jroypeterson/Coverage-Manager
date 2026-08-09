@@ -74,6 +74,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "export_watchlist",
         "export_reporting_calendar",
         "sigma_export",
+        "weekly_page",           # renders docs/ for GitHub Pages, wired 2026-08-08
         "universe_delta_slack",
     }
     assert result["steps"]["validate"] == "ok"
@@ -87,6 +88,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
     assert "skipped" in result["steps"]["export_watchlist"]
     assert "skipped" in result["steps"]["sigma_export"]
     assert "skipped" in result["steps"]["universe_delta_slack"]
+    assert "skipped" in result["steps"]["weekly_page"]
 
     assert result["non_successes"] == []
 

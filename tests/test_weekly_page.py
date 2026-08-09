@@ -146,7 +146,16 @@ def test_render_produces_balanced_markup():
 
 def test_render_carries_the_reports_own_header_facts():
     page = wp.render(_sample_md(), report_date="2026-08-07", decisions=[])
-    assert "2026-07-28 -&gt; 2026-08-07 (10 days)" in page or "2026-07-28" in page
+    assert "2026-07-28" in page
+    assert "1,328 rows" in page
+
+
+@pytest.mark.parametrize("dash", ["—", "–", "-"])
+def test_the_row_count_survives_whichever_dash_the_report_used(dash):
+    """The dedup deletes this line from the body, so a missed match loses it entirely."""
+    md = (f"**Universe checked against:** `x.csv` {dash} 1,328 rows\n\n"
+          "## Notes\n\nBody.\n")
+    page = wp.render(md, report_date="2026-08-07", decisions=[])
     assert "1,328 rows" in page
 
 
@@ -325,3 +334,30 @@ def test_the_published_page_is_balanced_on_the_real_report():
     assert stack == []
     assert bad == []
     assert "**" not in re.sub(r"<style>.*?</style>", "", page, flags=re.S)
+
+
+# ------------------------------------------------------------------ dedup + step
+
+
+def test_the_reports_header_block_is_not_repeated_in_the_body():
+    """The masthead already shows the window and row count."""
+    md = ("**Review window:** 2026-07-28 -> 2026-08-07\n"
+          "**Universe checked against:** x --- 1,328 rows\n\n"
+          "## Recommendations\n\nBody.\n")
+    body, _ = wp.render_body(md)
+    assert "Review window" not in body
+    assert "Body." in body
+
+
+def test_the_same_phrase_inside_a_section_is_kept():
+    """Only the copy BEFORE the first H2 is a duplicate of the masthead."""
+    md = "## Notes\n\n**Review window:** was extended this week.\n"
+    body, _ = wp.render_body(md)
+    assert "was extended this week." in body
+
+
+def test_weekly_page_step_reports_why_it_published_nothing(tmp_path, monkeypatch):
+    import weekly_universe as wu
+    monkeypatch.setattr("config.REPORTS_DIR", tmp_path)
+    result = wu._step_weekly_page()
+    assert "skipped" in result

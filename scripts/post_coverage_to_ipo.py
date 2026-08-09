@@ -249,7 +249,18 @@ def main(argv: list[str] | None = None) -> int:
 
     thread_ts = a.thread_ts
     if not thread_ts:
-        thread_ts = post(markdown_to_blocks(lead_md), token=token, channel=channel,
+        # The full report is a page now; the lead carries the decisions and a link.
+        # JP 2026-08-08 on the eleven-reply thread: "kind of confusing since there
+        # are so many questions". Of those eleven replies exactly one asked him for
+        # anything -- the rest were reference material shaped like questions.
+        from reporting.weekly_page import PAGES_URL
+
+        lead_blocks = markdown_to_blocks(lead_md) + [context_block(
+            f":page_facing_up: *Full report, formatted and clickable:* {PAGES_URL}\n"
+            "Pipeline, listing-lane findings, exclusions, company briefings and the "
+            "auto-add rules all live there. Reply here to decide -- top-level or in "
+            "thread, either is read.", convert=False)]
+        thread_ts = post(lead_blocks, token=token, channel=channel,
                          fallback=f"Weekly Coverage Universe Additions - {a.date}",
                          dry_run=a.dry_run, preview=a.preview)
         print(f"lead posted: ts={thread_ts}")
