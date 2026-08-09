@@ -392,6 +392,13 @@ def build_parser():
         help="Informational; the universe pipeline does not gate on validation, but the flag is accepted for symmetry with weekly-build.",
     )
 
+    wp_parser = subparsers.add_parser(
+        "weekly-page",
+        help="Render the weekly additions report to docs/ for GitHub Pages.",
+    )
+    wp_parser.add_argument("--date", default="", help="Report date (default: the newest report).")
+    wp_parser.add_argument("--thread-ts", default="", help="Slack thread ts for the decision strip.")
+
     wr_parser = subparsers.add_parser(
         "weekly-report",
         help="Run only the reporting-side weekly pipeline (performance, email).",
@@ -630,6 +637,17 @@ def main():
         # unreachable API must never exit 0 and read as a clean universe.
         learned_nothing = result["checked"] > 0 and result["ok"] == 0 and not result["conflicts"]
         raise SystemExit(2 if (result["conflicts"] or learned_nothing) else 0)
+    elif args.command == "weekly-page":
+        from reporting import weekly_page as _wp
+        path, stamp = _wp.find_report(args.date)
+        ts = args.thread_ts or _wp.thread_ts_for(stamp)
+        result = _wp.publish(path.read_text(encoding="utf-8", errors="replace"),
+                             report_date=stamp, thread_ts=ts)
+        print(f"rendered {path.name} -> docs/index.html + docs/weekly/{stamp}.html")
+        print(f"  {result['decisions']} decision row(s), {result['open']} awaiting a reply; "
+              f"{result['archived']} week(s) archived; {result['bytes']:,} bytes")
+        print(f"  {result['url']}")
+        raise SystemExit(0)
     elif args.command == "form10-watch":
         from pathlib import Path as _Path
         from universe import form10_watch as _f10
