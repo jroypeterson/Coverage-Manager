@@ -405,3 +405,21 @@ def test_no_cell_is_lost_when_a_wide_row_becomes_a_card():
     out = wp._render_table([head, row])
     for value in row:
         assert value in out
+
+
+def test_the_card_headline_is_the_company_not_the_peers_list():
+    """Live bug: "widest short cell" picked the peer list over the company name."""
+    head = ["#", "Company", "Ticker", "Exchange", "Market Cap", "Sector",
+            "Subsector", "Listing Date", "Trigger", "Peers in sheet", "Reason to add"]
+    row = ["1", "Jersey Mike's Subs Inc.", "JMKE", "NYSE", "~$5.3B", "Consumer",
+           "Restaurants", "2026-07-30", "IPO", "WMT, LULU, CROX, FIVE, CVNA",
+           "D " + "word " * 40]
+    out = wp._render_table([head, row])
+    assert "<h4>Jersey Mike&#x27;s Subs Inc.</h4>" in out or            "<h4>Jersey Mike's Subs Inc.</h4>" in out
+
+
+def test_the_headline_falls_back_when_no_column_names_the_record():
+    head = ["A", "B", "C", "D", "E", "F", "G"]
+    row = ["1", "A much longer descriptive label", "x", "y", "z", "w", "v"]
+    out = wp._render_table([head, row])
+    assert "<h4>A much longer descriptive label</h4>" in out

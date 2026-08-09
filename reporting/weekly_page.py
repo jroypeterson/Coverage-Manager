@@ -323,10 +323,16 @@ def _render_record_cards(rows: list[list[str]]) -> str:
                  if v.strip().lower() not in slack_blocks.EMPTY_CELLS]
         if not pairs:
             continue
-        # Headline = the widest short cell (the company name in every live table);
-        # never the row number, and never the paragraph.
-        titles = [v for _, v in pairs if len(slack_blocks._plain(v)) <= 48]
-        headline = max(titles, key=lambda v: len(v), default=pairs[0][1])
+        # Headline = the cell under a name-ish column. Falling back to "the widest
+        # short cell" alone picked the PEERS list ("WMT, LULU, CROX, FIVE, CVNA")
+        # over "Jersey Mike's Subs Inc." on the live table, because peer lists are
+        # longer than company names. The column header is the actual signal.
+        named = [v for k, v in pairs if k.strip().lower() in _HEADLINE_KEYS]
+        if named:
+            headline = named[0]
+        else:
+            titles = [v for _, v in pairs if len(slack_blocks._plain(v)) <= 48]
+            headline = max(titles, key=len, default=pairs[0][1])
         prose = [(k, v) for k, v in pairs
                  if len(slack_blocks._plain(v)) > 90 and v != headline]
         fields = [(k, v) for k, v in pairs
@@ -342,6 +348,9 @@ def _render_record_cards(rows: list[list[str]]) -> str:
 
 
 _BULLET_RE = re.compile(r"^[-*+]\s+(.*)")
+
+# Column headers that name the record, best first.
+_HEADLINE_KEYS = ("company", "company name", "name", "registrant", "fund")
 
 # The masthead already shows these. Matched only before the first H2.
 _HEADER_BLOCK_RE = re.compile(r"^\*\*(Review window|Universe checked against):\*\*")
