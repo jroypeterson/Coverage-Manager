@@ -6257,7 +6257,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "Secare SS": {
+  "SECTB SS": {
     "name": "Sectra AB",
     "sector": "Healthcare Services",
     "subsector": "HIT",
@@ -9383,6 +9383,13 @@
     "name": "Marvell Technology, Inc.",
     "sector": "Tech",
     "subsector": "Semiconductors / Connectivity",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "SECARE SS": {
+    "name": "Swedencare AB",
+    "sector": "Healthcare Services",
+    "subsector": "Animal Health",
     "sub_subsector": "",
     "core": ""
   }

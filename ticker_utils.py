@@ -26,6 +26,11 @@ MANUAL_TICKER_MAP = {
     # quoteType with no name, i.e. no usable fundamentals at all.
     "Coloplast A/S": "COLO-B.CO",
     "Getinge AB": "GETI-B.ST",
+    # Same hyphenated-share-class case. The universe carries "SECTB SS", and the
+    # space-suffix rule yields "SECTB.ST", but Yahoo writes it "SECT-B.ST".
+    # Added 2026-08-09 when this row was split out of a chimera that had held
+    # Swedencare's ticker (SECARE SS) under Sectra's name.
+    "Sectra AB": "SECT-B.ST",
     # Japanese tickers (name-based in CSV → numeric yfinance format)
     "Olympus": "7733.T",
     "Shimadzu": "7701.T",
