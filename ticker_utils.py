@@ -31,6 +31,9 @@ MANUAL_TICKER_MAP = {
     # Added 2026-08-09 when this row was split out of a chimera that had held
     # Swedencare's ticker (SECARE SS) under Sectra's name.
     "Sectra AB": "SECT-B.ST",
+    # Ambu's B share, same hyphen convention. The row carried a corrupted ticker
+    # ("Ambush DC") until 2026-08-09, so this never had a working symbol at all.
+    "Ambu A/S": "AMBU-B.CO",
     # Japanese tickers (name-based in CSV → numeric yfinance format)
     "Olympus": "7733.T",
     "Shimadzu": "7701.T",

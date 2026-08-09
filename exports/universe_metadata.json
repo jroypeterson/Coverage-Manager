@@ -308,7 +308,7 @@
     "core": ""
   },
   "600276.SS": {
-    "name": "JIangsu",
+    "name": "Jiangsu Hengrui Pharmaceuticals Co Ltd",
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
@@ -1273,7 +1273,7 @@
     "sub_subsector": "",
     "core": ""
   },
-  "Ambush DC": {
+  "AMBUB DC": {
     "name": "Ambu A/S",
     "sector": "MedTech",
     "subsector": "Hospital Supply & Equipment",
@@ -6801,14 +6801,14 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "VIRP.PA": {
     "name": "Virbac SA",
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "VISTN.OL": {
     "name": "Vistin Pharma ASA",
@@ -9391,6 +9391,6 @@
     "sector": "Healthcare Services",
     "subsector": "Animal Health",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   }
 }
