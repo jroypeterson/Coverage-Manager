@@ -235,10 +235,9 @@ def _render_decisions(decisions: list[Decision]) -> str:
 
 _RULES_HTML = """
 <section id="rules"><h2>The rules &mdash; what adds itself, what waits for you</h2>
-<p class="sec-lede">Two of the five inclusion buckets are size-gated formalities, so the lane
-applies them without asking. The other three are judgement calls and always queue. An undecided
-rule defaults to the status quo: wrongly queueing costs one Slack reply, wrongly auto-adding puts
-a row in the fleet's most-depended-on artifact.</p>
+<p class="sec-lede">Four of the five inclusion buckets now enter the universe without asking.
+Only Bucket 4 &mdash; and any <span class="tk">New candidate</span> trigger &mdash; still waits for
+your reply, because both are judgement calls by construction.</p>
 <div class="tw"><table>
 <thead><tr><th>Bucket</th><th>Rule</th><th class="num">Threshold</th><th>Behaviour</th><th>Why</th></tr></thead>
 <tbody>
@@ -248,21 +247,29 @@ a row in the fleet's most-depended-on artifact.</p>
 <tr><td class="co">3</td><td>Spin-off, carve-out, separation</td>
 <td class="num">&gt; $10B</td><td class="tight b-auto">AUTO</td>
 <td>Same. Applies at separation, never before &mdash; no shares trade, so there is no cap to gate on.</td></tr>
-<tr><td class="co">1</td><td>Core-sector IPO / listing / spin-off &mdash; HC services, MedTech, tools, diagnostics, HCIT, adjacent tech</td>
-<td class="num">any size</td><td class="tight b-queue">QUEUES</td>
-<td>No size floor at all, so auto-adding would sweep in every microcap biotech that lists.</td></tr>
+<tr><td class="co">1</td><td>Listing in a <strong>core sector</strong> &mdash; Biopharma, MedTech, Healthcare Services, Life Science Tools</td>
+<td class="num">any size</td><td class="tight b-auto">AUTO</td>
+<td>Opened up 2026-08-09. Gated on the <em>sector column</em>, not the rule's prose: &ldquo;adjacent tech relevant to my universe&rdquo; is a judgement, so a <span class="tk">Tech</span> name still queues.</td></tr>
+<tr><td class="co">5</td><td>Russell 1000 / 2000 first-time addition, any sector</td>
+<td class="num">$2&ndash;20B</td><td class="tight b-auto">AUTO</td>
+<td>Opened up 2026-08-09. Outside the band it still queues.</td></tr>
 <tr><td class="co">4</td><td>Strategically relevant new candidate</td>
 <td class="num">$2&ndash;20B</td><td class="tight b-queue">QUEUES</td>
 <td>&ldquo;Strategically relevant&rdquo; is explicitly a judgement call. Not mechanisable.</td></tr>
-<tr><td class="co">5</td><td>Russell 1000 / 2000 first-time addition, any sector</td>
-<td class="num">$2&ndash;20B</td><td class="tight b-queue">QUEUES</td>
-<td>~40 a quarter, mostly unfamiliar names.</td></tr>
 </tbody></table></div>
+<p class="prose-narrow"><strong>What that ruling was based on.</strong> Buckets 1 and 5 are
+genuinely discretionary, so they were not opened on the &ldquo;mandatory anyway&rdquo; reasoning
+that covers 2 and 3. Replayed over every candidate the lane has ever proposed &mdash; 31 names,
+29 approved, 2 declined &mdash; they auto-add <strong>10 names you approved and neither of the two
+you declined</strong>. Both declines (<span class="tk">DPC</span> Industrials,
+<span class="tk">EROC</span> Energy) fall in neither bucket.</p>
 <h3>Three refusals that override everything above</h3>
 <ul class="guards">
-<li><b>No market cap means no auto-add, ever.</b> Both auto buckets are size-gated, and unknown is
-not qualifying. This matters most for spin-offs &mdash; a Form 10 candidate legitimately has no cap
-until it trades.</li>
+<li><b>No market cap means no auto-add, ever.</b> The size buckets are gated on it, and for Bucket 1
+&mdash; which has no floor &mdash; it stands in for <em>&ldquo;does this actually trade yet&rdquo;</em>.
+A Form 10 SpinCo has a core SIC code and no shares, so it cannot auto-add on the sector alone. A cap
+written as prose (<span class="tk">~$3.7B</span>) is refused too, and says so rather than claiming
+the cap is missing.</li>
 <li><b>A ticker on the provenance removals list is never auto-added.</b> A vendor has no idea a row
 was deliberately removed and will keep re-proposing it. An FMP biopharma screen re-proposed
 <span class="tk">ALBT</span> eight days after it was removed for leaving healthcare.</li>

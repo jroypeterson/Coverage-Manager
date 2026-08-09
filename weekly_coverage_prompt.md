@@ -237,14 +237,32 @@ names accumulate unnoticed between 2026-06-19 and 2026-07-28.
 
 ### Some names are now ADDED WITHOUT ASKING — report them first
 
-`sync_candidate_ledger.py` auto-adds two buckets, because JP's own rules already
-make them mandatory (his decision, 2026-08-06):
+`sync_candidate_ledger.py` auto-adds **four** buckets (JP's decisions 2026-08-06 and
+2026-08-09):
 
 - **Bucket 2** — any IPO / direct listing **≥ $25B, any sector**
 - **Bucket 3** — spin-off / carve-out / separation **> $10B**
+- **Bucket 1** — a listing in a **core sector** (Biopharma / MedTech / Healthcare
+  Services / Life Science Tools), **any size, no floor**
+- **Bucket 5** — a **Russell** first-time addition inside **$2–20B**
 
-Everything else still queues as `pending` and waits for his `add TICKER` reply,
-**including Buckets 1 and 5**, which are undecided.
+**Bucket 4 is now the only bucket that queues** — "strategically relevant $2–20B"
+is a judgement call by definition, and so is a `New candidate` trigger under any
+bucket (that is the coverage-gap shape: MU, Fabrinet, the optical complex). Both
+still wait for his `add TICKER` reply.
+
+Two consequences for how you write the report:
+
+- **A core-sector name no longer needs to clear a size bar to enter** — so do not
+  quietly drop a small biopharma listing into *Considered and excluded* on the
+  "sub-$1B platform biotech" reasoning and leave it there. JP overrode exactly
+  that call on `BLSM` (2026-08-08), and Bucket 1 now auto-adds it. If you think a
+  core-sector listing genuinely does not belong, say so **explicitly and argue
+  it**, because the rule is against you.
+- **A cap is still required.** `market_cap` must be a number (the schema enforces
+  it); a null cap refuses the auto-add. For Bucket 1 that gate is not about size —
+  it stands in for *"does this actually trade yet"*, so an unseparated Form 10
+  SpinCo cannot auto-add on its SIC code alone.
 
 The script prints `AUTO-ADDED <TICKER>: <reason>` for each. **Those go at the TOP
 of your report, in their own section, before the recommendations** — with the

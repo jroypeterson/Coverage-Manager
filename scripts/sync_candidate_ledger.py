@@ -103,15 +103,23 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _auto_add(candidates: list[dict]) -> int:
-    """Add the mandatory-by-rule candidates without asking (JP 2026-08-06).
+    """Add the by-rule candidates without asking (JP 2026-08-06, extended 08-09).
 
-    Buckets 2 (>= $25B IPO, any sector) and 3 (spin-off/carve-out > $10B) are
-    mandatory adds under JP's own inclusion rules, so queueing them puts a step
-    between the rule and the outcome. Everything else -- including Buckets 1 and
-    5, which are undecided -- keeps queueing, because an undecided rule must
-    default to the STATUS QUO and the costs are asymmetric: wrongly queueing is
-    one Slack reply, wrongly auto-adding is a row in the fleet's
-    most-depended-on artifact.
+    Buckets 2 (>= $25B IPO) and 3 (spin-off/carve-out > $10B) are mandatory under
+    JP's own inclusion rules, so queueing them puts a step between the rule and
+    the outcome. Buckets 1 (core sector, any size) and 5 (Russell addition,
+    $2-20B) joined them on 2026-08-09.
+
+    That second decision was NOT made on the same "it is mandatory anyway"
+    reasoning -- 1 and 5 are genuinely discretionary. It was made on measured
+    evidence: replayed over the whole candidate ledger, they auto-add 10 names
+    JP approved and NEITHER of the two he declined. See `universe/auto_add.py`.
+
+    **Bucket 4 is now the only bucket that queues**, plus any `New candidate`
+    trigger, because both are judgement calls by construction. The asymmetry that
+    justified the caution still holds and still governs anything undecided:
+    wrongly queueing is one Slack reply, wrongly auto-adding is a row in the
+    fleet's most-depended-on artifact.
     """
     import importlib.util
 

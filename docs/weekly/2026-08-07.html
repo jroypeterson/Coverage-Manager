@@ -114,10 +114,9 @@ footer{border-top:1px solid var(--rule);padding-top:20px;font-size:12.5px;color:
 font-family:var(--mono);display:flex;flex-wrap:wrap;gap:6px 24px}
 </style></head><body><div class="shell"><header class="mast"><p class="eyebrow">Agentic Investing &middot; Coverage Manager &middot; discovery lane</p><h1>Weekly Coverage Universe Additions</h1><div class="mast-meta"><span>Report <b>2026-08-07</b></span><span>Window <b>2026-07-28 → 2026-08-07 (10 days)</b></span><span>Universe <b>1,328 rows</b></span><span>Built <b>2026-08-09</b></span></div><nav class="secnav"><a href="#decisions">Decisions</a><a href="#rules">The rules</a><a href="#added-without-asking-already-in-the-universe">Added without asking — already in the universe</a><a href="#recommendations">Recommendations</a><a href="#pipeline-filings-to-monitor">Pipeline / filings to monitor</a><a href="#listing-lane-findings">Listing-lane findings</a><a href="#considered-and-excluded">Considered and excluded</a><a href="#company-summaries">Company Summaries</a><a href="#notes">Notes</a><a href="#csv-changes">CSV Changes</a><a href="#report-files-generated">Report Files Generated</a><a href="#briefings">Company briefings</a></nav></header><div class="tiles"><div class="tile "><span class="n">0</span><span class="l">Awaiting you</span></div><div class="tile is-added"><span class="n">13</span><span class="l">In the universe</span></div><div class="tile "><span class="n">0</span><span class="l">Declined</span></div></div><section id="decisions"><h2>Decisions</h2><p class="sec-lede"><strong>Nothing is waiting on you.</strong> Every candidate below has been decided. Reply <span class="tk">decline TICKER</span> in <span class="tk">#ipo-spinoffs-newissues</span> to reverse any of them.</p><h3>Decided &mdash; 13 names</h3><ul class="settled"><li class="s-added"><span class="row-tk">3308.HK</span><span class="settled-co">Zhongji Innolight Co., Ltd.</span><span class="settled-meta">~$167.0B &middot; Tech/Optical Interconnect</span><span class="chip c-added">Added by rule &mdash; you were not asked</span></li><li class="s-added"><span class="row-tk">AAOI</span><span class="settled-co">Applied Optoelectronics, Inc.</span><span class="settled-meta">~$10.0B &middot; Tech/Optical Interconnect</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">ALAB</span><span class="settled-co">Astera Labs, Inc.</span><span class="settled-meta">~$56.8B &middot; Tech/Semiconductors / Connectivity</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">ANET</span><span class="settled-co">Arista Networks, Inc.</span><span class="settled-meta">~$242.0B &middot; Tech/Networking</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">BLSM</span><span class="settled-co">BlossomHill Therapeutics, Inc.</span><span class="settled-meta">~$465M &middot; Biopharma/Biotech (Oncology)</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">CIEN</span><span class="settled-co">Ciena Corporation</span><span class="settled-meta">~$57.2B &middot; Tech/Optical Interconnect</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">COHR</span><span class="settled-co">Coherent Corp.</span><span class="settled-meta">~$65.4B &middot; Tech/Optical Interconnect</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">CRDO</span><span class="settled-co">Credo Technology Group Holding Ltd</span><span class="settled-meta">~$43.0B &middot; Tech/Semiconductors / Connectivity</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">FN</span><span class="settled-co">Fabrinet</span><span class="settled-meta">~$19.5B &middot; Tech/Optical Interconnect</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">JMKE</span><span class="settled-co">Jersey Mike&#x27;s Subs Inc.</span><span class="settled-meta">~$5.3B &middot; Consumer/Restaurants</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">LITE</span><span class="settled-co">Lumentum Holdings Inc.</span><span class="settled-meta">~$65.2B &middot; Tech/Optical Interconnect</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">LTGO</span><span class="settled-co">Latigo Biotherapeutics, Inc.</span><span class="settled-meta">~$1.1B &middot; Biopharma/Biotech (Pain)</span><span class="chip c-added">In the universe</span></li><li class="s-added"><span class="row-tk">MRVL</span><span class="settled-co">Marvell Technology, Inc.</span><span class="settled-meta">~$184.0B &middot; Tech/Semiconductors / Connectivity</span><span class="chip c-added">In the universe</span></li></ul></section>
 <section id="rules"><h2>The rules &mdash; what adds itself, what waits for you</h2>
-<p class="sec-lede">Two of the five inclusion buckets are size-gated formalities, so the lane
-applies them without asking. The other three are judgement calls and always queue. An undecided
-rule defaults to the status quo: wrongly queueing costs one Slack reply, wrongly auto-adding puts
-a row in the fleet's most-depended-on artifact.</p>
+<p class="sec-lede">Four of the five inclusion buckets now enter the universe without asking.
+Only Bucket 4 &mdash; and any <span class="tk">New candidate</span> trigger &mdash; still waits for
+your reply, because both are judgement calls by construction.</p>
 <div class="tw"><table>
 <thead><tr><th>Bucket</th><th>Rule</th><th class="num">Threshold</th><th>Behaviour</th><th>Why</th></tr></thead>
 <tbody>
@@ -127,21 +126,29 @@ a row in the fleet's most-depended-on artifact.</p>
 <tr><td class="co">3</td><td>Spin-off, carve-out, separation</td>
 <td class="num">&gt; $10B</td><td class="tight b-auto">AUTO</td>
 <td>Same. Applies at separation, never before &mdash; no shares trade, so there is no cap to gate on.</td></tr>
-<tr><td class="co">1</td><td>Core-sector IPO / listing / spin-off &mdash; HC services, MedTech, tools, diagnostics, HCIT, adjacent tech</td>
-<td class="num">any size</td><td class="tight b-queue">QUEUES</td>
-<td>No size floor at all, so auto-adding would sweep in every microcap biotech that lists.</td></tr>
+<tr><td class="co">1</td><td>Listing in a <strong>core sector</strong> &mdash; Biopharma, MedTech, Healthcare Services, Life Science Tools</td>
+<td class="num">any size</td><td class="tight b-auto">AUTO</td>
+<td>Opened up 2026-08-09. Gated on the <em>sector column</em>, not the rule's prose: &ldquo;adjacent tech relevant to my universe&rdquo; is a judgement, so a <span class="tk">Tech</span> name still queues.</td></tr>
+<tr><td class="co">5</td><td>Russell 1000 / 2000 first-time addition, any sector</td>
+<td class="num">$2&ndash;20B</td><td class="tight b-auto">AUTO</td>
+<td>Opened up 2026-08-09. Outside the band it still queues.</td></tr>
 <tr><td class="co">4</td><td>Strategically relevant new candidate</td>
 <td class="num">$2&ndash;20B</td><td class="tight b-queue">QUEUES</td>
 <td>&ldquo;Strategically relevant&rdquo; is explicitly a judgement call. Not mechanisable.</td></tr>
-<tr><td class="co">5</td><td>Russell 1000 / 2000 first-time addition, any sector</td>
-<td class="num">$2&ndash;20B</td><td class="tight b-queue">QUEUES</td>
-<td>~40 a quarter, mostly unfamiliar names.</td></tr>
 </tbody></table></div>
+<p class="prose-narrow"><strong>What that ruling was based on.</strong> Buckets 1 and 5 are
+genuinely discretionary, so they were not opened on the &ldquo;mandatory anyway&rdquo; reasoning
+that covers 2 and 3. Replayed over every candidate the lane has ever proposed &mdash; 31 names,
+29 approved, 2 declined &mdash; they auto-add <strong>10 names you approved and neither of the two
+you declined</strong>. Both declines (<span class="tk">DPC</span> Industrials,
+<span class="tk">EROC</span> Energy) fall in neither bucket.</p>
 <h3>Three refusals that override everything above</h3>
 <ul class="guards">
-<li><b>No market cap means no auto-add, ever.</b> Both auto buckets are size-gated, and unknown is
-not qualifying. This matters most for spin-offs &mdash; a Form 10 candidate legitimately has no cap
-until it trades.</li>
+<li><b>No market cap means no auto-add, ever.</b> The size buckets are gated on it, and for Bucket 1
+&mdash; which has no floor &mdash; it stands in for <em>&ldquo;does this actually trade yet&rdquo;</em>.
+A Form 10 SpinCo has a core SIC code and no shares, so it cannot auto-add on the sector alone. A cap
+written as prose (<span class="tk">~$3.7B</span>) is refused too, and says so rather than claiming
+the cap is missing.</li>
 <li><b>A ticker on the provenance removals list is never auto-added.</b> A vendor has no idea a row
 was deliberately removed and will keep re-proposing it. An FMP biopharma screen re-proposed
 <span class="tk">ALBT</span> eight days after it was removed for leaving healthcare.</li>
