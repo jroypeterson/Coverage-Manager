@@ -285,8 +285,21 @@ reaches the downstream consumers.</p>
 
 
 def _render_table(rows: list[list[str]]) -> str:
+    """A grid when the table is a grid; cards when it is really a list of records.
+
+    Reuses `slack_blocks.is_narrow` rather than inventing a second shape rule, so
+    the page and the Slack post agree on what "too wide for a table" means. The
+    live case is the eleven-column recommendations table whose last column is a
+    paragraph: as a grid it renders as four words per line down a 90px column and
+    a row six hundred pixels tall. That is the same defect the Slack renderer was
+    built to fix -- Slack has no table primitive, and a browser has one that will
+    happily let you build something unreadable.
+    """
     if not rows:
         return ""
+    if not slack_blocks.is_narrow(rows):
+        return _render_record_cards(rows)
+
     head, body = rows[0], rows[1:]
     ths = "".join(f"<th>{_inline(c)}</th>" for c in head)
     trs = []
@@ -297,6 +310,35 @@ def _render_table(rows: list[list[str]]) -> str:
         trs.append(f"<tr>{tds}</tr>")
     return (f'<div class="tw"><table><thead><tr>{ths}</tr></thead>'
             f'<tbody>{"".join(trs)}</tbody></table></div>')
+
+
+def _render_record_cards(rows: list[list[str]]) -> str:
+    """One card per row: headline, a label/value grid, and the prose cell as prose."""
+    head = rows[0]
+    cards = []
+    for row in rows[1:]:
+        cells = list(row) + [""] * (len(head) - len(row))
+        pairs = [(head[j] if j < len(head) else "", c) for j, c in enumerate(cells)]
+        pairs = [(k, v) for k, v in pairs
+                 if v.strip().lower() not in slack_blocks.EMPTY_CELLS]
+        if not pairs:
+            continue
+        # Headline = the widest short cell (the company name in every live table);
+        # never the row number, and never the paragraph.
+        titles = [v for _, v in pairs if len(slack_blocks._plain(v)) <= 48]
+        headline = max(titles, key=lambda v: len(v), default=pairs[0][1])
+        prose = [(k, v) for k, v in pairs
+                 if len(slack_blocks._plain(v)) > 90 and v != headline]
+        fields = [(k, v) for k, v in pairs
+                  if v != headline and (k, v) not in prose]
+
+        grid = "".join(
+            f'<div class="f"><span class="fk">{_inline(k)}</span>'
+            f'<span class="fv">{_inline(v)}</span></div>' for k, v in fields)
+        body = "".join(f'<p class="row-why">{_inline(v)}</p>' for _, v in prose)
+        cards.append(f'<article class="rec"><h4>{_inline(headline)}</h4>'
+                     f'<div class="fields">{grid}</div>{body}</article>')
+    return f'<div class="recs">{"".join(cards)}</div>'
 
 
 _BULLET_RE = re.compile(r"^[-*+]\s+(.*)")
@@ -610,6 +652,15 @@ border-radius:100px;white-space:nowrap;background:var(--closed-bg);color:var(--c
 color:var(--muted);margin:8px 0 10px}
 .row-why{font-size:14.5px;line-height:1.55;color:var(--ink-soft);max-width:82ch;margin:0}
 .row-why strong{color:var(--ink);font-weight:650}
+.recs{display:flex;flex-direction:column;gap:12px;margin:0 0 16px}
+.rec{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:16px 18px 15px}
+.rec h4{margin:0 0 12px;font-size:15.5px;font-weight:650;letter-spacing:-.005em;color:var(--ink)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px 20px;margin-bottom:12px}
+.f{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fk{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fv{font-size:13.5px;color:var(--ink-soft);overflow-wrap:anywhere}
+.rec .row-why{max-width:none}
+.rec .row-why+.row-why{margin-top:10px}
 .settled{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:1px;
 background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
 .settled li{background:var(--surface);padding:10px 14px;display:flex;flex-wrap:wrap;

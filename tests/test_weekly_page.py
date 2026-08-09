@@ -361,3 +361,47 @@ def test_weekly_page_step_reports_why_it_published_nothing(tmp_path, monkeypatch
     monkeypatch.setattr("config.REPORTS_DIR", tmp_path)
     result = wu._step_weekly_page()
     assert "skipped" in result
+
+
+# ------------------------------------------------------------- wide tables
+
+
+def test_a_narrow_table_stays_a_grid():
+    out = wp._render_table([["Ticker", "Cap"], ["FN", "~$19.5B"]])
+    assert "<table>" in out
+
+
+def test_a_wide_table_becomes_cards_not_a_squeezed_grid():
+    """11 columns with a paragraph in the last renders 4 words per line as a grid."""
+    head = ["#", "Company", "Ticker", "Exchange", "Market Cap", "Sector",
+            "Subsector", "Listing Date", "Trigger", "Peers", "Reason to add"]
+    row = ["1", "Jersey Mike's Subs Inc.", "JMKE", "NYSE", "~$5.3B", "Consumer",
+           "Restaurants", "2026-07-30", "IPO", "WMT, LULU", "A " + "long " * 40]
+    out = wp._render_table([head, row])
+    assert "<table>" not in out
+    assert '<h4>' in out
+    assert "Jersey Mike's Subs Inc." in out
+
+
+def test_a_card_puts_the_long_prose_cell_in_prose_not_a_field():
+    head = ["Company", "Ticker", "Exchange", "Sector", "Subsector", "Trigger", "Why"]
+    row = ["Fabrinet", "FN", "NYSE", "Tech", "Optical", "New candidate", "B " + "word " * 40]
+    out = wp._render_table([head, row])
+    assert '<p class="row-why">' in out
+    assert "Optical" in out
+
+
+def test_a_card_drops_placeholder_dashes_but_keeps_real_values():
+    head = ["Company", "Ticker", "Exchange", "Listing Date", "Sector", "Subsector", "Why"]
+    row = ["Fabrinet", "FN", "NYSE", "-", "Tech", "Optical", "C " + "word " * 40]
+    out = wp._render_table([head, row])
+    assert "Listing Date" not in out
+    assert "NYSE" in out
+
+
+def test_no_cell_is_lost_when_a_wide_row_becomes_a_card():
+    head = ["Company", "Ticker", "Exchange", "Sector", "Subsector", "Trigger", "Peers"]
+    row = ["Fabrinet", "FN", "NYSE", "Tech", "Optical", "New candidate", "TSM, NVDA"]
+    out = wp._render_table([head, row])
+    for value in row:
+        assert value in out
