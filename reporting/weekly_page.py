@@ -299,31 +299,38 @@ def _render_table(rows: list[list[str]]) -> str:
             f'<tbody>{"".join(trs)}</tbody></table></div>')
 
 
-def _render_para(text: str) -> str:
-    """A markdown paragraph buffer may hold a bullet list, prose, or both."""
-    out: list[str] = []
-    items: list[str] = []
+_BULLET_RE = re.compile(r"^[-*+]\s+(.*)")
 
-    def flush_items() -> None:
-        if items:
+
+def _render_para(text: str) -> str:
+    """A parse() paragraph buffer -> HTML paragraphs and lists.
+
+    **A newline is not a paragraph break.** The weekly report is hard-wrapped at
+    ~95 columns, so rendering one `<p>` per source line shredded every lede into a
+    dozen one-line stubs AND split `**bold**` spans across two elements, which
+    then rendered as literal asterisks (seen live on the first published page).
+    Soft line breaks are joined; only a BLANK line starts a new paragraph, which
+    is what markdown means.
+    """
+    out: list[str] = []
+    for chunk in re.split(r"\n\s*\n", text):
+        lines = [ln for ln in chunk.split("\n") if ln.strip()]
+        if not lines:
+            continue
+        if _BULLET_RE.match(lines[0].strip()):
+            items: list[str] = []
+            for raw in lines:
+                m = _BULLET_RE.match(raw.strip())
+                if m:
+                    items.append(m.group(1))
+                elif items:
+                    items[-1] += " " + raw.strip()   # wrapped continuation
+                else:
+                    items.append(raw.strip())
             lis = "".join(f"<li>{_inline(x)}</li>" for x in items)
             out.append(f'<ul class="notes">{lis}</ul>')
-            items.clear()
-
-    for raw in text.split("\n"):
-        line = raw.strip()
-        if not line:
-            continue
-        m = re.match(r"^[-*+]\s+(.*)", line)
-        if m:
-            items.append(m.group(1))
-            continue
-        if items and raw.startswith(("  ", "\t")):
-            items[-1] += " " + line          # continuation of the bullet above
-            continue
-        flush_items()
-        out.append(f"<p>{_inline(line)}</p>")
-    flush_items()
+        else:
+            out.append(f"<p>{_inline(' '.join(ln.strip() for ln in lines))}</p>")
     return "".join(out)
 
 
