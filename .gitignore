@@ -23,6 +23,14 @@ run_log.csv
 # survive locally — it just must not be republished. Back it up outside git.
 data/crsp/
 
+# Point-in-time analyst-estimate archive — same reasoning as data/crsp/ above.
+# THIS REPO IS PUBLIC and these are licensed FMP rows, so they must not be
+# republished; but the archive is IRREPLACEABLE (it records what the street
+# forecast on a given date, which cannot be reconstructed later at any price),
+# so it must survive locally. Dropbox is the backup. Do NOT "fix" this by
+# tracking it.
+data/estimates_history/
+
 # Codex review output — kept on disk as proof-of-run, but untracked.
 # If tracked/untracked, each review appears in the next review's working-tree
 # diff and pollutes it with hundreds of KB of prior review text (2026-07-20).

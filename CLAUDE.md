@@ -1226,6 +1226,43 @@ The performance run renders a scatter of **P/E (TTM)** (y) vs **annualized forwa
 - **S&P 500 is intentionally excluded** — the benchmark tab is built price-only (no fundamentals, no P/E) to keep the run fast; a 500-name fundamentals pull is the expensive path the architecture avoids. Portfolio/Phase-1 only.
 - Internal report artifact only — does **not** touch the `exports/` contract. Tests: `tests/test_pe_growth_chart.py`.
 
+## Point-in-time estimates archive (2026-08-12)
+
+**`cache/analyst_estimates/` is a snapshot, and a snapshot is not a record.** It holds one
+overwritten blob per ticker with a `_cached_at` stamp, so it always answers *"what does the
+street forecast now"* and can never answer *"what did the street forecast then"*. The second
+question is the one a forward-P/E history needs, it is **unanswerable retroactively** (FMP
+Starter sells no point-in-time consensus and nothing else in the fleet stored one), and every
+week not recorded is a week of history nobody can buy back.
+
+`providers/estimates_history.py` appends alongside the cache: one JSON line per
+`(ticker, observation date)` in **`data/estimates_history/<TICKER>.jsonl`**. Wired into
+`fetch_estimates` immediately after `cache_set`, and **non-gating by construction** —
+`record_observation` swallows its own errors, because an archive is a side effect of fetching
+and must never break the fetch that feeds the live report.
+
+Four properties worth knowing before touching it:
+
+- **Cadence is the cache TTL (~30 days), not the run schedule.** `fetch_estimates` returns
+  early on a cache hit, so observations land roughly monthly per ticker. That is deliberate:
+  annual EPS estimates move slowly, and JP's own `SPY vs DGX PE.xlsx` samples forward P/E
+  **monthly**, so the granularity already matches the artifact this exists to reproduce. Want
+  denser? Shorten the TTL — do not add a second fetch path.
+- **Idempotent per calendar day.** A re-run cannot stack two observations onto one date and
+  silently double-weight it in any series built later.
+- **An empty or all-null curve is NOT recorded.** *"We asked and the vendor had nothing"* is a
+  fact about the vendor; writing it as an observation would put a hole in a series whose whole
+  premise is that its points are real readings.
+- **`data/estimates_history/` is gitignored, same reasoning as `data/crsp/`.** THIS REPO IS
+  PUBLIC and these are licensed FMP rows, so they must not be republished — but the archive is
+  irreplaceable, so it must survive locally. Dropbox is the backup. Do **not** "fix" this by
+  tracking it.
+
+Consumer context: deep_dd's C4 valuation module needs a multiple-history band, and until this
+series has depth its only honest bases are trailing P/E (no look-ahead bias) or a
+perfect-foresight forward P/E (rejected — its error correlates with outcomes). See
+`deep_dd/BUILD_PLAN_C1-C5.md` §8 Q3. Tests: `tests/test_estimates_history.py` (9).
+
 ## Movers report
 
 `python cli.py movers` flags tickers in the coverage universe with extreme weekly performance and pulls a "why" summary for each. The report consumes the performance snapshot pickle written by `cli.py performance` (under `cache/perf/perf_df_<date>.pkl`) — it does **not** re-fetch prices.

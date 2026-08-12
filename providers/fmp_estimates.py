@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from cache import cache_get, cache_set
 from logging_utils import get_logger, log_exception
+from providers.estimates_history import record_observation
 from providers.fmp_provider import _fmp_request
 
 logger = get_logger("providers.fmp_estimates")
@@ -55,6 +56,11 @@ def fetch_estimates(ticker, api_key, use_cache=True):
     rows = [{"date": r.get("date"), "epsAvg": r.get("epsAvg")} for r in data]
     if any(r["epsAvg"] is not None for r in rows):
         cache_set(ESTIMATES_CACHE_NAMESPACE, ticker, rows)
+        # The cache answers "what does the street forecast NOW" and is
+        # overwritten; this appends "what did it forecast on <date>", which is
+        # unanswerable retroactively and is what a forward-P/E history needs.
+        # Non-gating by construction -- see providers/estimates_history.
+        record_observation(ticker, rows)
     return rows
 
 
