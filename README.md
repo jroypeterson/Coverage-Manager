@@ -194,7 +194,7 @@ The sigma-alert-specific `ticker_metadata.json` (in the sibling sigma-alert clon
 | `add-exchanges` | Resolves exchange names by suffix or yfinance lookup. |
 | `cache-clear` | Clears cached API data; optional `--namespace` to clear one bucket. |
 | `watchlist add/remove/list/validate` | Manage `data/watchlist.csv` — the core watchlist of tickers you own or are watching. `add` and `validate` enforce subset-of-universe and require non-empty `Company Name`, `Sector (JP)`, `Currency`, `Exchange` on the universe row. |
-| `watchlist-report` | Generate the weekly Monday core watchlist report (HTML + Excel + email + Slack). |
+| `watchlist-report` | Generate the weekly Monday core watchlist report (HTML + Excel + email + Slack). **Slack goes to `#portfolio`** as of 2026-08-10 (JP: "that table belongs in the portfolio channel, not in price movements"), posted with `SLACK_BOT_TOKEN` + `SLACK_PORTFOLIO_CHANNEL_ID` via `chat.postMessage` — **not** `SLACK_WEBHOOK_URL`, which is bound to `#stock-price-alerts` and cannot be retargeted. If the bot pair is unset it skips **loudly and does not fall back**; the HTML/XLSX email is unaffected. |
 
 ## Output
 

@@ -60,6 +60,42 @@ def urlopen_with_retry(req, *, timeout=15, attempts=4, label="slack post"):
 SLACK_CHANNEL = "#stock-price-alerts"
 HEALTH_CHANNEL = "#status-reports"
 HEALTH_TAG = "health/v1"
+# Where the watchlist buy/target-gap report goes as of 2026-08-10 (JP: "That table
+# belongs in the portfolio channel, not in price movements"). It is posted with the
+# BOT TOKEN, not `SLACK_WEBHOOK_URL`: an incoming webhook is permanently bound to the
+# channel it was minted for, so `SLACK_CHANNEL` above is only a log label and moving
+# the report was never a matter of editing a channel string.
+POSITIONS_CHANNEL = "#portfolio"
+
+
+class SlackPostError(RuntimeError):
+    """A channel-targeted post failed. Raised, never swallowed."""
+
+
+def post_to_channel(token, channel_id, text, timeout=20):
+    """Post `text` to a specific channel via chat.postMessage.
+
+    Returns True on success and raises `SlackPostError` on a Slack-level failure,
+    because the alternative -- returning False and letting the caller shrug -- is how
+    a report goes missing for weeks with a green run behind it. `not_in_channel` is
+    the expected first-run failure and names its own fix.
+    """
+    payload = json.dumps({"channel": channel_id, "text": text,
+                          "unfurl_links": False, "unfurl_media": False}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://slack.com/api/chat.postMessage",
+        data=payload,
+        headers={"Authorization": "Bearer " + token,
+                 "Content-Type": "application/json; charset=utf-8"},
+    )
+    with urlopen_with_retry(req, timeout=timeout, label="Slack chat.postMessage") as resp:
+        body = json.loads(resp.read())
+    if not body.get("ok"):
+        hint = ("  -> invite the bot to the channel"
+                if body.get("error") == "not_in_channel" else "")
+        raise SlackPostError(f"chat.postMessage failed: {body.get('error')}{hint}")
+    logger.info("Slack notification sent to %s", channel_id)
+    return True
 
 _STATUS_ICON = {
     "ok": ":white_check_mark:",

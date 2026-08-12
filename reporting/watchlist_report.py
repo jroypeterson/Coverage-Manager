@@ -24,7 +24,7 @@ from logging_utils import configure_logging, get_logger
 from providers.yfinance_provider import batch_download_prices
 from reporting.calcs import compute_returns
 from reporting.email import archive_files, send_email_report
-from reporting.slack import SLACK_CHANNEL, send_slack_notification
+from reporting.slack import POSITIONS_CHANNEL, post_to_channel
 from ticker_utils import normalize_ticker
 from universe import watchlist as wl
 
@@ -212,6 +212,39 @@ def format_slack_summary(df, today_str):
     return "\n".join(lines)
 
 
+def post_watchlist_to_slack(df, today_str, api_keys):
+    """Send the buy/target-gap summary to #portfolio. Returns True if it posted.
+
+    Moved off #stock-price-alerts 2026-08-10 (JP: "That table belongs in the portfolio
+    channel, not in price movements"). Two decisions worth keeping:
+
+    * **Bot token, not the webhook.** `SLACK_WEBHOOK_URL` is permanently bound to
+      #stock-price-alerts, so this was never a channel-string edit.
+    * **No fallback to the old webhook.** If the bot path is unconfigured this skips
+      loudly. Falling back would keep posting to the exact channel he asked us to stop
+      posting to, and would look like success. The HTML + XLSX still go out by email,
+      so the cost of a skip is a convenience copy, not the report.
+
+    Never raises: the report has already been written and emailed by this point, and a
+    Slack outage must not turn a delivered report into a failed run.
+    """
+    token = api_keys.get("SLACK_BOT_TOKEN")
+    channel = api_keys.get("SLACK_PORTFOLIO_CHANNEL_ID")
+    if not (token and channel):
+        logger.warning(
+            "Slack: SKIPPED - need SLACK_BOT_TOKEN + SLACK_PORTFOLIO_CHANNEL_ID to "
+            "post to %s. Deliberately NOT falling back to the old "
+            "#stock-price-alerts webhook.", POSITIONS_CHANNEL)
+        return False
+    try:
+        post_to_channel(token, channel, format_slack_summary(df, today_str))
+        return True
+    except Exception as e:  # noqa: BLE001 - report already shipped by email
+        logger.warning("Slack: post to %s FAILED (%s). The HTML/XLSX email is "
+                       "unaffected.", POSITIONS_CHANNEL, e)
+        return False
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main(skip_email=False, skip_slack=False, dry_run=False):
@@ -257,15 +290,18 @@ def main(skip_email=False, skip_slack=False, dry_run=False):
         else:
             logger.info("Email: skipped (GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set)")
 
-    # Slack
+    # Slack -> #portfolio (moved off #stock-price-alerts 2026-08-10 on JP's ask:
+    # "stop sending it to stock price movements and post it to #portfolio instead").
+    #
+    # Deliberately NOT falling back to the old webhook when the bot path is
+    # unconfigured. A fallback would quietly keep posting to the exact channel he
+    # asked us to stop posting to, and it would look like it worked. The HTML +
+    # XLSX still go out by email, so a loud skip loses a convenience copy, not the
+    # report.
     if skip_slack:
         logger.info("Slack: skipped")
     else:
-        webhook = API_KEYS.get("SLACK_WEBHOOK_URL")
-        if webhook:
-            send_slack_notification(webhook, format_slack_summary(df, TODAY))
-        else:
-            logger.info("Slack: skipped (SLACK_WEBHOOK_URL not set)")
+        post_watchlist_to_slack(df, TODAY, API_KEYS)
 
     logger.info("Watchlist report done (%d entries)", entry_count)
     return {"status": "ok", "entries": entry_count, "html": str(REPORT_HTML)}
