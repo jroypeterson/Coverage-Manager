@@ -1,0 +1,31 @@
+{
+  "date": "2026-08-14",
+  "candidates": [
+    {
+      "company": "Vogenx, Inc.",
+      "ticker": "VOGX",
+      "exchange": "NASDAQ",
+      "market_cap": 195930512,
+      "sector": "Biopharma",
+      "subsector": "Biotech",
+      "listing_date": "2026-08-12",
+      "trigger": "IPO",
+      "peers": ["NVO", "LLY", "VKTX", "CRNX"],
+      "reason": "Bucket 1 - core sector listing, any size, no floor. Priced 6.25M shares at $13.00 on 2026-08-12 for $81.3M gross; ~13.9M shares outstanding for a ~$196M cap. Lead asset mizagliflozin is a minimally-absorbed selective SGLT1 inhibitor in post-bariatric hypoglycemia - a direct downstream consequence of the bariatric/GLP-1 volume the sheet already tracks through NVO and LLY. Flagged as pipeline in the 07-31 and 08-07 reports; it has now priced.",
+      "business_summary": "We are a clinical-stage biopharmaceutical company developing mizagliflozin, an oral, minimally-absorbed selective inhibitor of SGLT1 - the transporter that pulls glucose out of the small intestine. By blocking glucose absorption locally in the gut rather than systemically in the kidney, we blunt the post-meal glucose-and-insulin spike that causes post-bariatric hypoglycemia, a debilitating condition in patients who have had gastric bypass and for which no drug is approved. We have dosed more than 500 subjects across 10 clinical studies and are advancing the same molecule into gastroparesis and GIP-dependent Cushing's syndrome. We have no product revenue; our IPO proceeds of roughly $81 million fund a Phase 2b in post-bariatric hypoglycemia and a 2027 Phase 2 start in gastroparesis, into approximately 2028."
+    },
+    {
+      "company": "BioStem Technologies, Inc.",
+      "ticker": "BSEM",
+      "exchange": "NASDAQ",
+      "market_cap": 55278764,
+      "sector": "Biopharma",
+      "subsector": "Biotech",
+      "listing_date": "2026-08-07",
+      "trigger": "Direct listing",
+      "peers": ["MDXG", "ORGO", "IART"],
+      "reason": "Bucket 1 - core sector listing, any size, no floor. OTC-to-Nasdaq UPLISTING (no offering, hence the Direct listing trigger): Nasdaq approved the listing and shares began trading on the Nasdaq Capital Market on 2026-08-07, off the Form 10-12B the listing lane flagged on 08-04. Exact-category peers MDXG and ORGO are both already covered, and the CMS skin-substitute reimbursement reset reads through to both. CAUTION, argued in the report: FY2024 net revenue was restated from a preliminary $301.8M to $69.7M on a gross-to-net reclassification, FY2025 came in at $47.5M, and FY2026 is guided to $26-29M.",
+      "business_summary": "We process donated human placental tissue into allografts - thin, sheet-form biologic dressings sold under the Vendaje, Vendaje AC and Vendaje Optic brands - using our proprietary BioREtain method, which is designed to preserve the tissue's native growth factors rather than devitalise them. We sell to wound-care clinics, hospital outpatient departments and physician offices treating chronic diabetic foot ulcers and venous leg ulcers, and we are reimbursed almost entirely by Medicare under product-specific Q-codes, which makes CMS pricing policy the single largest determinant of our revenue. We generated $7.9 million of net revenue in Q2 2026, up 29% sequentially, and guide to $26-29 million for the full year. We uplisted from OTC to the Nasdaq Capital Market on 7 August 2026."
+    }
+  ]
+}

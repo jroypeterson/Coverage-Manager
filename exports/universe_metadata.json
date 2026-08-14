@@ -9427,5 +9427,19 @@
     "subsector": "Storage / HDD",
     "sub_subsector": "",
     "core": ""
+  },
+  "VOGX": {
+    "name": "Vogenx Inc.",
+    "sector": "Biopharma",
+    "subsector": "Biotech",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "BSEM": {
+    "name": "BioStem Technologies, Inc.",
+    "sector": "Biopharma",
+    "subsector": "Biotech",
+    "sub_subsector": "",
+    "core": ""
   }
 }
