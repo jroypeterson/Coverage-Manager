@@ -63,12 +63,22 @@ SLACK_API = "https://slack.com/api/"
 # being asked — and `sync_candidate_ledger` has always said it "must be the most
 # visible line in the report, not the quietest." It was being threaded, which is
 # the quietest place there is.
+#
+# "decisions" and "watch" joined on 2026-08-17. They are the scannable strip the
+# report top is now written as (see `weekly_coverage_prompt.md` -> "Report top").
+# Without them here, a correctly-written top routes to the page and the lead is
+# left as a bare title -- the opposite of the fix. "watch" is matched as a whole
+# prefix, so `### Form 10 watch (...)` inside Listing-lane findings is untouched.
 LEAD_SECTION_PREFIXES = ("recommendations", "pending approval",
-                         "added without asking")
+                         "added without asking", "decisions", "watch")
 
 # Sections that are pure run-metadata: rendered as a small grey footer at the end
 # of the thread rather than as a full section, because nobody decides from them.
 FOOTER_SECTION_PREFIXES = ("report files", "csv changes")
+
+# Soft ceiling on the whole channel-level lead, in characters. Diagnostic only --
+# nothing truncates. ~2,600 is roughly one phone screen of header + two tables.
+LEAD_SOFT_LIMIT = 2600
 
 
 class PostError(RuntimeError):
@@ -123,18 +133,57 @@ def split_sections(md: str) -> tuple[str, list[tuple[str, str]]]:
     return preamble, sections
 
 
+def split_lead_detail(body: str) -> tuple[str, list[str]]:
+    """-> (scannable head, [per-subsection detail bodies]) for one lead section.
+
+    A lead section keeps its heading, its intro lines and its table; every H3
+    **nested inside it** is deferred to the published page.
+
+    Why this is code and not a style note in the prompt: on 2026-08-14 the
+    `## Added without asking` section carried two H3 essays (`### VOGX — why it
+    qualifies…`, `### BSEM — added by rule, and here is the argument against it`),
+    ~1,400 words, and `split_sections` only breaks on H2 — so both landed in the
+    channel-level lead. JP's screenshot: *"the format is too much blocks of text -
+    needs to be better delineated or sectioned with bullets or tables. It needs to
+    be formatted for speed readability first and then be able to delve into the
+    details."* The detail was never the problem; the detail being **in the lead**
+    was. The page already renders the whole report, so nothing here is lost — and
+    the deferred titles are named in the lead's link block, so "it moved" still
+    cannot look like "it vanished".
+    """
+    lines = body.splitlines()
+    for n, line in enumerate(lines):
+        if n == 0:                      # the section's own heading, whatever its depth
+            continue
+        if re.match(r"^### +\S", line):
+            head = "\n".join(lines[:n]).strip()
+            details, cur = [], []
+            for rest in lines[n:]:
+                if re.match(r"^### +\S", rest) and cur:
+                    details.append("\n".join(cur).strip())
+                    cur = []
+                cur.append(rest)
+            if cur:
+                details.append("\n".join(cur).strip())
+            return head, [d for d in details if d]
+    return body, []
+
+
 def route(md: str) -> tuple[str, list[str], list[str]]:
     """Split the report into (lead_markdown, thread_bodies, footer_bodies).
 
     Every H2 section lands in exactly one bucket. Unrecognised titles go to the
-    thread — never dropped.
+    thread — never dropped. A lead section's nested H3 detail is split off into
+    the reference bucket (see `split_lead_detail`), so the lead stays scannable.
     """
     preamble, sections = split_sections(md)
     lead_parts = [preamble] if preamble else []
     thread, footer = [], []
     for title, body in sections:
         if _matches(title, LEAD_SECTION_PREFIXES):
-            lead_parts.append(body)
+            head, details = split_lead_detail(body)
+            lead_parts.append(head)
+            thread.extend(details)
         elif _matches(title, FOOTER_SECTION_PREFIXES):
             footer.append(body)
         else:
@@ -256,6 +305,15 @@ def main(argv: list[str] | None = None) -> int:
 
     summary_md = summary_p.read_text(encoding="utf-8")
     lead_md, thread_bodies, footer_bodies = route(summary_md)
+
+    # The lead is the decisions strip, and it is the only part JP reads on a phone
+    # without scrolling. `split_lead_detail` bounds the SECTIONS; nothing bounds the
+    # report's own preamble, which on 2026-08-14 ran five prose paragraphs before the
+    # first table. Warn rather than truncate -- a silently cut lead would hide an
+    # auto-add, which is the one thing this post exists to make unmissable.
+    if len(lead_md) > LEAD_SOFT_LIMIT:
+        print(f"WARNING: lead is {len(lead_md)} chars (target <= {LEAD_SOFT_LIMIT}); "
+              "the preamble or a lead section is carrying prose that belongs on the page")
 
     # Reference sections moved to the published page (JP 2026-08-08: "the way you
     # have all of the replies threaded is kind of confusing since there are so many

@@ -269,3 +269,75 @@ def test_reference_sections_still_route_to_a_bucket_so_they_can_be_named():
     lead, thread, footer = poster.route(md)
     assert "rows here" in "\n".join(thread)
     assert "rows here" not in lead
+
+
+# ------------------------------------------- the lead stays scannable (2026-08-17)
+
+
+def test_h3_detail_inside_a_lead_section_defers_to_the_page():
+    """JP 2026-08-17: "the format is too much blocks of text ... needs to be
+    formatted for speed readability first and then be able to delve into details."
+
+    The 2026-08-14 post carried two ~700-word H3 essays inside
+    `## Added without asking`. `split_sections` only breaks on H2, so both went to
+    the channel-level lead and buried the two-row table that IS the decision.
+    """
+    md = ("# T\n\nintro\n\n## Added without asking - already in the universe\n\n"
+          "| Ticker | Bucket |\n|---|---|\n| `VOGX` | 1 |\n\n"
+          "### VOGX - why it qualifies\n\nseven hundred words of thesis\n\n"
+          "### BSEM - the argument against\n\nseven hundred more\n")
+    lead, thread, _ = poster.route(md)
+    assert "| `VOGX` | 1 |" in lead                     # the decision stays
+    assert "seven hundred words of thesis" not in lead  # the essay does not
+    joined = "\n".join(thread)
+    assert "seven hundred words of thesis" in joined
+    assert "seven hundred more" in joined
+
+
+def test_deferred_lead_detail_is_named_not_silently_dropped():
+    """Each deferred H3 becomes its own body, so its title reaches the "On the
+    page:" line the same way a threaded H2 section does."""
+    md = ("# T\n\nx\n\n## Recommendations\n\ncards\n\n"
+          "### ACME - the long case\n\nbody\n")
+    _, thread, _ = poster.route(md)
+    assert [b.splitlines()[0].lstrip("# ").strip() for b in thread] == [
+        "ACME - the long case"]
+
+
+def test_a_lead_section_that_is_itself_an_h3_keeps_its_own_heading():
+    """`### Pending approval backlog` nested under `## Notes` is a lead section
+    whose own heading is an H3 -- it must not defer itself into the thread."""
+    md = ("# T\n\nx\n\n## Notes\n\nnote\n\n"
+          "### Pending approval backlog\n\n`add MU` to approve.\n")
+    lead, thread, _ = poster.route(md)
+    assert "add MU" in lead
+    assert "add MU" not in "\n".join(thread)
+
+
+def test_lead_section_without_subsections_is_unchanged():
+    md = "# T\n\nx\n\n## Recommendations\n\njust cards, no H3\n"
+    lead, thread, _ = poster.route(md)
+    assert "just cards, no H3" in lead
+    assert thread == []
+
+
+def test_the_scannable_top_reaches_the_lead():
+    """`## Decisions` / `## Watch` are the report top's two sections. Unrecognised,
+    they route to the page and the lead posts as a bare title."""
+    md = ("# T\n\n**Action needed:** none\n\n"
+          "## Decisions\n\n| # | What |\n|---|---|\n| 2 | Added by rule |\n\n"
+          "## Watch\n\n- `LYNT` prices 08-17 at $2.53B\n\n"
+          "## Notes\n\nsome note\n")
+    lead, thread, _ = poster.route(md)
+    assert "| 2 | Added by rule |" in lead
+    assert "`LYNT` prices 08-17 at $2.53B" in lead
+    assert "some note" in "\n".join(thread)
+
+
+def test_form_10_watch_subsection_is_not_pulled_into_the_lead_by_the_watch_prefix():
+    """"watch" is a prefix match, and `### Form 10 watch` is reference material."""
+    md = ("# T\n\nx\n\n## Listing-lane findings\n\nintro\n\n"
+          "### Form 10 watch (`form10_watch_2026-08-14.md`)\n\nrows\n")
+    lead, thread, _ = poster.route(md)
+    assert "rows" not in lead
+    assert "rows" in "\n".join(thread)

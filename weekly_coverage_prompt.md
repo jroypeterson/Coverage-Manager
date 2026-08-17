@@ -179,6 +179,13 @@ Create a Gmail draft to jroypeterson@gmail.com with:
 
 Subject: [Agentic Investing] — Weekly Coverage Universe Additions — [date]
 
+**That `[Agentic Investing]` tag belongs to the Gmail draft and NOWHERE else.** It is an
+inbox-filter prefix, not a project reference. It reached the Slack title because this file
+used to say the report's H1 must match the email subject, and JP read it in
+#ipo-spinoffs-newissues as a different project leaking into new issues: *"Why does it say
+agentic investing? that is a discrete project and shouldn't interact with new issues."* The
+report's H1 is specified in "Report top" below and carries no tag.
+
 Body: HTML table with all recommendations, followed by a "Company Summaries" section with the 2-4 sentence elevator pitch for each recommended company (from field 11), notes section, signed "Coverage Universe Builder"
 
 After the notes section, include:
@@ -193,6 +200,65 @@ A bulleted list of all report files saved this week with their filenames and a o
 - `coverage_performance_2026-04-03.xlsx` — Excel performance workbook for the full coverage universe
 - `coverage_consolidated_2026-04-03.html` — Consolidated HTML performance report (all sectors)
 - (etc. for each HTML sector report generated)
+
+## Report top — this IS the Slack lead, so write it to be scanned
+
+Everything above the first `##` heading of `weekly_coverage_universe_additions_<date>.md`
+is posted verbatim as the channel-level Slack message, above the fold, on a phone. JP's
+2026-08-17 verdict on the 08-14 post: *"the format is too much blocks of text - needs to be
+better delineated or sectioned with bullets or tables. It needs to be formatted for speed
+readability first and then be able to delve into details. Don't add qualitative commentary
+like 'light week' be terse."*
+
+Write the top **exactly** in this shape. No lede paragraph, no framing sentence, no
+narrative:
+
+```markdown
+# Weekly Coverage Universe Additions — YYYY-MM-DD
+
+**Window** 2026-08-04 → 2026-08-14 (10d) · **Universe** 1,347 → 1,349 · **Action needed:** none
+
+## Decisions
+- **Added by rule — 2** · `VOGX` Vogenx · `BSEM` BioStem — Bucket 1, already in the universe
+- **Awaiting your reply — 0** · backlog empty (15 cleared 08-08/09)
+- **Flagged — 1** · `BSEM` FY2024 revenue restated $301.8M → $69.7M
+
+## Watch
+- `LYNT` Lyntris — prices week of 08-17, $492M on 24M shares, $2.53B cap; 07-31 said "~$100M"
+- Shein — Bucket 2 trigger, now $22–25B (Bloomberg Intelligence), below the $25B bar
+- 4 covered names left the exchange this period — see Listing-lane findings
+```
+
+`## Decisions` and `## Watch` are **routed to the Slack lead by title** — do not rename them.
+
+**Use bullets here, not a table.** A markdown table only renders as an aligned monospace
+grid when every cell is ≤36 chars and the whole row ≤88 (`slack_blocks.is_narrow`);
+anything wider becomes one card per row, which turns a three-line summary into fifteen
+lines. A `Detail` column carrying two tickers and a clause is always over the limit. Tables
+are right for `## Added without asking` (short cells, one row per name) and wrong here.
+
+Rules, all load-bearing:
+
+- **`Action needed:` is the first line, always**, and it is either `none` or the literal
+  tickers he must reply about. It is the only reason to open the message.
+- **No qualitative characterisation of the week.** Not "a quiet week", not "light week",
+  not "the forward book is where the value is". A count is the summary; an adjective is
+  noise. If a fact matters, state the fact.
+- **Every `Watch` bullet is ONE line** — ticker, the number, the consequence. Anything
+  needing a second sentence is not a bullet, it is a section further down the report.
+- **No `###` prose inside `## Added without asking`, `## Recommendations`, or
+  `## Pending approval backlog`.** Those three H2s are the Slack lead. Keep the table and
+  at most two lines of framing; put the per-company argument under its own `###`, which
+  `post_coverage_to_ipo.py` now **automatically defers to the published page**
+  (`split_lead_detail`). Writing the essay inline no longer puts it in Slack — it just
+  makes the section harder to read on the page too.
+- **Prose is not banned, it is relocated.** The reasoning, the bull/bear, the restatement
+  history all still get written in full — under the later H2s and in
+  `company_backgrounds_<date>.md`, which is what the page is for. Terse at the top, complete
+  below.
+
+The poster prints `WARNING: lead is N chars` above ~2,600. If you see that in the run log,
+the top is carrying prose that belongs further down; move it, do not trim facts.
 
 ## Structured output (required every run)
 
@@ -365,7 +431,8 @@ ClaudeBot is already a member of the channel.
 
 The summary report (which the script posts verbatim as the thread parent) must include:
 
-- Subject line (matching the email subject)
+- The H1 title from "Report top" above — **untagged**, never the email subject (the
+  `[Agentic Investing]` prefix is Gmail-only; see the note in "Email output")
 - Number of recommendations this week
 - One-line summary for each recommended company (ticker, trigger, and short reason)
 - **A "Pipeline / filings to monitor" section** — deals that have filed or launched a roadshow
