@@ -247,19 +247,25 @@ def _preview(blocks: list[dict]) -> str:
 
 
 def post(blocks: list[dict], *, token: str, channel: str, fallback: str,
-         thread_ts: str | None = None, dry_run: bool = False,
-         preview: bool = False) -> str:
+         thread_ts: str | None = None, update_ts: str | None = None,
+         dry_run: bool = False, preview: bool = False) -> str:
     if len(blocks) > MAX_BLOCKS:
         raise PostError(f"{len(blocks)} blocks exceeds the {MAX_BLOCKS} cap")
     if dry_run:
         print(f"  [dry-run] {len(blocks)} block(s)"
-              f"{' (threaded)' if thread_ts else ''} - {fallback[:60]}")
+              f"{' (threaded)' if thread_ts else ''}"
+              f"{f' (update {update_ts})' if update_ts else ''} - {fallback[:60]}")
         if preview:
             print(_preview(blocks).encode("ascii", "replace").decode("ascii"))
             print()
         return "dry-run"
     payload = {"channel": channel, "blocks": blocks, "text": fallback,
                "unfurl_links": False, "unfurl_media": False}
+    if update_ts:
+        # chat.update takes `ts`, not `thread_ts`, and rejects the unfurl keys.
+        payload = {"channel": channel, "blocks": blocks, "text": fallback,
+                   "ts": update_ts}
+        return _api("chat.update", payload, token)["ts"]
     if thread_ts:
         payload["thread_ts"] = thread_ts
     return _api("chat.postMessage", payload, token)["ts"]
@@ -271,6 +277,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reports-dir", default=None)
     ap.add_argument("--thread-ts", default=None,
                     help="attach briefings to an existing summary post")
+    ap.add_argument("--update-ts", default=None,
+                    help="rewrite an ALREADY-POSTED lead in place (chat.update) "
+                         "instead of posting a new one; briefings are skipped, "
+                         "since the thread they hang under is unchanged")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--preview", action="store_true",
                     help="with --dry-run, print the rendered text")
@@ -331,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
     moved = ", ".join(deferred) if deferred else "nothing else this week"
 
     thread_ts = a.thread_ts
-    if not thread_ts:
+    if a.update_ts or not thread_ts:
         lead_blocks = markdown_to_blocks(lead_md) + [context_block(
             f":page_facing_up: *Full report:* {PAGES_URL}\n"
             f"On the page: {moved}, the full company briefings, and the auto-add "
@@ -339,9 +349,16 @@ def main(argv: list[str] | None = None) -> int:
             convert=False)]
         thread_ts = post(lead_blocks, token=token, channel=channel,
                          fallback=f"Weekly Coverage Universe Additions - {a.date}",
+                         update_ts=a.update_ts,
                          dry_run=a.dry_run, preview=a.preview)
-        print(f"lead posted: ts={thread_ts}")
+        print(f"lead {'updated' if a.update_ts else 'posted'}: ts={thread_ts}")
         print(f"  deferred to the page: {len(deferred)} section(s)")
+
+    # An update rewrites the lead of a thread that already has its briefings. Posting
+    # them again would double every company write-up under the same parent.
+    if a.update_ts:
+        print("done - lead rewritten in place; briefings left as they were")
+        return 0
 
     # A name the report promised to add and then quietly excluded is the failure
     # that lost Jersey Mike's. Surface it beside the exclusion, not in a log file.

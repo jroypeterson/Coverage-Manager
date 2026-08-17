@@ -504,7 +504,7 @@ def render(md: str, *, report_date: str, decisions: list[Decision],
         f"<title>Coverage Universe Additions — {html.escape(report_date)}</title>"
         f"<style>{_CSS}</style></head><body><div class=\"shell\">"
         '<header class="mast">'
-        '<p class="eyebrow">Agentic Investing &middot; Coverage Manager &middot; discovery lane</p>'
+        '<p class="eyebrow">Coverage Manager &middot; discovery lane</p>'
         "<h1>Weekly Coverage Universe Additions</h1>"
         f'<div class="mast-meta">{meta_html}</div>'
         f'<nav class="secnav">{nav_html}</nav>'
@@ -531,7 +531,7 @@ def render_archive(dates: list[str]) -> str:
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
         "<title>Coverage Universe Additions — archive</title>"
         f"<style>{_CSS}</style></head><body><div class=\"shell\">"
-        '<header class="mast"><p class="eyebrow">Agentic Investing &middot; Coverage Manager</p>'
+        '<header class="mast"><p class="eyebrow">Coverage Manager</p>'
         "<h1>Weekly reports</h1></header>"
         f'<section><h2>Archive</h2><ul class="archive">{items}</ul>'
         '<p class="prose-narrow"><a href="index.html">&larr; Latest report</a></p></section>'
