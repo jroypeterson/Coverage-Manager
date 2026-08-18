@@ -177,14 +177,24 @@ Target: usually 3 to 10 recommendations. Fewer is fine if the week is quiet.
 ## Email output
 Create a Gmail draft to jroypeterson@gmail.com with:
 
-Subject: [Agentic Investing] — Weekly Coverage Universe Additions — [date]
+Subject: [ClaudeFin] Coverage Manager — Weekly Coverage Universe Additions — [date]
 
-**That `[Agentic Investing]` tag belongs to the Gmail draft and NOWHERE else.** It is an
-inbox-filter prefix, not a project reference. It reached the Slack title because this file
-used to say the report's H1 must match the email subject, and JP read it in
-#ipo-spinoffs-newissues as a different project leaking into new issues: *"Why does it say
-agentic investing? that is a discrete project and shouldn't interact with new issues."* The
-report's H1 is specified in "Report top" below and carries no tag.
+**The subject tag is `[ClaudeFin]`, and it belongs to the Gmail draft and NOWHERE else.**
+
+Two separate corrections landed here on 2026-08-17:
+
+- **It used to read `[Agentic Investing]`.** That was an inbox-filter prefix, not a project
+  reference — `agentic_trading` has never touched this lane. It reached the *Slack* title
+  because this file used to require the report's H1 to match the email subject, and JP read it
+  in #ipo-spinoffs-newissues as a different project leaking into new issues: *"Why does it say
+  agentic investing? that is a discrete project and shouldn't interact with new issues."*
+- **It is now the fleet convention** — `CONVENTIONS.md` §5: `[ClaudeFin] <project> — <what>`,
+  so one inbox filter catches every Claude project. The 2026-07-13 fleet audit moved every
+  other sender onto it and left this draft as the last opt-out; 13F Analyzer made exactly this
+  switch off `[Agentic Investing]`. Note this draft is built by hand (IMAP/MCP), **not** through
+  `_shared/email_alert`, so write the whole subject — there is no helper to prepend the prefix.
+
+The report's H1 is specified in "Report top" below and carries **no tag at all**.
 
 Body: HTML table with all recommendations, followed by a "Company Summaries" section with the 2-4 sentence elevator pitch for each recommended company (from field 11), notes section, signed "Coverage Universe Builder"
 
@@ -432,7 +442,7 @@ ClaudeBot is already a member of the channel.
 The summary report (which the script posts verbatim as the thread parent) must include:
 
 - The H1 title from "Report top" above — **untagged**, never the email subject (the
-  `[Agentic Investing]` prefix is Gmail-only; see the note in "Email output")
+  `[ClaudeFin]` prefix is Gmail-only; see the note in "Email output")
 - Number of recommendations this week
 - One-line summary for each recommended company (ticker, trigger, and short reason)
 - **A "Pipeline / filings to monitor" section** — deals that have filed or launched a roadshow
