@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-21",
+  "candidates": [
+    {
+      "company": "Unitree Robotics Technology Co., Ltd.",
+      "ticker": "688836.SS",
+      "exchange": "Shanghai STAR",
+      "market_cap": 40500000000,
+      "sector": "Tech",
+      "subsector": "Industrial Robotics / Automation",
+      "listing_date": "2026-08-19",
+      "trigger": "IPO",
+      "peers": ["2715.HK", "688825.SS", "TSLA", "ISRG"],
+      "reason": "Bucket 2 on market cap: the first pure-play humanoid-robot maker to get a public-market price, now ~USD 40.5B two days after listing. Priced at ~USD 9.1B on 2026-08-06 and closed its 2026-08-19 debut up 460%, so the bucket fires on market cap, not on the offer valuation - that distinction is the one thing to check before keeping it. Same exchange as the covered 688825.SS (CXMT) and the same subsector as the covered 2715.HK (Estun), so the row has real peers in the sheet.",
+      "business_summary": "We design and build legged robots and the motors, reducers and controllers inside them. We sell quadrupeds - the Go2, B2 and A2 - and humanoids - the G1, H1, R1 and H2 - mostly to universities, research labs, industrial inspection contractors and, increasingly, entertainment and retail buyers, at prices from a few thousand dollars for a consumer quadruped to roughly RMB 166,000 for a humanoid. We make money on hardware units, and we protect the margin by manufacturing our own actuators and joint modules rather than buying them, which is why gross margin ran 60.4% in FY2025 against a mid-40s level two years earlier. FY2025 revenue was RMB 1.70B, up 335%, with RMB 278M of attributable net profit - we are one of the very few humanoid-robot companies that earns anything at all."
+    }
+  ]
+}

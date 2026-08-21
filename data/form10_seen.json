@@ -224,9 +224,9 @@
   "verdict": "not-relevant"
  },
  "2128626": {
-  "accession": "0001193125-26-288697",
+  "accession": "0001193125-26-352605",
   "doc": "ck0002128626-ex99_1.htm",
-  "filed": "2026-06-29",
+  "filed": "2026-08-14",
   "first_seen": "2026-08-06",
   "listing_kind": "new registration",
   "parent": "",
@@ -234,6 +234,20 @@
   "registrant": "Vylor Inc.",
   "sector": "",
   "sic": "0100",
+  "ticker": "",
+  "verdict": "not-relevant"
+ },
+ "2132873": {
+  "accession": "0001193125-26-352589",
+  "doc": "d127770dex991.htm",
+  "filed": "2026-08-14",
+  "first_seen": "2026-08-17",
+  "listing_kind": "spin-off",
+  "parent": "Madison Square Garden Sports Corp.",
+  "reason": "SIC 7990 is outside the covered sectors",
+  "registrant": "MSGS Spinco, Inc.",
+  "sector": "",
+  "sic": "7990",
   "ticker": "",
   "verdict": "not-relevant"
  },
