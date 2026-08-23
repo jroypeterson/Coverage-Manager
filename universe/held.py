@@ -295,14 +295,28 @@ def migrate_legacy_portfolio(entries, feed: "HeldFeed"):
     a sale date that every downstream reader would take as fact. They are returned by
     name instead, so the operator can fill the real dates if they matter.
     """
+    from universe import positions as _pos
+
     migrated = []
     already_sold = []
     out = []
     for e in entries:
         e = dict(e)
-        if (e.get("Position") or "").strip() == LEGACY_POSITION:
+        # Keyed on the FLAGS being empty, never on `Position`. Since 2026-08-23
+        # `Position` is a DERIVED MIRROR that `save()` recomputes -- and it prints
+        # "Portfolio" for every held row -- so a Position-keyed check re-fires on
+        # all 30 holdings every single run and reports a migration it did not do.
+        # The genuine legacy shape is a row with no intent flag at all; `load()`
+        # upgrades anything that still has the old column, so in practice this is
+        # now inert, which is exactly what a completed migration should be.
+        is_legacy = (
+            not any(_pos.has_state(e, f) for f in _pos.STATE_FLAGS)
+            and not _pos.is_held(e)
+            and (e.get("Position") or "").strip() == LEGACY_POSITION
+        )
+        if is_legacy:
             ticker = e["Ticker"].strip().upper()
-            e["Position"] = DEMOTION_POSITION
+            e["Researching"] = "Y"
             migrated.append(ticker)
             if ticker not in feed.rows:
                 e["Previously Held"] = "Y"

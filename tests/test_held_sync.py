@@ -48,13 +48,18 @@ def _write_feed(tmp_path, payload):
 
 def _entries(spec):
     """spec: {ticker: (position, held)}"""
-    return [
-        {"Ticker": t, "Position": p, "Position Date": "", "Buy Price": None,
-         "Sell Price": None, "First Buy Date": "", "Average Cost": None,
-         "Shares": None, "Notes": "", "Held": h, "Held As Of": "",
-         "Previously Held": "", "Held Until": ""}
-        for t, (p, h) in spec.items()
-    ]
+    out = []
+    for t, (p, h) in spec.items():
+        e = {"Ticker": t, "Position": p, "Position Date": "", "Buy Price": None,
+             "Sell Price": None, "First Buy Date": "", "Average Cost": None,
+             "Shares": None, "Notes": "", "Held": h, "Held As Of": "",
+             "Previously Held": "", "Held Until": ""}
+        # Intent lives in the flags since 2026-08-23; mirror the spec's Position
+        # onto the matching flag so these fixtures describe a real row.
+        for f in pos.STATE_FLAGS:
+            e[f] = "Y" if f == p else ""
+        out.append(e)
+    return out
 
 
 @pytest.fixture()
@@ -255,3 +260,31 @@ def test_the_alias_map_stays_a_stopgap(tmp_path):
     assert len(held_mod.SYMBOL_ALIASES) == 1, (
         "adding an alias is not the fix -- see board row #345"
     )
+
+
+def test_the_completed_migration_stays_inert_on_a_held_book(tmp_path):
+    """Regression, found by running the sync twice on 2026-08-23.
+
+    `save()` writes `Position` as a DERIVED MIRROR and it reads "Portfolio" for
+    every held row -- so a migration keyed on that string re-fires on all 30
+    holdings every run and reports work it did not do. The flags are the store;
+    the mirror is not evidence of anything.
+    """
+    entries = _entries({"AAPL": ("Portfolio", "Y")})   # mirror says Portfolio, held
+    entries[0]["Researching"] = ""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    out, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
+    assert migrated == [] and already_sold == []
+    assert out[0]["Researching"] == "", "a held row must not be flagged Researching"
+
+
+def test_a_genuinely_legacy_row_still_migrates(tmp_path):
+    """The flip side: a row with NO intent flag whose old Position said Portfolio,
+    and which the brokers do not hold, is a sale that already happened."""
+    entries = _entries({"ROIV": ("Portfolio", "")})
+    for f in ("Researching", "Following for Interest", "Ready to Buy", "Ready to Short"):
+        entries[0][f] = ""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    out, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
+    assert migrated == ["ROIV"] and already_sold == ["ROIV"]
+    assert out[0]["Researching"] == "Y" and out[0]["Previously Held"] == "Y"

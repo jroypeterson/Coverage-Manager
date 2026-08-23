@@ -316,12 +316,18 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
         header = reader.fieldnames
         rows = list(reader)
     assert header[0] == "Ticker"
-    # The four derived Held columns were APPENDED 2026-08-23 (universe/held.py).
-    # Additive and last, so a consumer reading by name (they all use DictReader) is
-    # unaffected -- and they now get the ownership fact instead of inferring it.
-    assert header[-12:] == ["Position", "Position Date", "Buy Price", "Sell Price",
+    # 2026-08-23: the four derived Held columns and the four intent FLAGS were
+    # appended, and `Position` moved to LAST because it is now a derived mirror of
+    # the flags rather than a stored value. All additive and all at the end, so a
+    # consumer reading by name (they all use DictReader) is unaffected -- and they
+    # now get the ownership fact and each state separately instead of a scalar that
+    # can only say one thing at a time.
+    assert header[-16:] == ["Position Date", "Buy Price", "Sell Price",
                             "First Buy Date", "Average Cost", "Shares", "Notes",
-                            "Held", "Held As Of", "Previously Held", "Held Until"]
+                            "Held", "Held As Of", "Previously Held", "Held Until",
+                            "Researching", "Following for Interest",
+                            "Ready to Buy", "Ready to Short"] + ["Position"]
+    assert header[-1] == "Position", "the derived mirror must stay last"
     assert len(rows) == 2
     aapl_row = next(r for r in rows if r["Ticker"] == "AAPL")
     assert aapl_row["Position"] == "Portfolio"

@@ -476,6 +476,18 @@ def build_parser():
         help="Override the ownership feed path (default: ../portfolio_daily/exports/held.json).",
     )
 
+    pos_state = pos_sub.add_parser(
+        "set-state",
+        help=("Turn ONE intent flag on/off, leaving the other states alone. "
+              "This is what a Slack instruction lands on."),
+    )
+    pos_state.add_argument("ticker")
+    pos_state.add_argument("--state", required=True,
+                           help="Researching | Following for Interest | "
+                                "Ready to Buy | Ready to Short")
+    pos_state.add_argument("--off", action="store_true",
+                           help="Clear the flag instead of setting it.")
+
     pos_sub.add_parser("list", help="Print all positions.")
     pos_sub.add_parser("validate", help="Validate (subset + Position enum + universe metadata).")
 
@@ -806,6 +818,25 @@ def main():
         )
     elif args.command == "positions":
         from universe import positions
+
+        if args.pos_command == "set-state":
+            try:
+                entry, changed = positions.set_state(
+                    args.ticker, args.state, on=not args.off)
+            except positions.PositionsError as exc:
+                print(f"set-state failed: {exc}")
+                return 2
+            verb = "cleared" if args.off else "set"
+            if not changed:
+                # Reported, not silent: "nothing happened" and "it was already
+                # true" look identical from the outside, and only one of them
+                # means the instruction was understood.
+                print(f"{entry['Ticker']}: {args.state} was already "
+                      f"{'off' if args.off else 'on'} - nothing written")
+                return 0
+            print(f"{entry['Ticker']}: {args.state} {verb}")
+            print(f"  now -> {positions.published_position(entry)}")
+            return 0
 
         if args.pos_command == "sync-held":
             from universe import held as held_mod

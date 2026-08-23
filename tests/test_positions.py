@@ -81,13 +81,25 @@ def test_add_rejects_sell_not_above_buy(fake_universe, pos_path):
 
 
 def test_validate_flags_invalid_position(fake_universe, pos_path):
-    entries = [{
-        "Ticker": "INSM", "Position": "Watching",  # invalid
+    # Two ways a row can now be wrong, and they are different failures.
+    bad_flag = [{
+        "Ticker": "INSM", "Researching": "maybe",  # not Y / N / blank
         "Position Date": "2026-04-11", "Buy Price": None, "Sell Price": None,
         "First Buy Date": "", "Average Cost": None, "Shares": None, "Notes": "",
     }]
-    errors, _ = pos.validate(entries, universe_csv_path=fake_universe)
-    assert any("Position must be one of" in e for e in errors)
+    errors, _ = pos.validate(bad_flag, universe_csv_path=fake_universe)
+    assert any("must be Y, N or blank" in e for e in errors)
+
+    # A row that is neither held nor carries any intent has no reason to exist --
+    # far likelier a flag cleared by mistake than a deliberate blank, so it is
+    # REPORTED rather than dropped.
+    orphan = [{
+        "Ticker": "INSM", "Position Date": "2026-04-11", "Buy Price": None,
+        "Sell Price": None, "First Buy Date": "", "Average Cost": None,
+        "Shares": None, "Notes": "",
+    }]
+    errors, _ = pos.validate(orphan, universe_csv_path=fake_universe)
+    assert any("no intent flag" in e for e in errors)
 
 
 def test_validate_flags_missing_from_universe(fake_universe, pos_path):
@@ -219,13 +231,14 @@ def test_add_following_for_interest_roundtrip(fake_universe, pos_path):
 
 def test_validate_accepts_all_remaining_position_values(fake_universe, pos_path):
     entries = [
-        {"Ticker": "INSM", "Position": "Researching", "Position Date": "2026-04-11",
+        # Intent lives in the FLAGS since 2026-08-23; `Position` is a derived mirror.
+        {"Ticker": "INSM", "Researching": "Y", "Position Date": "2026-04-11",
          "Buy Price": None, "Sell Price": None, "First Buy Date": "",
          "Average Cost": None, "Shares": None, "Notes": ""},
-        {"Ticker": "ISRG", "Position": "Researching", "Position Date": "2026-04-11",
+        {"Ticker": "ISRG", "Researching": "Y", "Position Date": "2026-04-11",
          "Buy Price": None, "Sell Price": None, "First Buy Date": "",
          "Average Cost": None, "Shares": None, "Notes": ""},
-        {"Ticker": "WELL", "Position": "Following for Interest", "Position Date": "2026-05-10",
+        {"Ticker": "WELL", "Following for Interest": "Y", "Position Date": "2026-05-10",
          "Buy Price": None, "Sell Price": None, "First Buy Date": "",
          "Average Cost": None, "Shares": None, "Notes": ""},
     ]
