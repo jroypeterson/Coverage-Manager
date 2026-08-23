@@ -11,6 +11,23 @@ import pytest
 
 import weekly_universe
 
+def _mark_held(path, *tickers):
+    """Mark rows held the way PRODUCTION does -- by writing the derived column.
+
+    Deliberately not a `held=` kwarg on `pos.add`: ownership must not be
+    authorable through the human-facing path, which is the entire point of the
+    2026-08-23 change. Tests earn the state the same way the sync does.
+    """
+    from universe import positions as _pos
+
+    entries = _pos.load(path)
+    for e in entries:
+        if e["Ticker"] in tickers:
+            e["Held"] = "Y"
+            e["Held As Of"] = "2026-08-22"
+    _pos.save(entries, path)
+
+
 
 @pytest.fixture
 def fixture_csv(tmp_path):
@@ -229,13 +246,17 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
 
     pos_csv = tmp_path / "positions_and_researching.csv"
     pos.add(
-        "AAPL", position="Portfolio", sell_price=220, notes="core long",
+        "AAPL", position="Researching", sell_price=220, notes="core long",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
     )
     pos.add(
         "MRNA", position="Researching", buy_price=40, notes="watching",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-12",
     )
+    # AAPL is OWNED. Since 2026-08-23 that is a broker-derived fact in the `Held`
+    # column, not a Position anyone types -- so the test earns it the same way the
+    # sync does. It still lands in portfolio.json publishing position "Portfolio".
+    _mark_held(pos_csv, "AAPL")
 
     exports_dir = tmp_path / "exports"
     monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
@@ -295,8 +316,12 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
         header = reader.fieldnames
         rows = list(reader)
     assert header[0] == "Ticker"
-    assert header[-8:] == ["Position", "Position Date", "Buy Price", "Sell Price",
-                            "First Buy Date", "Average Cost", "Shares", "Notes"]
+    # The four derived Held columns were APPENDED 2026-08-23 (universe/held.py).
+    # Additive and last, so a consumer reading by name (they all use DictReader) is
+    # unaffected -- and they now get the ownership fact instead of inferring it.
+    assert header[-12:] == ["Position", "Position Date", "Buy Price", "Sell Price",
+                            "First Buy Date", "Average Cost", "Shares", "Notes",
+                            "Held", "Held As Of", "Previously Held", "Held Until"]
     assert len(rows) == 2
     aapl_row = next(r for r in rows if r["Ticker"] == "AAPL")
     assert aapl_row["Position"] == "Portfolio"

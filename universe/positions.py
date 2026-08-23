@@ -66,16 +66,27 @@ POSITIONS_COLUMNS = [
     "Buy Price", "Sell Price",
     "First Buy Date", "Average Cost", "Shares",
     "Notes",
+    # DERIVED from portfolio_daily's broker feed -- see universe/held.py. Never
+    # typed by a human, and never authored through Notion: `Position` is intent,
+    # these are fact. `Held Until` + `Previously Held` keep the history of a sold
+    # name beside it, so the Position column does not have to encode it (which
+    # would change where the name flows -- see held.py's module docstring).
+    "Held", "Held As Of", "Previously Held", "Held Until",
 ]
+# "Portfolio" LEFT this set on 2026-08-23 and that is the whole point of the change:
+# ownership is a broker fact derived into the `Held` column, not an intent someone
+# types. A row can no longer CLAIM to be owned. `portfolio.json` is still exported --
+# it is now built from Held == "Y" (weekly_universe), so every consumer's contract is
+# byte-identical and none needed editing.
 ALLOWED_POSITION_VALUES = {
-    "Portfolio", "Researching", "Following for Interest",
+    "Researching", "Following for Interest",
     "Ready to Buy", "Ready to Short",
 }
 
 # Ordered list used wherever stable iteration order matters (CLI summary,
 # manifest, exports). Mirrors the five states above.
 POSITION_VALUES_ORDERED = [
-    "Portfolio", "Researching", "Following for Interest",
+    "Researching", "Following for Interest",
     "Ready to Buy", "Ready to Short",
 ]
 
@@ -117,13 +128,23 @@ def _parse_price(raw, field):
     return val
 
 
-def _parse_int(raw, field):
+def _parse_shares(raw, field):
+    """Share counts are FRACTIONAL and must not be rounded.
+
+    This was `_parse_int` doing `int(float(x))`, which silently TRUNCATED: the real
+    book carries FMS 452.656, PACS 277.893, CI 40.532, AAPL 13.036. While the column
+    was reserved-and-blank that cost nothing; the moment it is filled from the broker
+    feed it would publish 452 shares for a 452.656 holding -- a wrong number that
+    looks entirely plausible. Non-negative rather than strictly positive (unlike
+    `_parse_price`), because zero shares is expressible even though the feed omits
+    such rows.
+    """
     if raw is None or str(raw).strip() == "":
         return None
     try:
-        val = int(float(str(raw).strip()))
+        val = float(str(raw).strip())
     except ValueError as e:
-        raise PositionsError(f"{field} must be an integer, got {raw!r}") from e
+        raise PositionsError(f"{field} must be a number, got {raw!r}") from e
     if val < 0:
         raise PositionsError(f"{field} must be non-negative, got {val}")
     return val
@@ -153,10 +174,40 @@ def load(path=POSITIONS_PATH):
                 "Sell Price": _parse_price(row.get("Sell Price"), "Sell Price"),
                 "First Buy Date": (row.get("First Buy Date") or "").strip(),
                 "Average Cost": _parse_price(row.get("Average Cost"), "Average Cost"),
-                "Shares": _parse_int(row.get("Shares"), "Shares"),
+                "Shares": _parse_shares(row.get("Shares"), "Shares"),
                 "Notes": (row.get("Notes") or "").strip(),
+                # Derived columns. Absent in a pre-2026-08-23 file, which reads as
+                # "" -- NOT as "N". A missing key is not a value: `held.plan_sync`
+                # treats only an explicit "Y" as held, so an unmigrated file
+                # promotes rather than mass-demoting on the first run.
+                "Held": (row.get("Held") or "").strip(),
+                "Held As Of": (row.get("Held As Of") or "").strip(),
+                "Previously Held": (row.get("Previously Held") or "").strip(),
+                "Held Until": (row.get("Held Until") or "").strip(),
             })
     return entries
+
+
+def is_held(entry):
+    """True when the BROKERS report this name as held. The only ownership test."""
+    return (entry.get("Held") or "").strip().upper() == "Y"
+
+
+def published_position(entry):
+    """The `Position` value as PUBLISHED to consumers.
+
+    Ownership stopped being an authorable `Position` on 2026-08-23 and became the
+    broker-derived `Held` column -- but the published artifacts must not move,
+    because ~8 sibling repos read them and `earnings_agent` subgroups on this very
+    field. So a held row publishes "Portfolio" exactly as it always did, whatever
+    intent it stores.
+
+    This function exists because the rule has THREE call sites -- portfolio.json
+    (weekly_universe), the sigma-alert payloads (reporting/sigma_export), and the
+    joined positions CSV -- and three copies of a rule is three chances for them to
+    disagree about what the fleet owns. Change it here or not at all.
+    """
+    return "Portfolio" if is_held(entry) else entry.get("Position", "")
 
 
 def filter_by_position(entries, position):
@@ -183,6 +234,10 @@ def save(entries, path=POSITIONS_PATH):
                 "Average Cost": "" if e.get("Average Cost") is None else e["Average Cost"],
                 "Shares": "" if e.get("Shares") is None else e["Shares"],
                 "Notes": e.get("Notes", ""),
+                "Held": e.get("Held", ""),
+                "Held As Of": e.get("Held As Of", ""),
+                "Previously Held": e.get("Previously Held", ""),
+                "Held Until": e.get("Held Until", ""),
             })
 
 
@@ -313,7 +368,7 @@ def add(ticker, position, buy_price=None, sell_price=None, notes="",
     buy = _parse_price(buy_price, "Buy Price") if buy_price not in (None, "") else None
     sell = _parse_price(sell_price, "Sell Price") if sell_price not in (None, "") else None
     avg_cost = _parse_price(average_cost, "Average Cost") if average_cost not in (None, "") else None
-    n_shares = _parse_int(shares, "Shares") if shares not in (None, "") else None
+    n_shares = _parse_shares(shares, "Shares") if shares not in (None, "") else None
 
     if buy is not None and sell is not None and sell <= buy:
         raise PositionsError(

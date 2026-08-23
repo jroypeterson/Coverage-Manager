@@ -442,10 +442,18 @@ def _step_export_positions():
             for col in pos_unique_cols:
                 v = e.get(col)
                 row[col] = "" if v is None else v
+            # The joined CSV must agree with portfolio.json about what is owned --
+            # earnings_agent reads BOTH. One rule, one function.
+            row["Position"] = pos.published_position(e)
             writer.writerow(row)
 
     # ── NEW: portfolio.json + researching.json ──────────────────────────────
     def _build_position_json(entries_subset):
+        # A HELD row publishes `position: "Portfolio"` even though its stored `Position`
+        # is now an intent value. The published field keeps the meaning it has always had
+        # -- consumers read it (earnings_agent subgroups on it) and the whole promise of
+        # this change was that the export contract does not move. What changed is WHO
+        # decides ownership, not how the artifact expresses it.
         out = {}
         for e in entries_subset:
             t = e["Ticker"]
@@ -453,7 +461,7 @@ def _step_export_positions():
             meta = metadata.get(meta_key, {})
             row = universe_rows.get(t, {})
             entry = {
-                "position": e.get("Position", ""),
+                "position": pos.published_position(e),
                 "position_date": e.get("Position Date", ""),
                 "buy_price": e.get("Buy Price"),
                 "sell_price": e.get("Sell Price"),
@@ -474,8 +482,21 @@ def _step_export_positions():
             out[t] = entry
         return out
 
-    portfolio_entries = pos.filter_by_position(pos_entries, "Portfolio")
-    researching_entries = pos.filter_by_position(pos_entries, "Researching")
+    # OWNERSHIP IS DERIVED, NOT AUTHORED (2026-08-23). `portfolio.json` used to be
+    # `filter_by_position(..., "Portfolio")` -- a value a human typed. It is now the
+    # rows the BROKERS report as held (universe/held.py fills `Held` from
+    # portfolio_daily's feed). The emitted JSON shape is byte-identical, so no schema
+    # bump and no consumer edit: catalyst_watch pins _ACCEPTED_CM_SCHEMA={3,4} and
+    # would hard-fail on an unannounced bump.
+    portfolio_entries = [e for e in pos_entries if (e.get("Held") or "").strip().upper() == "Y"]
+    # Held names are EXCLUDED from researching.json so the exported lists stay mutually
+    # exclusive exactly as they were when Position was a single value. Without this a
+    # held name would appear in both files (its intent is `Researching` while it is
+    # owned), which is a membership change no consumer asked for.
+    researching_entries = [
+        e for e in pos.filter_by_position(pos_entries, "Researching")
+        if (e.get("Held") or "").strip().upper() != "Y"
+    ]
     following_entries = pos.filter_by_position(pos_entries, "Following for Interest")
     ready_to_buy_entries = pos.filter_by_position(pos_entries, "Ready to Buy")
     ready_to_short_entries = pos.filter_by_position(pos_entries, "Ready to Short")

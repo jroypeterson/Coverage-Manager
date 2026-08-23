@@ -128,6 +128,26 @@ def build_core_watchlist_payload(csv_path):
     return out
 
 
+def _select(entries, position_value):
+    """Pick the rows for one exported list.
+
+    `Portfolio` is no longer a `Position` value -- ownership is DERIVED into the
+    `Held` column from the brokers (2026-08-23, see `universe/held.py`). This
+    function is the single place that knows it, so every sigma-alert payload and
+    `weekly_universe`'s exports agree by construction rather than by both being
+    remembered. `Researching` excludes held names to keep the exported lists
+    mutually exclusive, exactly as they were when Position was one value.
+    """
+    from universe import positions
+
+    if position_value == "Portfolio":
+        return [e for e in entries if (e.get("Held") or "").strip().upper() == "Y"]
+    rows = positions.filter_by_position(entries, position_value)
+    if position_value == "Researching":
+        rows = [e for e in rows if (e.get("Held") or "").strip().upper() != "Y"]
+    return rows
+
+
 def _build_position_payload(csv_path, position_value):
     """Return the {ticker: {...}} dict for one Position state.
 
@@ -138,7 +158,7 @@ def _build_position_payload(csv_path, position_value):
     from universe import positions
 
     entries = positions.load(positions.POSITIONS_PATH)
-    filtered = positions.filter_by_position(entries, position_value)
+    filtered = _select(entries, position_value)
     metadata = build_universe_metadata(csv_path)
     out = {}
     for e in filtered:
@@ -146,7 +166,7 @@ def _build_position_payload(csv_path, position_value):
         meta_key = t.split()[0].split(".")[0].upper()
         meta = metadata.get(meta_key, {})
         out[t] = {
-            "position": e.get("Position", ""),
+            "position": positions.published_position(e),
             "position_date": e.get("Position Date", ""),
             "buy_price": e.get("Buy Price"),
             "sell_price": e.get("Sell Price"),
@@ -164,7 +184,8 @@ def _build_position_payload(csv_path, position_value):
 
 
 def build_portfolio_payload(csv_path):
-    """{ticker: {...}} for Position=='Portfolio' rows. Pushed to sigma-alert."""
+    """{ticker: {...}} for HELD rows (derived from the broker feed, not from
+    Position). Pushed to sigma-alert. Shape unchanged -- see `_select`."""
     return _build_position_payload(csv_path, "Portfolio")
 
 

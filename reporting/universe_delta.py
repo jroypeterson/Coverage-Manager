@@ -460,6 +460,18 @@ def compute_universe_delta(
         if not old_isin and new_isin:
             modified.append({"ticker": t, "field": "ISIN", "old": "", "new": new_isin})
 
+    # A BUY or a SALE must show up here (2026-08-23). Ownership left the `Position`
+    # column and became the derived `Held` column, so a diff that reads Position
+    # alone would report a sale as -- at most -- an intent tweak, and often as
+    # nothing at all. That silence is the bug this whole change exists to end:
+    # ROIV was liquidated on 2026-08-03 and no weekly delta ever mentioned it.
+    # The two states are folded into ONE comparable string per ticker so a
+    # Held transition renders in the same "before -> after" line as everything else.
+    def _state(row):
+        pos_v = str(row.get("Position") or "").strip()
+        held_v = str(row.get("Held") or "").strip().upper()
+        return f"Portfolio (held)" if held_v == "Y" else pos_v
+
     position_changes = []
     if before_positions_df is not None and after_positions_df is not None:
         before_pos, after_pos = {}, {}
@@ -467,12 +479,12 @@ def compute_universe_delta(
             for _, r in before_positions_df.iterrows():
                 t = str(r["Ticker"] or "").strip()
                 if t:
-                    before_pos[t] = str(r["Position"] or "").strip()
+                    before_pos[t] = _state(r)
         if "Ticker" in after_positions_df.columns and "Position" in after_positions_df.columns:
             for _, r in after_positions_df.iterrows():
                 t = str(r["Ticker"] or "").strip()
                 if t:
-                    after_pos[t] = str(r["Position"] or "").strip()
+                    after_pos[t] = _state(r)
         for t in sorted(set(before_pos) | set(after_pos)):
             b = before_pos.get(t, "")
             a = after_pos.get(t, "")

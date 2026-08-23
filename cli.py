@@ -460,6 +460,22 @@ def build_parser():
     pos_rm = pos_sub.add_parser("remove", help="Remove a ticker.")
     pos_rm.add_argument("ticker")
 
+    pos_sync = pos_sub.add_parser(
+        "sync-held",
+        help=(
+            "Derive the Held column from portfolio_daily's broker feed. Ownership "
+            "is a broker fact, not something typed here."
+        ),
+    )
+    pos_sync.add_argument(
+        "--dry-run", action="store_true",
+        help="Print exactly what would change and write nothing.",
+    )
+    pos_sync.add_argument(
+        "--feed", type=str, default=None,
+        help="Override the ownership feed path (default: ../portfolio_daily/exports/held.json).",
+    )
+
     pos_sub.add_parser("list", help="Print all positions.")
     pos_sub.add_parser("validate", help="Validate (subset + Position enum + universe metadata).")
 
@@ -790,6 +806,42 @@ def main():
         )
     elif args.command == "positions":
         from universe import positions
+
+        if args.pos_command == "sync-held":
+            from universe import held as held_mod
+
+            try:
+                feed = held_mod.load_feed(args.feed)
+            except held_mod.HeldFeedError as exc:
+                # Every guard lands here. Nothing has been written at this point and
+                # nothing will be -- that is the contract: a feed we cannot trust
+                # must leave the book exactly as it was.
+                print(f"sync-held ABORTED, nothing written: {exc}")
+                return 2
+
+            entries = positions.load(positions.POSITIONS_PATH)
+            entries, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
+            plan = held_mod.plan_sync(entries, feed, positions._load_universe_tickers())
+            plan.migrated_legacy = migrated
+            plan.already_sold = already_sold
+
+            for line in plan.summary_lines():
+                print(f"  {line}")
+            if feed.aliased:
+                print(f"  symbol alias(es) applied: {', '.join(feed.aliased)} (see board #345)")
+
+            if plan.is_blocked:
+                return 2
+            if args.dry_run:
+                print("  [dry run] nothing written")
+                return 0
+
+            updated = held_mod.apply_plan(entries, feed, plan)
+            positions.save(updated, positions.POSITIONS_PATH)
+            print(f"  wrote {positions.POSITIONS_PATH}")
+            # A held ticker the universe does not know is NOT fatal, but it must not
+            # exit 0 either -- a silent 0 is how it would go unread for months.
+            return 2 if plan.not_in_universe else 0
 
         if args.pos_command == "add":
             try:

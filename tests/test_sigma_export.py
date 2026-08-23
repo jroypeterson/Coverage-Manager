@@ -11,6 +11,23 @@ import json
 
 import pytest
 
+def _mark_held(path, *tickers):
+    """Mark rows held the way PRODUCTION does -- by writing the derived column.
+
+    Deliberately not a `held=` kwarg on `pos.add`: ownership must not be
+    authorable through the human-facing path, which is the entire point of the
+    2026-08-23 change. Tests earn the state the same way the sync does.
+    """
+    from universe import positions as _pos
+
+    entries = _pos.load(path)
+    for e in entries:
+        if e["Ticker"] in tickers:
+            e["Held"] = "Y"
+            e["Held As Of"] = "2026-08-22"
+    _pos.save(entries, path)
+
+
 from reporting import sigma_export
 from reporting.sigma_export import (
     CORE_WATCHLIST_FILENAME,
@@ -117,9 +134,11 @@ def test_build_core_watchlist_payload_joins_universe_metadata(
     from universe import watchlist as wl
     monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
     pos.add(
-        "AAPL", position="Portfolio", sell_price=220, notes="core long",
+        "AAPL", position="Researching", sell_price=220, notes="core long",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
     )
+
+    _mark_held(pos_csv, "AAPL")
 
     payload = build_core_watchlist_payload(fixture_csv)
     assert set(payload.keys()) == {"AAPL"}
@@ -135,16 +154,19 @@ def test_build_core_watchlist_payload_joins_universe_metadata(
 def test_build_portfolio_payload_filters_to_portfolio_rows(
     monkeypatch, tmp_path, fixture_csv,
 ):
-    """build_portfolio_payload only includes Position == 'Portfolio'."""
+    """build_portfolio_payload includes HELD rows -- ownership is derived from
+    the broker feed, not from a typed Position. The published `position` field
+    still reads "Portfolio" so the artifact contract is unchanged."""
     from universe import positions as pos
     from reporting.sigma_export import build_portfolio_payload, build_researching_payload
 
     pos_csv = tmp_path / "positions_and_researching.csv"
     monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
-    pos.add("AAPL", position="Portfolio", sell_price=220,
+    pos.add("AAPL", position="Researching", sell_price=220,
             path=pos_csv, universe_csv_path=fixture_csv)
     pos.add("MRNA", position="Researching", buy_price=40,
             path=pos_csv, universe_csv_path=fixture_csv)
+    _mark_held(pos_csv, "AAPL")
 
     portfolio = build_portfolio_payload(fixture_csv)
     researching = build_researching_payload(fixture_csv)
@@ -166,10 +188,11 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
     from universe import watchlist as wl
     monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
-    pos.add("MRNA", position="Portfolio", sell_price=100,
+    pos.add("MRNA", position="Researching", sell_price=100,
             path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11")
     pos.add("AAPL", position="Ready to Buy", buy_price=180,
             path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08")
+    _mark_held(pos_csv, "MRNA")
 
     target_dir = tmp_path / "sigma-alert"
     target_dir.mkdir()
@@ -202,7 +225,10 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     assert portfolio_payload["MRNA"]["sector"] == "Biopharma"
 
     researching_payload = json.loads((target_dir / "researching.json").read_text())
-    assert researching_payload == {}  # no Researching rows in this test
+    # MRNA's stored intent is `Researching`, but it is HELD -- and the exported
+    # lists stay mutually exclusive, exactly as they were when Position was a
+    # single value. A held name appears in portfolio.json only.
+    assert researching_payload == {}
 
     following_payload = json.loads((target_dir / "following_for_interest.json").read_text())
     assert following_payload == {}  # no Following-for-Interest rows

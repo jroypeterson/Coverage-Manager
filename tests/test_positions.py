@@ -30,13 +30,13 @@ def pos_path(tmp_path):
 
 
 def test_add_portfolio_roundtrip(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio", sell_price=75.0, notes="core long",
+    pos.add("INSM", position="Researching", sell_price=75.0, notes="core long",
             path=pos_path, universe_csv_path=fake_universe, today="2026-04-11")
     entries = pos.load(pos_path)
     assert len(entries) == 1
     e = entries[0]
     assert e["Ticker"] == "INSM"
-    assert e["Position"] == "Portfolio"
+    assert e["Position"] == "Researching"
     assert e["Sell Price"] == 75.0
     assert e["Buy Price"] is None
     assert e["Position Date"] == "2026-04-11"
@@ -52,7 +52,7 @@ def test_add_researching_roundtrip(fake_universe, pos_path):
 
 
 def test_add_with_broker_fields(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio",
+    pos.add("INSM", position="Researching",
             first_buy_date="2026-01-15", average_cost=42.5, shares=100,
             path=pos_path, universe_csv_path=fake_universe)
     e = pos.load(pos_path)[0]
@@ -71,7 +71,7 @@ def test_add_rejects_invalid_position(fake_universe, pos_path):
 
 def test_add_rejects_non_universe_ticker(fake_universe, pos_path):
     with pytest.raises(pos.PositionsError, match="not in the coverage universe"):
-        pos.add("AAPL", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+        pos.add("AAPL", position="Researching", path=pos_path, universe_csv_path=fake_universe)
 
 
 def test_add_rejects_sell_not_above_buy(fake_universe, pos_path):
@@ -92,7 +92,7 @@ def test_validate_flags_invalid_position(fake_universe, pos_path):
 
 def test_validate_flags_missing_from_universe(fake_universe, pos_path):
     entries = [{
-        "Ticker": "ZZZ", "Position": "Portfolio",
+        "Ticker": "ZZZ", "Position": "Researching",
         "Position Date": "2026-04-11", "Buy Price": None, "Sell Price": None,
         "First Buy Date": "", "Average Cost": None, "Shares": None, "Notes": "",
     }]
@@ -114,9 +114,9 @@ def test_validate_warns_on_sell_at_or_below_buy(fake_universe, pos_path):
 
 
 def test_add_updates_existing_entry(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio", sell_price=75.0,
+    pos.add("INSM", position="Researching", sell_price=75.0,
             path=pos_path, universe_csv_path=fake_universe, today="2026-04-11")
-    pos.add("INSM", position="Portfolio", sell_price=80.0, notes="raised target",
+    pos.add("INSM", position="Researching", sell_price=80.0, notes="raised target",
             path=pos_path, universe_csv_path=fake_universe, today="2026-04-12")
     entries = pos.load(pos_path)
     assert len(entries) == 1
@@ -127,7 +127,7 @@ def test_add_updates_existing_entry(fake_universe, pos_path):
 
 
 def test_remove(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("INSM", position="Researching", path=pos_path, universe_csv_path=fake_universe)
     pos.add("ISRG", position="Researching", path=pos_path, universe_csv_path=fake_universe)
     assert pos.remove("INSM", path=pos_path) is True
     entries = pos.load(pos_path)
@@ -143,8 +143,8 @@ def test_load_missing_file_returns_empty(tmp_path):
 
 def test_save_sorts_by_ticker(fake_universe, pos_path):
     pos.add("WELL", position="Researching", path=pos_path, universe_csv_path=fake_universe)
-    pos.add("INSM", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
-    pos.add("ISRG", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("INSM", position="Researching", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("ISRG", position="Researching", path=pos_path, universe_csv_path=fake_universe)
     with open(pos_path) as f:
         rows = list(csv.DictReader(f))
     assert [r["Ticker"] for r in rows] == ["INSM", "ISRG", "WELL"]
@@ -154,14 +154,23 @@ def test_save_sorts_by_ticker(fake_universe, pos_path):
 
 
 def test_filter_by_position(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
-    pos.add("ISRG", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("INSM", position="Ready to Buy", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("ISRG", position="Ready to Buy", path=pos_path, universe_csv_path=fake_universe)
     pos.add("WELL", position="Researching", path=pos_path, universe_csv_path=fake_universe)
     entries = pos.load(pos_path)
-    portfolio = pos.filter_by_position(entries, "Portfolio")
+    ready = pos.filter_by_position(entries, "Ready to Buy")
     researching = pos.filter_by_position(entries, "Researching")
-    assert {e["Ticker"] for e in portfolio} == {"INSM", "ISRG"}
+    assert {e["Ticker"] for e in ready} == {"INSM", "ISRG"}
     assert {e["Ticker"] for e in researching} == {"WELL"}
+
+
+def test_filter_by_position_no_longer_answers_ownership(fake_universe, pos_path):
+    """`Portfolio` was retired as a Position value on 2026-08-23 -- ownership is
+    DERIVED into the `Held` column from the brokers (universe/held.py), because a
+    row must not be able to CLAIM to be owned. Asking this function for it now
+    correctly returns nothing; `portfolio.json` is built from `Held == "Y"`."""
+    pos.add("INSM", position="Researching", path=pos_path, universe_csv_path=fake_universe)
+    assert pos.filter_by_position(pos.load(pos_path), "Portfolio") == []
 
 
 # ── trigger-ready states ────────────────────────────────────────────────────
@@ -188,7 +197,7 @@ def test_add_ready_to_short_roundtrip(fake_universe, pos_path):
 
 
 def test_filter_by_position_includes_ready_states(fake_universe, pos_path):
-    pos.add("INSM", position="Portfolio", path=pos_path, universe_csv_path=fake_universe)
+    pos.add("INSM", position="Researching", path=pos_path, universe_csv_path=fake_universe)
     pos.add("ISRG", position="Ready to Buy", buy_price=400, path=pos_path, universe_csv_path=fake_universe)
     pos.add("WELL", position="Ready to Short", sell_price=200, path=pos_path, universe_csv_path=fake_universe)
     entries = pos.load(pos_path)
@@ -208,9 +217,9 @@ def test_add_following_for_interest_roundtrip(fake_universe, pos_path):
     assert e["Notes"] == "bellwether"
 
 
-def test_validate_accepts_all_five_position_values(fake_universe, pos_path):
+def test_validate_accepts_all_remaining_position_values(fake_universe, pos_path):
     entries = [
-        {"Ticker": "INSM", "Position": "Portfolio", "Position Date": "2026-04-11",
+        {"Ticker": "INSM", "Position": "Researching", "Position Date": "2026-04-11",
          "Buy Price": None, "Sell Price": None, "First Buy Date": "",
          "Average Cost": None, "Shares": None, "Notes": ""},
         {"Ticker": "ISRG", "Position": "Researching", "Position Date": "2026-04-11",
@@ -269,7 +278,7 @@ def test_add_create_if_missing_without_sector_errors(fake_universe, pos_path):
 
 
 def test_add_dry_run_does_not_write(fake_universe, pos_path):
-    result = pos.add("INSM", position="Portfolio", sell_price=75.0,
+    result = pos.add("INSM", position="Researching", sell_price=75.0,
                      path=pos_path, universe_csv_path=fake_universe,
                      dry_run=True)
     assert "positions_entry" in result
