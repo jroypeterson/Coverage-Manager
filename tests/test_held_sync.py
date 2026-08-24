@@ -167,10 +167,11 @@ def test_a_sale_lands_on_Researching_and_records_its_history(tmp_path):
     assert sold["Held"] == "N"
     assert sold["Previously Held"] == "Y"
     assert sold["Held Until"] == "2026-08-23"
-    # The routing key must stay somewhere catalyst_watch / analyst-days /
-    # insider_ownership can still see it -- they read only portfolio.json and
-    # researching.json, so any other state silently drops the name.
-    assert sold["Position"] == "Researching"
+    # JP 2026-08-24: a sold name lands on Following for Interest -- you are not
+    # building a thesis on something you have sold, you are interested in what it
+    # says. Asserted on the FLAG, because `Position` is only a derived mirror.
+    assert sold["Following for Interest"] == "Y"
+    assert sold["Researching"] == "", "the old landing state must be cleared"
 
 
 def test_a_row_that_is_not_held_carries_no_shares_or_cost(tmp_path):
@@ -275,7 +276,7 @@ def test_the_completed_migration_stays_inert_on_a_held_book(tmp_path):
     feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
     out, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
     assert migrated == [] and already_sold == []
-    assert out[0]["Researching"] == "", "a held row must not be flagged Researching"
+    assert out[0]["Following for Interest"] == "", "a held row carries no landing flag"
 
 
 def test_a_genuinely_legacy_row_still_migrates(tmp_path):
@@ -287,4 +288,16 @@ def test_a_genuinely_legacy_row_still_migrates(tmp_path):
     feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
     out, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
     assert migrated == ["ROIV"] and already_sold == ["ROIV"]
-    assert out[0]["Researching"] == "Y" and out[0]["Previously Held"] == "Y"
+    assert out[0]["Following for Interest"] == "Y"
+    assert out[0]["Previously Held"] == "Y"
+
+
+def test_the_demotion_flag_list_matches_positions():
+    """`held.py` names the state flags locally to dodge a circular import. If the
+    two lists drift, a demotion clears the wrong ones and leaves the name in two
+    states at once -- silently, because both files still import."""
+    assert set(held_mod.STATE_FLAGS_FOR_DEMOTION) == set(pos.STATE_FLAGS)
+
+
+def test_the_landing_state_is_one_of_the_real_states():
+    assert held_mod.DEMOTION_POSITION in pos.STATE_FLAGS

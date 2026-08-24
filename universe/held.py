@@ -24,19 +24,34 @@ Now the axes are separate:
 `portfolio.json` is then derived from `Held`, so its shape is unchanged and no
 consumer needed editing.
 
-## Why a sale demotes to `Researching` and not to a new state
+## Why a sale lands on `Following for Interest`
 
 JP's requirement (2026-08-22): a sold name stays in coverage and keeps getting
 flagged for earnings and movers; it just stops claiming to be owned.
 
-`catalyst_watch`, `analyst-days` and `insider_ownership` read ONLY
-`portfolio.json` + `researching.json`. Any other landing state — including a
-tidy-looking new `Previously Held` — would silently drop the name from those three
-lanes. (`earnings_agent` and this repo's `sigma_export` read all five states, so
-the two lanes JP named would have been fine either way; the other three would not.)
-So the ROUTING key falls to `Researching`, and the history it would have carried
-goes into its own columns — `Previously Held` and `Held Until` — where it is
-preserved without deciding where the name flows.
+It landed on `Researching` for the first two days, and that was a CONSTRAINT
+talking, not a judgement: `catalyst_watch`, `analyst-days` and `insider_ownership`
+read only `portfolio.json` + `researching.json`, so any other state silently
+dropped the name from three lanes.
+
+JP corrected it on 2026-08-24 -- "RPD and U should default to Following for
+Interest once I sell a stock" -- and he is right on the meaning. Once you have
+sold something you are not building a thesis on it; you are interested in what it
+says. That is his own definition of the state: "I would be interested in
+particular in what they are saying on their earnings calls." `Researching`
+described the plumbing, not the position.
+
+**What it costs, stated because it is a real trade.** A sold name still reaches
+transcripts, earnings_agent, sigma-alert and analyst-days (all four read every
+state, the last since 2026-08-23) and NO LONGER reaches `catalyst_watch` or
+`insider_ownership`, which still read the two files only. That is defensible --
+forward catalysts and insider buying are questions about a position you might
+take, not about a bellwether you read -- but it is a consequence, not a free
+change. If either lane should carry these names, widen THAT lane rather than
+mislabelling the position to sneak them in, which is what the first two days did.
+
+The history goes into its own columns -- `Previously Held` and `Held Until` --
+where it is preserved without deciding where the name flows.
 
 ## The guards are the point of this module
 
@@ -91,7 +106,11 @@ HELD_STALE_MAX_DAYS = 10.0
 # while still catching any failure that empties or halves the feed.
 MAX_DEMOTIONS_PER_RUN = 5
 
-DEMOTION_POSITION = "Researching"
+# Where a sold name lands. It was `Researching` for two days because three
+# consumers could not see anything else -- a constraint masquerading as a
+# taxonomy. JP 2026-08-24: "RPD and U should default to Following for Interest
+# once I sell a stock."
+DEMOTION_POSITION = "Following for Interest"
 
 # BROKER SYMBOL -> COVERAGE-UNIVERSE SYMBOL.
 #
@@ -115,6 +134,13 @@ SYMBOL_ALIASES = {
     "FISV": "FI",
 }
 
+
+
+# Named here rather than imported from `positions` to keep this module free of a
+# circular import at load time; a test pins the two lists together so they cannot
+# drift.
+STATE_FLAGS_FOR_DEMOTION = ["Ready to Buy", "Ready to Short",
+                            "Researching", "Following for Interest"]
 
 
 class HeldFeedError(Exception):
@@ -316,7 +342,7 @@ def migrate_legacy_portfolio(entries, feed: "HeldFeed"):
         )
         if is_legacy:
             ticker = e["Ticker"].strip().upper()
-            e["Researching"] = "Y"
+            e[DEMOTION_POSITION] = "Y"
             migrated.append(ticker)
             if ticker not in feed.rows:
                 e["Previously Held"] = "Y"
@@ -387,7 +413,11 @@ def apply_plan(entries, feed: HeldFeed, plan: SyncPlan, today=None):
             e["Held As Of"] = plan.feed_as_of
             e["Previously Held"] = "Y"
             e["Held Until"] = stamp
-            e["Position"] = DEMOTION_POSITION
+            # Set the FLAG. Writing `Position` alone is a dead write that `save()`
+            # recomputes from the flags -- precisely what made the legacy migration
+            # look like it was working when it was not.
+            for _f in STATE_FLAGS_FOR_DEMOTION:
+                e[_f] = "Y" if _f == DEMOTION_POSITION else ""
             e["Shares"] = None
             e["Average Cost"] = None
         else:
