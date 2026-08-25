@@ -269,6 +269,13 @@ def test_adr_stripping_adds_no_duplicate_company_collisions():
     names = list(read_universe_csv()["Company Name"])
     counts = collections.Counter(norm(n) for n in names if str(n).strip())
     dupes = {k: v for k, v in counts.items() if v > 1 and k}
-    assert dupes == {"shimadzu": 2}, (
+    # Was `{"shimadzu": 2}` until 2026-08-25. That was not a normalizer artefact
+    # but a real double-count: `SHMZF` (OTC) and `7701.T` (TSE) were the same
+    # issuer on two lines, so Shimadzu's market cap landed twice in every
+    # MedTech aggregate. The SHMZF row was deleted; the primary Tokyo line kept
+    # it. Accepting the collision here is what let it sit unnoticed -- if this
+    # fires again, check whether the pair is a genuine cross-listing before
+    # widening the expectation.
+    assert dupes == {}, (
         f"unexpected normalized-name collisions: {dupes}"
     )

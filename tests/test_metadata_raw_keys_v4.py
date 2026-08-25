@@ -26,12 +26,27 @@ def meta():
     return m, s
 
 
-def test_rogers_corporation_is_back(meta):
-    """The specific company the old key destroyed."""
+def test_a_bare_ticker_and_its_suffixed_sibling_both_survive(meta):
+    """The specific damage the old key did: one of the two rows disappeared.
+
+    This was pinned on `ROG` (Rogers Corporation, Core=Y) against `ROG.SW`
+    (Roche) until 2026-08-25, when the `ROG` row was deleted. It had never been
+    Rogers deliberately: the row was authored as Roche -- whose SIX ticker IS
+    `ROG` -- and a bare-symbol lookup bound it to the US namesake, then enriched
+    Rogers' CIK, FIGI, website and venue over the top. Its `Sub-subsector`
+    survived as `NextGen Sequencing`, which is Roche's fingerprint, not Rogers'.
+
+    NGEN.V / NGEN (NervGen Pharma: TSXV primary plus its NASDAQ cross-listing)
+    is the same shape and carries the invariant now. Keep an example here that
+    is a REAL pair of listings rather than a collision, so the test cannot be
+    satisfied by the bug it exists to catch.
+    """
     m, _ = meta
-    assert m["ROG"]["name"] == "Rogers Corporation"
-    assert m["ROG"]["core"] == "Y", "and it is a Core name, which is why it mattered"
+    assert m["NGEN.V"]["name"] == "NervGen Pharma Corp."
+    assert m["NGEN"]["name"] == "NervGen Pharma Corp. Common stock"
     assert m["ROG.SW"]["name"] == "Roche"
+    assert m["ROG.SW"]["core"] == "Y", "and it is a Core name, which is why it mattered"
+    assert "ROG" not in m, "the bare ROG row was deleted on 2026-08-25; see the docstring"
 
 
 def test_there_are_no_collisions_left(meta):
