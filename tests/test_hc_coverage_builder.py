@@ -320,3 +320,68 @@ def test_the_ratings_workbook_is_scoped_to_core_coverage():
     assert b.HUMAN_COLS == {"Rating", "Notes"}
     assert not (b.HUMAN_COLS & b.MACHINE_COLS), \
         "a column cannot be both human-owned and machine-refreshed"
+
+
+# ── precision and colour ─────────────────────────────────────────────────────
+
+def test_every_column_with_a_number_format_also_declares_its_decimals():
+    """The workbook's number format and the CSV's rounding read from two tables.
+    If they drift, the same column shows 22 in one surface and 21.94 in the other
+    and there is nothing to say which is intended."""
+    assert set(b.NUMFMT) == set(b.DECIMALS), (
+        set(b.NUMFMT) ^ set(b.DECIMALS))
+    for col, fmt in b.NUMFMT.items():
+        want_decimals = b.DECIMALS[col]
+        has_decimals = "." in fmt
+        assert has_decimals == (want_decimals > 0), (
+            "%s: number format %r disagrees with DECIMALS=%d" % (col, fmt, want_decimals))
+
+
+@pytest.mark.parametrize("col", ["Fwd P/E", "2019", "2024", "YTD",
+                                 "Mkt Cap (USD $M)"])
+def test_the_columns_jp_asked_to_lose_decimals_have_none(col):
+    """JP 2026-08-26: "the annual returns dont need decimal point precision. and
+    the Fwd P/e doesnt as well"."""
+    assert b.DECIMALS[col] == 0
+    assert "." not in b.NUMFMT[col]
+
+
+def test_market_cap_shows_thousands_separators():
+    assert "," in b.NUMFMT["Mkt Cap (USD $M)"]
+
+
+def test_price_keeps_its_cents():
+    """Rounding a price to whole units would make every sub-dollar name read 0."""
+    assert b.DECIMALS["Price (local)"] == 2
+
+
+def test_every_return_column_gets_its_own_colour_scale():
+    """Per column, not one scale across the block: 2022 and 2021 have wildly
+    different ranges and a shared gradient would render one of them flat."""
+    path = os.path.join(b.DEFAULT_OUT, "%s.xlsx" % b.STEM)
+    if not os.path.exists(path):
+        pytest.skip("workbook not built in this checkout")
+    ws = openpyxl.load_workbook(path)["Coverage List"]
+    hdr = [c for c in next(ws.iter_rows(min_row=4, max_row=4, values_only=True))]
+    ranges = {str(r) for r in ws.conditional_formatting._cf_rules}
+    assert len(ranges) == len(b.RETURN_COLS), (
+        "expected one colour scale per return column, got %d for %d columns"
+        % (len(ranges), len(b.RETURN_COLS)))
+    for rng in ws.conditional_formatting._cf_rules:
+        rules = ws.conditional_formatting._cf_rules[rng]
+        assert [r.type for r in rules] == ["colorScale"], rules
+
+
+def test_the_colour_scale_puts_white_at_zero_not_at_the_median():
+    """A percentile midpoint would paint a column where everything fell as though
+    half of it were fine. Anchoring white at 0 means the colour always answers
+    "did this make money" and only the intensity is relative."""
+    path = os.path.join(b.DEFAULT_OUT, "%s.xlsx" % b.STEM)
+    if not os.path.exists(path):
+        pytest.skip("workbook not built in this checkout")
+    ws = openpyxl.load_workbook(path)["Coverage List"]
+    rng = next(iter(ws.conditional_formatting._cf_rules))
+    rule = ws.conditional_formatting._cf_rules[rng][0]
+    kinds = [c.type for c in rule.colorScale.cfvo]
+    assert kinds == ["min", "num", "max"], kinds
+    assert str(rule.colorScale.cfvo[1].val) in ("0", "0.0"), rule.colorScale.cfvo[1].val

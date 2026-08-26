@@ -31,6 +31,7 @@ import argparse, csv, datetime, json, os, shutil, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 import openpyxl
+from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -39,7 +40,7 @@ UNIVERSE = os.path.join(REPO, "exports", "universe.csv")
 RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
 # Moved here from Career\Pitches\Coverage on 2026-08-26 (JP), so the workbook,
 # its archive and the ratings workbook it joins all live under one root.
-DEFAULT_OUT = os.path.join(RATINGS_DIR, "Coverage")
+DEFAULT_OUT = os.path.join(RATINGS_DIR, "_Coverage")
 STEM = "AA_Core Coverage"
 # The stem before 2026-08-26. `archive_existing` only looks for the CURRENT stem,
 # so without this the old workbook would sit at the top level next to the new one,
@@ -105,6 +106,19 @@ TITLE_FONT = Font(bold=True, size=13, color="1F3864")
 SUB_FONT = Font(size=9, italic=True, color="595959")
 THIN = Side(style="thin", color="BFBFBF")
 SUMHDR = ["Subsector", "Companies", "Core", "Rated", "Total Mkt Cap (USD $M)"]
+
+# Decimal places per column, applied to BOTH the workbook's number format and the
+# CSV's rounding, so the two surfaces cannot disagree about precision. JP
+# 2026-08-26: "the annual returns dont need decimal point precision. and the
+# Fwd P/e doesnt as well". Market cap has always been whole millions; the commas
+# are display only, never in the CSV, where they would make the value text and
+# break sorting in the Sheet.
+DECIMALS = {"Mkt Cap (USD $M)": 0, "EV (USD $M)": 0, "Fwd P/E": 0,
+            "Price (local)": 2}
+DECIMALS.update({c: 0 for c in RETURN_COLS})
+NUMFMT = {"Mkt Cap (USD $M)": "#,##0", "EV (USD $M)": "#,##0",
+          "Fwd P/E": "0", "Price (local)": "#,##0.00"}
+NUMFMT.update({c: "0" for c in RETURN_COLS})
 
 
 def num(x):
@@ -498,10 +512,8 @@ def write_sheet(wb, title, rows, subtitle):
         ws.cell(rr, 1, i).alignment = Alignment(horizontal="center")
         for j, col in enumerate(COLS, start=2):
             cell = ws.cell(rr, j, r[col])
-            if col == "Mkt Cap (USD $M)":
-                cell.number_format = "#,##0"
-            elif col == "Price (local)":
-                cell.number_format = "#,##0.00"
+            if col in NUMFMT:
+                cell.number_format = NUMFMT[col]
             if col in ("Core Coverage", "Rating", "Ccy", "Size"):
                 cell.alignment = Alignment(horizontal="center")
             if col == "Company Name":
@@ -511,6 +523,25 @@ def write_sheet(wb, title, rows, subtitle):
                 cell.font = Font(bold=True, size=10, color="1F5132")
         for j in range(1, len(COLS) + 2):
             ws.cell(rr, j).border = Border(bottom=THIN)
+
+    # Red / white / green across each return column INDEPENDENTLY, with white
+    # pinned to zero rather than to the column's median. A midpoint of "50th
+    # percentile" would paint a column where everything fell as if half of it were
+    # fine; anchoring at 0 means the colour always answers "did this make money",
+    # and only the intensity is relative to the column. `min`/`max` keep the
+    # gradient scaled per column, which is what makes 2022 readable next to 2021.
+    if rows:
+        first, last = hr + 1, hr + len(rows)
+        for j, col in enumerate(COLS, start=2):
+            if col not in RETURN_COLS:
+                continue
+            letter = get_column_letter(j)
+            ws.conditional_formatting.add(
+                "%s%d:%s%d" % (letter, first, letter, last),
+                ColorScaleRule(
+                    start_type="min", start_color="F8696B",     # red
+                    mid_type="num", mid_value=0, mid_color="FFFFFF",
+                    end_type="max", end_color="63BE7B"))        # green
 
     ws.freeze_panes = ws.cell(hr + 1, 4)
     ws.auto_filter.ref = "A%d:%s%d" % (hr, get_column_letter(len(COLS) + 1), hr + len(rows))
@@ -872,9 +903,17 @@ def main():
             out.append([])
         out.append(["#"] + cols)
         for i, r in enumerate(recs, 1):
-            out.append([i] + [
-                ("" if r.get(c) is None else
-                 (round(r[c], 2) if isinstance(r[c], float) else r[c])) for c in cols])
+            row = [i]
+            for c in cols:
+                v = r.get(c)
+                if v is None:
+                    row.append("")
+                elif isinstance(v, float):
+                    dp = DECIMALS.get(c, 2)
+                    row.append(int(round(v)) if dp == 0 else round(v, dp))
+                else:
+                    row.append(v)
+            out.append(row)
         return out
 
     # Beside the workbook: the FULL schema, ratings included. This folder is JP's.
