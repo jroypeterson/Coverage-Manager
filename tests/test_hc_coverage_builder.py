@@ -60,14 +60,24 @@ def test_info_is_fetched_once_per_attempt_not_once_per_field(monkeypatch):
 
 # ── what may and may not be published ────────────────────────────────────────
 
-def test_ratings_are_never_in_the_public_schema():
-    """`docs/hc_coverage.csv` is served by GitHub Pages to anyone with the URL and
-    is what the Google Sheet reads. The CSV writer serialises whatever is in COLS,
-    so adding `Rating` to COLS without excluding it publishes JP's private
-    judgement. Codex flagged this Critical before it shipped."""
-    assert "Rating" in b.COLS
-    assert "Rating" in b.PRIVATE_ONLY
-    assert "Rating" not in b.PUBLIC_COLS
+def test_rating_sits_immediately_after_company_name():
+    """JP 2026-08-26: "have a ratings column after the company name column"."""
+    assert b.COLS[:3] == ["Ticker", "Company Name", "Rating"]
+
+
+def test_ramp_effort_is_gone_from_every_surface():
+    assert not any("Ramp" in c for c in b.COLS)
+    assert not any("Ramp" in c for c in b.PUBLIC_COLS)
+
+
+def test_the_private_only_mechanism_still_works_even_though_it_is_empty():
+    """`Rating` was withheld from the public CSV until JP asked for it in the
+    Google file too, so PRIVATE_ONLY is empty now. Keep the mechanism honest: the
+    next sensitive column must be excludable without rediscovering that the CSV
+    writer publishes everything in COLS."""
+    assert b.PUBLIC_COLS == [c for c in b.COLS if c not in b.PRIVATE_ONLY]
+    probe = set(b.COLS[:1])
+    assert [c for c in b.COLS if c not in probe] == b.COLS[1:]
 
 
 def test_public_schema_is_the_private_one_minus_exactly_the_private_columns():
@@ -85,9 +95,16 @@ def test_the_published_csv_on_disk_carries_no_rating_column():
     path = b.PUBLIC_CSV
     if not os.path.exists(path):
         pytest.skip("public CSV not built in this checkout")
-    header = open(path, encoding="utf-8").readline().strip().split(",")
-    assert "Rating" not in header, "the PUBLISHED csv is exposing ratings"
-    assert "Ticker" in header and "Size" in header
+    lines = open(path, encoding="utf-8").read().splitlines()
+    # Row 1 is the provenance line, row 2 blank, row 3 the header. JP asked for
+    # "when it was last updated and any relevant background" to live in the file,
+    # and the Google Sheet is a single =IMPORTDATA cell that nothing here can write
+    # to -- so the only way it reaches that surface is inside the CSV itself.
+    assert "LAST UPDATED" in lines[0], "the published CSV lost its provenance line"
+    header = lines[2].split(",")
+    assert header[:4] == ["#", "Ticker", "Company Name", "Rating"], header[:4]
+    assert "Size" in header and "Fwd P/E" in header
+    assert not any("Ramp" in h for h in header)
 
 
 # ── the size bucket ──────────────────────────────────────────────────────────

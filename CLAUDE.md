@@ -37,7 +37,7 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `reporting/pipeline_reversals.py` — flags a company an **earlier report committed to adding** that a later report puts under *Considered and excluded* with no acknowledgement. Built from the Jersey Mike's case: 07-24 said "Would be a Consumer add at pricing", 07-31 said "not universe-relevant" and cited the 07-24 report — **citing a date is not withdrawing a promise**, and that distinction is the check. Commitment phrases are matched **line-wise across the whole prior report**, not within a named section, because the forward book has lived in both a `Pipeline` table (07-31) and a bullet list under `## Notes` (07-24) — a table-only parser found nothing on the very report the check exists for. Exclusions stay section-scoped (an exclusion reason is ordinary prose; only the heading marks it a verdict). Calibrated on the live corpus: **9 reports, 1 finding, 0 false positives**, pinned by `test_corpus_false_positive_rate_stays_at_zero`. Tests: `tests/test_pipeline_reversals.py` (13).
 - `scripts/poll_ipo_replies.py` — applies JP's `add TICKER` / `decline TICKER` / `add all` replies (thread **and** top-level) to `data/candidate_ledger.csv`, shells `approve_candidates.py` for approvals, republishes `exports/`, and answers in-thread. Gated to `pending` ledger rows, gated to the approver user (`SLACK_APPROVER_USER_ID`, default JP), idempotent by message `ts` in `data/ipo_reply_state.json` — recorded on failure too, so a transient enrichment error cannot re-fire an approval. **Until 2026-08-05 nothing read the thread**, so every weekly post's "reply `add MU`" was a dead end and three names sat pending. Scheduled as `CoverageManager-IpoReplyPoll` (09:20/13:20/18:20, `run_poll_ipo_replies.bat`). Manual: `python scripts/poll_ipo_replies.py [--dry-run] [--no-publish] [--since YYYY-MM-DD]`.
 - `scripts/build_hc_coverage_xlsx.py` — **JP's `AA_Core Coverage` workbook**, at
-  `Dropbox\Career\Pitches\Coverage\AA_Core Coverage.xlsx`, plus the flat CSV that
+  `Dropbox\Companies_Stocks_Sectors_Ratings\Coverage\AA_Core Coverage.xlsx`, plus the flat CSV that
   feeds a Google Sheet. Reads `exports/universe.csv` filtered to `Sector (JP)` in
   {Healthcare Services, MedTech} (239 rows), prices each row, and joins JP's
   ratings. Run by the Friday `WeeklyCoverageBuilder` (see below); manual:
@@ -101,7 +101,17 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
   stops attaching. JP's rule: *"Ticker is an identity but it can be fuzzy so you
   need to check and verify with me if its too ambiguous."*
 
-  Tests: `tests/test_hc_coverage_builder.py` (29).
+  **Columns, and the provenance line.** `Rating` sits immediately after
+  `Company Name` (JP, 2026-08-26); the old `Ramp Effort` column and the
+  legacy-sheet matching behind it are gone. Every surface carries a `LAST UPDATED`
+  line naming the build time, the Friday cadence, the sources and the column
+  rules — the xlsx as its subtitle, and the CSV as a **preamble row before the
+  header** (row 1 note, row 2 blank, row 3 header). The CSV preamble looks odd but
+  is the only route to the Google Sheet: that Sheet is a single `=IMPORTDATA()`
+  cell and nothing here can write to any other cell of it, so anything the reader
+  should see has to travel inside the data.
+
+  Tests: `tests/test_hc_coverage_builder.py` (31).
 
 - `config.py` — All paths, API keys, segment definitions
 - `data/coverage_universe_tickers.csv` — Master coverage universe

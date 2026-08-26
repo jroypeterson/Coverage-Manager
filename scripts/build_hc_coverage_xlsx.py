@@ -36,20 +36,21 @@ from openpyxl.utils import get_column_letter
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UNIVERSE = os.path.join(REPO, "exports", "universe.csv")
-DEFAULT_OUT = r"C:\Users\jroyp\Dropbox\Career\Pitches\Coverage"
+RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
+# Moved here from Career\Pitches\Coverage on 2026-08-26 (JP), so the workbook,
+# its archive and the ratings workbook it joins all live under one root.
+DEFAULT_OUT = os.path.join(RATINGS_DIR, "Coverage")
 STEM = "AA_Core Coverage"
 # The stem before 2026-08-26. `archive_existing` only looks for the CURRENT stem,
 # so without this the old workbook would sit at the top level next to the new one,
 # still looking current. One-time migration; safe to leave in place forever.
 PRIOR_STEMS = ("Coverage - HC Services and MedTech",)
-LEGACY = os.path.join(DEFAULT_OUT, "Jason Peterson Coverage.xlsx")
 
 # NOT renamed alongside the workbook. The Google Sheet mirror is a single
 # =IMPORTDATA() cell pointed at this exact URL and nothing here can rewrite that
 # cell, so renaming the endpoint silently empties the Sheet.
 PUBLIC_CSV = os.path.join(REPO, "docs", "hc_coverage.csv")
 
-RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
 RATINGS_PATH = os.path.join(RATINGS_DIR, "Ratings_CoreCoverage.xlsx")
 # Scope: rows flagged `Core` in the universe -- the names JP covers analytically
 # (310 of 1,346, spanning every sector, not just the HC segment). JP 2026-08-26:
@@ -77,24 +78,23 @@ LC_THRESHOLD_USD_M = 25000
 FIELDS = ["marketCap", "regularMarketPrice", "currentPrice", "currency",
           "forwardPE", "longName"]
 
-COLS = (["Ticker", "Company Name", "Sector", "Subsector", "Sub-subsector",
-         "Core Coverage", "Rating", "Listing", "Exchange", "Country (HQ)",
+COLS = (["Ticker", "Company Name", "Rating", "Sector", "Subsector",
+         "Sub-subsector", "Core Coverage", "Listing", "Exchange", "Country (HQ)",
          "Ccy", "Price (local)", "Mkt Cap (USD $M)", "Size", "Fwd P/E"]
-        + RETURN_COLS + ["Ramp Effort (1/2)"])
+        + RETURN_COLS)
 
-# ⛑ THE PUBLIC CSV IS A DIFFERENT SCHEMA, AND THAT IS THE POINT.
-# `docs/hc_coverage.csv` is served by GitHub Pages to anyone with the URL. JP's
-# ratings are a private judgement, unlike the position book already in this repo,
-# so they are dropped on the way out. Adding a column to COLS therefore publishes
-# it by default -- add anything sensitive to PRIVATE_ONLY at the same time.
-PRIVATE_ONLY = {"Rating"}
+# `docs/hc_coverage.csv` is served by GitHub Pages to ANYONE WITH THE URL, and it
+# is what the Google Sheet reads. Anything in COLS is published unless it is named
+# here. `Rating` was withheld until 2026-08-26, when JP asked for it in the Google
+# file as well as the local one -- so his ratings are now publicly readable at that
+# URL. That is his explicit call; keep the mechanism for the next sensitive column.
+PRIVATE_ONLY = set()
 PUBLIC_COLS = [c for c in COLS if c not in PRIVATE_ONLY]
 
 WIDTH = {"Ticker": 11, "Company Name": 36, "Sector": 19, "Subsector": 26,
          "Sub-subsector": 20, "Core Coverage": 9, "Rating": 9, "Listing": 17,
          "Exchange": 16, "Country (HQ)": 15, "Ccy": 6, "Price (local)": 12,
-         "Mkt Cap (USD $M)": 15, "Size": 7, "Fwd P/E": 9,
-         "Ramp Effort (1/2)": 12}
+         "Mkt Cap (USD $M)": 15, "Size": 7, "Fwd P/E": 9}
 WIDTH.update({c: 9 for c in RETURN_COLS})
 
 HDR_FILL = PatternFill("solid", fgColor="1F3864")
@@ -104,7 +104,7 @@ HDR_FONT = Font(color="FFFFFF", bold=True, size=10)
 TITLE_FONT = Font(bold=True, size=13, color="1F3864")
 SUB_FONT = Font(size=9, italic=True, color="595959")
 THIN = Side(style="thin", color="BFBFBF")
-SUMHDR = ["Subsector", "Companies", "Core", "Ramp 1", "Total Mkt Cap (USD $M)"]
+SUMHDR = ["Subsector", "Companies", "Core", "Rated", "Total Mkt Cap (USD $M)"]
 
 
 def num(x):
@@ -113,12 +113,6 @@ def num(x):
         return None if f != f else f
     except (TypeError, ValueError):
         return None
-
-
-def basesym(t):
-    """'DAE SW' -> DAE, '1SXP.DE' -> 1SXP. Used ONLY to match JP's legacy sheet,
-    never to key a vendor lookup -- a bare symbol is what causes the collisions."""
-    return str(t or "").strip().upper().split(" ")[0].split(".")[0]
 
 
 def size_bucket(mcap_usd_m):
@@ -290,20 +284,6 @@ def fetch_fx(currencies):
     return fx
 
 
-def legacy_bases():
-    """Tickers on JP's existing coverage sheet -> Ramp Effort 1."""
-    if not os.path.exists(LEGACY):
-        print("  legacy sheet not found; Ramp Effort left blank", file=sys.stderr)
-        return set()
-    ws = openpyxl.load_workbook(LEGACY, data_only=True)["JP Coverage"]
-    out = set()
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=6, values_only=True):
-        t = row[3]
-        if t and str(t).strip().lower() not in ("ticker", "count", "#"):
-            out.add(basesym(t))
-    return out
-
-
 def load_returns():
     """Calendar-year returns from the newest weekly performance snapshot.
 
@@ -396,9 +376,6 @@ def build_records(asof):
         print("  currencies Yahoo used that the universe did not declare: %s"
               % ", ".join(sorted(extra)))
         fx.update({k: v for k, v in fetch_fx(sorted(extra)).items() if k not in fx})
-    legacy = legacy_bases()
-    # Owens & Minor renamed to Accendra Health; same company, so it keeps the credit.
-    renamed = {"ACH": "OMI"}
     returns, returns_asof = load_returns()
     ratings = load_ratings()
 
@@ -418,7 +395,6 @@ def build_records(asof):
         rate = fx.get("GBP") if ccy == "GBp" else fx.get(ccy)
         mc = num(d.get("marketCap"))
         px = num(d.get("regularMarketPrice")) or num(d.get("currentPrice"))
-        known = basesym(t) in legacy or renamed.get(t.strip().upper()) in legacy
         mcap_usd_m = (mc * rate / 1e6) if (mc and rate) else None
 
         rating = None
@@ -453,7 +429,6 @@ def build_records(asof):
             # against the price (pence-vs-pounds alone is a 100x trap). A blank
             # here means "not known", which is a true statement.
             "Fwd P/E": forward_pe(d.get("forwardPE")),
-            "Ramp Effort (1/2)": 1 if known else None,
         }
         rec.update({c: None for c in RETURN_COLS})
         rec.update(returns.get(t, {}))
@@ -514,7 +489,7 @@ def write_sheet(wb, title, rows, subtitle):
     for j, col in enumerate(COLS, start=2):
         c = ws.cell(hr, j, col)
         c.font = HDR_FONT
-        c.fill = RAMP_FILL if col == "Ramp Effort (1/2)" else HDR_FILL
+        c.fill = RAMP_FILL if col == "Rating" else HDR_FILL
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws.row_dimensions[hr].height = 30
 
@@ -527,11 +502,11 @@ def write_sheet(wb, title, rows, subtitle):
                 cell.number_format = "#,##0"
             elif col == "Price (local)":
                 cell.number_format = "#,##0.00"
-            if col in ("Core Coverage", "Rating", "Ccy", "Ramp Effort (1/2)"):
+            if col in ("Core Coverage", "Rating", "Ccy", "Size"):
                 cell.alignment = Alignment(horizontal="center")
             if col == "Company Name":
                 cell.font = Font(bold=True, size=10)
-            if col == "Ramp Effort (1/2)" and r[col] == 1:
+            if col == "Rating" and r[col] not in (None, ""):
                 cell.fill = RAMP_CELL
                 cell.font = Font(bold=True, size=10, color="1F5132")
         for j in range(1, len(COLS) + 2):
@@ -548,11 +523,12 @@ def write_summary(wb, allr, mt, hs, asof, src):
     ws = wb.create_sheet("Summary")
     ws["A1"] = "Coverage Summary - Healthcare Services & MedTech"
     ws["A1"].font = TITLE_FONT
-    nramp = sum(1 for r in allr if r["Ramp Effort (1/2)"] == 1)
+    nrated = sum(1 for r in allr if r["Rating"] not in (None, ""))
     ws["A2"] = ("As of %s.  %d companies (%d MedTech, %d Healthcare Services).  "
-                "%d marked Core Coverage.  %d marked Ramp Effort 1, %d blank."
+                "%d marked Core Coverage.  %d carry a Rating, %d blank."
                 % (asof, len(allr), len(mt), len(hs),
-                   sum(1 for r in allr if r["Core Coverage"] == "Y"), nramp, len(allr) - nramp))
+                   sum(1 for r in allr if r["Core Coverage"] == "Y"), nrated,
+                   len(allr) - nrated))
     ws["A2"].font = SUB_FONT
 
     row = 4
@@ -562,7 +538,7 @@ def write_summary(wb, allr, mt, hs, asof, src):
         for j, h in enumerate(SUMHDR, start=1):
             c = ws.cell(row, j, h)
             c.font = HDR_FONT
-            c.fill = RAMP_FILL if h == "Ramp 1" else HDR_FILL
+            c.fill = RAMP_FILL if h == "Rated" else HDR_FILL
             c.alignment = Alignment(horizontal="center", wrap_text=True)
         ws.row_dimensions[row].height = 28
         row += 1
@@ -575,7 +551,7 @@ def write_summary(wb, allr, mt, hs, asof, src):
             ws.cell(row, 1, name)
             ws.cell(row, 2, len(grp)).alignment = Alignment(horizontal="center")
             ws.cell(row, 3, sum(1 for x in grp if x["Core Coverage"] == "Y")).alignment = Alignment(horizontal="center")
-            c = ws.cell(row, 4, sum(1 for x in grp if x["Ramp Effort (1/2)"] == 1))
+            c = ws.cell(row, 4, sum(1 for x in grp if x["Rating"] not in (None, "")))
             c.alignment = Alignment(horizontal="center")
             c.fill = RAMP_CELL
             ws.cell(row, 5, sum(caps) if caps else None).number_format = "#,##0"
@@ -584,7 +560,7 @@ def write_summary(wb, allr, mt, hs, asof, src):
         ws.cell(row, 1, sec + " total").font = Font(bold=True)
         for j, v in ((2, len(rows)),
                      (3, sum(1 for x in rows if x["Core Coverage"] == "Y")),
-                     (4, sum(1 for x in rows if x["Ramp Effort (1/2)"] == 1))):
+                     (4, sum(1 for x in rows if x["Rating"] not in (None, "")))):
             c = ws.cell(row, j, v)
             c.font = Font(bold=True)
             c.alignment = Alignment(horizontal="center")
@@ -596,9 +572,9 @@ def write_summary(wb, allr, mt, hs, asof, src):
     for n in [
         src,
         "Rebuilt by Coverage Manager scripts/build_hc_coverage_xlsx.py. The previous version of this file is in archive/, stamped with the date it was built.",
-        "Ramp Effort (1/2) = 1 where the name already appears in 'Jason Peterson Coverage.xlsx'. Matched on the base symbol, because the two files write some symbols differently (STMN.SW = 'STMN SW', 1SXP.DE = '1SXP', CVSG.L = 'CVSG', and so on).",
-        "ACH (Accendra Health) counts as Ramp 1 because it is Owens & Minor renamed - 'OMI' on the legacy sheet.",
-        "Core Coverage = the 'Core' flag on the Coverage Manager universe. It is a separate judgement from Ramp Effort.",
+        "Rating is joined by ticker from Ratings_CoreCoverage.xlsx in the parent folder, which this build never writes - it is yours to edit. A blank means you have not rated that name yet.",
+        "A rating is NOT attached when that file names a different company for the same ticker; the row is reported instead, because a ticker can be reassigned to another issuer and a silently carried-over rating is worse than a blank one.",
+        "Core Coverage = the 'Core' flag on the Coverage Manager universe - the names you cover analytically. Separate from whether you have rated them.",
         "Prices are in local trading currency; market cap is USD at spot FX on the build date. The LSE names quote in pence (GBp).",
         "FOOTNOTE ON THE RETURN COLUMNS (2019-2025, YTD): these are TOTAL returns on split- and dividend-adjusted prices, and they are NOT as of the build date above - they come from the Coverage Manager weekly performance snapshot named in the caption. YTD in particular is as of that snapshot, while Price and Mkt Cap are same-day. A blank is a company that did not trade that year, never a zero.",
         "Size: LC at or above USD 25,000M market cap, SMID below. That threshold is a policy choice, not a measurement - the reference sheet only pins it between USD 22.7bn (SMID) and USD 34.2bn (LC). Names near the line move with price and FX.",
@@ -807,18 +783,40 @@ def main():
     recs, returns_asof, ambiguous = build_records(asof)
     mt = [r for r in recs if r["Sector"] == "MedTech"]
     hs = [r for r in recs if r["Sector"] == "Healthcare Services"]
-    ret_note = ("Returns are from the Coverage Manager performance snapshot built %s"
-                % returns_asof.isoformat()) if returns_asof else                "Returns unavailable (no fresh performance snapshot)"
+    if returns_asof:
+        ret_note = ("Returns are from the Coverage Manager performance snapshot "
+                    "built %s" % returns_asof.isoformat())
+    else:
+        ret_note = "Returns unavailable (no fresh performance snapshot)"
     src = ("Source: Coverage Manager exports/universe.csv, filtered to Sector (JP) in "
            "(Healthcare Services, MedTech). Price and market cap pulled %s from Yahoo "
            "Finance, falling back to FMP per row where Yahoo had no answer. %s."
            % (asof, ret_note))
 
+    # One line that travels WITH the data. The xlsx carries it as the subtitle
+    # under the title; the CSV carries it as a preamble row, which is the only way
+    # it reaches the Google Sheet -- that Sheet is a single =IMPORTDATA cell and
+    # nothing here can write to any other cell of it. JP asked for "when it was
+    # last updated and any relevant background" to live in the file itself, so a
+    # reader never has to come and ask which of these numbers is stale.
+    provenance = (
+        "AA_Core Coverage - LAST UPDATED %s %s. Rebuilt automatically every Friday "
+        "by Coverage Manager (scheduled task WeeklyCoverageBuilder), immediately "
+        "after the weekly performance run so prices and returns share one as-of "
+        "date. %d names: Sector (JP) in (Healthcare Services, MedTech). "
+        "Price/market cap from Yahoo Finance that morning, FMP per row where Yahoo "
+        "had no answer; market cap USD at spot FX, price in local currency. %s. "
+        "Size: LC at or above USD 25,000M, else SMID. Fwd P/E is Yahoo's next-twelve-"
+        "month figure, blank where absent or non-positive. Rating is joined by ticker "
+        "from Ratings_CoreCoverage.xlsx and is yours to edit - this build never "
+        "writes it."
+        % (asof, datetime.datetime.now().strftime("%H:%M"), len(recs), ret_note))
+
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
-    write_sheet(wb, "Coverage List", recs, "All %d names  |  %s" % (len(recs), src))
-    write_sheet(wb, "MedTech", mt, "%d names  |  %s" % (len(mt), src))
-    write_sheet(wb, "Healthcare Services", hs, "%d names  |  %s" % (len(hs), src))
+    write_sheet(wb, "Coverage List", recs, provenance)
+    write_sheet(wb, "MedTech", mt, "%d names.  %s" % (len(mt), provenance))
+    write_sheet(wb, "Healthcare Services", hs, "%d names.  %s" % (len(hs), provenance))
     write_summary(wb, recs, mt, hs, asof, src)
     wb.move_sheet("Summary", offset=-4)
 
@@ -867,8 +865,12 @@ def main():
     #      can only rename and move a Sheet -- it cannot write cells -- so the
     #      alternative was replacing the file every build and minting a new URL
     #      each time, which breaks every link to it.
-    def _flatten(cols):
-        out = [["#"] + cols]
+    def _flatten(cols, preamble=None):
+        out = []
+        if preamble:
+            out.append([preamble])
+            out.append([])
+        out.append(["#"] + cols)
         for i, r in enumerate(recs, 1):
             out.append([i] + [
                 ("" if r.get(c) is None else
@@ -878,21 +880,21 @@ def main():
     # Beside the workbook: the FULL schema, ratings included. This folder is JP's.
     private_csv = os.path.join(args.out_dir, "%s.csv" % STEM)
     with open(private_csv, "w", newline="", encoding="utf-8") as fh:
-        csv.writer(fh).writerows(_flatten(COLS))
+        csv.writer(fh).writerows(_flatten(COLS, provenance))
     print("wrote %s" % private_csv)
 
     # docs/: PUBLIC. Served by GitHub Pages to anyone with the URL, and read by the
     # Google Sheet. Ratings are dropped here -- see PRIVATE_ONLY.
     os.makedirs(os.path.dirname(PUBLIC_CSV), exist_ok=True)
     with open(PUBLIC_CSV, "w", newline="", encoding="utf-8") as fh:
-        csv.writer(fh).writerows(_flatten(PUBLIC_COLS))
+        csv.writer(fh).writerows(_flatten(PUBLIC_COLS, provenance))
     print("wrote %s  (public schema, %d of %d columns)"
           % (PUBLIC_CSV, len(PUBLIC_COLS), len(COLS)))
     print("  NOTE: docs/ is only served after a git commit+push of this repo.")
 
     print(json.dumps({
         "asof": asof, "rows": len(recs), "medtech": len(mt), "hc_services": len(hs),
-        "ramp_1": sum(1 for r in recs if r["Ramp Effort (1/2)"] == 1),
+        "rated": sum(1 for r in recs if r["Rating"] not in (None, "")),
         "total_mkt_cap_usd_bn": round(sum(r["Mkt Cap (USD $M)"] or 0 for r in recs) / 1000, 1),
     }, indent=1))
 
