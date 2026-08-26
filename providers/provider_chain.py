@@ -116,15 +116,30 @@ def fetch_fundamentals_with_fallback(
 
     # AlphaVantage as final fallback if still not successful
     if not _is_success(result) and av_key:
-        try:
-            av_symbol = ticker.split(".")[0] if "." in ticker else ticker
-            av_data = av_fetch(av_symbol, av_key, use_cache=use_cache)
-            if av_data and av_data.get("Mkt Cap") is not None:
-                _merge_partial(result, av_data)
-                if provider_used == "none":
-                    provider_used = "alphavantage"
-        except Exception as e:
-            log_exception(logger, f"AlphaVantage fallback failed for {ticker}", e)
+        # ⛑ A SUFFIXED SYMBOL IS NEVER SENT HERE, AND IS NEVER STRIPPED TO FIT.
+        # This used to read `av_symbol = ticker.split(".")[0]`, which turns
+        # `MED.SW` (Medartis, SIX) into `MED` and asks AlphaVantage about
+        # MEDIFAST — then `_merge_partial` folds the namesake's market cap,
+        # margins and growth into the row with no currency guard. That is the
+        # wrong-company bug class this repo has repaired three times, except
+        # reached from a row whose ticker is entirely CORRECT, so no amount of
+        # fixing the universe prevents it.
+        # AlphaVantage is a US-symbol service and a foreign line simply has no
+        # answer here. Skipping yields a missing value, which is visible; the
+        # strip yielded a confident wrong one, which is not.
+        if "." in ticker or " " in ticker:
+            logger.debug(
+                "AlphaVantage fallback skipped for %s: suffixed/foreign symbol, "
+                "and stripping the suffix would query a different issuer", ticker)
+        else:
+            try:
+                av_data = av_fetch(ticker, av_key, use_cache=use_cache)
+                if av_data and av_data.get("Mkt Cap") is not None:
+                    _merge_partial(result, av_data)
+                    if provider_used == "none":
+                        provider_used = "alphavantage"
+            except Exception as e:
+                log_exception(logger, f"AlphaVantage fallback failed for {ticker}", e)
 
     # Finnhub TTM overlay always wins for growth + PEG
     if finnhub_metrics:

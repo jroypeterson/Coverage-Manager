@@ -49,7 +49,12 @@ LEGACY = os.path.join(DEFAULT_OUT, "Jason Peterson Coverage.xlsx")
 # cell, so renaming the endpoint silently empties the Sheet.
 PUBLIC_CSV = os.path.join(REPO, "docs", "hc_coverage.csv")
 
-RATINGS_PATH = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings/Ratings.xlsx"
+RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
+RATINGS_PATH = os.path.join(RATINGS_DIR, "Ratings_CoreCoverage.xlsx")
+# Scope: rows flagged `Core` in the universe -- the names JP covers analytically
+# (310 of 1,346, spanning every sector, not just the HC segment). JP 2026-08-26:
+# "I just want stocks in there that are coded as part of core=Y in the coverage
+# manager." Seeding the whole universe made a 1,346-row sheet nobody would fill in.
 
 SECTORS = ("Healthcare Services", "MedTech")
 
@@ -112,6 +117,26 @@ def basesym(t):
     """'DAE SW' -> DAE, '1SXP.DE' -> 1SXP. Used ONLY to match JP's legacy sheet,
     never to key a vendor lookup -- a bare symbol is what causes the collisions."""
     return str(t or "").strip().upper().split(" ")[0].split(".")[0]
+
+
+def size_bucket(mcap_usd_m):
+    """LC / SMID / blank. Blank when the market cap is unknown -- the partial-book
+    guard tolerates up to 5% missing, so a bucket must never be invented."""
+    if mcap_usd_m is None:
+        return None
+    return "LC" if mcap_usd_m >= LC_THRESHOLD_USD_M else "SMID"
+
+
+def forward_pe(raw):
+    """Yahoo's forwardPE, or None. Non-positive is None, not a negative multiple.
+
+    Yahoo returns a negative forwardPE for a company expected to lose money
+    (Guardant: -380.9). That is the sign of the EPS estimate leaking through a
+    ratio, not a valuation, and sorting a column containing it puts the biggest
+    loss-maker at the top as if it were the cheapest name on the sheet.
+    """
+    v = num(raw)
+    return v if (v is not None and v > 0) else None
 
 
 def _payload_names_match(a, b):
@@ -419,19 +444,13 @@ def build_records(asof):
             "Mkt Cap (USD $M)": mcap_usd_m,
             # Blank, never a guessed bucket, when the market cap is unknown. The
             # partial-book guard tolerates up to 5% missing, so this does happen.
-            "Size": (None if mcap_usd_m is None
-                     else ("LC" if mcap_usd_m >= LC_THRESHOLD_USD_M else "SMID")),
+            "Size": size_bucket(mcap_usd_m),
             # Yahoo's forwardPE only -- genuinely NTM. Never backfilled from FMP's
             # trailing P/E, and never from Price/FY1-estimate either: an annual FY1
             # figure is not NTM, and its currency and share basis are unvalidated
             # against the price (pence-vs-pounds alone is a 100x trap). A blank
             # here means "not known", which is a true statement.
-            # Non-positive is blanked. Yahoo returns a negative forwardPE for a
-            # company expected to lose money (Guardant came back -380.9), and that
-            # is not a valuation multiple -- it is the sign of the EPS estimate
-            # leaking through a ratio. Ranking or averaging a column containing it
-            # gives a loss-maker the appearance of the cheapest name on the sheet.
-            "Fwd P/E": (fpe if (fpe := num(d.get("forwardPE"))) and fpe > 0 else None),
+            "Fwd P/E": forward_pe(d.get("forwardPE")),
             "Ramp Effort (1/2)": 1 if known else None,
         }
         rec.update({c: None for c in RETURN_COLS})
@@ -582,7 +601,7 @@ def write_summary(wb, allr, mt, hs, asof, src):
         "FOOTNOTE ON THE RETURN COLUMNS (2019-2025, YTD): these are TOTAL returns on split- and dividend-adjusted prices, and they are NOT as of the build date above - they come from the Coverage Manager weekly performance snapshot named in the caption. YTD in particular is as of that snapshot, while Price and Mkt Cap are same-day. A blank is a company that did not trade that year, never a zero.",
         "Size: LC at or above USD 25,000M market cap, SMID below. That threshold is a policy choice, not a measurement - the reference sheet only pins it between USD 22.7bn (SMID) and USD 34.2bn (LC). Names near the line move with price and FX.",
         "Fwd P/E is Yahoo's forwardPE (next twelve months) and is blank where Yahoo has none. It is deliberately never backfilled from a trailing P/E or from an annual FY1 estimate - both would be a different measure under the same heading.",
-        "Rating is joined from Companies_Stocks_Sectors_Ratings/Ratings.xlsx, which this build never writes. It is omitted from the published CSV and the Google Sheet.",
+        "Rating is joined from Companies_Stocks_Sectors_Ratings/Ratings_CoreCoverage.xlsx (Core=Y names only), which this build never writes. It is omitted from the published CSV and the Google Sheet.",
         "Some rows are priced under a different symbol than the Ticker column shows - Coverage Manager keys them by its own convention and Yahoo needs another string. MED and MOVE are the ones that matter: their bare symbols collide with live US listings.",
     ]:
         row += 1
@@ -658,9 +677,15 @@ def sync_ratings():
     row is marked `REVIEW - issuer may have changed`, the rating stops attaching,
     and JP adjudicates. Fail closed.
     """
-    uni = list(csv.DictReader(open(UNIVERSE, encoding="utf-8")))
-    by_ticker = {r["Ticker"]: r for r in uni}
+    everything = list(csv.DictReader(open(UNIVERSE, encoding="utf-8")))
+    uni = [r for r in everything if r.get("Core", "").strip().upper() == "Y"]
+    # Keyed on the FULL universe, not just the core slice: a row that has dropped
+    # out of Core still needs its name checked before its rating is trusted, and
+    # "no longer core" is a different fact from "no longer exists".
+    by_ticker = {r["Ticker"]: r for r in everything}
+    core_tickers = {r["Ticker"] for r in uni}
     today = datetime.date.today().isoformat()
+    print("core=Y in universe: %d of %d rows" % (len(uni), len(everything)))
 
     if os.path.exists(RATINGS_PATH):
         wb = openpyxl.load_workbook(RATINGS_PATH)
@@ -686,7 +711,7 @@ def sync_ratings():
         ws.row_dimensions[1].height = 28
         idx = {c: j for j, c in enumerate(RATING_COLS, start=1)}
 
-    seen, dupes, added, reviewed, retired = {}, [], 0, [], 0
+    seen, dupes, added, reviewed, retired, uncored = {}, [], 0, [], 0, 0
     for rr in range(2, ws.max_row + 1):
         t = ws.cell(rr, idx["Ticker"]).value
         if not t:
@@ -706,6 +731,14 @@ def sync_ratings():
             ws.cell(rr, idx["Status"], "Not in universe")
             ws.cell(rr, idx["Last Synced"], today)
             retired += 1
+            continue
+        if t not in core_tickers:
+            # Dropped out of core coverage. The row and JP's rating STAY -- he formed
+            # that view and it is not the sync's to discard -- but the status says so,
+            # so a stale rating is visible rather than silently current.
+            ws.cell(rr, idx["Status"], "No longer Core=Y")
+            ws.cell(rr, idx["Last Synced"], today)
+            uncored += 1
             continue
         stored_name = str(ws.cell(rr, idx["Company Name"]).value or "").strip()
         if stored_name and not _payload_names_match(stored_name, u["Company Name"]):
@@ -745,8 +778,9 @@ def sync_ratings():
                          % RATINGS_PATH)
 
     print("ratings file: %s" % RATINGS_PATH)
-    print("  rows now %d | added %d | marked not-in-universe %d | flagged for review %d"
-          % (ws.max_row - 1, added, retired, len(reviewed)))
+    print("  rows now %d | added %d | not-in-universe %d | no-longer-core %d | "
+          "flagged for review %d"
+          % (ws.max_row - 1, added, retired, uncored, len(reviewed)))
     for t, old, new in reviewed:
         print("     REVIEW %-10s ratings says '%s', universe says '%s'" % (t, old, new))
     if reviewed:

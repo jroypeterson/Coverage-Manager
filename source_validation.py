@@ -153,7 +153,16 @@ def _collect_ticker_snapshots(row, use_cache=True):
     fmp_key = API_KEYS.get("FMP_API_KEY", "")
     if fmp_key:
         try:
-            fmp_data, _, fmp_currency = fetch_fmp_fundamentals(ticker, fmp_key, use_cache=use_cache)
+            # ⛑ THE NORMALIZED SYMBOL, the same one yfinance was given.
+            # This passed the RAW `ticker` while yfinance got `yf_ticker`, so for
+            # every bare foreign row the two vendors were asked about DIFFERENT
+            # COMPANIES and the gap was reported as provider disagreement: `MED`
+            # compared Medartis (yf, MED.SW) against Medifast (FMP, MED). The
+            # monetary fields are suppressed by the currency guard, but margins
+            # and growth are not, so a cross-check built to find discrepancies was
+            # manufacturing them. Verified 2026-08-26 that FMP resolves the
+            # suffixed forms directly: MED.SW, SHL.DE, COLO-B.CO, 7701.T, CTEC.L.
+            fmp_data, _, fmp_currency = fetch_fmp_fundamentals(yf_ticker, fmp_key, use_cache=use_cache)
             if any(v is not None for v in fmp_data.values()):
                 snapshots["fmp"] = {"values": fmp_data, "currency": fmp_currency or ""}
         except Exception as exc:

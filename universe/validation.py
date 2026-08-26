@@ -450,6 +450,54 @@ def validate_subsector_populated(df):
     return warnings
 
 
+def validate_bare_foreign_tickers(df):
+    """Warn on a non-US listing whose Ticker carries no exchange suffix.
+
+    This is the offline half of the wrong-company problem, and it is the half
+    `validate_venue_consistency` structurally cannot see. That check asks whether
+    Exchange, Country and Currency agree WITH EACH OTHER — and this failure mode
+    ENDS by making them agree, because enrichment stamps the namesake's venue
+    across the whole row. Every one of the nine rows repaired by hand in July 2026
+    was internally consistent by the time anyone looked at it.
+
+    What a bare foreign ticker actually means is that the row's KEY is ambiguous:
+    handed to any US-defaulting vendor it returns whoever owns that symbol in the
+    US. `MED` is Medartis here and Medifast at Yahoo; `MOVE` is Medacta here and
+    Corvex there; `CSL`, `UCB` and `IPN` have each already cost a repair pass.
+    Those rows read correctly TODAY only because `normalize_ticker` rescues them
+    from the `Exchange` column — so the exposure is not this repo's own reports,
+    it is the ~7 downstream projects that read `exports/universe.csv` and use
+    `Ticker` raw.
+
+    WARNING, never an error, for two reasons: the rows are not currently wrong,
+    and the universe legitimately contains bare tickers for foreign issuers whose
+    listing really is in the US (every ADR — TEVA, ASML, SPOT, MDT). Keying on
+    `Country (Listing)` rather than `Country (HQ)` is what separates those: an ADR
+    lists in the United States and drops out by construction, which is why this
+    flags 25 rows and not the 156 a domicile-based filter would.
+    """
+    warnings = []
+    suspect = []
+    for _, row in df.iterrows():
+        ticker = str(row.get("Ticker", "") or "").strip()
+        listing = str(row.get("Country (Listing)", "") or "").strip()
+        if not ticker or not listing or listing == "United States":
+            continue
+        if "." in ticker or " " in ticker:
+            continue
+        suspect.append(ticker)
+    if suspect:
+        # EVERY ticker, never a truncated sample. The reader of this warning is
+        # asking "is <name> exposed?", and a list cut at 12 answers "no" for the
+        # 13th by omission.
+        warnings.append(
+            "%d row(s) list outside the US but carry a bare ticker with no exchange "
+            "suffix, so any consumer resolving Ticker at a US-defaulting vendor gets "
+            "a different issuer: %s"
+            % (len(suspect), ", ".join(sorted(suspect))))
+    return warnings
+
+
 def run_all_validations(df):
     """Run all validators. Returns (errors, warnings) as lists of strings."""
     errors = []
@@ -466,6 +514,7 @@ def run_all_validations(df):
     warnings.extend(validate_duplicate_companies(df))
     warnings.extend(validate_exchange_populated(df))
     warnings.extend(validate_venue_consistency(df))
+    warnings.extend(validate_bare_foreign_tickers(df))
     warnings.extend(validate_against_provenance_ledger(df))
     warnings.extend(validate_subsector_populated(df))
     warnings.extend(validate_listing_date_agreement(df))

@@ -193,9 +193,37 @@ _LEGAL_FORM_TOKENS = frozenset({
 })
 
 
+_UMLAUT_EXPANSIONS = str.maketrans({
+    "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+    "Ä": "Ae", "Ö": "Oe", "Ü": "Ue",
+})
+
+
 def _payload_tokens(s: str) -> frozenset[str]:
+    """Comparable tokens from a company name.
+
+    ACCENTS ARE FOLDED FIRST, and that is load-bearing rather than tidy. The
+    `[^a-z0-9 ]` scrub turns every accented character into a SPACE, so
+    "bioMérieux" became the two tokens {biom, rieux} while the same company
+    written "bioMerieux" became the one token {biomerieux}. They then share no
+    token at all and `_payload_names_match` returns False — the gate rejecting
+    the company's own payload. Measured on the live universe 2026-08-26:
+    bioMérieux and Dätwyler were the ONLY two false positives in a 135-row
+    identity sweep, and both were this. NFKD + combining-mark strip folds
+    é→e and ä→a before the scrub ever sees them.
+    """
     import re as _re
-    raw = _re.sub(r"[^a-z0-9 ]", " ", str(s or "").lower()).split()
+    import unicodedata as _ud
+
+    # German umlauts transliterate to ae/oe/ue, NOT to bare a/o/u, and BOTH
+    # spellings occur in the wild for one company: this universe stores
+    # "Daetwyler Holding AG" while the vendor answers "Dätwyler". Plain NFKD
+    # folds ä→a and yields "Datwyler", which still does not match "Daetwyler".
+    # So expand these first, then let NFKD handle everything else (é→e, ø→o).
+    folded = str(s or "").translate(_UMLAUT_EXPANSIONS)
+    folded = "".join(c for c in _ud.normalize("NFKD", folded)
+                     if not _ud.combining(c))
+    raw = _re.sub(r"[^a-z0-9 ]", " ", folded.lower()).split()
     return frozenset(t for t in raw if t and t not in _LEGAL_FORM_TOKENS)
 
 
@@ -433,6 +461,23 @@ def enrich_single_ticker(ticker, sector_jp, exchange_hint=None, company_hint=Non
                     log_exception(logger, f"yfinance info failed for {ticker}", e)
                     info = {}
 
+                # GATE THE WHOLE YFINANCE PAYLOAD, exactly as the FMP profile and
+                # the SEC title are gated. It was not, and that was the hole: the
+                # ISIN below has been identity-checked since 81ada8d while Exchange
+                # Code, Currency, Country (HQ), Website, YF Sector/Industry and Year
+                # Listed from the SAME response landed unchecked. Every wrong-issuer
+                # row measured on 2026-08-25 (ASX, ROG, MED, MOVE) came through
+                # yfinance, so the 13f8d01 gate was built one vendor short.
+                # A blank Company Name yields verdict None -> allowed, so a brand
+                # new row still enriches.
+                if info:
+                    vendor_name = str(info.get("longName", "")
+                                      or info.get("shortName", "")).strip()
+                    if vendor_name and not payload_is_for_this_row(
+                            str(row.get("Company Name", "")).strip(),
+                            vendor_name, ticker, "yfinance"):
+                        info = {}
+
                 if info:
                     if not row["Company Name"]:
                         row["Company Name"] = str(info.get("longName", "") or info.get("shortName", "")).strip()
@@ -594,6 +639,19 @@ def fetch_yfinance_identifiers(df):
             # Info dict
             try:
                 info = t.info
+                # Same gate as the single-ticker path. Without it this loop writes
+                # Exchange Code, Currency, Country (HQ), Website and YF Sector/
+                # Industry from whatever issuer the symbol resolved to, and
+                # corrupting `Exchange` is self-perpetuating -- `normalize_ticker`
+                # keys off it, so the next run's lookup goes bare too and the row
+                # converges on the namesake with every column agreeing.
+                if info:
+                    vendor_name = str(info.get("longName", "")
+                                      or info.get("shortName", "")).strip()
+                    if vendor_name and not payload_is_for_this_row(
+                            str(row.get("Company Name", "") or "").strip(),
+                            vendor_name, orig_ticker, "yfinance"):
+                        info = {}
                 if info:
                     data["Exchange Code"] = info.get("exchange", "")
                     data["Exchange Full Name"] = info.get("fullExchangeName", "")

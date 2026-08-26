@@ -1,240 +1,240 @@
 #,Ticker,Company Name,Sector,Subsector,Sub-subsector,Core Coverage,Listing,Exchange,Country (HQ),Ccy,Price (local),Mkt Cap (USD $M),Size,Fwd P/E,2019,2020,2021,2022,2023,2024,2025,YTD,Ramp Effort (1/2)
-1,JNJ,Johnson & Johnson,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,271.36,653938.07,LC,22.05,16.22,10.82,11.44,5.97,-8.58,-4.81,47.48,30.63,
-2,TMO,Thermo Fisher Scientific Inc,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,630.65,233181.13,LC,22.92,45.55,43.72,43.54,-17.29,-3.36,-1.72,11.78,8.52,
-3,ABT,Abbott Laboratories,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,115.06,199097.91,LC,18.97,22.08,28.04,30.53,-20.68,2.26,4.81,12.87,-7.21,
-4,DHR,Danaher Corp,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,215.96,151816.86,LC,23.23,49.55,45.34,48.57,-19.02,-1.24,-0.35,0.35,-5.29,
-5,ISRG,Intuitive Surgical Inc,MedTech,Surgery,Surgical Robotics,Y,Primary,NASDAQ,United States,USD,366.78,131409.22,LC,30.39,23.43,38.39,31.76,-26.15,27.14,54.72,8.51,-33.88,
-6,SYK,Stryker Corp,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,330.59,126805.42,LC,19.73,35.33,18.17,10.22,-7.42,23.8,21.34,-1.48,-6.26,
-7,MDT,Medtronic plc,MedTech,Diversified MedTech,,Y,ADR/Cross-listed,NYSE,Ireland,USD,91.66,117316.64,LC,14.31,27.34,5.7,-9.79,-22.55,9.58,0.28,24.05,-2.26,
-8,BSX,Boston Scientific Corp,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,47.55,68903.62,LC,13.85,27.96,-20.5,18.16,8.92,24.94,54.51,6.75,-48.22,
-9,7741.T,Hoya Corporation,MedTech,Ophthalmology,,Y,Primary,TSE,Japan,JPY,24965.0,52429.94,LC,36.54,59.75,37.69,20.61,-25.16,39.78,13.06,21.05,5.77,
-10,EW,Edwards Lifesciences Corp,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,90.75,52311.18,LC,26.87,52.31,17.32,42.0,-42.41,2.2,-2.91,15.16,5.37,
-11,BDX,Becton Dickinson and Co,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,190.53,51897.86,LC,14.33,22.2,-6.75,1.88,5.08,-2.67,-5.38,-12.61,24.63,
-12,SHL GY,Siemens Healthineers AG,MedTech,Hospital Supply & Equipment,,Y,Primary,XETRA,Germany,EUR,39.52,51556.99,LC,16.71,19.54,-0.03,59.4,-27.91,14.68,-0.82,-10.78,-9.63,
-13,LONN CH,Lonza Group AG,MedTech,Life Science Tools,CDMO,Y,Primary,SIX,Switzerland,CHF,589.0,51085.65,LC,26.79,39.91,62.08,34.6,-40.18,-21.46,52.64,1.08,9.95,
-14,NTRA,"Natera, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,340.25,49045.06,LC,,141.33,195.4,-6.16,-56.99,55.94,152.71,44.72,41.8,
-15,A,"Agilent Technologies, Inc.",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,154.05,43508.64,LC,23.3,27.54,39.79,35.51,-5.52,-6.42,-2.7,1.92,15.56,
-16,WAT,Waters Corp,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,417.02,40945.95,LC,25.2,23.85,5.89,50.59,-8.06,-3.9,12.68,2.39,6.55,
-17,ALC,Alcon Inc.,MedTech,Ophthalmology,,Y,ADR/Cross-listed,NYSE,Switzerland,USD,72.67,35131.1,LC,18.27,,16.63,32.23,-21.09,14.32,9.02,-6.84,-7.01,
-18,ILMN,"Illumina, Inc.",MedTech,Diagnostics,NextGen Sequencing,Y,Primary,NASDAQ,United States,USD,225.97,34121.47,LC,37.07,10.61,11.53,2.82,-46.85,-31.14,-1.34,-1.85,62.58,
-19,RMD,Resmed Inc,MedTech,Sleep,,Y,Primary,NYSE,United States,USD,233.84,33731.96,LC,17.69,37.85,38.33,23.41,-19.47,-16.55,34.18,6.26,-4.38,
-20,DXCM,"DexCom, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,88.53,33407.75,LC,28.34,82.59,69.02,45.23,-15.64,9.58,-37.33,-14.66,35.93,
-21,GEHC,GE HealthCare Technologies Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,73.72,33298.31,LC,13.63,,,,,32.6,1.26,5.11,-9.57,
-22,MTD,Mettler-Toledo International Inc,MedTech,Life Science Tools,,Y,ADR/Cross-listed,NYSE,Switzerland,USD,1405.15,28154.37,LC,27.18,40.26,43.67,48.92,-14.83,-16.08,0.88,13.93,-0.07,
-23,PHG,Koninklijke Philips N.V.,MedTech,Sleep,,Y,ADR/Cross-listed,NYSE,Netherlands,USD,27.02,26410.09,LC,14.19,42.23,11.0,-30.75,-57.64,55.64,8.53,11.25,5.51,
-24,WST,West Pharmaceutical Services Inc,MedTech,Packaging,,Y,Primary,NYSE,United States,USD,351.31,24723.71,SMID,35.26,54.13,89.05,65.88,-49.7,49.97,-6.75,-15.73,28.88,1
+1,JNJ,Johnson & Johnson,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,270.18,651106.39,LC,21.95,16.22,10.82,11.44,5.97,-8.58,-4.81,47.48,30.63,
+2,TMO,Thermo Fisher Scientific Inc,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,634.25,234512.22,LC,23.06,45.55,43.72,43.54,-17.29,-3.36,-1.72,11.78,8.52,
+3,ABT,Abbott Laboratories,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,114.56,198224.07,LC,18.89,22.08,28.04,30.53,-20.68,2.26,4.81,12.87,-7.21,
+4,DHR,Danaher Corp,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,216.14,151943.4,LC,23.25,49.55,45.34,48.57,-19.02,-1.24,-0.35,0.35,-5.29,
+5,ISRG,Intuitive Surgical Inc,MedTech,Surgery,Surgical Robotics,Y,Primary,NASDAQ,United States,USD,370.95,132903.25,LC,30.73,23.43,38.39,31.76,-26.15,27.14,54.72,8.51,-33.88,
+6,SYK,Stryker Corp,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,331.63,127204.34,LC,19.79,35.33,18.17,10.22,-7.42,23.8,21.34,-1.48,-6.26,
+7,MDT,Medtronic plc,MedTech,Diversified MedTech,,Y,ADR/Cross-listed,NYSE,Ireland,USD,92.45,118334.22,LC,14.44,27.34,5.7,-9.79,-22.55,9.58,0.28,24.05,-2.26,
+8,BSX,Boston Scientific Corp,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,48.45,70207.92,LC,14.11,27.96,-20.5,18.16,8.92,24.94,54.51,6.75,-48.22,
+9,EW,Edwards Lifesciences Corp,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,91.37,52665.67,LC,27.05,52.31,17.32,42.0,-42.41,2.2,-2.91,15.16,5.37,
+10,7741.T,Hoya Corporation,MedTech,Ophthalmology,,Y,Primary,TSE,Japan,JPY,24965.0,52429.94,LC,36.54,59.75,37.69,20.61,-25.16,39.78,13.06,21.05,5.77,
+11,BDX,Becton Dickinson and Co,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,190.46,51878.79,LC,14.33,22.2,-6.75,1.88,5.08,-2.67,-5.38,-12.61,24.63,
+12,SHL GY,Siemens Healthineers AG,MedTech,Hospital Supply & Equipment,,Y,Primary,XETRA,Germany,EUR,39.26,51217.8,LC,16.6,19.54,-0.03,59.4,-27.91,14.68,-0.82,-10.78,-9.63,
+13,LONN CH,Lonza Group AG,MedTech,Life Science Tools,CDMO,Y,Primary,SIX,Switzerland,CHF,587.8,50981.56,LC,26.74,39.91,62.08,34.6,-40.18,-21.46,52.64,1.08,9.95,
+14,NTRA,"Natera, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,338.52,48795.68,LC,,141.33,195.4,-6.16,-56.99,55.94,152.71,44.72,41.8,
+15,A,"Agilent Technologies, Inc.",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,153.6,43381.55,LC,23.23,27.54,39.79,35.51,-5.52,-6.42,-2.7,1.92,15.56,
+16,WAT,Waters Corp,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,413.28,40578.25,LC,24.98,23.85,5.89,50.59,-8.06,-3.9,12.68,2.39,6.55,
+17,ALC,Alcon Inc.,MedTech,Ophthalmology,,Y,ADR/Cross-listed,NYSE,Switzerland,USD,72.92,35251.95,LC,18.33,,16.63,32.23,-21.09,14.32,9.02,-6.84,-7.01,
+18,RMD,Resmed Inc,MedTech,Sleep,,Y,Primary,NYSE,United States,USD,237.62,34277.23,LC,17.98,37.85,38.33,23.41,-19.47,-16.55,34.18,6.26,-4.38,
+19,ILMN,"Illumina, Inc.",MedTech,Diagnostics,NextGen Sequencing,Y,Primary,NASDAQ,United States,USD,224.32,33872.32,LC,36.8,10.61,11.53,2.82,-46.85,-31.14,-1.34,-1.85,62.58,
+20,DXCM,"DexCom, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,89.66,33834.17,LC,28.7,82.59,69.02,45.23,-15.64,9.58,-37.33,-14.66,35.93,
+21,GEHC,GE HealthCare Technologies Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,73.6,33244.11,LC,13.6,,,,,32.6,1.26,5.11,-9.57,
+22,MTD,Mettler-Toledo International Inc,MedTech,Life Science Tools,,Y,ADR/Cross-listed,NYSE,Switzerland,USD,1403.17,28114.7,LC,27.15,40.26,43.67,48.92,-14.83,-16.08,0.88,13.93,-0.07,
+23,PHG,Koninklijke Philips N.V.,MedTech,Sleep,,Y,ADR/Cross-listed,NYSE,Netherlands,USD,26.98,26366.11,LC,14.17,42.23,11.0,-30.75,-57.64,55.64,8.53,11.25,5.51,
+24,WST,West Pharmaceutical Services Inc,MedTech,Packaging,,Y,Primary,NYSE,United States,USD,351.47,24734.97,SMID,35.27,54.13,89.05,65.88,-49.7,49.97,-6.75,-15.73,28.88,1
 25,4543.T,Terumo Corporation,MedTech,Cardiovascular,,Y,Primary,TSE,Japan,JPY,2572.0,23818.69,SMID,25.26,25.85,11.78,13.44,-22.19,24.81,33.66,-25.06,13.97,
-26,STE,STERIS plc,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,236.5,23058.29,SMID,19.31,44.09,25.5,29.47,-23.43,20.19,-5.6,24.26,-6.5,
-27,GH,"Guardant Health, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,168.51,22614.07,SMID,,107.87,64.93,-22.39,-72.81,-0.55,12.94,234.34,64.36,
-28,ZBH,"Zimmer Biomet Holdings, Inc",MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,100.6,19188.21,SMID,11.09,45.37,3.77,-17.02,4.24,-3.81,-12.46,-14.03,10.66,
-29,STMN.SW,Straumann Holding AG,MedTech,Dental,,Y,Primary,SIX,Switzerland,CHF,93.68,18549.26,SMID,24.73,54.77,9.39,88.66,-45.21,29.18,-15.23,-17.37,1.07,1
-30,SOON,Sonova Holding AG,MedTech,Hearing Aid,,Y,Primary,SIX,Switzerland,CHF,242.6,17896.33,SMID,20.46,39.68,4.53,57.1,-37.76,27.56,9.63,-28.89,19.42,
-31,COLOB DC,Coloplast A/S,MedTech,Urology,,Y,Primary,OMX Copenhagen,Denmark,DKK,456.2,16027.24,SMID,17.55,39.66,14.67,26.1,-27.8,-2.4,4.47,-27.73,-19.53,
-32,SOLV,Solventum Corporation,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,92.05,15668.24,SMID,12.74,,,,,,,19.95,11.82,
+26,STE,STERIS plc,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,237.0,23107.53,SMID,19.35,44.09,25.5,29.47,-23.43,20.19,-5.6,24.26,-6.5,
+27,GH,"Guardant Health, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,172.14,23100.53,SMID,,107.87,64.93,-22.39,-72.81,-0.55,12.94,234.34,64.36,
+28,ZBH,"Zimmer Biomet Holdings, Inc",MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,101.91,19438.08,SMID,11.24,45.37,3.77,-17.02,4.24,-3.81,-12.46,-14.03,10.66,
+29,STMN.SW,Straumann Holding AG,MedTech,Dental,,Y,Primary,SIX,Switzerland,CHF,92.88,18390.86,SMID,24.51,54.77,9.39,88.66,-45.21,29.18,-15.23,-17.37,1.07,1
+30,SOON,Sonova Holding AG,MedTech,Hearing Aid,,Y,Primary,SIX,Switzerland,CHF,241.2,17793.05,SMID,20.34,39.68,4.53,57.1,-37.76,27.56,9.63,-28.89,19.42,
+31,COLOB DC,Coloplast A/S,MedTech,Urology,,Y,Primary,OMX Copenhagen,Denmark,DKK,454.2,15956.97,SMID,17.47,39.66,14.67,26.1,-27.8,-2.4,4.47,-27.73,-19.53,
+32,SOLV,Solventum Corporation,MedTech,Diversified MedTech,,Y,Primary,NYSE,United States,USD,91.74,15616.34,SMID,12.7,,,,,,,19.95,11.82,
 33,SRT.DE,Sartorius AG,MedTech,Life Science Tools,Bioprocessing,Y,Primary,XETRA,Germany,EUR,193.0,15534.55,SMID,29.88,83.1,97.42,44.91,-32.72,-20.42,-34.77,11.26,3.06,
-34,ERF FP,Eurofins Scientific SE,MedTech,Diagnostics,,Y,ADR/Cross-listed,Euronext Paris,Luxembourg,EUR,73.62,14791.65,SMID,15.67,52.7,38.87,59.66,-37.53,-10.51,-15.45,27.97,17.22,
+34,ERF FP,Eurofins Scientific SE,MedTech,Diagnostics,,Y,ADR/Cross-listed,Euronext Paris,Luxembourg,EUR,72.82,14630.92,SMID,15.5,52.7,38.87,59.66,-37.53,-10.51,-15.45,27.97,17.22,
 35,7733.T,Olympus Corporation,MedTech,Hospital Supply & Equipment,Endoscopy,Y,Primary,TSE,Japan,JPY,2133.0,14232.76,SMID,16.98,101.44,34.36,18.03,-10.69,-12.63,17.14,-15.45,11.46,
-36,COO,"The Cooper Companies, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,72.5,14140.7,SMID,14.51,26.27,13.1,15.33,-21.06,14.47,-2.83,-10.85,-7.08,
-37,RVTY,"Revvity, Inc.",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,125.19,13969.5,SMID,21.25,24.01,48.2,40.37,-30.13,-21.87,2.37,-13.07,28.56,
-38,BAX,Baxter International Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,26.39,13640.94,SMID,12.96,28.4,-2.95,8.48,-39.58,-21.91,-22.4,-33.28,38.34,
-39,PEN,"Penumbra, Inc.",MedTech,Cardiovascular,Peripheral,Y,Primary,NYSE,United States,USD,322.3,12695.21,SMID,52.56,34.43,6.53,64.18,-22.57,13.07,-5.59,30.92,4.13,
-40,ELAN,Elanco Animal Health Incorporated,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,25.04,12506.22,SMID,19.57,-6.6,4.14,-7.47,-56.94,21.93,-18.72,86.87,4.11,
-41,TEM,"Tempus AI, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,68.62,12381.02,SMID,,,,,,,,74.91,12.87,
-42,SNN,Smith & Nephew PLC,MedTech,Orthopedics,,Y,ADR/Cross-listed,NYSE,United Kingdom,USD,29.2,12218.29,SMID,12.03,30.84,-10.4,-16.21,-20.2,4.44,-7.34,36.82,-10.15,
-43,ALGN,"Align Technology, Inc.",MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,159.94,11362.11,SMID,12.75,33.24,91.51,22.98,-67.91,29.92,-23.9,-25.11,1.79,1
-44,TECH,Bio-Techne Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,72.36,11347.37,SMID,31.23,52.67,45.4,63.4,-35.69,-6.49,-6.25,-17.89,23.3,
-45,GMED,Globus Medical Inc,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,82.46,11071.24,SMID,15.37,36.04,10.77,10.7,2.87,-28.25,55.21,5.56,-1.88,
-46,GKOS,Glaukos Corporation,MedTech,Ophthalmology,,Y,Primary,NYSE,United States,USD,180.16,10626.55,SMID,357.23,-3.03,38.17,-40.95,-1.71,81.98,88.63,-24.7,63.75,
-47,BIO,"Bio-Rad Laboratories, Inc. Class A Common Stock",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,389.87,10424.28,SMID,38.88,59.34,57.54,29.61,-44.35,-23.21,1.74,-7.77,24.25,
-48,RGEN,Repligen Corporation,MedTech,Life Science Tools,Bioprocessing,Y,Primary,NASDAQ,United States,USD,182.75,10313.61,SMID,69.25,75.39,107.17,38.2,-36.07,6.2,-19.94,13.84,10.03,
-49,BIM,bioMerieux SA,MedTech,Diagnostics,,Y,Primary,Euronext Paris,France,EUR,74.7,10247.81,SMID,16.01,38.67,45.65,8.98,-20.89,3.68,3.81,7.36,-32.4,
-50,HSIC,"Henry Schein, Inc.",MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,90.14,10045.79,SMID,15.03,8.34,0.21,15.96,3.02,-5.21,-8.6,9.22,17.04,1
-51,PODD,Insulet Corporation,MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,142.08,9853.84,SMID,18.43,115.83,49.32,4.08,10.64,-26.3,20.32,8.88,-48.33,
-52,AVTR,"Avantor, Inc.",MedTech,Life Science Tools,Lab Products / Chemicals,Y,Primary,NYSE,United States,USD,14.52,9817.35,SMID,16.46,,55.1,49.7,-49.95,8.25,-7.71,-45.61,24.35,
-53,TWST,Twist Bioscience Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,152.88,9586.71,SMID,,-9.05,572.81,-45.23,-69.23,54.81,26.07,-31.74,329.79,
-54,QGEN,Qiagen N.V.,MedTech,Diagnostics,,Y,ADR/Cross-listed,NYSE,Netherlands,USD,43.78,9041.38,SMID,16.78,-1.89,56.36,5.17,-10.27,-12.91,2.43,1.51,0.74,
-55,BRKR,Bruker Corp,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,57.34,8736.28,SMID,23.83,71.85,6.58,55.35,-18.29,7.82,-19.99,-19.24,27.49,
-56,ATR,Aptargroup Inc,MedTech,Packaging,,Y,Primary,NYSE,United States,USD,135.66,8625.1,SMID,21.47,24.47,19.87,-9.54,-8.93,13.89,28.6,-21.4,10.26,1
-57,TXG,"10x Genomics, Inc.",MedTech,Diagnostics,NextGen Sequencing,Y,Primary,NASDAQ,United States,USD,62.99,8207.04,SMID,309.79,,85.7,5.2,-75.54,53.57,-74.34,13.58,291.6,
+36,COO,"The Cooper Companies, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,72.87,14211.88,SMID,14.58,26.27,13.1,15.33,-21.06,14.47,-2.83,-10.85,-7.08,
+37,RVTY,"Revvity, Inc.",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,126.32,14095.59,SMID,21.44,24.01,48.2,40.37,-30.13,-21.87,2.37,-13.07,28.56,
+38,BAX,Baxter International Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,26.68,13796.04,SMID,13.1,28.4,-2.95,8.48,-39.58,-21.91,-22.4,-33.28,38.34,
+39,PEN,"Penumbra, Inc.",MedTech,Cardiovascular,Peripheral,Y,Primary,NYSE,United States,USD,323.42,12739.13,SMID,52.74,34.43,6.53,64.18,-22.57,13.07,-5.59,30.92,4.13,
+40,ELAN,Elanco Animal Health Incorporated,MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,25.11,12543.68,SMID,19.63,-6.6,4.14,-7.47,-56.94,21.93,-18.72,86.87,4.11,
+41,TEM,"Tempus AI, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,69.22,12489.69,SMID,,,,,,,,74.91,12.87,
+42,SNN,Smith & Nephew PLC,MedTech,Orthopedics,,Y,ADR/Cross-listed,NYSE,United Kingdom,USD,29.39,12297.81,SMID,12.11,30.84,-10.4,-16.21,-20.2,4.44,-7.34,36.82,-10.15,
+43,ALGN,"Align Technology, Inc.",MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,160.58,11407.58,SMID,12.8,33.24,91.51,22.98,-67.91,29.92,-23.9,-25.11,1.79,1
+44,TECH,Bio-Techne Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,72.38,11349.78,SMID,31.24,52.67,45.4,63.4,-35.69,-6.49,-6.25,-17.89,23.3,
+45,GMED,Globus Medical Inc,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,83.62,11226.98,SMID,15.59,36.04,10.77,10.7,2.87,-28.25,55.21,5.56,-1.88,
+46,GKOS,Glaukos Corporation,MedTech,Ophthalmology,,Y,Primary,NYSE,United States,USD,181.13,10683.76,SMID,359.15,-3.03,38.17,-40.95,-1.71,81.98,88.63,-24.7,63.75,
+47,BIO,"Bio-Rad Laboratories, Inc. Class A Common Stock",MedTech,Life Science Tools,,Y,Primary,NYSE,United States,USD,387.48,10360.38,SMID,38.64,59.34,57.54,29.61,-44.35,-23.21,1.74,-7.77,24.25,
+48,RGEN,Repligen Corporation,MedTech,Life Science Tools,Bioprocessing,Y,Primary,NASDAQ,United States,USD,180.89,10208.64,SMID,68.54,75.39,107.17,38.2,-36.07,6.2,-19.94,13.84,10.03,
+49,BIM,bioMerieux SA,MedTech,Diagnostics,,Y,Primary,Euronext Paris,France,EUR,74.3,10192.94,SMID,15.93,38.67,45.65,8.98,-20.89,3.68,3.81,7.36,-32.4,
+50,HSIC,"Henry Schein, Inc.",MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,90.53,10088.7,SMID,15.09,8.34,0.21,15.96,3.02,-5.21,-8.6,9.22,17.04,1
+51,PODD,Insulet Corporation,MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,144.24,10003.65,SMID,18.71,115.83,49.32,4.08,10.64,-26.3,20.32,8.88,-48.33,
+52,AVTR,"Avantor, Inc.",MedTech,Life Science Tools,Lab Products / Chemicals,Y,Primary,NYSE,United States,USD,14.54,9837.64,SMID,16.49,,55.1,49.7,-49.95,8.25,-7.71,-45.61,24.35,
+53,TWST,Twist Bioscience Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,152.08,9536.54,SMID,,-9.05,572.81,-45.23,-69.23,54.81,26.07,-31.74,329.79,
+54,QGEN,Qiagen N.V.,MedTech,Diagnostics,,Y,ADR/Cross-listed,NYSE,Netherlands,USD,43.43,8968.08,SMID,16.64,-1.89,56.36,5.17,-10.27,-12.91,2.43,1.51,0.74,
+55,BRKR,Bruker Corp,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,57.23,8718.76,SMID,23.78,71.85,6.58,55.35,-18.29,7.82,-19.99,-19.24,27.49,
+56,ATR,Aptargroup Inc,MedTech,Packaging,,Y,Primary,NYSE,United States,USD,135.17,8594.26,SMID,21.4,24.47,19.87,-9.54,-8.93,13.89,28.6,-21.4,10.26,1
+57,TXG,"10x Genomics, Inc.",MedTech,Diagnostics,NextGen Sequencing,Y,Primary,NASDAQ,United States,USD,64.2,8365.34,SMID,315.77,,85.7,5.2,-75.54,53.57,-74.34,13.58,291.6,
 58,7701.T,Shimadzu Corporation,MedTech,Life Science Tools,Analytical Instruments,Y,Primary,TSE,Japan,JPY,4110.0,7455.47,SMID,19.15,59.88,17.72,21.94,-21.92,6.73,14.72,-4.92,-0.33,
 59,6869.T,Sysmex Corporation,MedTech,Diagnostics,,Y,Primary,TSE,Japan,JPY,1940.0,7332.52,SMID,18.32,42.61,67.81,26.11,-48.1,-0.7,12.52,-46.23,29.9,
-60,GETIB SS,Getinge AB,MedTech,Cardiovascular,,Y,Primary,OMX Stockholm,Sweden,SEK,244.7,6999.81,SMID,22.37,119.54,11.35,107.98,-44.49,5.44,-17.49,23.62,14.16,
-61,LNTH,"Lantheus Holdings, Inc.",MedTech,Radiopharmaceuticals,,Y,Primary,NASDAQ,United States,USD,100.95,6589.25,SMID,15.96,31.05,-34.23,114.16,76.39,21.66,44.29,-25.61,50.62,
-62,YPSN,Ypsomed Holding AG,MedTech,Packaging,,Y,Primary,SIX,Switzerland,CHF,401.2,6549.97,SMID,26.56,13.38,13.3,26.77,-8.76,80.81,8.62,0.68,26.61,1
+60,GETIB SS,Getinge AB,MedTech,Cardiovascular,,Y,Primary,OMX Stockholm,Sweden,SEK,245.0,7008.39,SMID,22.39,119.54,11.35,107.98,-44.49,5.44,-17.49,23.62,14.16,
+61,LNTH,"Lantheus Holdings, Inc.",MedTech,Radiopharmaceuticals,,Y,Primary,NASDAQ,United States,USD,100.99,6591.86,SMID,15.97,31.05,-34.23,114.16,76.39,21.66,44.29,-25.61,50.62,
+62,YPSN,Ypsomed Holding AG,MedTech,Packaging,,Y,Primary,SIX,Switzerland,CHF,400.4,6536.91,SMID,26.51,13.38,13.3,26.77,-8.76,80.81,8.62,0.68,26.61,1
 63,COH.AX,Cochlear Limited,MedTech,Hearing Aid,,Y,Primary,ASX,Australia,AUD,137.71,6465.24,SMID,23.9,31.71,-15.9,15.66,-4.22,48.33,-1.64,-8.69,-47.37,
-64,STVN,Stevanato Group S.p.A.,MedTech,Packaging,,Y,ADR/Cross-listed,NYSE,Italy,USD,22.89,6250.49,SMID,27.23,,,,-19.66,52.18,-19.92,-7.41,11.48,1
-65,BLCO,Bausch + Lomb Corporation,MedTech,Ophthalmology,,Y,ADR/Cross-listed,NYSE,Canada,USD,17.15,6125.38,SMID,15.69,,,,,9.99,5.86,-5.43,0.7,
-66,CTEC LN,ConvaTec Group PLC,MedTech,Urology,,Y,Primary,LSE,United Kingdom,GBp,230.8,6099.22,SMID,13.8,42.86,0.4,-3.02,20.45,5.01,-9.4,9.97,-7.44,
-67,TFX,Teleflex Incorporated,MedTech,Urology,,Y,Primary,NYSE,United States,USD,139.31,5902.9,SMID,12.72,46.26,9.75,-19.89,-23.61,0.48,-28.16,-30.67,11.47,
-68,SHC,Sotera Health Company,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,19.65,5607.61,SMID,18.28,,,-14.18,-64.63,102.28,-18.81,28.95,8.96,
-69,MMED,MiniMed Group Inc,MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,19.29,5427.24,SMID,29.45,,,,,,,,,
-70,NOVT,Novanta Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,142.6,5392.81,SMID,32.66,40.38,33.67,49.15,-22.95,23.95,-9.29,-22.11,22.3,
-71,MMSI,"Merit Medical Systems, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,89.45,5341.1,SMID,19.4,-44.06,77.8,12.23,13.35,7.56,27.33,-8.87,2.42,
-72,HAE,Haemonetics Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,107.75,4902.53,SMID,18.77,14.84,3.35,-55.33,48.28,8.72,-8.69,2.65,35.02,
-73,BLLN,"BillionToOne, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,97.36,4594.37,SMID,73.21,,,,,,,,16.41,
-74,ICUI,"ICU Medical, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,181.31,4534.03,SMID,18.8,-18.51,14.63,10.65,-33.65,-36.66,55.57,-8.06,27.94,
-75,NVST,Envista Holdings Corporation,MedTech,Dental,,Y,Primary,NYSE,United States,USD,27.71,4450.72,SMID,16.62,,13.8,33.59,-25.28,-28.54,-19.83,12.55,24.04,1
-76,HTFL,"HeartFlow, Inc.",MedTech,Diagnostics,AI,Y,Primary,NASDAQ,United States,USD,49.94,4342.46,SMID,,,,,,,,,60.55,
-77,DIA.MI,DiaSorin S.p.A.,MedTech,Diagnostics,,Y,Primary,Borsa Italiana,Italy,EUR,75.26,4337.38,SMID,17.55,64.75,48.24,-0.87,-21.43,-27.72,8.0,-30.2,10.4,
-78,LIVN,LivaNova PLC,MedTech,Cardiovascular,,Y,ADR/Cross-listed,NASDAQ,United Kingdom,USD,77.88,4278.22,SMID,16.65,-17.54,-12.22,32.05,-36.47,-6.84,-10.49,32.87,27.11,
-79,ITGR,Integer Holdings Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,125.39,4262.26,SMID,18.26,5.47,0.94,5.42,-20.01,44.73,33.75,-40.82,59.65,
-80,ADPT,Adaptive Biotechnologies Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,26.16,4175.03,SMID,,,97.63,-52.55,-72.77,-35.86,22.35,170.89,56.65,
-81,1SXP.DE,SCHOTT Pharma AG & Co. KGaA,MedTech,Packaging,,Y,Primary,XETRA,Germany,EUR,23.4,4108.15,SMID,21.6,,,,,,-24.83,-39.57,53.57,1
-82,SFZN.SW,Siegfried Holding AG,MedTech,Life Science Tools,CDMO,Y,Primary,SIX,Switzerland,CHF,74.45,4050.19,SMID,15.99,40.56,39.81,36.99,-30.67,40.1,15.19,-24.02,8.93,
-83,IRTC,"iRhythm Holdings, Inc",MedTech,Cardiovascular,,Y,Primary,NASDAQ,United States,USD,119.15,3927.54,SMID,98.18,-2.0,248.38,-50.39,-20.41,14.27,-15.76,96.78,-27.87,
-84,AMP IM,Amplifon S.p.A.,MedTech,Hearing Aid,,Y,Primary,Borsa Italiana,Italy,EUR,11.84,3660.73,SMID,13.45,83.82,32.76,40.24,-40.89,13.62,-20.03,-43.84,-11.77,
-85,GRAL,"GRAIL, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,80.42,3592.06,SMID,,,,,,,,379.5,-8.9,
-86,VCYT,"Veracyte, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,43.84,3523.93,SMID,22.5,121.94,75.29,-15.82,-42.4,15.93,43.95,6.31,-0.74,
-87,PLSE,Pulse Biosciences Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,48.12,3432.04,SMID,,17.02,77.93,-37.93,-81.3,341.88,42.24,-21.14,248.51,
-88,MRVI,"Maravai LifeSciences Holdings, Inc.",MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,9.26,3427.66,SMID,,,,49.38,-65.85,-54.23,-16.79,-40.37,155.08,
-89,AFX DE,Carl Zeiss Meditec AG,MedTech,Ophthalmology,,Y,Primary,XETRA,Germany,EUR,31.6,3224.32,SMID,20.33,67.64,-3.53,70.32,-35.83,-15.46,-53.5,-11.32,-17.48,
-90,MOVE,Medacta Group SA,MedTech,Orthopedics,,Y,Primary,SIX,Switzerland,CHF,127.2,3145.15,SMID,22.9,,20.99,62.1,-27.09,22.22,-14.72,47.44,-17.27,
-91,TMDX,TransMedics Group Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,90.27,3130.13,SMID,39.15,,4.68,-3.72,222.13,27.88,-21.01,95.11,-25.32,
-92,DAE,Daetwyler Holding AG,MedTech,Packaging,,Y,Primary,SIX,Switzerland,CHF,134.8,2845.72,SMID,19.58,52.6,40.9,58.19,-53.62,7.93,-30.58,26.09,-17.19,1
-93,AMBUB DC,Ambu A/S,MedTech,Hospital Supply & Equipment,,Y,Primary,OMX Copenhagen,Denmark,DKK,67.3,2744.31,SMID,21.86,-28.42,135.96,-34.16,-48.55,18.2,-0.8,-14.98,-13.07,
-94,ATRC,AtriCure Inc,MedTech,Cardiovascular,,Y,Primary,NASDAQ,United States,USD,47.4,2411.06,SMID,109.78,6.24,71.24,24.9,-36.17,-19.58,-14.37,29.45,20.05,
-95,ONT.L,Oxford Nanopore Technologies PLC,MedTech,Diagnostics,NextGen Sequencing,Y,Primary,LSE,United Kingdom,GBp,180.6,2396.58,SMID,,,,,-64.68,-15.54,-38.14,-0.31,30.76,
-96,UFPT,"UFP Technologies, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,303.26,2348.99,SMID,25.54,65.15,-6.07,50.77,67.79,45.93,42.12,-9.19,37.03,
-97,ALMR,"Alamar Biosciences, Inc.",MedTech,Life Science Tools,,,Primary,NASDAQ,United States,USD,33.11,2297.59,SMID,,,,,,,,,,
-98,BFLY,"Butterfly Network, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,8.52,2268.75,SMID,,,,-66.2,-63.23,-56.1,188.89,21.79,141.32,
-99,XRAY,DENTSPLY SIRONA Inc.,MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,11.02,2195.88,SMID,7.26,53.14,-6.59,7.32,-42.11,13.5,-45.28,-36.84,-5.69,1
-100,VCEL,Vericel Corporation,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,42.63,2182.94,SMID,50.39,0.0,77.47,27.27,-32.98,35.19,54.2,-34.42,16.94,
-101,NEO,"NeoGenomics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,16.81,2159.67,SMID,48.92,131.96,84.07,-36.63,-72.92,75.11,1.85,-28.64,40.56,
-102,ESTA,Establishment Labs Holdings Inc.,MedTech,Aesthetics,,Y,Primary,NASDAQ,United States,USD,72.13,2149.61,SMID,1202.17,0.88,36.08,79.57,-2.87,-60.56,77.95,58.19,-1.87,
-103,GN DC,GN Store Nord A/S,MedTech,Hearing Aid,,Y,Primary,OMX Copenhagen,Denmark,DKK,93.86,2130.54,SMID,21.41,29.33,56.21,-15.32,-60.96,7.54,-22.15,-20.19,-13.31,
-104,NVCR,Novocure Limited,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,17.29,2013.35,SMID,,151.7,105.34,-56.61,-2.3,-79.65,99.6,-56.61,37.43,
-105,OSSFF,Embla Medical hf.,MedTech,Orthopedics,,Y,ADR/Cross-listed,OTC,Iceland,USD,4.15,1766.01,SMID,,,6.23,-23.89,-23.47,-9.07,13.3,11.64,-22.07,
-106,INSP,"Inspire Medical Systems, Inc.",MedTech,Sleep,,Y,Primary,NYSE,United States,USD,60.97,1762.67,SMID,39.67,75.64,153.46,22.31,9.48,-19.24,-8.87,-50.25,-33.57,
+64,STVN,Stevanato Group S.p.A.,MedTech,Packaging,,Y,ADR/Cross-listed,NYSE,Italy,USD,22.62,6178.09,SMID,26.92,,,,-19.66,52.18,-19.92,-7.41,11.48,1
+65,BLCO,Bausch + Lomb Corporation,MedTech,Ophthalmology,,Y,ADR/Cross-listed,NYSE,Canada,USD,17.27,6168.24,SMID,15.8,,,,,9.99,5.86,-5.43,0.7,
+66,CTEC LN,ConvaTec Group PLC,MedTech,Urology,,Y,Primary,LSE,United Kingdom,GBp,227.6,6014.66,SMID,13.61,42.86,0.4,-3.02,20.45,5.01,-9.4,9.97,-7.44,
+67,TFX,Teleflex Incorporated,MedTech,Urology,,Y,Primary,NYSE,United States,USD,138.78,5880.44,SMID,12.67,46.26,9.75,-19.89,-23.61,0.48,-28.16,-30.67,11.47,
+68,SHC,Sotera Health Company,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,19.57,5586.21,SMID,18.21,,,-14.18,-64.63,102.28,-18.81,28.95,8.96,
+69,NOVT,Novanta Inc.,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,145.38,5498.14,SMID,33.29,40.38,33.67,49.15,-22.95,23.95,-9.29,-22.11,22.3,
+70,MMED,MiniMed Group Inc,MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,19.31,5432.87,SMID,29.48,,,,,,,,,
+71,MMSI,"Merit Medical Systems, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,90.45,5401.11,SMID,19.62,-44.06,77.8,12.23,13.35,7.56,27.33,-8.87,2.42,
+72,HAE,Haemonetics Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,107.11,4873.19,SMID,18.66,14.84,3.35,-55.33,48.28,8.72,-8.69,2.65,35.02,
+73,BLLN,"BillionToOne, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,96.99,4576.67,SMID,72.92,,,,,,,,16.41,
+74,ICUI,"ICU Medical, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,181.95,4550.03,SMID,18.86,-18.51,14.63,10.65,-33.65,-36.66,55.57,-8.06,27.94,
+75,NVST,Envista Holdings Corporation,MedTech,Dental,,Y,Primary,NYSE,United States,USD,27.8,4465.98,SMID,16.68,,13.8,33.59,-25.28,-28.54,-19.83,12.55,24.04,1
+76,LIVN,LivaNova PLC,MedTech,Cardiovascular,,Y,ADR/Cross-listed,NASDAQ,United Kingdom,USD,79.54,4369.41,SMID,17.01,-17.54,-12.22,32.05,-36.47,-6.84,-10.49,32.87,27.11,
+77,DIA.MI,DiaSorin S.p.A.,MedTech,Diagnostics,,Y,Primary,Borsa Italiana,Italy,EUR,75.66,4360.44,SMID,17.64,64.75,48.24,-0.87,-21.43,-27.72,8.0,-30.2,10.4,
+78,HTFL,"HeartFlow, Inc.",MedTech,Diagnostics,AI,Y,Primary,NASDAQ,United States,USD,49.56,4309.42,SMID,,,,,,,,,60.55,
+79,ITGR,Integer Holdings Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,125.35,4260.9,SMID,18.25,5.47,0.94,5.42,-20.01,44.73,33.75,-40.82,59.65,
+80,ADPT,Adaptive Biotechnologies Corporation,MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,26.21,4183.01,SMID,,,97.63,-52.55,-72.77,-35.86,22.35,170.89,56.65,
+81,1SXP.DE,SCHOTT Pharma AG & Co. KGaA,MedTech,Packaging,,Y,Primary,XETRA,Germany,EUR,23.25,4081.82,SMID,21.46,,,,,,-24.83,-39.57,53.57,1
+82,SFZN.SW,Siegfried Holding AG,MedTech,Life Science Tools,CDMO,Y,Primary,SIX,Switzerland,CHF,73.9,4020.27,SMID,15.85,40.56,39.81,36.99,-30.67,40.1,15.19,-24.02,8.93,
+83,IRTC,"iRhythm Holdings, Inc",MedTech,Cardiovascular,,Y,Primary,NASDAQ,United States,USD,119.5,3938.91,SMID,98.46,-2.0,248.38,-50.39,-20.41,14.27,-15.76,96.78,-27.87,
+84,AMP IM,Amplifon S.p.A.,MedTech,Hearing Aid,,Y,Primary,Borsa Italiana,Italy,EUR,12.01,3713.3,SMID,13.64,83.82,32.76,40.24,-40.89,13.62,-20.03,-43.84,-11.77,
+85,VCYT,"Veracyte, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,44.4,3569.35,SMID,22.79,121.94,75.29,-15.82,-42.4,15.93,43.95,6.31,-0.74,
+86,GRAL,"GRAIL, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,79.3,3542.03,SMID,,,,,,,,379.5,-8.9,
+87,PLSE,Pulse Biosciences Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,48.57,3464.14,SMID,,17.02,77.93,-37.93,-81.3,341.88,42.24,-21.14,248.51,
+88,MRVI,"Maravai LifeSciences Holdings, Inc.",MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,8.9,3298.04,SMID,,,,49.38,-65.85,-54.23,-16.79,-40.37,155.08,
+89,TMDX,TransMedics Group Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,92.77,3216.64,SMID,40.24,,4.68,-3.72,222.13,27.88,-21.01,95.11,-25.32,
+90,AFX DE,Carl Zeiss Meditec AG,MedTech,Ophthalmology,,Y,Primary,XETRA,Germany,EUR,31.28,3191.66,SMID,20.13,67.64,-3.53,70.32,-35.83,-15.46,-53.5,-11.32,-17.48,
+91,MOVE,Medacta Group SA,MedTech,Orthopedics,,Y,Primary,SIX,Switzerland,CHF,127.4,3150.1,SMID,22.94,,20.99,62.1,-27.09,22.22,-14.72,47.44,-17.27,
+92,DAE,Daetwyler Holding AG,MedTech,Packaging,,Y,Primary,SIX,Switzerland,CHF,135.0,2849.94,SMID,19.6,52.6,40.9,58.19,-53.62,7.93,-30.58,26.09,-17.19,1
+93,AMBUB DC,Ambu A/S,MedTech,Hospital Supply & Equipment,,Y,Primary,OMX Copenhagen,Denmark,DKK,66.05,2693.34,SMID,21.45,-28.42,135.96,-34.16,-48.55,18.2,-0.8,-14.98,-13.07,
+94,ATRC,AtriCure Inc,MedTech,Cardiovascular,,Y,Primary,NASDAQ,United States,USD,48.19,2450.99,SMID,111.6,6.24,71.24,24.9,-36.17,-19.58,-14.37,29.45,20.05,
+95,ONT.L,Oxford Nanopore Technologies PLC,MedTech,Diagnostics,NextGen Sequencing,Y,Primary,LSE,United Kingdom,GBp,181.8,2412.5,SMID,,,,,-64.68,-15.54,-38.14,-0.31,30.76,
+96,UFPT,"UFP Technologies, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,307.66,2383.07,SMID,25.91,65.15,-6.07,50.77,67.79,45.93,42.12,-9.19,37.03,
+97,ALMR,"Alamar Biosciences, Inc.",MedTech,Life Science Tools,,,Primary,NASDAQ,United States,USD,33.4,2317.37,SMID,,,,,,,,,,
+98,BFLY,"Butterfly Network, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NYSE,United States,USD,8.66,2307.36,SMID,,,,-66.2,-63.23,-56.1,188.89,21.79,141.32,
+99,NEO,"NeoGenomics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,17.25,2215.56,SMID,50.18,131.96,84.07,-36.63,-72.92,75.11,1.85,-28.64,40.56,
+100,VCEL,Vericel Corporation,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,42.74,2188.83,SMID,50.53,0.0,77.47,27.27,-32.98,35.19,54.2,-34.42,16.94,
+101,XRAY,DENTSPLY SIRONA Inc.,MedTech,Dental,,Y,Primary,NASDAQ,United States,USD,10.91,2175.95,SMID,7.19,53.14,-6.59,7.32,-42.11,13.5,-45.28,-36.84,-5.69,1
+102,ESTA,Establishment Labs Holdings Inc.,MedTech,Aesthetics,,Y,Primary,NASDAQ,United States,USD,72.51,2160.94,SMID,1208.5,0.88,36.08,79.57,-2.87,-60.56,77.95,58.19,-1.87,
+103,GN DC,GN Store Nord A/S,MedTech,Hearing Aid,,Y,Primary,OMX Copenhagen,Denmark,DKK,93.92,2131.9,SMID,21.62,29.33,56.21,-15.32,-60.96,7.54,-22.15,-20.19,-13.31,
+104,NVCR,Novocure Limited,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,17.7,2060.51,SMID,,151.7,105.34,-56.61,-2.3,-79.65,99.6,-56.61,37.43,
+105,INSP,"Inspire Medical Systems, Inc.",MedTech,Sleep,,Y,Primary,NYSE,United States,USD,61.96,1791.29,SMID,40.31,75.64,153.46,22.31,9.48,-19.24,-8.87,-50.25,-33.57,
+106,OSSFF,Embla Medical hf.,MedTech,Orthopedics,,Y,ADR/Cross-listed,OTC,Iceland,USD,4.15,1766.01,SMID,,,6.23,-23.89,-23.47,-9.07,13.3,11.64,-22.07,
 107,8086.T,Nipro Corporation,MedTech,Diversified MedTech,,,Primary,TSE,Japan,JPY,1572.5,1610.12,SMID,14.87,-0.55,-6.91,-8.08,-2.72,8.86,38.09,0.24,8.69,
-108,OMCL,"Omnicell, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,33.3,1514.22,SMID,15.93,33.44,46.87,50.34,-72.06,-25.37,18.31,1.75,-21.63,
-109,CNMD,CONMED Corporation,MedTech,Surgery,,Y,Primary,NYSE,United States,USD,50.5,1512.54,SMID,10.56,75.71,1.16,27.35,-36.98,24.45,-36.84,-40.03,26.55,
-110,TNDM,"Tandem Diabetes Care, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,21.27,1479.89,SMID,124.6,56.99,60.51,57.32,-70.14,-34.19,21.77,-38.98,2.68,
-111,ENOV,Enovis Corporation,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,25.16,1450.96,SMID,6.27,74.07,5.11,20.21,-32.36,4.67,-21.67,-39.29,-1.73,
-112,ATEC,"Alphatec Holdings, Inc.",MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,9.36,1445.66,SMID,15.62,210.04,104.51,-21.28,8.05,22.35,-39.25,129.19,-55.85,
-113,AZTA,"Azenta, Inc.",MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,32.89,1440.86,SMID,55.98,62.06,63.07,52.62,-43.54,11.89,-23.24,-33.48,9.77,
+108,OMCL,"Omnicell, Inc.",MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,33.58,1526.95,SMID,16.06,33.44,46.87,50.34,-72.06,-25.37,18.31,1.75,-21.63,
+109,CNMD,CONMED Corporation,MedTech,Surgery,,Y,Primary,NYSE,United States,USD,50.79,1521.22,SMID,10.62,75.71,1.16,27.35,-36.98,24.45,-36.84,-40.03,26.55,
+110,TNDM,"Tandem Diabetes Care, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,21.48,1494.2,SMID,125.81,56.99,60.51,57.32,-70.14,-34.19,21.77,-38.98,2.68,
+111,AZTA,"Azenta, Inc.",MedTech,Life Science Tools,,Y,Primary,NASDAQ,United States,USD,33.45,1465.61,SMID,56.94,62.06,63.07,52.62,-43.54,11.89,-23.24,-33.48,9.77,
+112,ENOV,Enovis Corporation,MedTech,Orthopedics,,Y,Primary,NYSE,United States,USD,25.38,1463.65,SMID,6.32,74.07,5.11,20.21,-32.36,4.67,-21.67,-39.29,-1.73,
+113,ATEC,"Alphatec Holdings, Inc.",MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,9.41,1453.38,SMID,15.7,210.04,104.51,-21.28,8.05,22.35,-39.25,129.19,-55.85,
 114,MED,Medartis Holding AG,MedTech,Orthopedics,,Y,Primary,SIX,Switzerland,CHF,90.3,1395.68,SMID,40.62,-21.12,6.41,180.0,-37.02,2.44,-32.62,55.83,1.81,
-115,IART,Integra LifeSciences Holdings Corporation,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,16.71,1299.58,SMID,6.41,29.22,11.39,3.19,-16.3,-22.33,-47.92,-45.24,33.57,
-116,AORT,Artivion Inc,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,26.36,1285.21,SMID,33.72,-4.55,-12.85,-13.81,-40.44,47.52,59.9,59.53,-38.65,
-117,PRCT,PROCEPT BioRobotics Corporation,MedTech,Urology,,Y,Primary,NASDAQ,United States,USD,20.93,1191.31,SMID,,,,,66.09,0.89,92.13,-60.93,-34.11,
-118,STAA,STAAR Surgical Company,MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,22.74,1140.27,SMID,22.21,10.22,125.25,15.25,-46.83,-35.7,-22.17,-4.94,-0.09,
-119,CSTL,"Castle Biosciences, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,34.09,1041.59,SMID,,,95.37,-36.16,-45.09,-8.33,23.49,45.97,-15.35,
-120,GXI,Gerresheimer AG,MedTech,Packaging,,Y,Primary,XETRA,Germany,EUR,25.38,1021.83,SMID,7.44,22.75,29.08,-2.15,-24.56,51.98,-23.86,-61.12,-0.29,1
+115,IART,Integra LifeSciences Holdings Corporation,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,17.02,1324.08,SMID,6.54,29.22,11.39,3.19,-16.3,-22.33,-47.92,-45.24,33.57,
+116,AORT,Artivion Inc,MedTech,Cardiovascular,,Y,Primary,NYSE,United States,USD,27.01,1316.91,SMID,34.55,-4.55,-12.85,-13.81,-40.44,47.52,59.9,59.53,-38.65,
+117,PRCT,PROCEPT BioRobotics Corporation,MedTech,Urology,,Y,Primary,NASDAQ,United States,USD,21.17,1204.97,SMID,,,,,66.09,0.89,92.13,-60.93,-34.11,
+118,STAA,STAAR Surgical Company,MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,22.79,1142.78,SMID,22.26,10.22,125.25,15.25,-46.83,-35.7,-22.17,-4.94,-0.09,
+119,CSTL,"Castle Biosciences, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,33.92,1036.24,SMID,,,95.37,-36.16,-45.09,-8.33,23.49,45.97,-15.35,
+120,GXI,Gerresheimer AG,MedTech,Packaging,,Y,Primary,XETRA,Germany,EUR,25.4,1022.63,SMID,7.45,22.75,29.08,-2.15,-24.56,51.98,-23.86,-61.12,-0.29,1
 121,QDEL,QuidelOrtho Corporation,MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,14.86,1019.03,SMID,10.3,53.69,139.44,-24.86,-36.54,-13.97,-39.55,-35.89,-48.0,
-122,SIBN,"SI-BONE, Inc.",MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,19.62,879.34,SMID,,2.92,39.07,-25.72,-38.77,54.34,-33.21,40.66,-1.22,
-123,INMD,InMode Ltd.,MedTech,Aesthetics,,Y,ADR/Cross-listed,NASDAQ,Israel,USD,14.96,860.86,SMID,10.9,,21.12,197.3,-49.42,-37.7,-24.91,-12.04,1.57,
-124,BBNX,"Beta Bionics, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,19.12,860.43,SMID,,,,,,,,,-36.07,
-125,VREX,Varex Imaging Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,18.51,780.16,SMID,16.92,25.89,-44.05,89.15,-35.66,0.99,-28.83,-20.15,58.71,
-126,KIDS,OrthoPediatrics Corp.,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,24.25,633.29,SMID,,34.72,-12.22,45.12,-33.63,-18.17,-28.7,-23.38,47.69,
-127,FLGT,"Fulgent Genetics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,19.77,543.98,SMID,,306.94,303.88,93.07,-70.39,-2.92,-36.11,42.23,-24.17,
-128,TCMD,Tactile Systems Technology Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,23.31,528.02,SMID,16.02,48.21,-33.43,-57.65,-39.67,24.56,19.79,69.29,-19.21,
-129,PACB,"Pacific Biosciences of California, Inc.",MedTech,Life Science Tools,Genomics / Sequencing,Y,Primary,NASDAQ,United States,USD,1.5,467.8,SMID,,-30.54,404.67,-21.13,-60.02,19.93,-81.35,2.19,-34.22,
-130,SGHT,"Sight Sciences, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,8.29,456.68,SMID,,,,,-30.51,-57.74,-29.46,117.86,2.77,
-131,OFIX,Orthofix Medical Inc.,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,9.53,385.22,SMID,25.76,-12.02,-6.93,-27.66,-33.97,-34.34,29.53,-13.17,-33.97,
-132,MOBI,"Mobia Medical, Inc.",MedTech,Neuromodulation,Stroke Recovery,,Primary,NASDAQ,United States,USD,10.81,359.42,SMID,,,,,,,,,,
-133,MYGN,"Myriad Genetics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,3.12,297.95,SMID,,-6.33,-27.4,39.61,-47.43,31.91,-28.37,-55.14,-47.64,
-134,RXST,"RxSight, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,6.51,270.98,SMID,,,,,12.62,218.23,-14.73,-69.69,-41.55,
-135,HYPR,Hyperfine Inc,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,0.83,88.46,SMID,,,,,-88.41,33.33,-21.43,11.25,-7.66,
-136,NNOX,Nano-X Imaging Ltd.,MedTech,Hospital Supply & Equipment,,Y,ADR/Cross-listed,NASDAQ,Israel,USD,0.86,67.26,SMID,,,,-68.16,-49.24,-13.69,13.03,-61.11,-68.39,
-137,UNH,UnitedHealth Group Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,401.79,360640.15,LC,17.91,20.0,21.25,45.2,6.94,0.8,-2.41,-33.14,18.16,1
-138,WELL,Welltower Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,241.17,173780.35,LC,75.84,23.04,-17.19,36.98,-21.18,41.79,43.07,49.86,29.28,
-139,CVS,CVS Health Corp,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,93.92,120127.3,LC,11.04,17.26,-5.14,54.87,-7.63,-12.53,-40.77,84.35,20.76,1
-140,MCK,McKesson Corp,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,898.25,104726.71,LC,17.78,26.72,27.06,44.23,51.82,24.13,23.67,44.54,2.45,1
-141,HCA,HCA Healthcare Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,425.0,92013.14,LC,13.24,20.24,11.89,57.58,-5.64,13.83,11.75,56.71,-12.67,1
-142,ELV,Elevance Health Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,404.36,87693.26,LC,13.66,16.33,7.74,46.12,11.83,-6.89,-20.72,-3.14,14.2,1
-143,CI,Cigna Group,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,282.3,74595.08,LC,8.43,7.7,1.83,12.29,46.68,-7.97,-6.27,1.72,0.83,1
-144,COR,Cencora Inc,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,328.78,62740.16,LC,16.62,23.51,23.37,44.09,26.26,25.33,10.37,51.48,-6.27,1
-145,CAH,Cardinal Health Inc,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,238.6,55492.57,LC,16.95,18.04,10.09,-0.4,54.08,34.15,19.01,76.25,11.96,1
-146,VTR,Ventas Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,93.76,48093.85,LC,102.47,3.43,-9.8,7.73,-8.53,15.06,22.24,35.09,21.25,
-147,HUM,Humana Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,394.11,47324.85,LC,23.79,28.94,12.71,13.8,11.15,-9.94,-43.96,2.36,49.75,1
-148,MDLN,Medline Inc,Healthcare Services,Distributors,,Y,Primary,NASDAQ,United States,USD,34.87,46915.26,LC,22.16,,,,,,,,-22.43,
-149,IDXX,IDEXX Laboratories Inc,Healthcare Services,Animal Health,,Y,Primary,NASDAQ,United States,USD,549.68,43304.41,LC,32.84,40.38,91.43,31.73,-38.04,36.06,-25.51,63.63,-19.31,1
-150,IQV,IQVIA Holdings Inc.,Healthcare Services,CRO / Health Data,,Y,Primary,NYSE,United States,USD,260.48,42875.01,LC,18.01,33.0,15.96,57.47,-27.38,12.93,-15.07,14.71,13.59,1
-151,VEEV,Veeva Systems Inc.,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,246.04,39967.55,LC,24.53,57.48,93.55,-6.16,-36.83,19.3,9.21,6.17,12.23,
-152,CNC,Centene Corp,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,67.03,33114.96,LC,12.62,9.05,-4.52,37.26,-0.47,-9.51,-18.37,-32.07,55.87,1
-153,ZTS,Zoetis Inc.,Healthcare Services,Animal Health,,Y,Primary,NYSE,United States,USD,77.73,32119.87,LC,11.78,55.71,25.76,48.26,-39.51,35.91,-16.63,-21.75,-39.44,
-154,FRE,Fresenius SE & Co KGaA,Healthcare Services,Biosim,,Y,Primary,XETRA,Germany,EUR,46.41,30466.28,LC,11.73,20.38,-22.95,-4.64,-23.65,10.58,19.49,49.5,-2.98,1
-155,LH,Labcorp Holdings Inc,Healthcare Services,Labs,,Y,Primary,NYSE,United States,USD,335.48,27207.28,LC,16.94,33.88,20.32,54.37,-24.41,13.82,2.22,10.62,33.36,1
-156,DGX,Quest Diagnostics Inc,Healthcare Services,Labs,,Y,Primary,NYSE,United States,USD,245.34,27078.45,LC,20.35,31.13,14.11,47.86,-7.8,-10.05,11.77,17.2,40.87,1
-157,THC,Tenet Healthcare Corp,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,276.44,22259.08,SMID,13.26,121.88,5.0,104.58,-40.27,54.89,67.04,57.43,37.18,1
-158,MEDP,"Medpace Holdings, Inc.",Healthcare Services,CRO,,Y,Primary,NASDAQ,United States,USD,615.73,17185.97,SMID,31.89,58.81,65.6,56.35,-2.4,44.31,8.38,69.05,9.08,1
-159,DOC,Healthpeak Properties Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,21.68,15366.43,SMID,,29.16,-7.69,23.74,-27.53,-16.4,8.79,-15.16,37.72,
-160,RDOR3,Rede D'Or Sao Luiz SA,Healthcare Services,Ex-US Facilities,,Y,Primary,B3,Brazil,BRL,35.77,15082.65,SMID,13.29,,,-32.86,-33.08,-1.36,-9.5,76.87,-16.1,1
-161,OHI,Omega Healthcare Investors Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,46.83,14952.69,SMID,22.91,29.01,-6.81,-12.06,3.5,19.93,33.57,25.52,10.05,
-162,CRL,Charles River Lbrtrs ntrntl Inc,Healthcare Services,CRO,,Y,Primary,NYSE,United States,USD,298.16,14361.69,SMID,23.5,34.97,63.56,50.8,-42.17,8.49,-21.91,8.06,46.1,1
-163,ICLR,ICON PLC,Healthcare Services,CRO,,Y,ADR/Cross-listed,NASDAQ,Ireland,USD,167.2,12900.18,SMID,14.08,33.29,13.21,58.84,-37.28,45.72,-25.92,-13.11,-4.36,1
-164,FMS,Fresenius Medical Care AG,Healthcare Services,Dialysis,,Y,ADR/Cross-listed,NYSE,Germany,USD,23.52,12517.8,SMID,6.4,15.62,14.73,-20.28,-48.42,30.88,11.86,8.22,2.33,1
-165,AHR,American Healthcare REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,56.95,12416.12,SMID,57.53,,,,,,,70.03,19.72,
-166,EHC,Encompass Health Corp,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,121.35,11971.59,SMID,18.17,14.26,21.42,-19.9,17.01,12.62,39.17,15.67,14.56,1
-167,BTSG,Brightspring Health Services Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,59.16,11704.66,SMID,25.97,,,,,,,119.91,58.96,1
-168,SCI,Service Corporation International,Healthcare Services,Deathcare,,Y,Primary,NYSE,United States,USD,85.43,11643.06,SMID,18.58,16.22,8.58,46.81,-1.04,0.74,18.42,-0.7,7.9,1
-169,DVA,Davita Inc,Healthcare Services,Dialysis,,Y,Primary,NYSE,United States,USD,181.43,11575.23,SMID,10.66,45.8,56.47,-3.1,-34.36,40.3,42.75,-24.03,54.25,1
-170,MOH,Molina Healthcare Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,204.14,10656.11,SMID,20.96,16.75,56.74,49.56,3.82,9.41,-19.45,-40.37,13.48,1
-171,ENSG,Ensign Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,180.77,10535.72,SMID,21.14,25.53,61.43,15.43,12.99,18.89,18.63,31.33,3.32,1
-172,UHS,Universal Health Services Inc,Healthcare Services,BH - Facilities,,Y,Primary,NYSE,United States,USD,178.36,10511.92,SMID,7.43,23.62,-4.0,-5.16,9.37,8.83,18.19,22.02,-20.52,1
-173,JAN,Janus Living Inc,Healthcare Services,Healthcare Real Estate,Senior Housing REIT,,Primary,NYSE,United States,USD,31.48,9767.95,SMID,105.45,,,,,,,,,
-174,OSCR,Oscar Health Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,31.21,9634.35,SMID,16.59,,,,-68.66,271.95,46.89,6.92,119.69,1
-175,CTRE,Caretrust REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,39.67,9373.75,SMID,22.35,16.31,13.67,7.91,-13.67,27.31,26.31,39.35,12.22,
-176,ARE,Alexandria Real Estate Equities Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,52.24,8990.26,SMID,,44.04,13.27,28.09,-32.63,-9.11,-19.44,-46.6,11.32,
-177,HNGE,Hinge Health Inc,Healthcare Services,Benefits,,Y,Primary,NYSE,United States,USD,91.55,7387.57,SMID,29.25,,,,,,,,84.33,
-178,CHE,Chemed Corp,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,548.31,7166.39,SMID,19.92,55.58,21.59,-0.38,-3.22,14.9,-9.11,-18.87,25.51,1
-179,HIMS,Hims & Hers Health Inc,Healthcare Services,Consumer,,Y,Primary,NYSE,United States,USD,30.56,7130.06,SMID,27.43,,47.47,-55.14,-2.14,38.85,171.69,34.28,-1.88,1
-180,PACS,PACS Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,44.22,7000.81,SMID,16.29,,,,,,,192.83,13.52,1
-181,HR,Healthcare Realty Trust Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,19.27,6686.65,SMID,963.5,26.64,-4.68,16.06,-17.47,-4.08,6.4,6.88,18.87,
-182,RDNT,Radnet Inc,Healthcare Services,Imaging,,Y,Primary,NASDAQ,United States,USD,76.27,6002.28,SMID,86.02,99.61,-3.6,53.86,-37.46,84.65,100.86,2.16,7.99,1
-183,SECTB SS,Sectra AB,Healthcare Services,HIT,,Y,Primary,OMX Stockholm,Sweden,SEK,276.8,5601.03,SMID,82.38,109.7,89.07,37.12,-25.12,22.25,54.05,-8.69,10.52,
-184,SBRA,Sabra Health Care REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NASDAQ,United States,USD,20.91,5340.45,SMID,26.92,41.14,-11.33,-16.16,0.38,26.26,31.23,17.02,13.29,
-185,LFST,Lifestance Health Group Inc,Healthcare Services,BH - Facilities,,Y,Primary,NASDAQ,United States,USD,12.32,4706.93,SMID,23.21,,,,-48.11,58.5,-5.87,-4.48,79.69,1
-186,WAY,Waystar Holding Corp,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,23.92,4586.62,SMID,12.74,,,,,,,-10.76,-24.15,1
-187,CON,Concentra Group Holdings Parent Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,35.12,4478.42,SMID,19.19,,,,,,,0.65,78.13,1
-188,DOCS,"Doximity, Inc.",Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,25.02,4458.82,SMID,16.15,,,,-33.05,-16.45,90.41,-17.06,-41.42,1
-189,KRC,Kilroy Realty Corporation,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,37.09,4355.94,SMID,69.33,36.76,-29.18,19.3,-39.25,10.09,7.81,-2.0,1.71,
-190,NHI,National Health Investors Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,72.92,3580.89,SMID,22.46,13.67,-8.67,-11.74,-3.26,14.57,30.71,15.69,-0.95,
-191,OPCH,Option Care Health Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,23.84,3571.63,SMID,11.45,4.48,4.83,81.84,5.8,11.96,-31.14,37.33,-26.27,1
-192,AVAH,Aveanna Healthcare Holdings Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,13.8,3012.41,SMID,15.6,,,,-89.46,243.59,70.52,78.77,58.75,1
-193,ACHC,Acadia Healthcare Company Inc,Healthcare Services,BH - Facilities,,Y,Primary,NASDAQ,United States,USD,31.55,2937.59,SMID,17.32,29.21,51.29,20.77,35.62,-5.54,-49.01,-64.21,90.06,1
-194,ALHC,Alignment Healthcare Inc,Healthcare Services,VBC,,Y,Primary,NASDAQ,United States,USD,14.06,2916.54,SMID,18.68,,,,-16.36,-26.79,30.66,75.56,-34.53,1
-195,BKD,Brookdale Senior Living Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,12.1,2888.49,SMID,71.15,8.51,-39.06,16.48,-47.09,113.19,-13.57,114.51,9.45,
-196,PRVA,Privia Health Group Inc,Healthcare Services,VBC,,Y,Primary,NASDAQ,United States,USD,21.27,2716.91,SMID,20.0,,,,-12.21,1.41,-15.11,21.28,-10.59,1
-197,MPT,"Medical Properties Trust, Inc.",Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,4.09,2445.53,SMID,37.23,38.54,8.94,14.3,-49.03,-50.35,-11.55,35.16,-15.27,
-198,ADUS,Addus Homecare Corporation,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,122.36,2284.99,SMID,16.27,43.22,20.44,-20.14,6.4,-6.67,35.0,-14.33,12.25,1
-199,CLOV,Clover Health Investments Corp,Healthcare Services,Mgd Care,,Y,Primary,NASDAQ,United States,USD,4.18,2220.23,SMID,27.87,,,-77.82,-75.0,2.37,230.88,-25.4,74.47,1
-200,LTC,LTC Properties Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,40.51,2183.71,SMID,26.92,12.79,-7.56,-6.77,10.52,-3.25,14.94,6.17,22.71,
-201,MD,Pediatrix Medical Group Inc,Healthcare Services,Providers,,Y,Primary,NYSE,United States,USD,26.86,2182.46,SMID,11.01,-15.79,-11.69,10.88,-45.39,-37.42,41.08,63.03,22.58,1
-202,PGNY,Progyny Inc,Healthcare Services,Benefits,,Y,Primary,NASDAQ,United States,USD,26.07,2000.65,SMID,11.24,,54.43,18.78,-38.13,19.36,-53.6,48.87,1.09,1
-203,DHC,Diversified Healthcare Trust,Healthcare Services,Healthcare Real Estate,,,Primary,NASDAQ,United States,USD,7.97,1930.98,SMID,,-21.84,-49.85,-24.27,-78.49,494.74,-37.64,113.91,67.1,
-204,SGRY,Surgery Partners Inc,Healthcare Services,Outpatient,,Y,Primary,NASDAQ,United States,USD,14.13,1849.87,SMID,22.53,59.91,85.31,84.11,-47.84,14.82,-33.82,-27.02,-9.77,1
-205,FTRE,Fortrea Holdings Inc,Healthcare Services,CRO,,Y,Primary,NASDAQ,United States,USD,18.21,1731.77,SMID,15.99,,,,,,-46.56,-7.51,5.45,1
-206,AGL,Agilon Health Inc,Healthcare Services,VBC,,Y,Primary,NYSE,United States,USD,97.23,1632.69,SMID,47.31,,,,-40.22,-22.24,-84.86,-63.74,438.35,1
-207,ARDT,Ardent Health Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,11.38,1605.1,SMID,9.27,,,,,,,-48.3,18.69,1
-208,HCSG,Healthcare Services Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,22.86,1568.93,SMID,18.57,-37.76,19.52,-34.56,-28.66,-13.58,12.05,64.54,20.29,1
-209,OMDA,"Omada Health, Inc.",Healthcare Services,Digital Health,,Y,Primary,NASDAQ,United States,USD,24.1,1475.32,SMID,43.33,,,,,,,,50.25,
-210,PAHC,Phibro Animal Health Corp,Healthcare Services,Animal Health,,Y,Primary,NASDAQ,United States,USD,36.36,1474.93,SMID,10.96,-21.31,-20.09,7.28,-32.33,-10.42,86.3,80.76,-5.22,
-211,SDGR,Schrodinger Inc,Healthcare Services,Life Science Software,,Y,Primary,NASDAQ,United States,USD,19.51,1459.46,SMID,,,,-56.01,-46.34,91.55,-46.12,-7.31,9.51,
-212,PNTG,Pennant Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,38.6,1348.26,SMID,24.32,,75.57,-60.25,-52.43,26.78,90.52,6.15,38.54,1
-213,AMN,AMN Healthcare Services Inc,Healthcare Services,Nurse staffing,,Y,Primary,NYSE,United States,USD,33.65,1303.26,SMID,35.93,9.97,9.53,79.24,-15.95,-27.17,-68.06,-34.11,120.75,1
-214,CERT,"Certara, Inc.",Healthcare Services,Life Science Software,,Y,Primary,NASDAQ,United States,USD,8.16,1244.72,SMID,20.88,,,-15.72,-43.46,9.46,-39.45,-17.28,-0.91,1
-215,NHP,National Healthcare Properties Inc,Healthcare Services,Healthcare Real Estate,Senior Housing REIT,,Primary,NASDAQ,United States,USD,16.59,1209.49,SMID,150.82,,,,,,,,,
-216,CVSG.L,CVS Group Plc,Healthcare Services,Animal Health,,Y,Primary,LSE,United Kingdom,GBp,1295.0,1198.34,SMID,13.57,73.1,31.18,49.14,-13.57,-13.06,-50.09,52.87,0.93,1
-217,GDRX,Goodrx Holdings Inc,Healthcare Services,Pharmacy,,Y,Primary,NASDAQ,United States,USD,3.48,1187.19,SMID,9.76,,,-18.99,-85.74,43.78,-30.6,-41.72,31.37,1
-218,USPH,US Physical Therapy Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,78.37,1169.49,SMID,23.17,12.81,5.52,-19.48,-13.67,16.98,-2.97,-9.88,1.22,1
-219,LMRI,Lumexa Imaging Holdings Inc,Healthcare Services,Imaging,,Y,Primary,NASDAQ,United States,USD,11.91,1144.25,SMID,13.09,,,,,,,,-36.86,
-220,TDOC,Teladoc Health Inc,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,6.27,1139.16,SMID,,68.89,138.84,-54.08,-74.24,-8.88,-57.82,-22.99,-7.29,
+122,SIBN,"SI-BONE, Inc.",MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,19.54,875.76,SMID,,2.92,39.07,-25.72,-38.77,54.34,-33.21,40.66,-1.22,
+123,BBNX,"Beta Bionics, Inc.",MedTech,Diabetes,,Y,Primary,NASDAQ,United States,USD,19.35,870.55,SMID,,,,,,,,,-36.07,
+124,INMD,InMode Ltd.,MedTech,Aesthetics,,Y,ADR/Cross-listed,NASDAQ,Israel,USD,14.95,860.0,SMID,10.89,,21.12,197.3,-49.42,-37.7,-24.91,-12.04,1.57,
+125,VREX,Varex Imaging Corporation,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,18.46,778.06,SMID,16.87,25.89,-44.05,89.15,-35.66,0.99,-28.83,-20.15,58.71,
+126,KIDS,OrthoPediatrics Corp.,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,24.28,633.95,SMID,,34.72,-12.22,45.12,-33.63,-18.17,-28.7,-23.38,47.69,
+127,FLGT,"Fulgent Genetics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,19.93,548.24,SMID,,306.94,303.88,93.07,-70.39,-2.92,-36.11,42.23,-24.17,
+128,TCMD,Tactile Systems Technology Inc,MedTech,Diversified MedTech,,Y,Primary,NASDAQ,United States,USD,23.43,530.74,SMID,16.1,48.21,-33.43,-57.65,-39.67,24.56,19.79,69.29,-19.21,
+129,PACB,"Pacific Biosciences of California, Inc.",MedTech,Life Science Tools,Genomics / Sequencing,Y,Primary,NASDAQ,United States,USD,1.6,497.33,SMID,,-30.54,404.67,-21.13,-60.02,19.93,-81.35,2.19,-34.22,
+130,SGHT,"Sight Sciences, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,8.34,459.43,SMID,,,,,-30.51,-57.74,-29.46,117.86,2.77,
+131,OFIX,Orthofix Medical Inc.,MedTech,Orthopedics,,Y,Primary,NASDAQ,United States,USD,9.8,396.13,SMID,26.49,-12.02,-6.93,-27.66,-33.97,-34.34,29.53,-13.17,-33.97,
+132,MOBI,"Mobia Medical, Inc.",MedTech,Neuromodulation,Stroke Recovery,,Primary,NASDAQ,United States,USD,11.65,387.35,SMID,,,,,,,,,,
+133,MYGN,"Myriad Genetics, Inc.",MedTech,Diagnostics,,Y,Primary,NASDAQ,United States,USD,3.12,298.91,SMID,,-6.33,-27.4,39.61,-47.43,31.91,-28.37,-55.14,-47.64,
+134,RXST,"RxSight, Inc.",MedTech,Ophthalmology,,Y,Primary,NASDAQ,United States,USD,6.48,269.52,SMID,,,,,12.62,218.23,-14.73,-69.69,-41.55,
+135,HYPR,Hyperfine Inc,MedTech,Hospital Supply & Equipment,,Y,Primary,NASDAQ,United States,USD,0.86,91.13,SMID,,,,,-88.41,33.33,-21.43,11.25,-7.66,
+136,NNOX,Nano-X Imaging Ltd.,MedTech,Hospital Supply & Equipment,,Y,ADR/Cross-listed,NASDAQ,Israel,USD,0.88,69.45,SMID,,,,-68.16,-49.24,-13.69,13.03,-61.11,-68.39,
+137,UNH,UnitedHealth Group Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,402.43,361222.5,LC,17.94,20.0,21.25,45.2,6.94,0.8,-2.41,-33.14,18.16,1
+138,WELL,Welltower Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,242.7,174882.83,LC,76.32,23.04,-17.19,36.98,-21.18,41.79,43.07,49.86,29.28,
+139,CVS,CVS Health Corp,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,94.84,121293.08,LC,11.15,17.26,-5.14,54.87,-7.63,-12.53,-40.77,84.35,20.76,1
+140,MCK,McKesson Corp,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,894.29,104266.17,LC,17.71,26.72,27.06,44.23,51.82,24.13,23.67,44.54,2.45,1
+141,HCA,HCA Healthcare Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,428.36,92740.58,LC,13.34,20.24,11.89,57.58,-5.64,13.83,11.75,56.71,-12.67,1
+142,ELV,Elevance Health Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,404.1,87636.89,LC,13.65,16.33,7.74,46.12,11.83,-6.89,-20.72,-3.14,14.2,1
+143,CI,Cigna Group,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,282.1,74540.92,LC,8.42,7.7,1.83,12.29,46.68,-7.97,-6.27,1.72,0.83,1
+144,COR,Cencora Inc,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,328.22,62633.29,LC,16.59,23.51,23.37,44.09,26.26,25.33,10.37,51.48,-6.27,1
+145,CAH,Cardinal Health Inc,Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,238.12,55380.35,LC,16.92,18.04,10.09,-0.4,54.08,34.15,19.01,76.25,11.96,1
+146,VTR,Ventas Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,93.8,48114.37,LC,102.51,3.43,-9.8,7.73,-8.53,15.06,22.24,35.09,21.25,
+147,MDLN,Medline Inc,Healthcare Services,Distributors,,Y,Primary,NASDAQ,United States,USD,34.92,46982.52,LC,22.19,,,,,,,,-22.43,
+148,HUM,Humana Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,389.74,46799.5,LC,23.52,28.94,12.71,13.8,11.15,-9.94,-43.96,2.36,49.75,1
+149,IDXX,IDEXX Laboratories Inc,Healthcare Services,Animal Health,,Y,Primary,NASDAQ,United States,USD,555.38,43753.46,LC,33.18,40.38,91.43,31.73,-38.04,36.06,-25.51,63.63,-19.31,1
+150,IQV,IQVIA Holdings Inc.,Healthcare Services,CRO / Health Data,,Y,Primary,NYSE,United States,USD,261.72,43079.11,LC,18.1,33.0,15.96,57.47,-27.38,12.93,-15.07,14.71,13.59,1
+151,VEEV,Veeva Systems Inc.,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,247.06,40133.24,LC,24.63,57.48,93.55,-6.16,-36.83,19.3,9.21,6.17,12.23,
+152,CNC,Centene Corp,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,65.63,32420.89,LC,12.35,9.05,-4.52,37.26,-0.47,-9.51,-18.37,-32.07,55.87,1
+153,ZTS,Zoetis Inc.,Healthcare Services,Animal Health,,Y,Primary,NYSE,United States,USD,77.83,32159.13,LC,11.92,55.71,25.76,48.26,-39.51,35.91,-16.63,-21.75,-39.44,
+154,FRE,Fresenius SE & Co KGaA,Healthcare Services,Biosim,,Y,Primary,XETRA,Germany,EUR,46.34,30426.89,LC,11.72,20.38,-22.95,-4.64,-23.65,10.58,19.49,49.5,-2.98,1
+155,LH,Labcorp Holdings Inc,Healthcare Services,Labs,,Y,Primary,NYSE,United States,USD,335.39,27200.53,LC,16.94,33.88,20.32,54.37,-24.41,13.82,2.22,10.62,33.36,1
+156,DGX,Quest Diagnostics Inc,Healthcare Services,Labs,,Y,Primary,NYSE,United States,USD,244.34,26969.18,LC,20.26,31.13,14.11,47.86,-7.8,-10.05,11.77,17.2,40.87,1
+157,THC,Tenet Healthcare Corp,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,275.88,22213.98,SMID,13.24,121.88,5.0,104.58,-40.27,54.89,67.04,57.43,37.18,1
+158,MEDP,"Medpace Holdings, Inc.",Healthcare Services,CRO,,Y,Primary,NASDAQ,United States,USD,619.49,17290.85,SMID,32.08,58.81,65.6,56.35,-2.4,44.31,8.38,69.05,9.08,1
+159,DOC,Healthpeak Properties Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,21.66,15352.25,SMID,,29.16,-7.69,23.74,-27.53,-16.4,8.79,-15.16,37.72,
+160,OHI,Omega Healthcare Investors Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,47.15,15054.87,SMID,23.07,29.01,-6.81,-12.06,3.5,19.93,33.57,25.52,10.05,
+161,RDOR3,Rede D'Or Sao Luiz SA,Healthcare Services,Ex-US Facilities,,Y,Primary,B3,Brazil,BRL,35.55,14989.89,SMID,13.21,,,-32.86,-33.08,-1.36,-9.5,76.87,-16.1,1
+162,CRL,Charles River Lbrtrs ntrntl Inc,Healthcare Services,CRO,,Y,Primary,NYSE,United States,USD,296.99,14305.33,SMID,23.41,34.97,63.56,50.8,-42.17,8.49,-21.91,8.06,46.1,1
+163,ICLR,ICON PLC,Healthcare Services,CRO,,Y,ADR/Cross-listed,NASDAQ,Ireland,USD,169.44,13073.28,SMID,14.27,33.29,13.21,58.84,-37.28,45.72,-25.92,-13.11,-4.36,1
+164,FMS,Fresenius Medical Care AG,Healthcare Services,Dialysis,,Y,ADR/Cross-listed,NYSE,Germany,USD,23.48,12499.17,SMID,6.4,15.62,14.73,-20.28,-48.42,30.88,11.86,8.22,2.33,1
+165,AHR,American Healthcare REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,57.17,12462.99,SMID,57.75,,,,,,,70.03,19.72,
+166,BTSG,Brightspring Health Services Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,60.9,12049.93,SMID,26.73,,,,,,,119.91,58.96,1
+167,EHC,Encompass Health Corp,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,121.1,11946.93,SMID,18.13,14.26,21.42,-19.9,17.01,12.62,39.17,15.67,14.56,1
+168,SCI,Service Corporation International,Healthcare Services,Deathcare,,Y,Primary,NYSE,United States,USD,85.65,11673.37,SMID,18.63,16.22,8.58,46.81,-1.04,0.74,18.42,-0.7,7.9,1
+169,DVA,Davita Inc,Healthcare Services,Dialysis,,Y,Primary,NYSE,United States,USD,181.14,11556.73,SMID,10.65,45.8,56.47,-3.1,-34.36,40.3,42.75,-24.03,54.25,1
+170,MOH,Molina Healthcare Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,203.86,10641.49,SMID,20.93,16.75,56.74,49.56,3.82,9.41,-19.45,-40.37,13.48,1
+171,UHS,Universal Health Services Inc,Healthcare Services,BH - Facilities,,Y,Primary,NYSE,United States,USD,179.82,10597.96,SMID,7.49,23.62,-4.0,-5.16,9.37,8.83,18.19,22.02,-20.52,1
+172,ENSG,Ensign Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,181.27,10564.86,SMID,21.19,25.53,61.43,15.43,12.99,18.89,18.63,31.33,3.32,1
+173,JAN,Janus Living Inc,Healthcare Services,Healthcare Real Estate,Senior Housing REIT,,Primary,NYSE,United States,USD,31.82,9875.0,SMID,106.61,,,,,,,,,
+174,OSCR,Oscar Health Inc,Healthcare Services,Mgd Care,,Y,Primary,NYSE,United States,USD,31.4,9691.45,SMID,16.69,,,,-68.66,271.95,46.89,6.92,119.69,1
+175,CTRE,Caretrust REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,40.14,9484.81,SMID,22.61,16.31,13.67,7.91,-13.67,27.31,26.31,39.35,12.22,
+176,ARE,Alexandria Real Estate Equities Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,52.97,9115.89,SMID,,44.04,13.27,28.09,-32.63,-9.11,-19.44,-46.6,11.32,
+177,HNGE,Hinge Health Inc,Healthcare Services,Benefits,,Y,Primary,NYSE,United States,USD,92.0,7423.89,SMID,29.4,,,,,,,,84.33,
+178,CHE,Chemed Corp,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,548.28,7166.0,SMID,19.92,55.58,21.59,-0.38,-3.22,14.9,-9.11,-18.87,25.51,1
+179,PACS,PACS Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,44.56,7055.44,SMID,16.42,,,,,,,192.83,13.52,1
+180,HIMS,Hims & Hers Health Inc,Healthcare Services,Consumer,,Y,Primary,NYSE,United States,USD,29.75,6942.05,SMID,26.7,,47.47,-55.14,-2.14,38.85,171.69,34.28,-1.88,1
+181,HR,Healthcare Realty Trust Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,19.37,6721.35,SMID,968.5,26.64,-4.68,16.06,-17.47,-4.08,6.4,6.88,18.87,
+182,RDNT,Radnet Inc,Healthcare Services,Imaging,,Y,Primary,NASDAQ,United States,USD,76.09,5988.11,SMID,85.82,99.61,-3.6,53.86,-37.46,84.65,100.86,2.16,7.99,1
+183,SECTB SS,Sectra AB,Healthcare Services,HIT,,Y,Primary,OMX Stockholm,Sweden,SEK,274.4,5552.47,SMID,81.67,109.7,89.07,37.12,-25.12,22.25,54.05,-8.69,10.52,
+184,SBRA,Sabra Health Care REIT Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NASDAQ,United States,USD,21.1,5390.26,SMID,27.17,41.14,-11.33,-16.16,0.38,26.26,31.23,17.02,13.29,
+185,LFST,Lifestance Health Group Inc,Healthcare Services,BH - Facilities,,Y,Primary,NASDAQ,United States,USD,12.16,4647.71,SMID,22.92,,,,-48.11,58.5,-5.87,-4.48,79.69,1
+186,WAY,Waystar Holding Corp,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,24.05,4611.55,SMID,12.81,,,,,,,-10.76,-24.15,1
+187,CON,Concentra Group Holdings Parent Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,35.09,4473.96,SMID,19.17,,,,,,,0.65,78.13,1
+188,DOCS,"Doximity, Inc.",Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,25.07,4468.63,SMID,16.18,,,,-33.05,-16.45,90.41,-17.06,-41.42,1
+189,KRC,Kilroy Realty Corporation,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,37.24,4374.15,SMID,69.62,36.76,-29.18,19.3,-39.25,10.09,7.81,-2.0,1.71,
+190,NHI,National Health Investors Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,73.48,3608.88,SMID,22.63,13.67,-8.67,-11.74,-3.26,14.57,30.71,15.69,-0.95,
+191,OPCH,Option Care Health Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,24.02,3598.59,SMID,11.54,4.48,4.83,81.84,5.8,11.96,-31.14,37.33,-26.27,1
+192,AVAH,Aveanna Healthcare Holdings Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,13.79,3010.23,SMID,15.59,,,,-89.46,243.59,70.52,78.77,58.75,1
+193,ALHC,Alignment Healthcare Inc,Healthcare Services,VBC,,Y,Primary,NASDAQ,United States,USD,14.19,2942.47,SMID,18.85,,,,-16.36,-26.79,30.66,75.56,-34.53,1
+194,BKD,Brookdale Senior Living Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,12.28,2931.48,SMID,72.21,8.51,-39.06,16.48,-47.09,113.19,-13.57,114.51,9.45,
+195,ACHC,Acadia Healthcare Company Inc,Healthcare Services,BH - Facilities,,Y,Primary,NASDAQ,United States,USD,30.95,2880.99,SMID,16.98,29.21,51.29,20.77,35.62,-5.54,-49.01,-64.21,90.06,1
+196,PRVA,Privia Health Group Inc,Healthcare Services,VBC,,Y,Primary,NASDAQ,United States,USD,21.35,2727.13,SMID,20.08,,,,-12.21,1.41,-15.11,21.28,-10.59,1
+197,MPT,"Medical Properties Trust, Inc.",Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,4.12,2463.45,SMID,37.5,38.54,8.94,14.3,-49.03,-50.35,-11.55,35.16,-15.27,
+198,ADUS,Addus Homecare Corporation,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,122.16,2281.25,SMID,16.25,43.22,20.44,-20.14,6.4,-6.67,35.0,-14.33,12.25,1
+199,CLOV,Clover Health Investments Corp,Healthcare Services,Mgd Care,,Y,Primary,NASDAQ,United States,USD,4.21,2236.17,SMID,28.07,,,-77.82,-75.0,2.37,230.88,-25.4,74.47,1
+200,LTC,LTC Properties Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,40.72,2195.03,SMID,27.06,12.79,-7.56,-6.77,10.52,-3.25,14.94,6.17,22.71,
+201,MD,Pediatrix Medical Group Inc,Healthcare Services,Providers,,Y,Primary,NYSE,United States,USD,26.98,2191.81,SMID,11.06,-15.79,-11.69,10.88,-45.39,-37.42,41.08,63.03,22.58,1
+202,PGNY,Progyny Inc,Healthcare Services,Benefits,,Y,Primary,NASDAQ,United States,USD,26.4,2025.59,SMID,11.38,,54.43,18.78,-38.13,19.36,-53.6,48.87,1.09,1
+203,DHC,Diversified Healthcare Trust,Healthcare Services,Healthcare Real Estate,,,Primary,NASDAQ,United States,USD,7.99,1933.4,SMID,,-21.84,-49.85,-24.27,-78.49,494.74,-37.64,113.91,67.1,
+204,SGRY,Surgery Partners Inc,Healthcare Services,Outpatient,,Y,Primary,NASDAQ,United States,USD,14.18,1856.42,SMID,22.61,59.91,85.31,84.11,-47.84,14.82,-33.82,-27.02,-9.77,1
+205,FTRE,Fortrea Holdings Inc,Healthcare Services,CRO,,Y,Primary,NASDAQ,United States,USD,18.37,1746.99,SMID,16.14,,,,,,-46.56,-7.51,5.45,1
+206,AGL,Agilon Health Inc,Healthcare Services,VBC,,Y,Primary,NYSE,United States,USD,96.56,1621.36,SMID,46.98,,,,-40.22,-22.24,-84.86,-63.74,438.35,1
+207,ARDT,Ardent Health Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,11.4,1608.63,SMID,9.29,,,,,,,-48.3,18.69,1
+208,HCSG,Healthcare Services Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,22.88,1570.3,SMID,18.59,-37.76,19.52,-34.56,-28.66,-13.58,12.05,64.54,20.29,1
+209,OMDA,"Omada Health, Inc.",Healthcare Services,Digital Health,,Y,Primary,NASDAQ,United States,USD,24.28,1486.34,SMID,43.66,,,,,,,,50.25,
+210,SDGR,Schrodinger Inc,Healthcare Services,Life Science Software,,Y,Primary,NASDAQ,United States,USD,19.67,1471.43,SMID,,,,-56.01,-46.34,91.55,-46.12,-7.31,9.51,
+211,PAHC,Phibro Animal Health Corp,Healthcare Services,Animal Health,,Y,Primary,NASDAQ,United States,USD,35.9,1456.27,SMID,10.82,-21.31,-20.09,7.28,-32.33,-10.42,86.3,80.76,-5.22,
+212,PNTG,Pennant Group Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,38.53,1345.82,SMID,24.28,,75.57,-60.25,-52.43,26.78,90.52,6.15,38.54,1
+213,AMN,AMN Healthcare Services Inc,Healthcare Services,Nurse staffing,,Y,Primary,NYSE,United States,USD,34.53,1337.54,SMID,36.87,9.97,9.53,79.24,-15.95,-27.17,-68.06,-34.11,120.75,1
+214,CERT,"Certara, Inc.",Healthcare Services,Life Science Software,,Y,Primary,NASDAQ,United States,USD,8.21,1253.11,SMID,21.02,,,-15.72,-43.46,9.46,-39.45,-17.28,-0.91,1
+215,NHP,National Healthcare Properties Inc,Healthcare Services,Healthcare Real Estate,Senior Housing REIT,,Primary,NASDAQ,United States,USD,16.62,1211.82,SMID,151.11,,,,,,,,,
+216,GDRX,Goodrx Holdings Inc,Healthcare Services,Pharmacy,,Y,Primary,NASDAQ,United States,USD,3.53,1204.24,SMID,9.91,,,-18.99,-85.74,43.78,-30.6,-41.72,31.37,1
+217,CVSG.L,CVS Group Plc,Healthcare Services,Animal Health,,Y,Primary,LSE,United Kingdom,GBp,1299.0,1202.04,SMID,13.61,73.1,31.18,49.14,-13.57,-13.06,-50.09,52.87,0.93,1
+218,USPH,US Physical Therapy Inc,Healthcare Services,Post-Acute,,Y,Primary,NYSE,United States,USD,78.32,1168.75,SMID,23.15,12.81,5.52,-19.48,-13.67,16.98,-2.97,-9.88,1.22,1
+219,TDOC,Teladoc Health Inc,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,6.33,1149.15,SMID,,68.89,138.84,-54.08,-74.24,-8.88,-57.82,-22.99,-7.29,
+220,LMRI,Lumexa Imaging Holdings Inc,Healthcare Services,Imaging,,Y,Primary,NASDAQ,United States,USD,11.9,1143.29,SMID,13.07,,,,,,,,-36.86,
 221,TALK,Talkspace Inc,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,5.25,870.57,SMID,29.17,,,,-69.02,316.19,21.65,17.48,44.63,1
-222,STRW,Strawberry Fields Reit Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,13.93,787.32,SMID,16.78,,,,,,43.87,30.5,6.79,
-223,AHCO,Adapthealth Corp,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,5.53,737.49,SMID,,11.7,242.08,-34.88,-21.42,-62.07,30.59,4.62,-45.88,1
-224,PHR,Phreesia Inc,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,11.51,711.45,SMID,7.17,,103.68,-23.22,-22.32,-28.46,8.68,-32.75,-29.08,1
-225,GMRS,GMR Solutions Inc.,Healthcare Services,Emergency Medical Services,Patient Transport,,Primary,NYSE,United States,USD,12.67,684.46,SMID,7.11,,,,,,,,,
-226,HAPV3.SA,Hapvida Participacoes e Investimentos SA,Healthcare Services,Ex-US Facilities,,Y,Primary,B3,Brazil,BRL,6.66,612.9,SMID,5.69,106.54,19.99,-31.68,-51.06,-12.4,-49.89,-55.96,-58.66,1
-227,EVH,Evolent Health Inc,Healthcare Services,VBC,,Y,Primary,NYSE,United States,USD,4.89,553.43,SMID,12.52,-54.64,77.13,72.61,1.48,17.63,-65.94,-64.44,17.5,1
-228,XRN,Chiron Real Estate Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,37.48,542.71,SMID,,59.98,5.76,45.22,-42.38,27.91,-23.56,-4.11,13.62,
+222,STRW,Strawberry Fields Reit Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,13.81,780.82,SMID,16.64,,,,,,43.87,30.5,6.79,
+223,AHCO,Adapthealth Corp,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,5.59,746.42,SMID,,11.7,242.08,-34.88,-21.42,-62.07,30.59,4.62,-45.88,1
+224,PHR,Phreesia Inc,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,11.68,721.96,SMID,7.27,,103.68,-23.22,-22.32,-28.46,8.68,-32.75,-29.08,1
+225,GMRS,GMR Solutions Inc.,Healthcare Services,Emergency Medical Services,Patient Transport,,Primary,NYSE,United States,USD,12.98,701.47,SMID,7.29,,,,,,,,,
+226,HAPV3.SA,Hapvida Participacoes e Investimentos SA,Healthcare Services,Ex-US Facilities,,Y,Primary,B3,Brazil,BRL,6.44,592.65,SMID,5.5,106.54,19.99,-31.68,-51.06,-12.4,-49.89,-55.96,-58.66,1
+227,EVH,Evolent Health Inc,Healthcare Services,VBC,,Y,Primary,NYSE,United States,USD,5.01,566.99,SMID,12.83,-54.64,77.13,72.61,1.48,17.63,-65.94,-64.44,17.5,1
+228,XRN,Chiron Real Estate Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,37.62,544.74,SMID,,59.98,5.76,45.22,-42.38,27.91,-23.56,-4.11,13.62,
 229,SRTA,"Strata Critical Medical, Inc.",Healthcare Services,Medical Logistics,,Y,Primary,NASDAQ,United States,USD,6.12,541.42,SMID,,,12.72,-20.31,-59.46,-1.4,20.4,13.18,23.91,
-230,CHCT,Community Healthcare Trust Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,14.95,428.37,SMID,37.38,54.97,14.31,4.12,-20.7,-21.51,-21.48,-3.87,-2.02,
-231,CYH,Community Health Systems Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,2.93,413.16,SMID,,2.84,156.21,79.14,-67.54,-27.55,-4.47,4.35,-4.49,1
-232,AUNA,Auna SA,Healthcare Services,Ex-US Facilities,,Y,ADR/Cross-listed,NYSE,Luxembourg,USD,5.29,391.76,SMID,4.79,,,,,,,-28.28,6.71,1
-233,SECARE SS,Swedencare AB,Healthcare Services,Animal Health,,Y,Primary,OMX Stockholm,Sweden,SEK,22.25,373.52,SMID,13.65,101.74,253.71,137.11,-79.99,99.59,-20.53,-19.81,-41.97,
-234,VMD,Viemed Healthcare Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,9.19,350.03,SMID,22.97,,25.16,-32.73,44.83,3.84,2.17,-7.36,15.34,1
-235,AMWL,American Well Corp,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,11.63,197.81,SMID,,,,-76.15,-53.15,-47.35,-75.67,-32.28,140.12,1
-236,HCAT,Health Catalyst Inc,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,1.57,118.53,SMID,200.64,,25.45,-8.98,-73.17,-12.89,-23.65,-66.2,-31.8,1
-237,ACH,Accendra Health (fma Owens and Minor),Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,1.15,88.06,SMID,7.65,-18.11,423.96,60.86,-55.1,-1.33,-32.17,-78.58,-53.21,1
-238,DH,Definitive Healthcare Corp,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,0.75,79.62,SMID,4.0,,,,-59.79,-9.55,-58.65,-30.17,-74.63,1
-239,DCGO,DocGo Inc,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,0.39,38.46,SMID,10.02,,,-7.93,-24.39,-20.93,-24.15,-79.29,-51.03,1
+230,CHCT,Community Healthcare Trust Inc,Healthcare Services,Healthcare Real Estate,,,Primary,NYSE,United States,USD,15.04,430.95,SMID,37.6,54.97,14.31,4.12,-20.7,-21.51,-21.48,-3.87,-2.02,
+231,CYH,Community Health Systems Inc,Healthcare Services,Hospitals,,Y,Primary,NYSE,United States,USD,2.95,415.98,SMID,,2.84,156.21,79.14,-67.54,-27.55,-4.47,4.35,-4.49,1
+232,AUNA,Auna SA,Healthcare Services,Ex-US Facilities,,Y,ADR/Cross-listed,NYSE,Luxembourg,USD,5.29,391.39,SMID,4.79,,,,,,,-28.28,6.71,1
+233,SECARE SS,Swedencare AB,Healthcare Services,Animal Health,,Y,Primary,OMX Stockholm,Sweden,SEK,22.2,372.68,SMID,13.62,101.74,253.71,137.11,-79.99,99.59,-20.53,-19.81,-41.97,
+234,VMD,Viemed Healthcare Inc,Healthcare Services,Post-Acute,,Y,Primary,NASDAQ,United States,USD,9.35,356.12,SMID,23.38,,25.16,-32.73,44.83,3.84,2.17,-7.36,15.34,1
+235,AMWL,American Well Corp,Healthcare Services,HIT,,Y,Primary,NYSE,United States,USD,11.82,201.04,SMID,,,,-76.15,-53.15,-47.35,-75.67,-32.28,140.12,1
+236,HCAT,Health Catalyst Inc,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,1.58,119.28,SMID,201.91,,25.45,-8.98,-73.17,-12.89,-23.65,-66.2,-31.8,1
+237,ACH,Accendra Health (fma Owens and Minor),Healthcare Services,Distributors,,Y,Primary,NYSE,United States,USD,1.2,92.29,SMID,8.01,-18.11,423.96,60.86,-55.1,-1.33,-32.17,-78.58,-53.21,1
+238,DH,Definitive Healthcare Corp,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,0.75,79.85,SMID,4.01,,,,-59.79,-9.55,-58.65,-30.17,-74.63,1
+239,DCGO,DocGo Inc,Healthcare Services,HIT,,Y,Primary,NASDAQ,United States,USD,0.4,39.09,SMID,10.19,,,-7.93,-24.39,-20.93,-24.15,-79.29,-51.03,1
