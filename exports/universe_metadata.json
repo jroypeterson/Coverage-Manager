@@ -5622,8 +5622,8 @@
   },
   "ROG.SW": {
     "name": "Roche",
-    "sector": "MedTech",
-    "subsector": "Diagnostics",
+    "sector": "Biopharma",
+    "subsector": "Large Pharma",
     "sub_subsector": "NextGen Sequencing",
     "core": "Y"
   },
