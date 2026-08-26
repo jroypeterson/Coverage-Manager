@@ -1,6 +1,6 @@
 """Build JP's Healthcare Services + MedTech coverage workbook.
 
-One CURRENT file lives at `Coverage - HC Services and MedTech.xlsx`; the previous
+One CURRENT file lives at `AA_Core Coverage.xlsx`; the previous
 current file is moved into `archive/` stamped with the date it was built, so the
 folder never accumulates dated copies at the top level. A stable filename is the
 point -- it can be bookmarked, and the Google Sheet mirror keeps one identity.
@@ -37,22 +37,58 @@ from openpyxl.utils import get_column_letter
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UNIVERSE = os.path.join(REPO, "exports", "universe.csv")
 DEFAULT_OUT = r"C:\Users\jroyp\Dropbox\Career\Pitches\Coverage"
-STEM = "Coverage - HC Services and MedTech"
+STEM = "AA_Core Coverage"
+# The stem before 2026-08-26. `archive_existing` only looks for the CURRENT stem,
+# so without this the old workbook would sit at the top level next to the new one,
+# still looking current. One-time migration; safe to leave in place forever.
+PRIOR_STEMS = ("Coverage - HC Services and MedTech",)
 LEGACY = os.path.join(DEFAULT_OUT, "Jason Peterson Coverage.xlsx")
+
+# NOT renamed alongside the workbook. The Google Sheet mirror is a single
+# =IMPORTDATA() cell pointed at this exact URL and nothing here can rewrite that
+# cell, so renaming the endpoint silently empties the Sheet.
+PUBLIC_CSV = os.path.join(REPO, "docs", "hc_coverage.csv")
+
+RATINGS_PATH = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings/Ratings.xlsx"
 
 SECTORS = ("Healthcare Services", "MedTech")
 
-FIELDS = ["marketCap", "regularMarketPrice", "currentPrice", "currency",
-          "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "longName"]
+# Calendar-year total returns, read from Coverage Manager's weekly performance
+# snapshot rather than recomputed. JP, 2026-08-26: "You can just use a footnote to
+# note when the returns are as of instead of re-running all the returns just for
+# this report."
+RETURN_COLS = ["2019", "2020", "2021", "2022", "2023", "2024", "2025", "YTD"]
+SNAPSHOT_MAX_AGE_DAYS = 10
 
-COLS = ["Ticker", "Company Name", "Sector", "Subsector", "Sub-subsector",
-        "Core Coverage", "Rating", "Listing", "Exchange", "Country (HQ)",
-        "Ccy", "Price (local)", "Mkt Cap (USD $M)", "Ramp Effort (1/2)"]
+# LC/SMID boundary. NOT derived from JP's reference sheet -- that sheet only bounds
+# it to the open interval (USD 22.7bn SMID, USD 34.2bn LC], with no observation in
+# between, so this is a named policy value inside that interval and not a measured
+# one. Names near the line will flip with price and FX; the method is stated in the
+# workbook so a flip reads as the rule working rather than as an error.
+LC_THRESHOLD_USD_M = 25000
+
+FIELDS = ["marketCap", "regularMarketPrice", "currentPrice", "currency",
+          "forwardPE", "longName"]
+
+COLS = (["Ticker", "Company Name", "Sector", "Subsector", "Sub-subsector",
+         "Core Coverage", "Rating", "Listing", "Exchange", "Country (HQ)",
+         "Ccy", "Price (local)", "Mkt Cap (USD $M)", "Size", "Fwd P/E"]
+        + RETURN_COLS + ["Ramp Effort (1/2)"])
+
+# ⛑ THE PUBLIC CSV IS A DIFFERENT SCHEMA, AND THAT IS THE POINT.
+# `docs/hc_coverage.csv` is served by GitHub Pages to anyone with the URL. JP's
+# ratings are a private judgement, unlike the position book already in this repo,
+# so they are dropped on the way out. Adding a column to COLS therefore publishes
+# it by default -- add anything sensitive to PRIVATE_ONLY at the same time.
+PRIVATE_ONLY = {"Rating"}
+PUBLIC_COLS = [c for c in COLS if c not in PRIVATE_ONLY]
 
 WIDTH = {"Ticker": 11, "Company Name": 36, "Sector": 19, "Subsector": 26,
-         "Sub-subsector": 20, "Core Coverage": 9, "Rating": 8, "Listing": 17,
+         "Sub-subsector": 20, "Core Coverage": 9, "Rating": 9, "Listing": 17,
          "Exchange": 16, "Country (HQ)": 15, "Ccy": 6, "Price (local)": 12,
-         "Mkt Cap (USD $M)": 15, "Ramp Effort (1/2)": 12}
+         "Mkt Cap (USD $M)": 15, "Size": 7, "Fwd P/E": 9,
+         "Ramp Effort (1/2)": 12}
+WIDTH.update({c: 9 for c in RETURN_COLS})
 
 HDR_FILL = PatternFill("solid", fgColor="1F3864")
 RAMP_FILL = PatternFill("solid", fgColor="2E6B4F")
@@ -78,6 +114,28 @@ def basesym(t):
     return str(t or "").strip().upper().split(" ")[0].split(".")[0]
 
 
+def _payload_names_match(a, b):
+    """Do two company names describe the same issuer?
+
+    Reuses `universe.enrich._payload_names_match`, which is token-based precisely
+    because character similarity cannot do this job -- Medartis/Medifast scores
+    0.62 on difflib and they are different companies. Accents are stripped first:
+    JP types these names by hand, so 'bioMerieux' must match 'bioMérieux'.
+    Returns True when the comparison cannot be made (one side blank) -- an absent
+    name is not evidence of a mismatch.
+    """
+    import unicodedata
+
+    def strip_accents(s):
+        return "".join(c for c in unicodedata.normalize("NFKD", str(s or ""))
+                       if not unicodedata.combining(c))
+
+    sys.path.insert(0, REPO)
+    from universe.enrich import _payload_names_match as _match
+    verdict = _match(strip_accents(a), strip_accents(b))
+    return True if verdict is None else bool(verdict)
+
+
 def fetch(rows):
     """rows: the universe dicts. Keyed by CM Ticker, valued by the Yahoo answer."""
     import yfinance as yf
@@ -97,7 +155,14 @@ def fetch(rows):
         # no market cap. Back off rather than accept the blank.
         for attempt in range(4):
             try:
-                d = {k: (yf.Ticker(sym).info or {}).get(k) for k in FIELDS}
+                # ONE payload per attempt, then project. This was written as
+                # `{k: yf.Ticker(sym).info.get(k) for k in FIELDS}`, which
+                # re-fetches `.info` once PER FIELD -- 7 fields x 4 attempts x 239
+                # tickers is up to 6,692 requests where 239 would do. That is what
+                # throttled Yahoo hard enough to refuse 143 of 239 rows and send
+                # this build to the FMP fallback three times in a row.
+                info = yf.Ticker(sym).info or {}
+                d = {k: info.get(k) for k in FIELDS}
                 if d.get("marketCap"):
                     break
             except Exception as e:
@@ -212,6 +277,81 @@ def legacy_bases():
     return out
 
 
+def load_returns():
+    """Calendar-year returns from the newest weekly performance snapshot.
+
+    Returns (by_ticker, as_of_date). These are TOTAL returns off split- and
+    dividend-adjusted prices, which may not match how JP's reference sheet
+    computes its columns -- said on the sheet rather than assumed away.
+
+    The snapshot's date is its BUILD date, not each security's last trading day;
+    the per-series observation date is discarded before the pickle is written.
+    So the footnote says "snapshot built <date>", which is the only claim the
+    data actually supports.
+    """
+    import glob
+    import pandas as pd
+
+    paths = sorted(glob.glob(os.path.join(REPO, "cache", "perf", "perf_df_*.pkl")),
+                   key=os.path.getmtime)
+    if not paths:
+        print("  no performance snapshot found; return columns left blank", file=sys.stderr)
+        return {}, None
+    path = paths[-1]
+    as_of = datetime.date.fromtimestamp(os.path.getmtime(path))
+    age = (datetime.date.today() - as_of).days
+    if age > SNAPSHOT_MAX_AGE_DAYS:
+        # Blank beats stale-and-unlabelled: a YTD from a month ago sitting beside a
+        # live price reads as one consistent moment and is not one.
+        print("  performance snapshot is %d days old (>%d); return columns left blank"
+              % (age, SNAPSHOT_MAX_AGE_DAYS), file=sys.stderr)
+        return {}, None
+    df = pd.read_pickle(path).set_index("Ticker")
+    df = df[~df.index.duplicated(keep="first")]
+    out = {}
+    for t, row in df.iterrows():
+        out[str(t)] = {c: num(row.get(c)) for c in RETURN_COLS if c in df.columns}
+    return out, as_of
+
+
+def load_ratings():
+    """JP's ratings, keyed by ticker. The build NEVER writes this file."""
+    if not os.path.exists(RATINGS_PATH):
+        print("  no ratings file at %s; Rating left blank" % RATINGS_PATH, file=sys.stderr)
+        return {}
+    try:
+        ws = openpyxl.load_workbook(RATINGS_PATH, data_only=True)["Ratings"]
+    except Exception as e:
+        print("  ratings file unreadable (%s); Rating left blank" % str(e)[:70], file=sys.stderr)
+        return {}
+    hdr = [(c.value if c.value is None else str(c.value).strip())
+           for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    idx = {h: i for i, h in enumerate(hdr) if h}
+    if "Ticker" not in idx:
+        print("  ratings file has no Ticker column; Rating left blank", file=sys.stderr)
+        return {}
+    out, dupes = {}, []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        t = row[idx["Ticker"]]
+        if not t:
+            continue
+        t = str(t).strip()
+        if t in out:
+            dupes.append(t)
+            continue
+        out[t] = {
+            "Rating": row[idx["Rating"]] if "Rating" in idx and idx["Rating"] < len(row) else None,
+            "Company Name": (row[idx["Company Name"]]
+                             if "Company Name" in idx and idx["Company Name"] < len(row) else None),
+        }
+    if dupes:
+        # A duplicated key fans a left-join out into extra rows. Refuse rather than
+        # silently pick one; JP has to resolve which rating is his.
+        raise SystemExit("ABORT: duplicate Ticker in %s: %s. Nothing written."
+                         % (RATINGS_PATH, ", ".join(sorted(set(dupes))[:10])))
+    return out
+
+
 def build_records(asof):
     rows = [r for r in csv.DictReader(open(UNIVERSE, encoding="utf-8"))
             if r["Sector (JP)"] in SECTORS]
@@ -232,6 +372,16 @@ def build_records(asof):
     legacy = legacy_bases()
     # Owens & Minor renamed to Accendra Health; same company, so it keeps the credit.
     renamed = {"ACH": "OMI"}
+    returns, returns_asof = load_returns()
+    ratings = load_ratings()
+
+    # ⛑ Ticker is the join key on JP's instruction ("Ticker is an identity but it
+    # can be fuzzy so you need to check and verify with me if its too ambiguous").
+    # So: join on ticker, but where the ratings file's Company Name disagrees with
+    # the universe's, DO NOT attach the rating -- collect it and make JP adjudicate.
+    # A warning alone is not enough; the value has to be unreachable, or the
+    # renderer publishes one issuer's rating against another's row.
+    ambiguous = []
 
     recs = []
     for r in rows:
@@ -242,22 +392,51 @@ def build_records(asof):
         mc = num(d.get("marketCap"))
         px = num(d.get("regularMarketPrice")) or num(d.get("currentPrice"))
         known = basesym(t) in legacy or renamed.get(t.strip().upper()) in legacy
-        recs.append({
+        mcap_usd_m = (mc * rate / 1e6) if (mc and rate) else None
+
+        rating = None
+        rr = ratings.get(t)
+        if rr is not None:
+            rated_name = str(rr.get("Company Name") or "").strip()
+            if rated_name and not _payload_names_match(rated_name, r["Company Name"]):
+                ambiguous.append((t, r["Company Name"], rated_name))
+            else:
+                rating = rr.get("Rating")
+
+        rec = {
             "Ticker": t,
             "Company Name": r["Company Name"],
             "Sector": r["Sector (JP)"],
             "Subsector": r["Subsector (JP)"],
             "Sub-subsector": r["Sub-subsector (JP)"],
             "Core Coverage": "Y" if r.get("Core", "").strip().upper() == "Y" else "",
-            "Rating": None,
+            "Rating": rating,
             "Listing": r["Listing Type"],
             "Exchange": r["Exchange"],
             "Country (HQ)": r["Country (HQ)"],
             "Ccy": ccy,
             "Price (local)": px,
-            "Mkt Cap (USD $M)": (mc * rate / 1e6) if (mc and rate) else None,
+            "Mkt Cap (USD $M)": mcap_usd_m,
+            # Blank, never a guessed bucket, when the market cap is unknown. The
+            # partial-book guard tolerates up to 5% missing, so this does happen.
+            "Size": (None if mcap_usd_m is None
+                     else ("LC" if mcap_usd_m >= LC_THRESHOLD_USD_M else "SMID")),
+            # Yahoo's forwardPE only -- genuinely NTM. Never backfilled from FMP's
+            # trailing P/E, and never from Price/FY1-estimate either: an annual FY1
+            # figure is not NTM, and its currency and share basis are unvalidated
+            # against the price (pence-vs-pounds alone is a 100x trap). A blank
+            # here means "not known", which is a true statement.
+            # Non-positive is blanked. Yahoo returns a negative forwardPE for a
+            # company expected to lose money (Guardant came back -380.9), and that
+            # is not a valuation multiple -- it is the sign of the EPS estimate
+            # leaking through a ratio. Ranking or averaging a column containing it
+            # gives a loss-maker the appearance of the cheapest name on the sheet.
+            "Fwd P/E": (fpe if (fpe := num(d.get("forwardPE"))) and fpe > 0 else None),
             "Ramp Effort (1/2)": 1 if known else None,
-        })
+        }
+        rec.update({c: None for c in RETURN_COLS})
+        rec.update(returns.get(t, {}))
+        recs.append(rec)
     recs.sort(key=lambda r: (0 if r["Sector"] == "MedTech" else 1,
                              -(r["Mkt Cap (USD $M)"] or 0)))
     # REFUSE A PARTIAL BOOK. A rate-limited Yahoo response is indistinguishable
@@ -280,7 +459,24 @@ def build_records(asof):
     if missing:
         print("  %d rows have no market cap: %s"
               % (len(missing), ", ".join(missing)), file=sys.stderr)
-    return recs
+
+    # Cardinality gates. A join that matched NOTHING publishes an entirely blank
+    # column and looks exactly like a column of honest blanks, which is how a
+    # silently-broken join survives. Say it out loud instead.
+    joined_returns = sum(1 for r in recs if any(r.get(c) is not None for c in RETURN_COLS))
+    joined_ratings = sum(1 for r in recs if r.get("Rating") not in (None, ""))
+    if returns and joined_returns == 0:
+        raise SystemExit("ABORT: the performance snapshot matched 0 of %d rows. "
+                         "Nothing written." % len(recs))
+    print("  returns joined for %d/%d rows | ratings joined for %d"
+          % (joined_returns, len(recs), joined_ratings))
+    if ambiguous:
+        print("  %d ticker(s) NOT rated - the ratings file names a different company:"
+              % len(ambiguous), file=sys.stderr)
+        for t, uni, rated in ambiguous:
+            print("     %-10s universe=%-32s ratings=%s" % (t, uni[:32], rated),
+                  file=sys.stderr)
+    return recs, returns_asof, ambiguous
 
 
 def write_sheet(wb, title, rows, subtitle):
@@ -383,6 +579,10 @@ def write_summary(wb, allr, mt, hs, asof, src):
         "ACH (Accendra Health) counts as Ramp 1 because it is Owens & Minor renamed - 'OMI' on the legacy sheet.",
         "Core Coverage = the 'Core' flag on the Coverage Manager universe. It is a separate judgement from Ramp Effort.",
         "Prices are in local trading currency; market cap is USD at spot FX on the build date. The LSE names quote in pence (GBp).",
+        "FOOTNOTE ON THE RETURN COLUMNS (2019-2025, YTD): these are TOTAL returns on split- and dividend-adjusted prices, and they are NOT as of the build date above - they come from the Coverage Manager weekly performance snapshot named in the caption. YTD in particular is as of that snapshot, while Price and Mkt Cap are same-day. A blank is a company that did not trade that year, never a zero.",
+        "Size: LC at or above USD 25,000M market cap, SMID below. That threshold is a policy choice, not a measurement - the reference sheet only pins it between USD 22.7bn (SMID) and USD 34.2bn (LC). Names near the line move with price and FX.",
+        "Fwd P/E is Yahoo's forwardPE (next twelve months) and is blank where Yahoo has none. It is deliberately never backfilled from a trailing P/E or from an annual FY1 estimate - both would be a different measure under the same heading.",
+        "Rating is joined from Companies_Stocks_Sectors_Ratings/Ratings.xlsx, which this build never writes. It is omitted from the published CSV and the Google Sheet.",
         "Some rows are priced under a different symbol than the Ticker column shows - Coverage Manager keys them by its own convention and Yahoo needs another string. MED and MOVE are the ones that matter: their bare symbols collide with live US listings.",
     ]:
         row += 1
@@ -394,7 +594,28 @@ def write_summary(wb, allr, mt, hs, asof, src):
 
 
 def archive_existing(out_dir, current):
-    """Move the current file into archive/, stamped with the date it was built."""
+    """Move the current file into archive/, stamped with the date it was built.
+
+    Also sweeps any PRIOR_STEMS file still sitting at the top level. Without that,
+    the first run after a rename leaves the old workbook beside the new one,
+    indistinguishable from a current file.
+    """
+    for stem in PRIOR_STEMS:
+        old = os.path.join(out_dir, "%s.xlsx" % stem)
+        if os.path.exists(old):
+            arch = os.path.join(out_dir, "archive")
+            os.makedirs(arch, exist_ok=True)
+            built = datetime.date.fromtimestamp(os.path.getmtime(old)).isoformat()
+            dest = os.path.join(arch, "%s - %s.xlsx" % (stem, built))
+            n = 2
+            while os.path.exists(dest):
+                dest = os.path.join(arch, "%s - %s (%d).xlsx" % (stem, built, n))
+                n += 1
+            shutil.move(old, dest)
+            print("migrated prior workbook -> archive/%s" % os.path.basename(dest))
+        old_csv = os.path.join(out_dir, "%s.csv" % stem)
+        if os.path.exists(old_csv):
+            os.remove(old_csv)
     if not os.path.exists(current):
         return None
     arch_dir = os.path.join(out_dir, "archive")
@@ -409,19 +630,153 @@ def archive_existing(out_dir, current):
     return dest
 
 
+RATING_SHEET = "Ratings"
+RATING_COLS = ["Ticker", "Company Name", "Sector (JP)", "Subsector (JP)",
+               "Rating", "Notes", "Status", "Last Synced"]
+HUMAN_COLS = {"Rating", "Notes"}          # never written by any code path
+MACHINE_COLS = {"Sector (JP)", "Subsector (JP)", "Status", "Last Synced"}
+
+
+def sync_ratings():
+    """Seed / refresh the ratings workbook. Only reachable via --sync-ratings.
+
+    The ordinary build NEVER calls this: the file is JP's to type in, and a daily
+    automated job writing the file he is editing is how edits get lost.
+
+    Ownership is split and enforced:
+      * `Rating` and `Notes` are HUMAN. No code path writes them, including this one.
+      * `Sector (JP)`, `Subsector (JP)`, `Status`, `Last Synced` are MACHINE and are
+        refreshed, because otherwise they rot as the universe moves.
+      * `Ticker` and `Company Name` are the identity, and are the interesting case.
+
+    ⛑ A CHANGED `Company Name` IS NOT REFRESHED. That looks like a bug and is the
+    whole safety mechanism. The build attaches a rating by ticker only when the
+    ratings file's company name still agrees with the universe's; if this function
+    quietly rewrote the name whenever it drifted, the two would agree by
+    construction and the check could never fire again -- which is precisely how
+    `ZEN` kept Zendesk's classification after the ticker became Zentek. Instead the
+    row is marked `REVIEW - issuer may have changed`, the rating stops attaching,
+    and JP adjudicates. Fail closed.
+    """
+    uni = list(csv.DictReader(open(UNIVERSE, encoding="utf-8")))
+    by_ticker = {r["Ticker"]: r for r in uni}
+    today = datetime.date.today().isoformat()
+
+    if os.path.exists(RATINGS_PATH):
+        wb = openpyxl.load_workbook(RATINGS_PATH)
+        if RATING_SHEET not in wb.sheetnames:
+            raise SystemExit("ABORT: %s has no '%s' sheet." % (RATINGS_PATH, RATING_SHEET))
+        ws = wb[RATING_SHEET]
+        hdr = [(c.value if c.value is None else str(c.value).strip())
+               for c in next(ws.iter_rows(min_row=1, max_row=1))]
+        idx = {h: i + 1 for i, h in enumerate(hdr) if h}
+        for need in ("Ticker", "Rating"):
+            if need not in idx:
+                raise SystemExit("ABORT: %s is missing the '%s' column." % (RATINGS_PATH, need))
+    else:
+        os.makedirs(os.path.dirname(RATINGS_PATH), exist_ok=True)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = RATING_SHEET
+        for j, c in enumerate(RATING_COLS, start=1):
+            cell = ws.cell(1, j, c)
+            cell.font = HDR_FONT
+            cell.fill = RAMP_FILL if c in HUMAN_COLS else HDR_FILL
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.row_dimensions[1].height = 28
+        idx = {c: j for j, c in enumerate(RATING_COLS, start=1)}
+
+    seen, dupes, added, reviewed, retired = {}, [], 0, [], 0
+    for rr in range(2, ws.max_row + 1):
+        t = ws.cell(rr, idx["Ticker"]).value
+        if not t:
+            continue
+        t = str(t).strip()
+        if t in seen:
+            dupes.append(t)
+            continue
+        seen[t] = rr
+    if dupes:
+        raise SystemExit("ABORT: duplicate Ticker rows in %s: %s. Resolve by hand; "
+                         "nothing written." % (RATINGS_PATH, ", ".join(sorted(set(dupes))[:10])))
+
+    for t, rr in seen.items():
+        u = by_ticker.get(t)
+        if u is None:
+            ws.cell(rr, idx["Status"], "Not in universe")
+            ws.cell(rr, idx["Last Synced"], today)
+            retired += 1
+            continue
+        stored_name = str(ws.cell(rr, idx["Company Name"]).value or "").strip()
+        if stored_name and not _payload_names_match(stored_name, u["Company Name"]):
+            # Leave EVERY cell alone except the flag. See the docstring.
+            ws.cell(rr, idx["Status"], "REVIEW - issuer may have changed")
+            reviewed.append((t, stored_name, u["Company Name"]))
+            continue
+        if not stored_name:
+            ws.cell(rr, idx["Company Name"], u["Company Name"])
+        ws.cell(rr, idx["Sector (JP)"], u["Sector (JP)"])
+        ws.cell(rr, idx["Subsector (JP)"], u["Subsector (JP)"])
+        ws.cell(rr, idx["Status"], "Active")
+        ws.cell(rr, idx["Last Synced"], today)
+
+    row = ws.max_row + 1
+    for r in uni:
+        if r["Ticker"] in seen:
+            continue
+        ws.cell(row, idx["Ticker"], r["Ticker"])
+        ws.cell(row, idx["Company Name"], r["Company Name"])
+        ws.cell(row, idx["Sector (JP)"], r["Sector (JP)"])
+        ws.cell(row, idx["Subsector (JP)"], r["Subsector (JP)"])
+        ws.cell(row, idx["Status"], "Active")
+        ws.cell(row, idx["Last Synced"], today)
+        row += 1
+        added += 1
+
+    ws.freeze_panes = "C2"
+    ws.auto_filter.ref = "A1:%s%d" % (get_column_letter(len(RATING_COLS)), ws.max_row - 1)
+    for c, w in zip("ABCDEFGH", (12, 38, 22, 26, 10, 46, 30, 13)):
+        ws.column_dimensions[c].width = w
+
+    try:
+        wb.save(RATINGS_PATH)
+    except PermissionError:
+        raise SystemExit("ABORT: %s is open in Excel. Close it and re-run; nothing written."
+                         % RATINGS_PATH)
+
+    print("ratings file: %s" % RATINGS_PATH)
+    print("  rows now %d | added %d | marked not-in-universe %d | flagged for review %d"
+          % (ws.max_row - 1, added, retired, len(reviewed)))
+    for t, old, new in reviewed:
+        print("     REVIEW %-10s ratings says '%s', universe says '%s'" % (t, old, new))
+    if reviewed:
+        print("  Those rows keep their rating in this file but the coverage build will"
+              " NOT attach it until the name is reconciled.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default=DEFAULT_OUT)
     ap.add_argument("--no-archive", action="store_true")
+    ap.add_argument("--sync-ratings", action="store_true",
+                    help="Seed/refresh the ratings workbook, then exit. Never run by "
+                         "the ordinary build.")
     args = ap.parse_args()
 
+    if args.sync_ratings:
+        sync_ratings()
+        return
+
     asof = datetime.date.today().isoformat()
-    recs = build_records(asof)
+    recs, returns_asof, ambiguous = build_records(asof)
     mt = [r for r in recs if r["Sector"] == "MedTech"]
     hs = [r for r in recs if r["Sector"] == "Healthcare Services"]
+    ret_note = ("Returns are from the Coverage Manager performance snapshot built %s"
+                % returns_asof.isoformat()) if returns_asof else                "Returns unavailable (no fresh performance snapshot)"
     src = ("Source: Coverage Manager exports/universe.csv, filtered to Sector (JP) in "
-           "(Healthcare Services, MedTech). Prices and market caps from Yahoo Finance, "
-           "pulled %s." % asof)
+           "(Healthcare Services, MedTech). Price and market cap pulled %s from Yahoo "
+           "Finance, falling back to FMP per row where Yahoo had no answer. %s."
+           % (asof, ret_note))
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -461,17 +816,28 @@ def main():
     #      can only rename and move a Sheet -- it cannot write cells -- so the
     #      alternative was replacing the file every build and minting a new URL
     #      each time, which breaks every link to it.
-    rows_out = [["#"] + COLS]
-    for i, r in enumerate(recs, 1):
-        rows_out.append([i] + [
-            ("" if r[c] is None else
-             (round(r[c], 2) if isinstance(r[c], float) else r[c])) for c in COLS])
-    for csv_path in (os.path.join(args.out_dir, "%s.csv" % STEM),
-                     os.path.join(REPO, "docs", "hc_coverage.csv")):
-        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-        with open(csv_path, "w", newline="", encoding="utf-8") as fh:
-            csv.writer(fh).writerows(rows_out)
-        print("wrote %s" % csv_path)
+    def _flatten(cols):
+        out = [["#"] + cols]
+        for i, r in enumerate(recs, 1):
+            out.append([i] + [
+                ("" if r.get(c) is None else
+                 (round(r[c], 2) if isinstance(r[c], float) else r[c])) for c in cols])
+        return out
+
+    # Beside the workbook: the FULL schema, ratings included. This folder is JP's.
+    private_csv = os.path.join(args.out_dir, "%s.csv" % STEM)
+    with open(private_csv, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(_flatten(COLS))
+    print("wrote %s" % private_csv)
+
+    # docs/: PUBLIC. Served by GitHub Pages to anyone with the URL, and read by the
+    # Google Sheet. Ratings are dropped here -- see PRIVATE_ONLY.
+    os.makedirs(os.path.dirname(PUBLIC_CSV), exist_ok=True)
+    with open(PUBLIC_CSV, "w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows(_flatten(PUBLIC_COLS))
+    print("wrote %s  (public schema, %d of %d columns)"
+          % (PUBLIC_CSV, len(PUBLIC_COLS), len(COLS)))
+    print("  NOTE: docs/ is only served after a git commit+push of this repo.")
 
     print(json.dumps({
         "asof": asof, "rows": len(recs), "medtech": len(mt), "hc_services": len(hs),
