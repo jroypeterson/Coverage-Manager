@@ -827,16 +827,31 @@ def main():
     current = os.path.join(args.out_dir, "%s.xlsx" % STEM)
     tmp = os.path.join(tempfile.gettempdir(), "hc_coverage_%d.xlsx" % os.getpid())
     wb.save(tmp)
-    if not args.no_archive:
-        moved = archive_existing(args.out_dir, current)
-        if moved:
-            print("archived -> archive/%s" % os.path.basename(moved))
+    # The archive MOVE and the install COPY share one handler on purpose. Excel
+    # holds a sharing lock on an open workbook, and the first thing that touches
+    # the file is `archive_existing`'s `shutil.move` -- so the PermissionError
+    # surfaces THERE, not at the copy below. Guarding only the copy left the move
+    # to raise an unhandled traceback and exit 1, which is the red-task false
+    # alarm the exit-3 code exists to avoid. (A read-only ATTRIBUTE does not
+    # reproduce this: move succeeds on those, which is why the first attempt to
+    # test this passed and proved nothing.)
     try:
+        if not args.no_archive:
+            moved = archive_existing(args.out_dir, current)
+            if moved:
+                print("archived -> archive/%s" % os.path.basename(moved))
         shutil.copy2(tmp, current)
     except PermissionError:
-        sys.exit("ERROR: %s is open in Excel. Close it and re-run. "
-                 "(The previous version is in archive/ and the new one is at %s)"
-                 % (current, tmp))
+        # EXIT 3 = "the file is open in Excel", deliberately distinct from every
+        # other failure. The weekly scheduled build calls this, and JP having the
+        # workbook open on a Friday morning is not a broken pipeline -- turning
+        # the task RED for it would train him to ignore the red. Exit 1 stays for
+        # the failures that ARE the pipeline's fault (dead FX, a partial book, an
+        # unreadable ratings file), which no amount of re-running fixes on its own.
+        print("ERROR: %s is open in Excel, so the workbook was NOT replaced. "
+              "The new one is at %s and the previous is in archive/. Close Excel "
+              "and re-run." % (current, tmp), file=sys.stderr)
+        raise SystemExit(3)
     finally:
         if os.path.exists(current):
             os.remove(tmp)

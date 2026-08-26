@@ -242,6 +242,54 @@ def test_archiving_is_a_noop_when_there_is_nothing_to_archive(tmp_path):
     assert b.archive_existing(str(tmp_path), str(tmp_path / "absent.xlsx")) is None
 
 
+def test_a_workbook_open_in_excel_exits_3_not_1(monkeypatch, tmp_path):
+    """Exit 3 means "JP has the file open", and the weekly build treats it as a
+    warning rather than a red task — a red that fires because someone was reading
+    the output trains you to ignore reds.
+
+    The lock is simulated at `shutil.move`, NOT with a read-only attribute. The
+    first attempt to verify this used `chmod 444` and the build exited 0, because
+    `archive_existing` MOVES the old file out of the way and a move succeeds on a
+    read-only file. Excel's is a sharing lock, so the failure lands on the move —
+    which is exactly why the handler had to cover the archive step and not just
+    the copy. A test that reproduces the wrong failure proves nothing.
+    """
+    current = tmp_path / ("%s.xlsx" % b.STEM)
+    current.write_bytes(b"pretend workbook")
+
+    def locked(*a, **k):
+        raise PermissionError(32, "The process cannot access the file")
+
+    row = {c: None for c in b.COLS}
+    row.update({"Ticker": "ACME", "Company Name": "Acme Inc", "Sector": "MedTech",
+                "Subsector": "Dental", "Mkt Cap (USD $M)": 1000.0,
+                "Price (local)": 10.0, "Ccy": "USD"})
+    monkeypatch.setattr(b, "build_records",
+                        lambda asof: ([row], datetime.date(2026, 8, 21), []))
+    monkeypatch.setattr(b.shutil, "move", locked)
+    monkeypatch.setattr(b.shutil, "copy2", locked)
+    monkeypatch.setattr(b, "PUBLIC_CSV", str(tmp_path / "docs" / "hc_coverage.csv"))
+    monkeypatch.setattr("sys.argv", ["build", "--out-dir", str(tmp_path)])
+
+    with pytest.raises(SystemExit) as e:
+        b.main()
+    assert e.value.code == 3, (
+        "a workbook locked by Excel exited %r; the weekly build reads anything "
+        "other than 3 as a pipeline failure and turns the task red"
+        % (e.value.code,))
+
+
+def test_archive_existing_surfaces_a_lock_rather_than_swallowing_it(monkeypatch, tmp_path):
+    """The move must not be silently skipped: a swallowed lock would leave the old
+    workbook in place while the run reports success."""
+    current = tmp_path / ("%s.xlsx" % b.STEM)
+    current.write_bytes(b"pretend workbook")
+    monkeypatch.setattr(b.shutil, "move",
+                        lambda *a, **k: (_ for _ in ()).throw(PermissionError(32, "locked")))
+    with pytest.raises(PermissionError):
+        b.archive_existing(str(tmp_path), str(current))
+
+
 def test_the_stem_and_the_published_endpoint_are_decoupled():
     """The Sheet is one =IMPORTDATA() cell pointed at this exact URL and nothing
     in this repo can rewrite that cell, so renaming the workbook must never rename

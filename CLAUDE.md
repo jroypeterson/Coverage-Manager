@@ -36,6 +36,73 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `reporting/slack_blocks.py` — markdown → Block Kit. **Slack has no table primitive; stop trying to make one.** The prior approach fenced every markdown table in a ``` block, which turned the 11-column recommendations table (last column: a paragraph) into unreadable pipe-soup — JP's 2026-08-05 screenshot. Tables now route by shape: **narrow** (≤6 cols, ≤36-char cells, ≤88 total) → aligned monospace; **anything wider** → one card per row, bold headline + prose + a two-column `section.fields` grid. Aligned tables emit `rich_text_preformatted`, not a fence, because **Slack auto-links anything domain-shaped and several exchange suffixes are live ccTLDs** (`.SS` South Sudan, `.HK`, `.BR`, `.PA`) — `688825.SS` came back as `<http://688825.SS|…>` *inside backticks and inside a fence*, and `parse:"none"` does not suppress it for `blocks` (both measured live 2026-08-05). `rich_text` is the one block type Slack leaves literal. Card headlines stay `section` blocks because `fields` has no rich_text equivalent, so a ccTLD-suffixed ticker is still a dead link there — a documented trade of density over a cosmetic blemish. Tests: `tests/test_slack_blocks.py` (24).
 - `reporting/pipeline_reversals.py` — flags a company an **earlier report committed to adding** that a later report puts under *Considered and excluded* with no acknowledgement. Built from the Jersey Mike's case: 07-24 said "Would be a Consumer add at pricing", 07-31 said "not universe-relevant" and cited the 07-24 report — **citing a date is not withdrawing a promise**, and that distinction is the check. Commitment phrases are matched **line-wise across the whole prior report**, not within a named section, because the forward book has lived in both a `Pipeline` table (07-31) and a bullet list under `## Notes` (07-24) — a table-only parser found nothing on the very report the check exists for. Exclusions stay section-scoped (an exclusion reason is ordinary prose; only the heading marks it a verdict). Calibrated on the live corpus: **9 reports, 1 finding, 0 false positives**, pinned by `test_corpus_false_positive_rate_stays_at_zero`. Tests: `tests/test_pipeline_reversals.py` (13).
 - `scripts/poll_ipo_replies.py` — applies JP's `add TICKER` / `decline TICKER` / `add all` replies (thread **and** top-level) to `data/candidate_ledger.csv`, shells `approve_candidates.py` for approvals, republishes `exports/`, and answers in-thread. Gated to `pending` ledger rows, gated to the approver user (`SLACK_APPROVER_USER_ID`, default JP), idempotent by message `ts` in `data/ipo_reply_state.json` — recorded on failure too, so a transient enrichment error cannot re-fire an approval. **Until 2026-08-05 nothing read the thread**, so every weekly post's "reply `add MU`" was a dead end and three names sat pending. Scheduled as `CoverageManager-IpoReplyPoll` (09:20/13:20/18:20, `run_poll_ipo_replies.bat`). Manual: `python scripts/poll_ipo_replies.py [--dry-run] [--no-publish] [--since YYYY-MM-DD]`.
+- `scripts/build_hc_coverage_xlsx.py` — **JP's `AA_Core Coverage` workbook**, at
+  `Dropbox\Career\Pitches\Coverage\AA_Core Coverage.xlsx`, plus the flat CSV that
+  feeds a Google Sheet. Reads `exports/universe.csv` filtered to `Sector (JP)` in
+  {Healthcare Services, MedTech} (239 rows), prices each row, and joins JP's
+  ratings. Run by the Friday `WeeklyCoverageBuilder` (see below); manual:
+  `python scripts/build_hc_coverage_xlsx.py [--out-dir DIR] [--no-archive]`.
+
+  **ONE current file, previous versions in `archive/`.** A stable filename is the
+  point: it can be bookmarked and the Google Sheet keeps one identity. `PRIOR_STEMS`
+  carries a one-time migration so the pre-rename workbook does not sit at the top
+  level looking current.
+
+  **It runs immediately AFTER `cli.py performance`, and that ordering is the design.**
+  The calendar-year return columns (`2019`..`2025`, `YTD`) are read from the
+  snapshot that step just wrote, so returns and prices share ONE as-of date. Run it
+  anywhere else and the workbook footnotes a snapshot up to a week older than its
+  own prices — which reads as one moment and is not. JP declined recomputing the
+  returns ("just use a footnote"), so the ordering is what makes the footnote
+  honest. A snapshot older than `SNAPSHOT_MAX_AGE_DAYS` (10) leaves the columns
+  BLANK rather than stale.
+
+  ⛑ **`docs/hc_coverage.csv` is PUBLIC and is a DIFFERENT SCHEMA.** GitHub Pages
+  serves it and the Google Sheet reads it through a single `=IMPORTDATA()`. The CSV
+  writer serialises whatever is in `COLS`, so **anything added to `COLS` is
+  published unless it is also added to `PRIVATE_ONLY`** — which is how joining JP's
+  ratings would have published them (Codex, Critical, 2026-08-26). `Rating` is in
+  the local xlsx/csv only. **Never rename that path**: nothing here can rewrite the
+  Sheet's `IMPORTDATA` cell, so renaming the endpoint silently empties the Sheet.
+
+  ⛑ **Symbols go through `ticker_utils.normalize_ticker`, FX through
+  `providers/fx_provider`.** Both were reimplemented privately first and both were
+  mistakes: `normalize_ticker` already handled 21 of 22 aliases including the
+  `MED`/`MOVE` collisions, and the private FX fetcher cost a whole build — the 239
+  ticker lookups exhausted the Yahoo budget and every FX call after them was
+  throttled, so the run aborted holding every price and no rate to convert with. FX
+  is fetched BEFORE the ticker sweep.
+
+  **It refuses to publish a partial book.** A rate-limited response is
+  indistinguishable from a company with no market cap, so it aborts on any dead FX
+  rate or >5% of rows missing one, saving to a temp path before archiving so a
+  failed write cannot leave the folder with the old file archived and no current
+  file. The first run shipped 105 of 239 blank — USD 3,089bn against a true ~4,950bn
+  — with nothing worse than a warning line.
+
+  **Exit codes: 0 ok, 3 = the xlsx is open in Excel, anything else = a real
+  failure.** 3 is separate because the weekly task calls this and JP having the file
+  open on a Friday morning is not a broken pipeline; a red that fires because
+  someone was reading the output trains you to ignore reds. The handler covers the
+  archive MOVE as well as the install COPY — Excel takes a sharing lock, so the
+  error lands on `shutil.move` first. A read-only attribute does NOT reproduce it
+  (move succeeds on those), which is why the first attempt to test this passed and
+  proved nothing.
+
+  **Ratings** live in `Companies_Stocks_Sectors_Ratings\Ratings_CoreCoverage.xlsx`,
+  seeded with the `Core=Y` rows (310 of 1,346, every sector). **The ordinary build
+  NEVER writes that file** — `--sync-ratings` does, and only that. `Rating`/`Notes`
+  are human-owned and no code path writes them. ⛑ **A changed `Company Name` is
+  deliberately NOT refreshed**, which looks like a bug and is the safety mechanism:
+  a rating attaches by ticker only while the stored name still agrees with the
+  universe, so refreshing it would make the two agree by construction and the check
+  could never fire — how `ZEN` kept Zendesk's classification after the ticker became
+  Zentek. Such a row is flagged `REVIEW - issuer may have changed` and the rating
+  stops attaching. JP's rule: *"Ticker is an identity but it can be fuzzy so you
+  need to check and verify with me if its too ambiguous."*
+
+  Tests: `tests/test_hc_coverage_builder.py` (29).
+
 - `config.py` — All paths, API keys, segment definitions
 - `data/coverage_universe_tickers.csv` — Master coverage universe
 - `data/positions_and_researching.csv` — Positions and research list (subset of universe). Replaces `data/watchlist.csv` (deleted 2026-05-03). Schema: `Ticker, Position, Position Date, Buy Price, Sell Price, First Buy Date, Average Cost, Shares, Notes, Held, Held As Of, Previously Held, Held Until`.
