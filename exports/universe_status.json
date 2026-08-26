@@ -1,7 +1,7 @@
 {
   "schema_version": 4,
   "dataset_version": "2026-08-26",
-  "generated_at": "2026-08-26T12:38:01Z",
+  "generated_at": "2026-08-26T21:40:27Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1346,
   "ticker_count": 1346,
@@ -10,6 +10,7 @@
   "validation_passed": true,
   "validation_errors": [],
   "validation_warnings": [
+    "28 row(s) list outside the US but carry a bare ticker with no exchange suffix, so any consumer resolving Ticker at a US-defaulting vendor gets a different issuer: 207940, 4519, BAYN, BCLI, BIM, CARA, CPH, CSL, CSU, CVT, DAE, FRE, GNFT, GXI, HEPA, IPN, MED, MOVE, OPT, RDOR3, SAAS, SDZ, SOON, SUNPHARMA, TUB, UCB, VXRT, YPSN",
     "185 ticker(s) missing Subsector (JP) value"
   ],
   "last_discovery_run": "2026-08-21"

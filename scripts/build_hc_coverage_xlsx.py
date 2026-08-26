@@ -65,10 +65,12 @@ SECTORS = ("Healthcare Services", "MedTech")
 RETURN_COLS = ["2019", "2020", "2021", "2022", "2023", "2024", "2025", "YTD"]
 SNAPSHOT_MAX_AGE_DAYS = 10
 
-# LC/SMID boundary. NOT derived from JP's reference sheet -- that sheet only bounds
-# it to the open interval (USD 22.7bn SMID, USD 34.2bn LC], with no observation in
-# between, so this is a named policy value inside that interval and not a measured
-# one. Names near the line will flip with price and FX; the method is stated in the
+# LC/SMID boundary. CONFIRMED BY JP 2026-08-26 ("Size threshold is fine"), which
+# is what makes it a decision rather than an assumption -- it was NOT derived from
+# his reference sheet, which only bounds the line to the open interval
+# (USD 22.7bn SMID, USD 34.2bn LC] with no observation in between. It does
+# reproduce that sheet on both sides: Guardant 22.6bn SMID, Illumina 34.1bn LC.
+# Names near the line will flip with price and FX; the method is stated in the
 # workbook so a flip reads as the rule working rather than as an error.
 LC_THRESHOLD_USD_M = 25000
 
