@@ -312,6 +312,9 @@ class SyncPlan:
     #: a holding that did not join. The row keeps its prior, trusted figures.
     withheld_refreshes: list[str] = field(default_factory=list)
     withheld_reason: str = ""
+    #: True when the operator passed --accept-partial-join and the withholds were
+    #: deliberately released. Recorded so the run output says a human decided.
+    accepted_partial_join: bool = False
     migrated_legacy: list[str] = field(default_factory=list)
     already_sold: list[str] = field(default_factory=list)
     feed_as_of: str = ""
@@ -559,7 +562,7 @@ def migrate_legacy_portfolio(entries, feed: "HeldFeed"):
     return out, sorted(migrated), sorted(already_sold)
 
 
-def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
+def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_join: bool = False) -> SyncPlan:
     """Compute the change WITHOUT touching disk.
 
     `entries` is `positions.load()` output. Pure function so the dry-run and the
@@ -708,18 +711,21 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     # the case where the universe holds two rows for one issuer and no alias links
     # them. Zero unjoined holdings, so the check above cannot see it.
     if plan.demotions and plan.promotions:
-        promoted = {t: feed.rows[t].shares for t in plan.promotions
-                    if t in feed.rows and _finite(feed.rows[t].shares)}
-        for ticker in plan.demotions:
-            recorded = _shares_of(by_ticker.get(ticker, {}))
-            if recorded is None:
-                continue
-            twin = [p for p, s in promoted.items()
-                    if abs(s - recorded) <= SHARE_MATCH_TOLERANCE]
-            if twin:
-                withhold_reasons.append(
-                    f"{ticker} would leave Held while {twin[0]} joins it carrying the "
-                    f"same {recorded:g} shares")
+        # NO SHARE COMPARISON HERE. The previous version required the promoted row
+        # to carry the SAME count as the demoted one -- the exact premise this
+        # redesign was written to delete, left gating the covered-row path. Codex
+        # round 6: a corporate action producing covered NEW at 103 against OLD at
+        # 100 slipped straight through and OLD was stamped sold, because the
+        # counts differ at precisely the event that renames a symbol.
+        #
+        # Without an identity anchor we genuinely cannot tell "sold X, bought Y"
+        # from "X became Y", so we do not pretend to: any demotion coinciding with
+        # any promotion is deferred. That over-defers a real rotation week by one
+        # run, which is why `--accept-partial-join` exists as the release.
+        withhold_reasons.append(
+            f"{len(plan.promotions)} name(s) joined Held in the same run "
+            f"({', '.join(plan.promotions[:5])}) -- with no identity anchor on the "
+            f"feed, a rename is indistinguishable from a sale plus a purchase")
 
     # A REFRESH CAN LOSE SHARES TO AN UNJOINED SYMBOL TOO, and that is corruption
     # rather than a fabricated sale: the position survives with the WRONG count.
@@ -733,12 +739,33 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
             now = feed.rows[ticker].shares if ticker in feed.rows else None
             if recorded is None or now is None or not _finite(now):
                 continue
-            if recorded - now > SHARE_MATCH_TOLERANCE:
+            # ANY difference, not just a decrease. Requiring `recorded > now` kept
+            # the same share-direction assumption the redesign rejects: with a
+            # joined leg at 35 against a stored 30 and an unjoined 20, the refresh
+            # was allowed and wrote 35, discarding 20 shares and their basis
+            # (Codex round 6). An unjoined holding could belong to ANY covered row,
+            # so any figure that moves while one exists is a figure we cannot trust.
+            if abs(recorded - now) > SHARE_MATCH_TOLERANCE:
                 plan.refreshed.remove(ticker)
                 plan.withheld_refreshes.append(ticker)
                 withhold_reasons.append(
                     f"{ticker} would drop {recorded - now:g} share(s) while "
                     f"{len(plan.not_in_universe)} holding(s) did not join")
+
+    # ⛑ THE RELEASE. Without one, a single persistently-uncovered holding defers
+    # every real sale FOREVER, and exit 2 is a repeated warning, not a mechanism --
+    # which recreates the exact stale-held failure this module exists to prevent
+    # (ROIV published as held for 19 days). Codex round 6. The operator who has
+    # looked at the named holdings and decided they are unrelated passes
+    # `--accept-partial-join`; the reasons are still printed, so the decision is
+    # recorded in the run output rather than made silently by a default.
+    if withhold_reasons and accept_partial_join:
+        logger.warning(
+            "accept-partial-join: applying %d demotion(s) and %d figure update(s) "
+            "the join could not vouch for, on operator instruction: %s",
+            len(plan.demotions), len(plan.refreshed), "; ".join(withhold_reasons))
+        plan.accepted_partial_join = True
+        withhold_reasons = []
 
     if withhold_reasons:
         plan.withheld_demotions = list(plan.demotions)
@@ -777,12 +804,15 @@ def apply_plan(entries, feed: HeldFeed, plan: SyncPlan, today=None):
     for e in entries:
         e = dict(e)
         ticker = e["Ticker"].strip().upper()
-        if ticker in plan.withheld_refreshes:
-            # UNTOUCHED, not "refreshed with nothing". Setting `row = None` here
-            # dropped the entry into the not-in-feed branch below, which CLEARS
-            # Shares -- destroying the exact figures the withhold exists to
-            # protect. Caught by running it; the fix and its own defect were
-            # ninety seconds apart.
+        if ticker in plan.withheld_refreshes or ticker in plan.withheld_demotions:
+            # UNTOUCHED -- and this covers BOTH withheld sets, which the first
+            # version did not. A withheld demotion has no feed row and was removed
+            # from `plan.demotions`, so it fell through to the generic
+            # not-in-feed branch and had Shares and Average Cost CLEARED: the row
+            # stayed Held=Y with blank figures. I fixed this exact erasure for
+            # refreshes and shipped the identical bug for demotions in the same
+            # commit, while its message claimed "a withheld row is left
+            # untouched". Codex round 6 caught it.
             out.append(e)
             continue
         row = feed.rows.get(ticker)

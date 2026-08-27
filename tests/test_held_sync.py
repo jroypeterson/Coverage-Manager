@@ -770,3 +770,110 @@ def test_an_ordinary_week_is_never_withheld(tmp_path):
     plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL", "MRNA"])
     assert plan.demotions == ["MRNA"]
     assert plan.withheld_demotions == [] and plan.withheld_refreshes == []
+
+
+# ── Codex round 6 (2026-08-27) ──────────────────────────────────────────────
+
+def test_a_withheld_DEMOTION_keeps_its_figures(tmp_path):
+    """I fixed this erasure for withheld REFRESHES and shipped the identical bug
+    for withheld DEMOTIONS in the same commit -- whose message claimed "a withheld
+    row is left untouched".
+
+    A withheld demotion has no feed row and was removed from `plan.demotions`, so
+    it fell through to the generic not-in-feed branch: Held stayed Y, Shares and
+    Average Cost went blank.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [{"ticker": "NEW", "shares": 100.0, "avg_cost": 50.0,
+                            "brokers": ["IBKR"]}]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"OLD": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "100"
+        entries[0]["Average Cost"] = "42"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["OLD"])
+        assert plan.withheld_demotions == ["OLD"]
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        row = next(e for e in out if e["Ticker"] == "OLD")
+        assert row["Shares"] == "100" and row["Average Cost"] == "42"
+        assert row["Held"] == "Y"
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_COVERED_rename_with_unequal_shares_is_withheld(tmp_path):
+    """The disproved share-equality premise was still gating the covered-row path.
+
+    A corporate action producing covered NEW at 103 against OLD at 100 slipped
+    through the twin check and OLD was stamped sold -- the counts differ at exactly
+    the event that renames a symbol, which is the whole reason the heuristic died.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [{"ticker": "NEW", "shares": 103.0, "avg_cost": 50.0,
+                            "brokers": ["IBKR"]}]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"OLD": ("Portfolio", "Y"), "NEW": ("Researching", "")})
+        entries[0]["Shares"] = "100"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["OLD", "NEW"])
+        assert plan.not_in_universe == [], "no unjoined row -- the other rule is blind"
+        assert plan.demotions == [] and plan.withheld_demotions == ["OLD"]
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_refresh_that_GROWS_is_withheld_too(tmp_path):
+    """Requiring `recorded > now` kept the same share-direction assumption the
+    redesign rejects: a joined leg at 35 against a stored 30 with an unjoined 20
+    wrote 35, discarding 20 shares and their basis."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [
+            {"ticker": "OLD", "shares": 35.0, "avg_cost": 50.0, "brokers": ["Fid"]},
+            {"ticker": "NEWX", "shares": 20.0, "avg_cost": 60.0, "brokers": ["IBKR"]},
+        ]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"OLD": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "30"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["OLD"])
+        assert plan.withheld_refreshes == ["OLD"]
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        assert next(e for e in out if e["Ticker"] == "OLD")["Shares"] == "30"
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_accept_partial_join_is_the_RELEASE_from_an_indefinite_defer(tmp_path):
+    """Without it a single persistently-uncovered holding defers every real sale
+    forever, and exit 2 is a repeated warning rather than a mechanism -- recreating
+    the stale-held failure this module exists to prevent."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [{"ticker": "UNLISTED", "shares": 5.0, "avg_cost": 1.0,
+                            "brokers": ["IBKR"]}]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"AAPL": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "10"
+
+        held_back = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL"])
+        assert held_back.withheld_demotions == ["AAPL"]
+
+        released = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL"],
+                                      accept_partial_join=True)
+        assert released.demotions == ["AAPL"]
+        assert released.withheld_demotions == []
+        assert released.accepted_partial_join is True
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)

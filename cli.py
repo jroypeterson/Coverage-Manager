@@ -475,6 +475,15 @@ def build_parser():
         "--feed", type=str, default=None,
         help="Override the ownership feed path (default: ../portfolio_daily/exports/held.json).",
     )
+    pos_sync.add_argument(
+        "--accept-partial-join", action="store_true",
+        help=(
+            "Apply demotions and figure updates the join could not vouch for. Use "
+            "ONLY after reading the withheld reasons and confirming the named "
+            "holdings are unrelated to the names leaving Held -- without this, a "
+            "persistently uncovered holding defers real sales indefinitely."
+        ),
+    )
 
     pos_state = pos_sub.add_parser(
         "set-state",
@@ -852,7 +861,8 @@ def main():
 
             entries = positions.load(positions.POSITIONS_PATH)
             entries, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
-            plan = held_mod.plan_sync(entries, feed, positions._load_universe_tickers())
+            plan = held_mod.plan_sync(entries, feed, positions._load_universe_tickers(),
+                                      accept_partial_join=getattr(args, 'accept_partial_join', False))
             plan.migrated_legacy = migrated
             plan.already_sold = already_sold
 
