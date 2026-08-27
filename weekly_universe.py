@@ -154,6 +154,51 @@ def _step_export_artifacts(validation_result):
 
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    # 0. ⛑ EVERY REFUSAL HAPPENS BEFORE THE FIRST WRITE.
+    #
+    #    The alias refusal used to sit at step 3b, by which point universe.csv,
+    #    universe_metadata.json and universe_status.json had already been
+    #    overwritten. Raising there left the NEW universe beside the STALE alias
+    #    map — file-path consumers immediately resolving a live ticker onto one
+    #    that no longer exists. A guard that fires halfway through a multi-file
+    #    publish converts one bad artifact into an inconsistent SET, which is
+    #    worse than either outcome it was choosing between (Codex round 3).
+    #
+    #    This step is not atomic and making it so is a larger change; ordering the
+    #    only condition that can refuse ahead of every write buys the same
+    #    property for the case that actually occurs.
+    from universe.aliases import published_payload as _alias_payload
+
+    import pandas as _pd
+
+    aliases_path = EXPORTS_DIR / "ticker_aliases.json"
+    alias_payload = _alias_payload(
+        df=_pd.read_csv(CSV_PATH, dtype=str, encoding="utf-8-sig").fillna(""))
+
+    # NEVER OVERWRITE A NON-EMPTY PUBLISHED MAP WITH AN EMPTY ONE.
+    # `load_aliases` treats a MISSING source as a legitimate empty store, and that
+    # is right — a fleet with no known symbol splits has none. But this is a
+    # load-with-fallback feeding a write-everything publish, the fleet's own
+    # data-loss shape, and `data/ticker_aliases.json` lives in Dropbox: delete it,
+    # or catch it mid-sync, and an empty contract would be republished over a
+    # working one, silently un-joining every consumer with a green run to show for
+    # it. `excluded_count` separates that from "every entry was correctly EXCLUDED
+    # for contradicting the universe", where the empty map is the right answer.
+    if (not alias_payload["alias_to_canonical"]
+            and not alias_payload.get("excluded_count")
+            and aliases_path.exists()):
+        try:
+            existing = json.loads(aliases_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            existing = {}
+        if isinstance(existing, dict) and existing.get("alias_to_canonical"):
+            raise RuntimeError(
+                f"refusing to publish an EMPTY ticker_aliases.json over one carrying "
+                f"{len(existing['alias_to_canonical'])} alias(es) — the curated source "
+                f"data/ticker_aliases.json is missing or empty. Restore it, or delete "
+                f"the published file deliberately if the store really is empty now. "
+                f"NOTHING has been written this run.")
+
     # 1. Snapshot the CSV — transcoded, NOT raw-copied.
     #    The source carries a UTF-8 BOM (ticker_utils writes it with utf-8-sig). A raw copy
     #    propagated that BOM into the published artifact, and every consumer that opens it
@@ -197,54 +242,15 @@ def _step_export_artifacts(validation_result):
     status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
 
     # 3b. Symbol aliases — issuers the fleet's sources spell differently.
-    #     Published as its own artifact rather than folded into universe_metadata
-    #     because the consumers are DIFFERENT: metadata answers "what sector is
-    #     this", aliases answer "what do I call this when I ask yfinance". A
-    #     consumer needing one rarely needs the other, and folding them would
-    #     have bumped a schema six projects pin.
-    from universe.aliases import published_payload as _alias_payload
-
-    aliases_path = EXPORTS_DIR / "ticker_aliases.json"
-    # The universe is passed so an entry that CONTRADICTS it is excluded rather
-    # than published; see `published_payload`.
-    import pandas as _pd
-
-    alias_payload = _alias_payload(
-        df=_pd.read_csv(CSV_PATH, dtype=str, encoding="utf-8-sig").fillna(""))
-
-    # ⛑ NEVER OVERWRITE A NON-EMPTY PUBLISHED MAP WITH AN EMPTY ONE.
+    #     Built and validated at step 0 above, before any write; only the write
+    #     itself happens here. Published as its own artifact rather than folded
+    #     into universe_metadata because the consumers are DIFFERENT: metadata
+    #     answers "what sector is this", aliases answer "what do I call this when
+    #     I ask yfinance", and folding them would have bumped a schema six
+    #     projects pin.
     #
-    # `load_aliases` treats a MISSING source file as a legitimate empty store, and
-    # that is right: a fleet with no known symbol splits has no store. But this is
-    # a load-with-fallback feeding a write-everything publish, which is the fleet's
-    # own documented data-loss shape. `data/ticker_aliases.json` lives in Dropbox;
-    # delete it, or catch it mid-sync, and this step would cheerfully republish an
-    # empty contract over a working one — silently un-joining every consumer, with
-    # a green run to show for it. An empty result is only believable when the
-    # published file was already empty.
-    # `excluded_count` separates "the curated source vanished" (refuse, keep the
-    # good published file) from "every entry was correctly EXCLUDED for
-    # contradicting the universe" (publish the empty map — it is the right
-    # answer). Without the distinction this guard raised on a correct exclusion
-    # and left a STALE export beside a universe.csv, metadata and status file this
-    # same function had already rewritten — an internally contradictory artifact
-    # set, which is worse than either outcome it was choosing between.
-    if (not alias_payload["alias_to_canonical"]
-            and not alias_payload.get("excluded_count")
-            and aliases_path.exists()):
-        try:
-            existing = json.loads(aliases_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            existing = {}
-        if isinstance(existing, dict) and existing.get("alias_to_canonical"):
-            raise RuntimeError(
-                f"refusing to publish an EMPTY ticker_aliases.json over one carrying "
-                f"{len(existing['alias_to_canonical'])} alias(es) — the curated source "
-                f"data/ticker_aliases.json is missing or empty. Restore it, or delete "
-                f"the published file deliberately if the store really is empty now.")
-
-    # Not part of the consumer contract — it describes THIS build, not the
-    # mapping — so it is used above and dropped before writing.
+    #     `excluded_count` describes THIS build, not the mapping, so it is used
+    #     above and dropped before writing.
     alias_payload.pop("excluded_count", None)
     aliases_path.write_text(json.dumps(alias_payload, indent=2) + "\n", encoding="utf-8")
 

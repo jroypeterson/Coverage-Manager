@@ -421,11 +421,23 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
                     f"map has no entry for it - consumers read that map, so they would "
                     f"send {canonical} to every vendor")
             elif present[canonical] != mapping:
+                # BOTH directions, and "bidirectional" was a claim before it was
+                # true: v1 compared only keys MISSING from the top-level map, so an
+                # EXTRA route there passed clean — and the per-vendor loop below
+                # defaults an undeclared vendor's expected value to itself, which
+                # hides it a second time. A consumer would then send a symbol no
+                # entry supports while acceptance reports green (Codex round 3).
                 missing = sorted(set(mapping) - set(present[canonical]))
+                extra = sorted(set(present[canonical]) - set(mapping))
                 if missing:
                     problems.append(
                         f"ticker_aliases.json: vendor_symbols[{canonical}] is missing "
                         f"{missing} that the entry declares")
+                if extra:
+                    problems.append(
+                        f"ticker_aliases.json: vendor_symbols[{canonical}] routes "
+                        f"{extra}, which the entry does not declare - consumers read "
+                        f"that map, so they would send a symbol no evidence supports")
 
     if top_vendors is not None and not isinstance(top_vendors, dict):
         problems.append(

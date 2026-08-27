@@ -132,6 +132,23 @@ class AliasStoreUnavailable(Exception):
     """The alias store could not be read. Callers MUST abort without writing."""
 
 
+#: Share counts are floats and brokers round differently (DRIP fractions, ADR
+#: distributions), so the false-sale match below is a near-equality, not `==`.
+#: Same tolerance `lots.py` uses for its own reconciliation.
+SHARE_MATCH_TOLERANCE = 0.5
+
+
+def _shares_of(entry) -> float | None:
+    """A position row's share count as a float, or None when it is not recorded."""
+    raw = str(entry.get("Shares", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
 def _load_symbol_aliases() -> dict[str, str]:
     """Broker/vendor symbol -> universe ticker, from the published alias store.
 
@@ -461,15 +478,40 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     #
     # `not_in_universe` is only populated when the caller passes `universe_tickers`
     # — without it we cannot see the signature and do not pretend to.
+    # ⛑ THE MATCH IS ON SHARE COUNT, NOT ON CO-OCCURRENCE.
+    #
+    # v1 of this guard blocked whenever ANY demotion coincided with ANY unjoined
+    # feed holding, which is the shape of a fabricated sale and also the shape of
+    # an ordinary week: sell a covered name, buy an uncovered one, and the whole
+    # sync aborted while the sold name kept publishing as owned (Codex round 3).
+    # That is "a guard can become the outage", and it contradicted this module's
+    # own documented contract that an uncovered holding is NOT fatal.
+    #
+    # The discriminator is cheap and strong: a fabricated sale is ONE position
+    # seen twice, so the unjoined feed row carries the SAME share count the
+    # position record already holds. A genuine rebalance has no such coincidence.
+    # A demoted row with no recorded share count cannot be matched either way, so
+    # it is reported and allowed through rather than blocking on ignorance.
+    suspects = []
     if plan.demotions and plan.not_in_universe:
+        feed_shares = {t: feed.rows[t].shares for t in plan.not_in_universe if t in feed.rows}
+        for ticker in plan.demotions:
+            held_shares = _shares_of(by_ticker.get(ticker, {}))
+            if held_shares is None:
+                continue
+            for other, shares in feed_shares.items():
+                if abs(shares - held_shares) <= SHARE_MATCH_TOLERANCE:
+                    suspects.append((ticker, other, held_shares))
+                    break
+
+    if suspects:
+        detail = "; ".join(f"{a} ({s:g} shares) vs unjoined {b}" for a, b, s in suspects)
         plan.blocked_reason = (
-            f"{len(plan.demotions)} name(s) would leave Held ({', '.join(plan.demotions)}) "
-            f"in the same run that {len(plan.not_in_universe)} feed holding(s) failed to "
-            f"join the universe ({', '.join(plan.not_in_universe)}). Those are very "
-            f"likely the SAME position under two symbols — the shape of a fabricated "
-            f"sale, not a sale. Add the name to the universe, or record the pair in "
-            f"data/ticker_aliases.json, then re-run. If they really are unrelated, the "
-            f"sale still applies next run once the unjoined holding is covered."
+            f"{len(suspects)} name(s) would leave Held while a feed holding that failed "
+            f"to join the universe carries the SAME share count: {detail}. That is one "
+            f"position under two symbols — the shape of a fabricated sale, not a sale. "
+            f"Add the name to the universe, or record the pair in "
+            f"data/ticker_aliases.json, then re-run."
         )
     elif len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
         plan.blocked_reason = (

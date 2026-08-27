@@ -617,3 +617,57 @@ def test_acceptance_flags_a_top_level_map_missing_ONE_declared_vendor(tmp_path):
     }), encoding="utf-8")
     problems = _check_ticker_aliases(tmp_path)
     assert any("is missing ['finra']" in p for p in problems)
+
+
+def test_acceptance_flags_an_EXTRA_route_the_entry_does_not_declare(tmp_path):
+    """Codex round 3: "bidirectional" was a claim before it was true.
+
+    v1 compared only keys MISSING from the top-level map, and the per-vendor loop
+    defaults an undeclared vendor's expected value to itself -- so an extra route
+    was hidden twice over and consumers would send a symbol no evidence supports.
+    """
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"FI": {"yfinance": "FISV", "finra": "FISV"}},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"],
+                     "vendor_symbols": {"yfinance": "FISV"}}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("which the entry does not declare" in p for p in problems)
+
+
+def test_the_empty_map_refusal_happens_BEFORE_any_artifact_is_written(monkeypatch, tmp_path):
+    """Codex round 3: the guard fired after universe.csv, metadata and status were
+    already overwritten, leaving the NEW universe beside the STALE alias map --
+    consumers resolving a live ticker onto one that no longer exists. A refusal
+    halfway through a multi-file publish turns one bad artifact into an
+    inconsistent SET.
+    """
+    import weekly_universe
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    (exports / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1, "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {}, "entries": []}), encoding="utf-8")
+    (exports / "universe.csv").write_text("Ticker\nOLD\n", encoding="utf-8")
+
+    csv_path = tmp_path / "universe.csv"
+    csv_path.write_text("Ticker,Company Name,Sector (JP),Subsector (JP),Sub-subsector (JP),Core\n"
+                        "FI,Fiserv Inc.,Financials,,,\n", encoding="utf-8")
+
+    import universe.aliases as aliases_mod
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", tmp_path / "gone.json")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", csv_path)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports)
+
+    with pytest.raises(RuntimeError, match="NOTHING has been written"):
+        weekly_universe._step_export_artifacts(
+            {"rows": 1, "errors": [], "warnings": [], "passed": True})
+
+    assert (exports / "universe.csv").read_text(encoding="utf-8") == "Ticker\nOLD\n", \
+        "the refusal must leave every artifact untouched, not just the alias map"
+    assert not (exports / "universe_status.json").exists()

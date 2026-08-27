@@ -400,6 +400,9 @@ def test_an_unjoined_feed_holding_alongside_a_demotion_BLOCKS(tmp_path):
         held_mod.SYMBOL_ALIASES.clear()          # a MISSING store, not a broken one
         feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
         entries = _entries({"FI": ("Portfolio", "Y")})
+        # One position seen twice carries the SAME share count on both sides --
+        # that equality is the discriminator, not mere co-occurrence.
+        entries[0]["Shares"] = "10.5"
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
         assert plan.demotions == ["FI"]
         assert plan.blocked_reason and "fabricated sale" in plan.blocked_reason
@@ -428,6 +431,45 @@ def test_the_guard_is_inert_without_a_universe_to_check_against(tmp_path):
         feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
         plan = held_mod.plan_sync(_entries({"FI": ("Portfolio", "Y")}), feed)
         assert plan.not_in_universe == []
+        assert plan.blocked_reason is None
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_an_ORDINARY_REBALANCE_is_not_blocked_by_the_false_sale_guard(tmp_path):
+    """Codex round 3: v1 of that guard blocked on mere CO-OCCURRENCE.
+
+    Sell a covered name and buy an uncovered one in the same week -- an ordinary
+    week -- and the whole sync aborted while the sold name kept publishing as
+    owned. That is "a guard can become the outage", and it contradicted this
+    module's own contract that an uncovered holding is not fatal. The share count
+    is the discriminator: one position seen twice matches, two unrelated trades
+    do not.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("TSLA",))))
+        entries = _entries({"AAPL": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "4"          # nothing like the feed's 10.5
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL"])
+        assert plan.demotions == ["AAPL"]
+        assert plan.not_in_universe == ["TSLA"]
+        assert plan.blocked_reason is None
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_demotion_with_no_recorded_share_count_is_allowed_through(tmp_path):
+    """Blocking on ignorance is how a guard becomes permanent."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("TSLA",))))
+        entries = _entries({"AAPL": ("Portfolio", "Y")})     # Shares stays None
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL"])
         assert plan.blocked_reason is None
     finally:
         held_mod.SYMBOL_ALIASES.clear()
