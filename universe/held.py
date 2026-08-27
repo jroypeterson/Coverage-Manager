@@ -354,6 +354,25 @@ def load_feed(path=None) -> HeldFeed:
         )
         merged.append(t)
 
+    # ⛑ THE EMPTY-FEED GUARD CHECKED THE RAW LIST, NOT WHAT SURVIVED PARSING.
+    #
+    # Rows with a blank ticker are skipped above, so a feed of `[{"ticker": "",
+    # ...}]` is non-empty going in and empty coming out — it sails past the
+    # "refusing to treat an empty book as everything-was-sold" check and marks the
+    # WHOLE book sold, with two demotions comfortably under the circuit breaker
+    # (Codex round 4). One blank row among good ones fabricates one sale the same
+    # way. The guard has to be applied to the rows that will actually be compared.
+    skipped = len(raw_rows) - len(rows) - len(merged)
+    if not rows:
+        raise HeldFeedError(
+            f"ownership feed carried {len(raw_rows)} row(s) but none had a usable "
+            f"ticker — refusing to treat that as 'everything was sold'")
+    if skipped > 0:
+        raise HeldFeedError(
+            f"ownership feed has {skipped} row(s) with no ticker among {len(raw_rows)} "
+            f"— each one is a holding this sync cannot see, and an unseen holding "
+            f"reads as a sale. Fix the publisher; nothing has been written")
+
     feed = HeldFeed(
         schema=int(schema),
         generated_at=str(payload.get("generated_at", "")),
@@ -492,26 +511,63 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     # position record already holds. A genuine rebalance has no such coincidence.
     # A demoted row with no recorded share count cannot be matched either way, so
     # it is reported and allowed through rather than blocking on ignorance.
+    # ⛑ THE RULE IS "SHARES LOST == SHARES UNJOINED", AND A DEMOTION IS ONLY ITS
+    #    EXTREME CASE. v1 of this guard looked at demotions alone, so a PARTIAL
+    #    split slipped through untouched: a 30-share position held at two brokers
+    #    under two spellings, with the alias store gone, arrives as `FI: 10` plus
+    #    an unjoined `FISV: 20`. That is `refreshed`, not a demotion — unblocked,
+    #    and `apply_plan` overwrote 30 shares with 10 and one broker's cost basis
+    #    with the other's (Codex round 4). Same defect, two thirds of the way
+    #    along. Generalising to "recorded minus new" covers both, and a demotion
+    #    falls out as new == 0.
     suspects = []
-    if plan.demotions and plan.not_in_universe:
+    # ⛑ AN ALIAS WHOSE SOURCE SYMBOL IS ITSELF A COVERED ROW MERGES TWO COMPANIES.
+    #
+    # `aliases.check_universe` calls this its fatal case and the EXPORT path drops
+    # such an entry — but this module reads `data/ticker_aliases.json` directly,
+    # so nothing was checking it here (Codex round 4). Repro: `FISV -> FI` with
+    # both in the universe, `FISV` held and `FI` not. The feed normalises to `FI`;
+    # the plan promotes `FI`, demotes `FISV`, reports NO unjoined holding, and
+    # publishes the wrong company as owned — silently, because every other guard
+    # sees a tidy one-in-one-out swap.
+    if universe_tickers:
+        known = {t.strip().upper() for t in universe_tickers}
+        hijacked = sorted(a for a in SYMBOL_ALIASES if a in known)
+        if hijacked:
+            plan.blocked_reason = (
+                f"{len(hijacked)} alias(es) name a symbol that is ALSO a covered row: "
+                f"{', '.join(f'{a} -> {SYMBOL_ALIASES[a]}' for a in hijacked)}. "
+                f"Resolving through them would merge two separately-covered companies "
+                f"into one holding. Fix data/ticker_aliases.json or the universe row, "
+                f"then re-run."
+            )
+            return plan
+
+    if plan.not_in_universe:
         feed_shares = {t: feed.rows[t].shares for t in plan.not_in_universe if t in feed.rows}
-        for ticker in plan.demotions:
-            held_shares = _shares_of(by_ticker.get(ticker, {}))
-            if held_shares is None:
+        for ticker in plan.demotions + plan.refreshed:
+            recorded = _shares_of(by_ticker.get(ticker, {}))
+            if recorded is None:
                 continue
+            now = feed.rows[ticker].shares if ticker in feed.rows else 0.0
+            lost = recorded - now
+            if lost <= SHARE_MATCH_TOLERANCE:
+                continue          # nothing left, or the position grew
             for other, shares in feed_shares.items():
-                if abs(shares - held_shares) <= SHARE_MATCH_TOLERANCE:
-                    suspects.append((ticker, other, held_shares))
+                if abs(shares - lost) <= SHARE_MATCH_TOLERANCE:
+                    suspects.append((ticker, other, lost, now))
                     break
 
     if suspects:
-        detail = "; ".join(f"{a} ({s:g} shares) vs unjoined {b}" for a, b, s in suspects)
+        detail = "; ".join(
+            f"{a} loses {lost:g} share(s) (to {now:g}) while unjoined {b} carries {lost:g}"
+            for a, b, lost, now in suspects)
         plan.blocked_reason = (
-            f"{len(suspects)} name(s) would leave Held while a feed holding that failed "
-            f"to join the universe carries the SAME share count: {detail}. That is one "
-            f"position under two symbols — the shape of a fabricated sale, not a sale. "
-            f"Add the name to the universe, or record the pair in "
-            f"data/ticker_aliases.json, then re-run."
+            f"{len(suspects)} position(s) would lose exactly the share count of a feed "
+            f"holding that failed to join the universe: {detail}. That is one position "
+            f"under two symbols — the shape of a fabricated sale, not a sale. Add the "
+            f"name to the universe, or record the pair in data/ticker_aliases.json, "
+            f"then re-run."
         )
     elif len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
         plan.blocked_reason = (

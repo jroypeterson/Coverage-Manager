@@ -671,3 +671,22 @@ def test_the_empty_map_refusal_happens_BEFORE_any_artifact_is_written(monkeypatc
     assert (exports / "universe.csv").read_text(encoding="utf-8") == "Ticker\nOLD\n", \
         "the refusal must leave every artifact untouched, not just the alias map"
     assert not (exports / "universe_status.json").exists()
+
+
+def test_acceptance_flags_an_extra_route_when_the_entry_declares_NONE(tmp_path):
+    """Codex round 4: filtering empty declarations out of the comparison dropped it
+    entirely for exactly the entries where an extra route is least supported.
+
+    An empty declaration is not a declaration to skip -- the same mistake as
+    iterating a container that can be empty, one level up.
+    """
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"FI": {"yfinance": "FISV"}},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"], "vendor_symbols": {}}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("does not declare" in p for p in problems)

@@ -409,7 +409,14 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
     # "a check that silently matches nothing" (Codex round 2).
     top_vendors = payload.get("vendor_symbols")
     if isinstance(top_vendors, dict) or top_vendors is None:
-        derived = {c: v for c, v in entry_vendors.items() if v}
+        # EVERY canonical, including those declaring NO vendor routes. Filtering
+        # the empty ones out of `derived` dropped the whole comparison for exactly
+        # the entries where an extra top-level route is least supported: an entry
+        # with `vendor_symbols: {}` beside a top-level `{"FI": {"yfinance":
+        # "FISV"}}` returned no problems at all (Codex round 4). "An empty
+        # declaration is not a declaration to skip" is the same mistake as
+        # iterating a container that can be empty, one level up.
+        derived = {c: entry_vendors.get(c, {}) for c in canonicals}
         present = {str(c).strip().upper(): {str(k): str(s).strip().upper()
                                             for k, s in m.items()}
                    for c, m in (top_vendors or {}).items() if isinstance(m, dict)}

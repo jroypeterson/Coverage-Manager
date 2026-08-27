@@ -474,3 +474,100 @@ def test_a_demotion_with_no_recorded_share_count_is_allowed_through(tmp_path):
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+# ── Codex round 4 (2026-08-27) ──────────────────────────────────────────────
+
+def test_an_alias_whose_source_is_ALSO_a_covered_row_blocks(tmp_path):
+    """`aliases.check_universe` calls this its fatal case and the EXPORT path drops
+    such an entry -- but this module reads data/ticker_aliases.json directly, so
+    nothing checked it here. Repro: FISV -> FI with BOTH in the universe, FISV
+    held and FI not. The feed normalises to FI, the plan promotes FI and demotes
+    FISV, reports no unjoined holding, and publishes the wrong company as owned --
+    silently, because every other guard sees a tidy one-in-one-out swap.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update({"FISV": "FI"})
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
+        entries = _entries({"FISV": ("Portfolio", "Y"), "FI": ("Researching", "")})
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI", "FISV"])
+        assert plan.blocked_reason and "merge two separately-covered companies" in plan.blocked_reason
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_feed_of_blank_tickers_is_REFUSED_not_read_as_everything_sold(tmp_path):
+    """The empty-feed guard checked the RAW list; blank rows are skipped after it.
+
+    So `held=[{"ticker": ""}]` was non-empty going in, empty coming out, sailed
+    past "refusing to treat an empty book as everything-was-sold", and marked the
+    whole book sold with two demotions comfortably under the circuit breaker.
+    """
+    payload = _feed_payload(tickers=())
+    payload["held"] = [{"ticker": "", "shares": 1.0, "avg_cost": 1.0, "brokers": ["IBKR"]}]
+    with pytest.raises(held_mod.HeldFeedError, match="none had a usable ticker"):
+        held_mod.load_feed(_write_feed(tmp_path, payload))
+
+
+def test_one_blank_row_among_good_ones_is_also_refused(tmp_path):
+    """An unseen holding reads as a sale; one blank row fabricates one sale."""
+    payload = _feed_payload(tickers=())
+    payload["held"] = [
+        {"ticker": "AAPL", "shares": 10.0, "avg_cost": 1.0, "brokers": ["IBKR"]},
+        {"ticker": "", "shares": 1.0, "avg_cost": 1.0, "brokers": ["IBKR"]},
+    ]
+    with pytest.raises(held_mod.HeldFeedError, match="no ticker"):
+        held_mod.load_feed(_write_feed(tmp_path, payload))
+
+
+def test_a_PARTIAL_alias_failure_blocks_even_with_no_demotion(tmp_path):
+    """The guard's rule is "shares lost == shares unjoined"; a demotion is only
+    its extreme case.
+
+    A 30-share position held at two brokers under two spellings, alias store
+    gone, arrives as FI:10 plus an unjoined FISV:20. That is `refreshed`, not a
+    demotion -- previously unblocked, and apply_plan overwrote 30 shares with 10
+    and one broker's cost basis with the other's.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [
+            {"ticker": "FI", "shares": 10.0, "avg_cost": 50.0, "brokers": ["Fidelity"]},
+            {"ticker": "FISV", "shares": 20.0, "avg_cost": 60.0, "brokers": ["IBKR"]},
+        ]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "30"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
+        assert plan.demotions == [] and plan.refreshed == ["FI"]
+        assert plan.blocked_reason and "loses 20 share(s)" in plan.blocked_reason
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_position_that_merely_SHRANK_is_not_blocked(tmp_path):
+    """Selling part of a position is ordinary; only a match against an unjoined
+    holding's exact share count is the split signature."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [
+            {"ticker": "FI", "shares": 10.0, "avg_cost": 50.0, "brokers": ["Fidelity"]},
+            {"ticker": "TSLA", "shares": 7.0, "avg_cost": 400.0, "brokers": ["IBKR"]},
+        ]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "30"          # sold 20, unjoined TSLA holds 7
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
+        assert plan.not_in_universe == ["TSLA"]
+        assert plan.blocked_reason is None
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
