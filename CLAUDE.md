@@ -428,11 +428,19 @@ to those identifiers, plus **which string to hand each vendor**.
 
 ⛑ **It is deliberately NOT a vote on which symbol is correct**, and `vendor_symbols`
 is a per-vendor map rather than one "true" symbol *because the directions oppose*:
-yfinance serves only `FISV`, FINRA serves only `FI`. `portfolio_daily` hit both at
-once — `no fundamentals: FISV` (broker symbol vs the CM frame) and `no short-interest
-data: FISV` (broker symbol vs FINRA's `FI`) — while `insider_ownership` hit the mirror
+yfinance serves only `FISV`, FINRA's short-interest series is keyed `FI`. Two
+published surfaces were corrupted in opposite directions — `portfolio_daily` could not
+join the broker's `FISV` to CM's `FI`, so the characteristics table warned *"not in the
+CM perf frame (no fundamentals): FISV"* and the **public** page invented an
+`Unclassified` sector bucket holding that one name; `insider_ownership` hit the mirror
 image, asking yfinance for `FI` and rendering every Fiserv stake as a share count with
 no dollar value. A single rewrite direction fixes one and breaks the other.
+
+🔻 **NOT caused by this, despite naming the same ticker:** `portfolio_daily`'s
+*"short interest: 1 holding(s) carry no short-interest data: FISV"*. That lane reads
+yfinance `.info`, not FINRA, and measured 2026-08-27 yfinance returns every
+short-interest field as `null` for **both** `FISV` and `FI`. It is a real vendor gap;
+the alias does not fix it, and board row #345 attributing it to the split was wrong.
 
 ⛑ **Do NOT fix a split by rewriting the broker CSVs or the universe row.** The broker
 reports what it holds; the repair belongs in the consumer that joins them. And do not
