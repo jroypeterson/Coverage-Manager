@@ -267,15 +267,23 @@ def vendor_symbol(ticker: str, vendor: str, index=None) -> str:
 
     `ticker` may be the canonical symbol or any alias — both name the same
     issuer, and a caller holding a broker symbol should not have to canonicalize
-    first. A vendor with no declared symbol gets the canonical one, which is the
-    status quo for every unaliased name.
+    first.
+
+    ⛑ **An unrouted vendor gets the CALLER'S OWN symbol, never the canonical.**
+    Returning the canonical asserts "this vendor wants the universe spelling",
+    which the store does not record and cannot support, and it is strictly worse
+    than doing nothing: it can turn a symbol the caller had working into one the
+    vendor does not have. Passthrough is the floor. A consumer hit exactly this
+    (`portfolio_daily`, Codex round 2, 2026-08-27) — a malformed vendor map left
+    the alias half intact, `FISV` canonicalised to `FI`, and a holding silently
+    vanished from a published page.
     """
     idx = index if index is not None else load_aliases()
     sym = _sym(ticker)
     entry = idx["by_canonical"].get(sym) or idx["by_alias"].get(sym)
     if not entry:
         return sym
-    return entry["vendor_symbols"].get(vendor, entry["canonical"])
+    return entry["vendor_symbols"].get(vendor, sym)
 
 
 def all_symbols(ticker: str, index=None) -> set[str]:
@@ -379,10 +387,12 @@ def published_payload(index=None, df=None) -> dict:
                 "ticker onto one that is not there. Fix data/ticker_aliases.json; "
                 "problems: %s", len(idx["entries"]) - len(kept), ", ".join(sorted(bad)),
                 "; ".join(problems[:4]))
+            excluded = len(idx["entries"]) - len(kept)
             idx = {"schema_version": idx["schema_version"],
                    "entries": kept,
                    "by_canonical": {e["canonical"]: e for e in kept},
                    "by_alias": {a: e for e in kept for a in e["aliases"]}}
+    payload_excluded = locals().get("excluded", 0)
     return {
         "schema_version": idx["schema_version"],
         "description": (
@@ -402,4 +412,11 @@ def published_payload(index=None, df=None) -> dict:
             for entry in idx["entries"] if entry["vendor_symbols"]
         },
         "entries": idx["entries"],
+        # How many entries this build DROPPED for contradicting the universe.
+        # The publish guard needs it to tell "the curated source vanished" (refuse,
+        # keep the good published file) from "every entry was correctly excluded"
+        # (publish the empty map — it is the right answer). Without the
+        # distinction the guard raised on a correct exclusion and left a STALE
+        # export beside a freshly-rewritten universe.csv (Codex round 2).
+        "excluded_count": payload_excluded,
     }

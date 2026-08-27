@@ -447,7 +447,31 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
         elif now_held and was_held:
             plan.refreshed.append(ticker)
 
-    if len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
+    # ⛑ AN UNJOINED FEED ROW ALONGSIDE A DEMOTION IS THE FALSE-SALE SIGNATURE.
+    #
+    # This guard is at the point of HARM, and that is the whole point: it does not
+    # care WHY a symbol failed to join. Codex round 2 showed the alias-store
+    # guards could not cover the case — `_load_symbol_aliases` raises on an
+    # UNREADABLE store, but a MISSING one legitimately yields an empty map, and a
+    # store whose entry contradicts the universe is never checked here at all
+    # (`held.py` reads `data/ticker_aliases.json` directly, so the publish-side
+    # guard is irrelevant to it). Both roads lead here: the feed's `FISV` does not
+    # join the universe's `FI`, `FI` is planned as a demotion, one demotion is far
+    # under MAX_DEMOTIONS_PER_RUN, and a real position is written out as sold.
+    #
+    # `not_in_universe` is only populated when the caller passes `universe_tickers`
+    # — without it we cannot see the signature and do not pretend to.
+    if plan.demotions and plan.not_in_universe:
+        plan.blocked_reason = (
+            f"{len(plan.demotions)} name(s) would leave Held ({', '.join(plan.demotions)}) "
+            f"in the same run that {len(plan.not_in_universe)} feed holding(s) failed to "
+            f"join the universe ({', '.join(plan.not_in_universe)}). Those are very "
+            f"likely the SAME position under two symbols — the shape of a fabricated "
+            f"sale, not a sale. Add the name to the universe, or record the pair in "
+            f"data/ticker_aliases.json, then re-run. If they really are unrelated, the "
+            f"sale still applies next run once the unjoined holding is covered."
+        )
+    elif len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
         plan.blocked_reason = (
             f"{len(plan.demotions)} names would leave Held in one run "
             f"(limit {MAX_DEMOTIONS_PER_RUN}): {', '.join(plan.demotions)}. "

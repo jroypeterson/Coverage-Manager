@@ -383,3 +383,52 @@ def test_the_demotion_flag_list_matches_positions():
 
 def test_the_landing_state_is_one_of_the_real_states():
     assert held_mod.DEMOTION_POSITION in pos.STATE_FLAGS
+
+
+def test_an_unjoined_feed_holding_alongside_a_demotion_BLOCKS(tmp_path):
+    """Codex round 2, Critical: the alias-store guards could not cover this.
+
+    `_load_symbol_aliases` raises on an UNREADABLE store, but a MISSING one
+    legitimately yields an empty map, and an entry contradicting the universe is
+    never checked here at all -- this module reads data/ticker_aliases.json
+    directly, so the publish-side guard is irrelevant to it. Both roads end in the
+    same fabricated sale, so the guard belongs at the point of HARM: a feed row
+    that failed to join, in the same run as a demotion, is that shape.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()          # a MISSING store, not a broken one
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
+        assert plan.demotions == ["FI"]
+        assert plan.blocked_reason and "fabricated sale" in plan.blocked_reason
+        with pytest.raises(Exception):
+            held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_demotion_with_every_feed_row_joined_is_NOT_blocked(tmp_path):
+    """The guard must not become the outage: an ordinary sale still applies."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "MRNA": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL", "MRNA"])
+    assert plan.demotions == ["MRNA"]
+    assert plan.blocked_reason is None
+
+
+def test_the_guard_is_inert_without_a_universe_to_check_against(tmp_path):
+    """`not_in_universe` is only populated when the caller passes the universe;
+    without it we cannot see the signature and must not pretend to."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
+        plan = held_mod.plan_sync(_entries({"FI": ("Portfolio", "Y")}), feed)
+        assert plan.not_in_universe == []
+        assert plan.blocked_reason is None
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)

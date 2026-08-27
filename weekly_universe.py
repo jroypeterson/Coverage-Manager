@@ -222,7 +222,16 @@ def _step_export_artifacts(validation_result):
     # empty contract over a working one — silently un-joining every consumer, with
     # a green run to show for it. An empty result is only believable when the
     # published file was already empty.
-    if not alias_payload["alias_to_canonical"] and aliases_path.exists():
+    # `excluded_count` separates "the curated source vanished" (refuse, keep the
+    # good published file) from "every entry was correctly EXCLUDED for
+    # contradicting the universe" (publish the empty map — it is the right
+    # answer). Without the distinction this guard raised on a correct exclusion
+    # and left a STALE export beside a universe.csv, metadata and status file this
+    # same function had already rewritten — an internally contradictory artifact
+    # set, which is worse than either outcome it was choosing between.
+    if (not alias_payload["alias_to_canonical"]
+            and not alias_payload.get("excluded_count")
+            and aliases_path.exists()):
         try:
             existing = json.loads(aliases_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
@@ -234,6 +243,9 @@ def _step_export_artifacts(validation_result):
                 f"data/ticker_aliases.json is missing or empty. Restore it, or delete "
                 f"the published file deliberately if the store really is empty now.")
 
+    # Not part of the consumer contract — it describes THIS build, not the
+    # mapping — so it is used above and dropped before writing.
+    alias_payload.pop("excluded_count", None)
     aliases_path.write_text(json.dumps(alias_payload, indent=2) + "\n", encoding="utf-8")
 
     # 4. Manifest — describes the contract for downstream consumers.

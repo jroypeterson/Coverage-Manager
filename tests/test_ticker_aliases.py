@@ -134,9 +134,14 @@ def test_vendor_symbol_accepts_an_alias_as_input(tmp_path):
     assert vendor_symbol("FISV", "finra", idx) == "FI"
 
 
-def test_undeclared_vendor_falls_back_to_canonical(tmp_path):
+def test_undeclared_vendor_falls_back_to_THE_CALLERS_symbol(tmp_path):
+    """Not to the canonical: that would assert this vendor wants the universe
+    spelling, which nothing in the store records, and can turn a symbol the caller
+    had working into one the vendor does not have (Codex round 2, on a consumer).
+    """
     idx = load_aliases(write(tmp_path, [entry()]))
     assert vendor_symbol("FI", "fmp", idx) == "FI"
+    assert vendor_symbol("FISV", "fmp", idx) == "FISV"
 
 
 def test_all_symbols_returns_both_live_strings(tmp_path):
@@ -539,3 +544,76 @@ def test_acceptance_flags_a_top_level_vendor_map_for_an_unknown_canonical(tmp_pa
     }), encoding="utf-8")
     problems = _check_ticker_aliases(tmp_path)
     assert any("not a canonical symbol in entries" in p for p in problems)
+
+
+# --------------------------------------------------------------------------
+# Codex round 2 (2026-08-27) — three defects, two of them IN round 1's fixes
+# --------------------------------------------------------------------------
+
+def test_an_excluded_entry_publishes_an_EMPTY_map_rather_than_raising(monkeypatch, tmp_path):
+    """Round 1's empty-publish guard misread a CORRECT exclusion as source loss.
+
+    Rename the canonical row: `published_payload` rightly drops the entry and
+    returns {}, the guard read that as "the curated file vanished", raised, and
+    left the STALE export beside a universe.csv / metadata / status this same
+    function had already rewritten — an internally contradictory artifact set,
+    worse than either outcome it was choosing between.
+    """
+    import weekly_universe
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    (exports / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1, "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {}, "entries": []}), encoding="utf-8")
+
+    csv_path = tmp_path / "universe.csv"
+    csv_path.write_text("Ticker,Company Name,Sector (JP),Subsector (JP),Sub-subsector (JP),Core\n"
+                        "FISV,Fiserv Inc.,Financials,,,\n", encoding="utf-8")   # renamed!
+
+    src = tmp_path / "ticker_aliases.json"
+    src.write_text(json.dumps({"schema_version": 1, "entries": [entry()]}), encoding="utf-8")
+    import universe.aliases as aliases_mod
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", src)
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", csv_path)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports)
+
+    weekly_universe._step_export_artifacts(
+        {"rows": 1, "errors": [], "warnings": [], "passed": True})
+    published = json.loads((exports / "ticker_aliases.json").read_text(encoding="utf-8"))
+    assert published["alias_to_canonical"] == {}
+    assert "excluded_count" not in published, "build-local, not part of the contract"
+
+
+def test_acceptance_flags_an_entry_whose_vendor_map_never_reached_the_top_level(tmp_path):
+    """A one-way loop over a container that can be EMPTY executes zero times.
+
+    An entry declaring `yfinance: FISV` beside `vendor_symbols: {}` returned no
+    problems, so consumers ask for the canonical, get the documented 404, and the
+    gate reports green.
+    """
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"],
+                     "vendor_symbols": {"yfinance": "FISV"}}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("has no entry for it" in p for p in problems)
+
+
+def test_acceptance_flags_a_top_level_map_missing_ONE_declared_vendor(tmp_path):
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"FI": {"yfinance": "FISV"}},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"],
+                     "vendor_symbols": {"yfinance": "FISV", "finra": "FI"}}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("is missing ['finra']" in p for p in problems)

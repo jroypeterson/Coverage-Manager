@@ -401,7 +401,32 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
     # were routed to the symbol that 404s — a copy of the fast map disagreeing
     # with the evidence it was derived from, which is the whole reason the two
     # live in one file.
+    # ...AND THE CHECK RUNS BOTH WAYS. Iterating the top-level map alone executes
+    # zero times when that map is missing or `{}`, so an entry declaring
+    # `yfinance: FISV` beside an empty consumer map returned no problems at all —
+    # consumers then ask for `FI`, get the documented 404, and acceptance reports
+    # green. A one-way check over a container that can be empty is the fleet's
+    # "a check that silently matches nothing" (Codex round 2).
     top_vendors = payload.get("vendor_symbols")
+    if isinstance(top_vendors, dict) or top_vendors is None:
+        derived = {c: v for c, v in entry_vendors.items() if v}
+        present = {str(c).strip().upper(): {str(k): str(s).strip().upper()
+                                            for k, s in m.items()}
+                   for c, m in (top_vendors or {}).items() if isinstance(m, dict)}
+        for canonical, mapping in derived.items():
+            if canonical not in present:
+                problems.append(
+                    f"ticker_aliases.json: entry {canonical} declares vendor symbols "
+                    f"({', '.join(sorted(mapping))}) but the top-level vendor_symbols "
+                    f"map has no entry for it - consumers read that map, so they would "
+                    f"send {canonical} to every vendor")
+            elif present[canonical] != mapping:
+                missing = sorted(set(mapping) - set(present[canonical]))
+                if missing:
+                    problems.append(
+                        f"ticker_aliases.json: vendor_symbols[{canonical}] is missing "
+                        f"{missing} that the entry declares")
+
     if top_vendors is not None and not isinstance(top_vendors, dict):
         problems.append(
             f"ticker_aliases.json: 'vendor_symbols' is {type(top_vendors).__name__}, "
