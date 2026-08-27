@@ -42,10 +42,30 @@ RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
 # its archive and the ratings workbook it joins all live under one root.
 DEFAULT_OUT = os.path.join(RATINGS_DIR, "_Coverage")
 STEM = "AA_Core Coverage"
-# The stem before 2026-08-26. `archive_existing` only looks for the CURRENT stem,
-# so without this the old workbook would sit at the top level next to the new one,
-# still looking current. One-time migration; safe to leave in place forever.
-PRIOR_STEMS = ("Coverage - HC Services and MedTech",)
+
+
+def dated_stem(day=None):
+    """`AA_Core Coverage auto-updated - 08.26.26`. JP asked for the date in the
+    filename, and "auto-updated" earns its place: this folder is his too, and the
+    word is what tells him at a glance which files a machine owns."""
+    d = day or datetime.date.today()
+    return "%s auto-updated - %s" % (STEM, d.strftime("%m.%d.%y"))
+
+
+# ⛑ ONLY THESE ARE OURS TO MOVE. JP 2026-08-26: "I might put my own files in this
+# coverage folder for different reasons. Don't move my files. You just archive the
+# files you auto-generate in the folder but leave the ones I put there manually
+# alone." So archiving matches this allow-list of names THIS SCRIPT has ever
+# produced -- never "every xlsx in the folder", which would sweep his work into
+# archive/ the first time he dropped a file here.
+AUTO_GENERATED_GLOBS = (
+    "AA_Core Coverage auto-updated - *.xlsx",
+    "AA_Core Coverage auto-updated - *.csv",
+    "AA_Core Coverage.xlsx",                      # stable-named era, to 2026-08-26
+    "AA_Core Coverage.csv",
+    "Coverage - HC Services and MedTech.xlsx",    # pre-rename era
+    "Coverage - HC Services and MedTech.csv",
+)
 
 # NOT renamed alongside the workbook. The Google Sheet mirror is a single
 # =IMPORTDATA() cell pointed at this exact URL and nothing here can rewrite that
@@ -64,7 +84,18 @@ SECTORS = ("Healthcare Services", "MedTech")
 # snapshot rather than recomputed. JP, 2026-08-26: "You can just use a footnote to
 # note when the returns are as of instead of re-running all the returns just for
 # this report."
-RETURN_COLS = ["2019", "2020", "2021", "2022", "2023", "2024", "2025", "YTD"]
+# Most recent on the LEFT, oldest on the right (JP). The snapshot names them
+# plainly; `SNAPSHOT_RETURN_KEY` maps our heading back to its column.
+CALENDAR_RETURNS = ["YTD", "2025", "2024", "2023", "2022", "2021", "2020", "2019"]
+# ⛑ ANNUALISED, and the label says so. The snapshot's `3Y`/`5Y` are CUMULATIVE --
+# `calc_period_return(hist, 365*3)` -- so JNJ's 3Y reads 74.4, which is 74% over
+# three years and NOT 74% a year. JP asked for annual returns, so these are
+# converted to a CAGR here. Publishing the raw figure under a heading saying
+# "annual" would overstate a three-year return by roughly three times.
+ANNUALISED_RETURNS = ["3Y ann.", "5Y ann."]
+ANNUALISED_YEARS = {"3Y ann.": 3, "5Y ann.": 5}
+ANNUALISED_SOURCE = {"3Y ann.": "3Y", "5Y ann.": "5Y"}
+RETURN_COLS = CALENDAR_RETURNS + ANNUALISED_RETURNS
 SNAPSHOT_MAX_AGE_DAYS = 10
 
 # LC/SMID boundary. CONFIRMED BY JP 2026-08-26 ("Size threshold is fine"), which
@@ -76,13 +107,18 @@ SNAPSHOT_MAX_AGE_DAYS = 10
 # workbook so a flip reads as the rule working rather than as an error.
 LC_THRESHOLD_USD_M = 25000
 
-FIELDS = ["marketCap", "regularMarketPrice", "currentPrice", "currency",
-          "forwardPE", "longName"]
+FIELDS = ["marketCap", "enterpriseValue", "regularMarketPrice", "currentPrice",
+          "currency", "forwardPE", "longName"]
 
-COLS = (["Ticker", "Company Name", "Rating", "Sector", "Subsector",
-         "Sub-subsector", "Core Coverage", "Listing", "Exchange", "Country (HQ)",
-         "Ccy", "Price (local)", "Mkt Cap (USD $M)", "Size", "Fwd P/E"]
-        + RETURN_COLS)
+# Order is JP's, 2026-08-26: size before sector, market cap and EV up front,
+# venue information last, performance most-recent-first. `Rating` keeps the slot
+# immediately after Company Name that he asked for earlier in the day -- he asked
+# for market cap there too, so the two share the front and Rating leads.
+COLS = (["Ticker", "Company Name", "Rating", "Mkt Cap (USD $M)", "EV (USD $M)",
+         "Size", "Sector", "Subsector", "Sub-subsector", "Core Coverage",
+         "Ccy", "Price (local)", "Fwd P/E"]
+        + RETURN_COLS
+        + ["Listing", "Exchange", "Country (HQ)"])
 
 # `docs/hc_coverage.csv` is served by GitHub Pages to ANYONE WITH THE URL, and it
 # is what the Google Sheet reads. Anything in COLS is published unless it is named
@@ -95,7 +131,7 @@ PUBLIC_COLS = [c for c in COLS if c not in PRIVATE_ONLY]
 WIDTH = {"Ticker": 11, "Company Name": 36, "Sector": 19, "Subsector": 26,
          "Sub-subsector": 20, "Core Coverage": 9, "Rating": 9, "Listing": 17,
          "Exchange": 16, "Country (HQ)": 15, "Ccy": 6, "Price (local)": 12,
-         "Mkt Cap (USD $M)": 15, "Size": 7, "Fwd P/E": 9}
+         "Mkt Cap (USD $M)": 15, "EV (USD $M)": 14, "Size": 7, "Fwd P/E": 9}
 WIDTH.update({c: 9 for c in RETURN_COLS})
 
 HDR_FILL = PatternFill("solid", fgColor="1F3864")
@@ -298,6 +334,27 @@ def fetch_fx(currencies):
     return fx
 
 
+def annualise(cumulative_pct, years):
+    """Cumulative % over `years` -> compound annual %, or None.
+
+    The snapshot stores CUMULATIVE multi-year returns (`calc_period_return(hist,
+    365*3)`), so JNJ's 3Y is 74.4 meaning 74% across three years. Reported under a
+    heading that says "annual" that would overstate the result roughly threefold.
+
+    Returns None below -100%: a security cannot lose more than everything, and the
+    root of a negative growth factor is not a real number. Treating that as 0 or
+    passing the raw value through would put an impossible figure in a column
+    people rank on.
+    """
+    v = num(cumulative_pct)
+    if v is None:
+        return None
+    growth = 1.0 + v / 100.0
+    if growth <= 0:
+        return None
+    return (growth ** (1.0 / years) - 1.0) * 100.0
+
+
 def load_returns():
     """Calendar-year returns from the newest weekly performance snapshot.
 
@@ -331,7 +388,11 @@ def load_returns():
     df = df[~df.index.duplicated(keep="first")]
     out = {}
     for t, row in df.iterrows():
-        out[str(t)] = {c: num(row.get(c)) for c in RETURN_COLS if c in df.columns}
+        vals = {c: num(row.get(c)) for c in CALENDAR_RETURNS if c in df.columns}
+        for col, years in ANNUALISED_YEARS.items():
+            cum = num(row.get(ANNUALISED_SOURCE[col]))
+            vals[col] = annualise(cum, years)
+        out[str(t)] = vals
     return out, as_of
 
 
@@ -408,6 +469,7 @@ def build_records(asof):
         ccy = (d.get("currency") or r["Currency"] or "USD").strip()
         rate = fx.get("GBP") if ccy == "GBp" else fx.get(ccy)
         mc = num(d.get("marketCap"))
+        ev = num(d.get("enterpriseValue"))
         px = num(d.get("regularMarketPrice")) or num(d.get("currentPrice"))
         mcap_usd_m = (mc * rate / 1e6) if (mc and rate) else None
 
@@ -434,6 +496,10 @@ def build_records(asof):
             "Ccy": ccy,
             "Price (local)": px,
             "Mkt Cap (USD $M)": mcap_usd_m,
+            # Same payload and the same FX rate as market cap, deliberately: an EV
+            # taken from a different source could be in a different currency and
+            # the ratio between the two columns would be quietly meaningless.
+            "EV (USD $M)": (ev * rate / 1e6) if (ev and rate) else None,
             # Blank, never a guessed bucket, when the market cap is unknown. The
             # partial-book guard tolerates up to 5% missing, so this does happen.
             "Size": size_bucket(mcap_usd_m),
@@ -621,41 +687,40 @@ def write_summary(wb, allr, mt, hs, asof, src):
         ws.column_dimensions[col].width = w
 
 
-def archive_existing(out_dir, current):
-    """Move the current file into archive/, stamped with the date it was built.
+def archive_previous_autogenerated(out_dir, keep_names):
+    """Move OUR earlier outputs into archive/. Leave everything else alone.
 
-    Also sweeps any PRIOR_STEMS file still sitting at the top level. Without that,
-    the first run after a rename leaves the old workbook beside the new one,
-    indistinguishable from a current file.
+    ⛑ JP keeps his own files in this folder. "Don't move my files. You just
+    archive the files you auto-generate in the folder but leave the ones I put
+    there manually alone." So this matches an explicit allow-list of names this
+    script has produced (`AUTO_GENERATED_GLOBS`) rather than sweeping the folder
+    by extension -- the lazy version would file his work under archive/ the first
+    time he dropped a workbook here, and he would have no way to tell that from a
+    file he had misplaced himself.
+
+    `keep_names` is today's output, which must survive: with the date in the
+    filename, a same-day rebuild would otherwise archive the file it just wrote.
     """
-    for stem in PRIOR_STEMS:
-        old = os.path.join(out_dir, "%s.xlsx" % stem)
-        if os.path.exists(old):
-            arch = os.path.join(out_dir, "archive")
-            os.makedirs(arch, exist_ok=True)
-            built = datetime.date.fromtimestamp(os.path.getmtime(old)).isoformat()
-            dest = os.path.join(arch, "%s - %s.xlsx" % (stem, built))
-            n = 2
-            while os.path.exists(dest):
-                dest = os.path.join(arch, "%s - %s (%d).xlsx" % (stem, built, n))
-                n += 1
-            shutil.move(old, dest)
-            print("migrated prior workbook -> archive/%s" % os.path.basename(dest))
-        old_csv = os.path.join(out_dir, "%s.csv" % stem)
-        if os.path.exists(old_csv):
-            os.remove(old_csv)
-    if not os.path.exists(current):
-        return None
+    import glob as _glob
+
     arch_dir = os.path.join(out_dir, "archive")
-    os.makedirs(arch_dir, exist_ok=True)
-    built = datetime.date.fromtimestamp(os.path.getmtime(current)).isoformat()
-    dest = os.path.join(arch_dir, "%s - %s.xlsx" % (STEM, built))
-    n = 2
-    while os.path.exists(dest):
-        dest = os.path.join(arch_dir, "%s - %s (%d).xlsx" % (STEM, built, n))
-        n += 1
-    shutil.move(current, dest)
-    return dest
+    moved = []
+    keep = {n.lower() for n in keep_names}
+    for pattern in AUTO_GENERATED_GLOBS:
+        for path in _glob.glob(os.path.join(out_dir, pattern)):
+            name = os.path.basename(path)
+            if name.lower() in keep:
+                continue
+            os.makedirs(arch_dir, exist_ok=True)
+            dest = os.path.join(arch_dir, name)
+            n = 2
+            root, ext = os.path.splitext(name)
+            while os.path.exists(dest):
+                dest = os.path.join(arch_dir, "%s (%d)%s" % (root, n, ext))
+                n += 1
+            shutil.move(path, dest)
+            moved.append(os.path.basename(dest))
+    return moved
 
 
 RATING_SHEET = "Ratings"
@@ -855,12 +920,14 @@ def main():
     # with the old file already archived and no current file in its place.
     # A plain copy rather than os.replace: Dropbox holds a lock that makes
     # atomic replace fail with WinError 5.
-    current = os.path.join(args.out_dir, "%s.xlsx" % STEM)
+    stem_today = dated_stem()
+    current = os.path.join(args.out_dir, "%s.xlsx" % stem_today)
+    private_csv = os.path.join(args.out_dir, "%s.csv" % stem_today)
     tmp = os.path.join(tempfile.gettempdir(), "hc_coverage_%d.xlsx" % os.getpid())
     wb.save(tmp)
     # The archive MOVE and the install COPY share one handler on purpose. Excel
     # holds a sharing lock on an open workbook, and the first thing that touches
-    # the file is `archive_existing`'s `shutil.move` -- so the PermissionError
+    # the file is the archive step's `shutil.move` -- so the PermissionError
     # surfaces THERE, not at the copy below. Guarding only the copy left the move
     # to raise an unhandled traceback and exit 1, which is the red-task false
     # alarm the exit-3 code exists to avoid. (A read-only ATTRIBUTE does not
@@ -868,9 +935,13 @@ def main():
     # test this passed and proved nothing.)
     try:
         if not args.no_archive:
-            moved = archive_existing(args.out_dir, current)
-            if moved:
-                print("archived -> archive/%s" % os.path.basename(moved))
+            # Today's two outputs are excluded, or a same-day rebuild would file
+            # away the very files it is about to write.
+            moved = archive_previous_autogenerated(
+                args.out_dir,
+                keep_names=[os.path.basename(current), os.path.basename(private_csv)])
+            for name in moved:
+                print("archived -> archive/%s" % name)
         shutil.copy2(tmp, current)
     except PermissionError:
         # EXIT 3 = "the file is open in Excel", deliberately distinct from every
@@ -917,7 +988,6 @@ def main():
         return out
 
     # Beside the workbook: the FULL schema, ratings included. This folder is JP's.
-    private_csv = os.path.join(args.out_dir, "%s.csv" % STEM)
     with open(private_csv, "w", newline="", encoding="utf-8") as fh:
         csv.writer(fh).writerows(_flatten(COLS, provenance))
     print("wrote %s" % private_csv)
