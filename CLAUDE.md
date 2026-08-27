@@ -505,6 +505,47 @@ consumer readers had a sixth: a well-formed JSON document with `alias_to_canonic
 module whose whole contract is to fail open — a crash in a scheduled build. Fixed in both
 readers, not just the one Codex was looking at.
 
+### Rounds 2–4, and the CLASS underneath them (2026-08-27)
+
+Three more unsteered rounds followed, and **each one found defects that the previous
+round's fixes had introduced** — 3 of 4, 3 of 4, and 4 of 4. Worth reading as one
+finding rather than eleven:
+
+**Every road to a wrong ownership record was the same structural fault: a check that
+existed on the PUBLISH side and not on the READ side.** `held.py` reads
+`data/ticker_aliases.json` directly, so the export pipeline's validation never runs for
+it. Three separate roads were found — an unreadable store, a *missing* store, and an
+entry whose alias is itself a covered row — and all three ended in a fabricated sale or
+a merged holding.
+
+Two guards now stand there, and the split matters:
+
+| Guard | Blocks on | Why not the other |
+|---|---|---|
+| `aliases.merge_hazards` | an alias that is ALSO a covered row | it resolves a symbol onto the **wrong company**, and every downstream check then sees a tidy one-in-one-out swap |
+| the share-count rule in `plan_sync` | **shares lost == shares unjoined** | it is at the point of HARM and does not care *why* a symbol failed to join — missing store, invalid store, or a split nobody has recorded yet |
+
+⛑ **"A guard can become the outage" fired THREE times in this feature, and twice the
+reviewer caught it rather than me.** A guard blocking on mere co-occurrence of a
+demotion and an unjoined holding stopped ordinary rebalances; blocking on the *full*
+`check_universe` output stopped any caller passing a partial universe. Hence the rules
+above are narrow on purpose, a demotion with no recorded share count is allowed through
+(blocking on ignorance is how a guard becomes permanent), and a validator that raises
+is caught and downgraded — a guard that crashes is worse than one that is absent.
+
+⛑ **`merge_hazards` is a FUNCTION, not a string match on a warning.** The first version
+of the read-side check was a hand-rolled copy of one of `check_universe`'s three rules;
+a copy drifts from the original the first time the original changes, and a caller
+matching message text is one reworded sentence away from silently checking nothing. A
+test asserts the real validator is *called*, so a rule added there cannot fail to apply
+here.
+
+Two defects found in these rounds were **older than this session** and are handled
+differently on purpose: blank-ticker feed rows slipping past the empty-feed guard was
+fixed here (three lines inside a function this work rewrote), while a broker holding
+with no positions row being dropped from `Held` at exit 0 is **board row #347** — it
+sits on the promotion path, not the symbol path, and its fix is a decision that is JP's.
+
 ⛑ **`ticker_change_check` now sorts a covered mismatch into `settled`, not `changes`.**
 That module's guidance used to name `FISV`-vs-`FI` as its worked example of "leave
 as-is", so the pair was re-reported as a review item **every week for months** while
