@@ -172,7 +172,7 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 
   **The export contract did NOT move.** `portfolio.json` is now the rows where `Held == "Y"`, and a held row still publishes `position: "Portfolio"` — see `positions.published_position()`, which is the single rule used by all three export sites (portfolio.json, the sigma-alert payloads, and the joined CSV). No schema bump, no consumer edit; `catalyst_watch` pins `_ACCEPTED_CM_SCHEMA={3,4}` and would hard-fail on an unannounced bump. The four `Held*` columns are APPENDED to the joined CSV — additive, and every consumer reads by name.
 
-  ⛑ **`SYMBOL_ALIASES` in `held.py` is a one-entry stopgap, not an aliasing layer.** Fiserv is one issuer under two live symbols (`FI` here, `FISV` at the brokers and on yfinance, which 404s `FI`). Without it the first sync reports that JP sold Fiserv. The real fix is board row **#345** — join on the identity that did not change (CIK/ISIN/FIGI are identical across both symbols and already in `exports/universe.csv`). A second entry means the stopgap became the architecture; a test pins the count at one.
+  ⛑ **`SYMBOL_ALIASES` in `held.py` now reads the shared store (board #345 landed 2026-08-27).** It was a hardcoded `{"FISV": "FI"}` pinned at one entry, carrying its own comment saying it was a stopgap and must not be grown. It is now derived from `data/ticker_aliases.json` via `universe.aliases` — see "Symbol aliases" below. Without a join the first sync reports that JP sold Fiserv, because the feed says `FISV` and the universe says `FI`. An unreadable store degrades to an EMPTY map, deliberately: an unjoined holding looks like a sale and `MAX_DEMOTIONS_PER_RUN` aborts the run rather than writing one, whereas guessing an alias would merge two issuers silently.
 
   ⛑ **`Shares` is a FLOAT.** `_parse_int` did `int(float(x))` and would publish 452 shares for a 452.656 holding. Fractional holdings are the norm here (FMS 452.656, PACS 277.893, CI 40.532).
 
@@ -407,6 +407,64 @@ PROVIDER_PRIORITY (config.py, env-overridable)
 - `universe/form10_watch.py` — **weekly Form 10 spin-off discovery** (`cli.py form10-watch`, and step `[4g/6]` of `weekly-universe`). A `10-12B` registers a subsidiary's shares for distribution onto a US exchange 1–3 months before separation. **A spin-off has no offering, so the Finnhub IPO calendar cannot see one** — of 18 candidates the lane had ever proposed, exactly one was a spin-off, proposed two months late at listing. Routes Bucket 1 on the registrant's **own SIC** (a SpinCo is classified under the business it operates) and Bucket 3 on the **parent's market cap as a size proxy** — Bucket 3 is size-gated and sector-agnostic, so SIC routing alone is blind to it (Honeywell Aerospace is SIC 3724, aircraft engines). **Market cap is never invented**: no shares trade pre-separation, so entries are `size unknown` pipeline items. Parent resolution is regex → CIK-resolution pin (0.80 + runner-up margin, CIK-deduped, whole-string tie-break); unresolved downgrades, never guesses. Three states incl. `inconclusive` for a missing SIC — an unclassifiable registrant is where a miss hides. Seen-ledger `data/form10_seen.json` doubles as an **open-items ledger**: a 14-day search window finds new FILINGS but does not describe the PIPELINE, so still-unlisted relevant filings are **carried forward** every week marked `(still open)` until their ticker appears in the universe (it listed and was added) or they age out at 540 days. Without it FedEx Freight (filed 2026-01-16) and Honeywell Aerospace (2026-03-03) would never appear in a weekly report again. Report ASCII-sanitized at the exit. **Gotchas, all found live and all of which returned plausible wrong answers:** EDGAR FTS **paginates at 10 hits per page** and returns one hit per *document*, so page 1 alone samples one company's exhibits (reported 10 registrants for a window holding 18); the per-registrant collapse must prefer **EX-99.1** (the information statement) or it picks an indenture; the parent capture must end at a corporate designator **and** reject the registrant itself (FedEx Freight names itself as a subsidiary before naming FedEx Corporation); `_name_similarity` is token-cover based so a subset scores 1.00 ("Honeywell International Inc" ties "Inter & Co, Inc."). Tests: `tests/test_form10_watch.py` (23).
 
 - `universe/symbol_directory.py` — **weekly US symbol-directory watch** (`cli.py symbol-directory`, and step `[4f/6]` of `weekly-universe`). Snapshots the two free Nasdaq Trader files (`nasdaqlisted.txt` + `otherlisted.txt`, covering Nasdaq/NYSE/Arca/American/Cboe/IEX — ~7,500 operating companies after dropping ETFs and test issues) and diffs against the prior snapshot. **Nasdaq keeps no archive**, so snapshots are committed to `data/symbol_directory/` — a missed week is a diff that can never be computed. **Absence from the directory is a candidate, not a verdict:** each covered US row that is missing gets adjudicated against SEC's per-CIK submissions endpoint into `delisted` (a filed Form 15-12B/12G/15D, or no registered ticker) / `listed` (a symbol-format mismatch — `FI` vs SEC's stale `FISV`, `SGMO` vs `SGMOQ`) / **`inconclusive`** (no CIK on the row, or the endpoint would not answer). Inconclusive is NEVER folded into delisted — deleting a live company from the universe is the one unrecoverable mistake here. Foreign lines are excluded by `Exchange` before comparison; they are absent from a US file by definition and flagging them would be an artefact of the question. Also surfaces Nasdaq's `Financial Status` field (D/E/Q/G/H/J/K — distinct states, mapped, not conflated), which nothing else in the fleet reads. Exit 2 on any covered name missing or removed. First live run 2026-08-06: 863 US rows checked, 31 absent → **10 confirmed delisted by Form 15** (ACLX, CCRN, CPRX, DAY, KZR, LYRA, NOTV, NUVL, PRTC, XOMA), 6 symbol mismatches, 15 inconclusive for want of a CIK. Tests: `tests/test_symbol_directory.py` (18).
+
+## Symbol aliases — one issuer, several live ticker strings (2026-08-27, board #345)
+
+`data/ticker_aliases.json` (curated) → `exports/ticker_aliases.json` (published).
+Module `universe/aliases.py`; tests `tests/test_ticker_aliases.py` (39).
+
+**The problem is not a stale row.** For a handful of issuers the fleet's sources
+disagree about the ticker string *right now*, with no source that reliably settles
+it. Fiserv, measured 2026-08-27, every one current:
+
+| Says `FI` | Says `FISV` |
+|---|---|
+| `data/coverage_universe_tickers.csv` · FINRA short-interest series · API Ninjas insider feed | OpenFIGI (keyed on this row's own ISIN **and** its own FIGI) · Nasdaq Trader exchange directory, 12/12 snapshots · SEC `company_tickers.json` · yfinance (`FI` → HTTP 404) · IBKR |
+
+The identity did **not** move — CIK `798354`, ISIN `US3377381088`, composite FIGI
+`BBG000BJKPG0` are identical on both sides and were already sitting in the export,
+unused for this. So the store records **that two strings are one issuer**, anchored
+to those identifiers, plus **which string to hand each vendor**.
+
+⛑ **It is deliberately NOT a vote on which symbol is correct**, and `vendor_symbols`
+is a per-vendor map rather than one "true" symbol *because the directions oppose*:
+yfinance serves only `FISV`, FINRA serves only `FI`. `portfolio_daily` hit both at
+once — `no fundamentals: FISV` (broker symbol vs the CM frame) and `no short-interest
+data: FISV` (broker symbol vs FINRA's `FI`) — while `insider_ownership` hit the mirror
+image, asking yfinance for `FI` and rendering every Fiserv stake as a share count with
+no dollar value. A single rewrite direction fixes one and breaks the other.
+
+⛑ **Do NOT fix a split by rewriting the broker CSVs or the universe row.** The broker
+reports what it holds; the repair belongs in the consumer that joins them. And do not
+use this file for a data-entry error — if a ticker is simply wrong and nothing outside
+CM ever used it, correct the row and record it in `identity_provenance.json`. An alias
+entry asserts *both* strings are live in the wild.
+
+**Consumers** read the published file, never this module:
+`alias_to_canonical[sym]` before joining a broker/vendor feed to `universe.csv`;
+`vendor_symbols[ticker][vendor]` before calling a named vendor. The contract is
+`map.get(sym, sym)`, so an absent file degrades to today's behaviour — which is why
+export acceptance does not require it, only that it not contradict itself.
+
+**The bar for an entry**, all enforced by `load_aliases` (each rule has a test that
+fires it, and all seven survive mutation testing): ≥1 identity anchor that matches
+the canonical row; ≥2 independent sources (the `identity_provenance` bar — one source
+is how a vendor's own lag becomes a fleet-wide fact); a `verified` date; no alias that
+is another entry's canonical or is claimed twice (order-dependent resolution is the
+bug where a join silently returns a different company); no vendor routed to a symbol
+that is neither the canonical nor a declared alias; and a closed `KNOWN_VENDORS` set,
+so a typo'd vendor key cannot silently fall back to the canonical and reintroduce the
+404. `validate_against_ticker_aliases` warns (never gates) when an entry drifts from
+the universe — the fatal drift being an alias that becomes a covered row in its own
+right, which would merge two companies.
+
+⛑ **`ticker_change_check` now sorts a covered mismatch into `settled`, not `changes`.**
+That module's guidance used to name `FISV`-vs-`FI` as its worked example of "leave
+as-is", so the pair was re-reported as a review item **every week for months** while
+two published surfaces were silently broken by it — the fleet's own "a flag that is
+always true", with the added cost that the next real rename lands in a section the
+reader has been trained to skim. Settled rows are listed separately, excluded from the
+mismatch count and the exit code, and a test pins the old example string out.
 
 ## Delisted / recycled ticker check
 

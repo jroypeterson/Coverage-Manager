@@ -28,6 +28,10 @@ EXPORTS_SCHEMA_VERSION = 4
 # The reporting-calendar export versions independently of the universe/positions
 # schemas (decoupled so calendar changes never force a bump on pinned consumers).
 REPORTING_CALENDAR_SCHEMA_VERSION = 1
+# Same reasoning for the alias map: it is re-exported from universe/aliases.py so
+# there is one definition of the version, and a consumer pinning it is unaffected
+# by a universe schema bump.
+from universe.aliases import SCHEMA_VERSION as ALIASES_SCHEMA_VERSION  # noqa: E402
 
 UNIVERSE_ARCHIVE_PATTERNS = [
     "weekly_coverage_universe_additions_*.md",
@@ -136,10 +140,11 @@ def _find_last_discovery_run():
 def _step_export_artifacts(validation_result):
     """Write the published universe artifacts to the `exports/` directory.
 
-    Produces four files described in `exports/manifest.json`:
+    Produces five files described in `exports/manifest.json`:
       - universe.csv              — snapshot of the coverage universe CSV
       - universe_metadata.json    — {ticker: {name, sector, subsector}} dict
       - universe_status.json      — versioned status + validation contract
+      - ticker_aliases.json       — symbol splits + per-vendor symbols
       - manifest.json             — directory of files in this exports/ folder
 
     `validation_result` is the dict returned by `_step_validate` and feeds the
@@ -191,6 +196,17 @@ def _step_export_artifacts(validation_result):
     status_path = EXPORTS_DIR / "universe_status.json"
     status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
 
+    # 3b. Symbol aliases — issuers the fleet's sources spell differently.
+    #     Published as its own artifact rather than folded into universe_metadata
+    #     because the consumers are DIFFERENT: metadata answers "what sector is
+    #     this", aliases answer "what do I call this when I ask yfinance". A
+    #     consumer needing one rarely needs the other, and folding them would
+    #     have bumped a schema six projects pin.
+    from universe.aliases import published_payload as _alias_payload
+
+    aliases_path = EXPORTS_DIR / "ticker_aliases.json"
+    aliases_path.write_text(json.dumps(_alias_payload(), indent=2) + "\n", encoding="utf-8")
+
     # 4. Manifest — describes the contract for downstream consumers.
     manifest = {
         "schema_version": EXPORTS_SCHEMA_VERSION,
@@ -221,6 +237,21 @@ def _step_export_artifacts(validation_result):
                 "purpose": "Versioned status + validation contract (read schema_version before consuming)",
                 "format": "json",
                 "schema_version": EXPORTS_SCHEMA_VERSION,
+            },
+            {
+                "name": "ticker_aliases.json",
+                "purpose": (
+                    "Issuers whose ticker string differs between sources, anchored "
+                    "to the identifiers that did NOT change (CIK / ISIN / composite "
+                    "FIGI). `alias_to_canonical` maps any known symbol to the "
+                    "universe ticker — use it before joining a broker or vendor "
+                    "feed to universe.csv. `vendor_symbols` gives the symbol to "
+                    "send a named vendor: Fiserv is FISV at yfinance and FI at "
+                    "FINRA, so there is no single 'correct' string to rewrite to. "
+                    "Read its own schema_version; usually empty."
+                ),
+                "format": "json",
+                "schema_version": ALIASES_SCHEMA_VERSION,
             },
             {
                 "name": "positions_and_researching.csv",
@@ -348,6 +379,7 @@ def _step_export_artifacts(validation_result):
             _rel(universe_csv_path),
             _rel(metadata_path),
             _rel(status_path),
+            _rel(aliases_path),
             _rel(manifest_path),
         ],
         "ticker_count": len(metadata),
@@ -810,6 +842,7 @@ def _step_ticker_change_check():
     return {
         "checked": result["checked"],
         "changes": len(result["changes"]),
+        "settled": len(result.get("settled", [])),
         "deregistered": len(result["deregistered"]),
         "sec_fetched_ok": result["sec_fetched_ok"],
         "report": paths["md_path"],
@@ -1315,9 +1348,14 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
             if not tc_result["sec_fetched_ok"]:
                 steps["ticker_change_check"] = "SEC data unavailable — not checked"
             else:
+                # `settled` is reported but never warned on: it counts splits a
+                # human already adjudicated into the alias store, and folding it
+                # into the mismatch count is what kept Fiserv lit for months.
+                settled = tc_result.get("settled", 0)
                 steps["ticker_change_check"] = (
                     f"{tc_result['changes']} mismatch, {tc_result['deregistered']} "
                     f"deregistered of {tc_result['checked']}"
+                    + (f" ({settled} settled split(s))" if settled else "")
                 )
                 if tc_result["changes"] or tc_result["deregistered"]:
                     logger.warning(

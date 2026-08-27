@@ -255,12 +255,34 @@ def test_the_symbol_alias_maps_the_broker_symbol_onto_the_universe_symbol(tmp_pa
     assert feed.aliased == ["FISV->FI"]
 
 
-def test_the_alias_map_stays_a_stopgap(tmp_path):
-    """A second entry means the stopgap has become the architecture. Fix #345
-    (join on CIK/ISIN/FIGI) instead of growing this."""
-    assert len(held_mod.SYMBOL_ALIASES) == 1, (
-        "adding an alias is not the fix -- see board row #345"
-    )
+def test_the_alias_map_comes_from_the_published_store_not_a_hardcoded_dict():
+    """#345 landed: this was a hardcoded {"FISV": "FI"} pinned at one entry.
+
+    The pin was the right guard for a stopgap and the wrong one afterwards -- it
+    would now fail the moment a SECOND genuine split is recorded, which is exactly
+    the case the store exists to serve. What must stay true is that this module
+    reads the shared store rather than growing a private map of its own, so the
+    assertion moved to the source of the mapping.
+    """
+    from universe.aliases import load_aliases
+
+    published = {alias: e["canonical"] for alias, e in load_aliases()["by_alias"].items()}
+    assert held_mod.SYMBOL_ALIASES == published
+    assert held_mod.SYMBOL_ALIASES.get("FISV") == "FI"
+
+
+def test_an_unreadable_alias_store_yields_an_empty_map_not_a_guess(tmp_path, monkeypatch):
+    """Degrading to "no aliases" is safe ONLY because the demotion guard aborts.
+
+    An unjoined holding reads as a sale, and `MAX_DEMOTIONS_PER_RUN` refuses to
+    write one. Inventing an alias instead would merge two issuers with no trace.
+    """
+    bad = tmp_path / "ticker_aliases.json"
+    bad.write_text("{not json", encoding="utf-8")
+    import universe.aliases as aliases_mod
+
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", bad)
+    assert held_mod._load_symbol_aliases() == {}
 
 
 def test_the_completed_migration_stays_inert_on_a_held_book(tmp_path):

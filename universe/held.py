@@ -114,25 +114,44 @@ DEMOTION_POSITION = "Following for Interest"
 
 # BROKER SYMBOL -> COVERAGE-UNIVERSE SYMBOL.
 #
-# This map exists because a ticker is not an identity, and it is deliberately as
-# small as the evidence supports -- one entry, not a general aliasing layer.
+# This was a hardcoded one-entry dict until 2026-08-27, carrying a comment saying
+# it was a stopgap for board row #345 and must not be grown. #345 landed, so the
+# map now comes from `data/ticker_aliases.json` via `universe.aliases` -- the same
+# store every other consumer reads, anchored to the identifiers that did not change
+# (CIK 798354 / ISIN US3377381088 / composite FIGI BBG000BJKPG0 for Fiserv).
 #
-# Fiserv is ONE issuer (CIK 798354, ISIN US3377381088, FIGI BBG000BJKQW0) trading
-# under two live symbols across the fleet: the coverage universe carries `FI` (the
-# 2025 corporate action), while IBKR and yfinance both serve `FISV` -- and yfinance
-# returns HTTP 404 for `FI`. Without this entry the very FIRST run of this sync
+# Why it still exists at all: without a join, the very FIRST run of this sync
 # reports that JP sold Fiserv, because the feed says FISV and the universe says FI
-# and nothing joins them. A false SALE is exactly the error this module was written
-# to eliminate, so shipping it as a side effect would be self-defeating.
+# and nothing connects them. A false SALE is exactly the error this module was
+# written to eliminate, so shipping it as a side effect would be self-defeating.
 #
-# THIS IS A STOPGAP, NOT THE FIX. The real repair is board row #345: join on the
-# identity that did NOT change (CIK / ISIN / FIGI are identical across both symbols
-# and are already sitting in exports/universe.csv, unused for this). When #345 lands,
-# delete this map -- do not grow it. A second entry here is the signal that the
-# stopgap has become the architecture.
-SYMBOL_ALIASES = {
-    "FISV": "FI",
-}
+# Loaded once at import, deliberately: this module runs as a single short-lived
+# sync, and re-reading the file per row would let the map change mid-run -- which
+# is how a half-aliased book gets written.
+def _load_symbol_aliases() -> dict[str, str]:
+    """Broker/vendor symbol -> universe ticker, from the published alias store.
+
+    Degrades to an EMPTY map on any load failure, and says so. That is the safe
+    direction here only because of the guards below it: an unjoined holding looks
+    like a sale, and `MAX_DEMOTIONS_PER_RUN` aborts the whole run rather than
+    writing one. Guessing an alias instead would merge two issuers silently.
+    """
+    try:
+        from universe.aliases import AliasError, load_aliases
+    except ImportError:
+        return {}
+    try:
+        return {alias: entry["canonical"]
+                for alias, entry in load_aliases()["by_alias"].items()}
+    except AliasError as exc:
+        logger.warning(
+            "ticker alias store unreadable (%s) - broker symbols will NOT be joined "
+            "to universe tickers this run; a split holding will look like a sale and "
+            "the demotion guard should abort before anything is written", exc)
+        return {}
+
+
+SYMBOL_ALIASES = _load_symbol_aliases()
 
 
 

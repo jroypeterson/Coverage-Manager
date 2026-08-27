@@ -64,7 +64,7 @@ def fixture_csv(tmp_path):
     return csv_path
 
 
-def test_export_step_writes_all_four_artifacts(monkeypatch, tmp_path, fixture_csv):
+def test_export_step_writes_all_five_artifacts(monkeypatch, tmp_path, fixture_csv):
     exports_dir = tmp_path / "exports"
     monkeypatch.setattr(weekly_universe, "CSV_PATH", fixture_csv)
     monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports_dir)
@@ -78,16 +78,19 @@ def test_export_step_writes_all_four_artifacts(monkeypatch, tmp_path, fixture_cs
 
     result = weekly_universe._step_export_artifacts(validation_result)
 
-    # Four files exist
+    # Five files exist. ticker_aliases.json joined the set 2026-08-27 (board
+    # #345); it is published even when empty, because a consumer doing
+    # `map.get(sym, sym)` needs the file to exist to get today's behaviour.
     assert (exports_dir / "universe.csv").exists()
     assert (exports_dir / "universe_metadata.json").exists()
     assert (exports_dir / "universe_status.json").exists()
+    assert (exports_dir / "ticker_aliases.json").exists()
     assert (exports_dir / "manifest.json").exists()
 
-    # Result advertises four artifacts and the right ticker count.
+    # Result advertises five artifacts and the right ticker count.
     # Generic export contract: ticker_count must equal CSV row count exactly,
     # with no consumer-specific augmentation (no sigma-alert ETFs, etc.).
-    assert len(result["artifacts"]) == 4
+    assert len(result["artifacts"]) == 5
     assert result["ticker_count"] == 2
 
 
@@ -447,6 +450,7 @@ def test_manifest_lists_all_files(monkeypatch, tmp_path, fixture_csv):
         "universe.csv",
         "universe_metadata.json",
         "universe_status.json",
+        "ticker_aliases.json",
         "positions_and_researching.csv",
         "portfolio.json",
         "researching.json",

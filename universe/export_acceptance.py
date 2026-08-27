@@ -302,6 +302,97 @@ def _expected_count(sp: Path, count_field: str, problems: list[str]) -> int | No
     return value
 
 
+def _check_ticker_aliases(exports_dir: Path) -> list[str]:
+    """`ticker_aliases.json` must be internally consistent and honour its schema.
+
+    This artifact needs its own check rather than a `JsonCountCheck` because it
+    has no status file and its correct count is legitimately **zero** — a fleet
+    with no known symbol splits publishes an empty map. So "is it empty?" is not
+    the question; "does it contradict itself?" is. Three ways it can, and each
+    would silently drop a join at a consumer:
+
+      * `alias_to_canonical` and `entries` disagree, so a consumer using the fast
+        map resolves differently from one reading the evidence;
+      * an alias also appears as a canonical, making resolution order-dependent;
+      * a `vendor_symbols` value that is neither a canonical nor a declared alias,
+        which sends a vendor a string nothing in the file supports.
+
+    Absent is NOT a finding: the file is new, and a consumer's contract is
+    `map.get(sym, sym)` — an absent map degrades to today's behaviour rather than
+    to wrong data. That is the same reasoning that leaves `reporting_calendar.json`
+    unrequired.
+    """
+    p = exports_dir / "ticker_aliases.json"
+    if not p.exists():
+        return []
+
+    problems: list[str] = []
+    ok, payload = _read_json_artifact(p, problems)
+    if not ok:
+        return problems
+    if not isinstance(payload, dict):
+        problems.append(
+            f"ticker_aliases.json: expected a JSON object, got "
+            f"{type(payload).__name__} - no consumer can resolve a symbol from this")
+        return problems
+
+    amap = payload.get("alias_to_canonical")
+    entries = payload.get("entries")
+    if not isinstance(amap, dict) or not isinstance(entries, list):
+        problems.append(
+            "ticker_aliases.json: needs an 'alias_to_canonical' object and an "
+            "'entries' array - a consumer reading either one alone would silently "
+            "resolve nothing")
+        return problems
+
+    from_entries: dict[str, str] = {}
+    canonicals: set[str] = set()
+    for e in entries:
+        if not isinstance(e, dict):
+            problems.append("ticker_aliases.json: an entry is not an object")
+            continue
+        canonical = str(e.get("canonical") or "").strip().upper()
+        aliases = e.get("aliases")
+        if not canonical or not isinstance(aliases, list):
+            problems.append(
+                f"ticker_aliases.json: entry {canonical or '<blank>'} is missing a "
+                f"canonical symbol or an aliases list")
+            continue
+        canonicals.add(canonical)
+        declared = {canonical}
+        for a in aliases:
+            alias = str(a).strip().upper()
+            declared.add(alias)
+            from_entries[alias] = canonical
+        vendors = e.get("vendor_symbols")
+        if isinstance(vendors, dict):
+            for vendor, symbol in vendors.items():
+                if str(symbol).strip().upper() not in declared:
+                    problems.append(
+                        f"ticker_aliases.json: {canonical} routes {vendor} to "
+                        f"{symbol}, which is neither its canonical symbol nor a "
+                        f"declared alias")
+
+    normalized = {str(k).strip().upper(): str(v).strip().upper() for k, v in amap.items()}
+    if normalized != from_entries:
+        only_map = sorted(set(normalized) - set(from_entries))
+        only_entries = sorted(set(from_entries) - set(normalized))
+        mismatched = sorted(k for k in set(normalized) & set(from_entries)
+                            if normalized[k] != from_entries[k])
+        problems.append(
+            f"ticker_aliases.json: alias_to_canonical disagrees with entries - "
+            f"only in map: {only_map[:5]}; only in entries: {only_entries[:5]}; "
+            f"resolving differently: {mismatched[:5]}")
+
+    both = sorted(set(normalized) & canonicals)
+    if both:
+        problems.append(
+            f"ticker_aliases.json: {len(both)} symbol(s) are both a canonical and "
+            f"an alias, so resolution is order-dependent: {both[:5]}")
+
+    return problems
+
+
 def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
     """Return a list of problems. Raises when `strict` and anything is wrong.
 
@@ -499,6 +590,8 @@ def check_exports(exports_dir: Path, *, strict: bool = True) -> list[str]:
                     f"{len(missing)} ticker(s) in positions_and_researching.csv are "
                     f"missing from every position-state JSON - they exist in the CSV "
                     f"but no state file claims them: {missing[:10]}")
+
+    problems.extend(_check_ticker_aliases(exports_dir))
 
     problems = [_ascii(p) for p in _dedupe(problems)]
     if problems and strict:

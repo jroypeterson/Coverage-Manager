@@ -168,6 +168,36 @@ def validate_against_provenance_ledger(df):
             + (f" ... +{len(problems) - 8} more" if len(problems) > 8 else "")]
 
 
+def validate_against_ticker_aliases(df):
+    """Warn when the symbol-alias store no longer agrees with the universe.
+
+    The store (`data/ticker_aliases.json`) says two ticker strings are one issuer,
+    anchored to the CIK/ISIN/FIGI that did not change. Three ways that goes stale,
+    and the second is the dangerous one: an alias that becomes a covered row in its
+    own right would make every consumer collapse two companies into one.
+
+    A WARNING for the same reason the provenance check is one — it must not gate
+    the weekly build over a cosmetic disagreement — and a malformed store is
+    reported rather than skipped, because "I could not check" must never read as
+    "I checked and it is fine".
+    """
+    try:
+        from universe.aliases import AliasError, check_universe, load_aliases
+    except ImportError:
+        return []
+    try:
+        index = load_aliases()
+    except AliasError as e:
+        return [f"ticker alias store unreadable, so symbol splits were NOT "
+                f"checked this run: {e}"]
+    problems = check_universe(df, index)
+    if not problems:
+        return []
+    return [f"{len(problems)} ticker-alias entry problem(s): "
+            + "; ".join(problems[:8])
+            + (f" ... +{len(problems) - 8} more" if len(problems) > 8 else "")]
+
+
 def validate_venue_consistency(df):
     """Warn when a row's Exchange, Country (Listing) and Currency disagree.
 
@@ -516,6 +546,7 @@ def run_all_validations(df):
     warnings.extend(validate_venue_consistency(df))
     warnings.extend(validate_bare_foreign_tickers(df))
     warnings.extend(validate_against_provenance_ledger(df))
+    warnings.extend(validate_against_ticker_aliases(df))
     warnings.extend(validate_subsector_populated(df))
     warnings.extend(validate_listing_date_agreement(df))
     warnings.extend(validate_relisting_cik_cohort(df))

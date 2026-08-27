@@ -16,15 +16,29 @@ symbol moves. So:
     (candidate ticker change). Report old + SEC's symbol(s) + SEC title.
   * CIK absent from the file entirely -> likely **deregistered**.
 
-Why a review list, not an auto-applied fix: SEC's structured ticker data can
-*lag* a real-world rebrand (it still lists the retired `FISV` long after Fiserv
-moved to `FI`, on BOTH the bulk file and the per-CIK submissions endpoint), and
-yfinance can't disambiguate either (Yahoo aliases the retired symbol to the live
-one). There is no automated authority that reliably says which symbol is current
-— so the check **surfaces the mismatch with full context and lets a human decide
-direction** (a glance at the SEC title + former-names settles it). For the handful
-of mismatches a week, that's fast and 100% accurate; auto-classification on an
-unreliable signal would just manufacture false confidence.
+Why a review list, not an auto-applied fix: there is no automated authority that
+reliably says which symbol is current. SEC's structured ticker data can *lag* a
+real-world rebrand, and a market-data vendor can be equally behind or ahead. So
+the check **surfaces the mismatch with full context and lets a human decide
+direction** (a glance at the SEC title + former-names usually settles it). For the
+handful of mismatches a week that's fast; auto-classification on an unreliable
+signal would just manufacture false confidence.
+
+**Three verdicts, not two — and the third one had to be added.** A mismatch is a
+stale row (remap it), a source lagging a rebrand (leave it), *or* a standing split
+where **both symbols are live at different sources and neither is stale**. Fiserv
+is the last kind: measured 2026-08-27, OpenFIGI / SEC / Nasdaq's own exchange
+directory / yfinance / IBKR say `FISV` while FINRA and API Ninjas say `FI`, and
+yfinance returns HTTP 404 for `FI`. Neither "remap" nor "leave it" fixes that —
+the fleet needs to know the two strings are one issuer, which is what
+`data/ticker_aliases.json` records.
+
+That distinction matters here because this module's own guidance used to name
+`FISV`-vs-`FI` as its worked example of "leave as-is", so the pair was re-reported
+as a review item every week for months while two published surfaces were silently
+broken by it. A mismatch the alias store already covers is now sorted into
+`settled` and reported separately: a flag that is always raised is one the reader
+learns to skim, and the next real rename would land in that skimmed list.
 
 A best-effort `formerNames` lookup (SEC per-CIK submissions, only for the few
 mismatch candidates) flags entities that legally renamed — a strong "this is a
@@ -159,6 +173,43 @@ def _default_submissions(cik):
         return {}
 
 
+def _load_alias_index():
+    """The published symbol-alias store, or an empty index on any problem.
+
+    Only ever used to move a mismatch from "review this" to "already settled", so
+    a failure to load is safe in the noisy direction: the mismatch keeps being
+    reported, which is where it started.
+    """
+    try:
+        from universe.aliases import AliasError, load_aliases
+    except ImportError:
+        return None
+    try:
+        return load_aliases()
+    except AliasError as exc:
+        logger.warning("ticker alias store unreadable (%s) - settled symbol splits "
+                       "will be re-reported as review items", exc)
+        return None
+
+
+def _alias_settles(ticker, sec_tickers, alias_index):
+    """True when the alias store already records this exact pair as one issuer.
+
+    Both directions count. The store's canonical symbol is the universe's, so the
+    usual shape is `alias_to_canonical[SEC symbol] == universe ticker`; but a row
+    could equally be carrying the aliased spelling while SEC carries the canonical
+    one, and that is the same settled fact seen from the other side.
+    """
+    if not alias_index:
+        return False
+    from universe.aliases import all_symbols
+
+    known = all_symbols(ticker, alias_index)
+    if len(known) < 2:
+        return False
+    return any(str(s).strip().upper() in known for s in sec_tickers)
+
+
 def _coerce_cik(raw):
     """Universe CIK -> int, or None if blank/non-numeric."""
     s = str(raw or "").strip()
@@ -205,11 +256,12 @@ def check_ticker_changes(csv_path=None, use_cache=True, submissions_fetcher=None
     if not fetched_ok:
         return {
             "checked": 0, "sec_cik_count": 0, "sec_fetched_ok": False,
-            "changes": [], "deregistered": [], "active_omissions": 0,
+            "changes": [], "settled": [], "deregistered": [], "active_omissions": 0,
         }
 
     fetch_subs = submissions_fetcher or _default_submissions
-    changes, deregistered = [], []
+    alias_index = _load_alias_index()
+    changes, settled, deregistered = [], [], []
     active_omissions = 0
     checked = 0
     for row in df.to_dict(orient="records"):
@@ -249,7 +301,7 @@ def check_ticker_changes(csv_path=None, use_cache=True, submissions_fetcher=None
         sec_norm = {_norm_symbol(t) for t in entry["tickers"]}
         if _norm_symbol(ticker) not in sec_norm:
             former = (fetch_subs(cik) or {}).get("former_names", [])
-            changes.append({
+            record = {
                 "ticker": ticker,
                 "sec_tickers": ", ".join(entry["tickers"]),
                 "cik": cik,
@@ -259,15 +311,27 @@ def check_ticker_changes(csv_path=None, use_cache=True, submissions_fetcher=None
                 "entity_renamed": bool(former),
                 "sector_jp": row.get("Sector (JP)", ""),
                 "subsector_jp": row.get("Subsector (JP)", ""),
-            })
+            }
+            # A mismatch a human already adjudicated into the alias store is not a
+            # finding any more. Before this split, Fiserv's FI/FISV appeared in
+            # every weekly report for months under guidance that said "leave
+            # as-is" -- a permanently-true flag, which is the fleet's own named
+            # failure mode: the reader learns to skim the section, and the next
+            # REAL rename lands in a list they have been trained to ignore.
+            if _alias_settles(ticker, entry["tickers"], alias_index):
+                settled.append(record)
+            else:
+                changes.append(record)
 
     changes.sort(key=lambda r: r["ticker"])
+    settled.sort(key=lambda r: r["ticker"])
     deregistered.sort(key=lambda r: r["ticker"])
     return {
         "checked": checked,
         "sec_cik_count": len(cik_map),
         "sec_fetched_ok": True,
         "changes": changes,
+        "settled": settled,
         "deregistered": deregistered,
         "active_omissions": active_omissions,
     }
@@ -290,6 +354,8 @@ def write_report(result, reports_dir=None, run_date=None):
         writer.writeheader()
         for r in result["changes"]:
             writer.writerow({"type": "change", **{k: r.get(k, "") for k in fieldnames if k != "type"}})
+        for r in result.get("settled", []):
+            writer.writerow({"type": "settled", **{k: r.get(k, "") for k in fieldnames if k != "type"}})
         for r in result["deregistered"]:
             writer.writerow({"type": "deregistered", **{k: r.get(k, "") for k in fieldnames if k != "type"}})
 
@@ -303,6 +369,9 @@ def write_report(result, reports_dir=None, run_date=None):
     lines.append(f"- Checked: {result['checked']} universe rows with a CIK "
                  f"(against {result['sec_cik_count']} SEC CIKs)")
     lines.append(f"- Ticker mismatches (candidate changes — review): {len(result['changes'])}")
+    if result.get("settled"):
+        lines.append(f"- Settled symbol splits (recorded in `data/ticker_aliases.json`, no action): "
+                     f"{len(result['settled'])}")
     lines.append(f"- Deregistered / delisted (submissions-confirmed, no live ticker): {len(result['deregistered'])}")
     if result.get("active_omissions"):
         lines.append(f"- (Dropped {result['active_omissions']} bulk-file omission(s) that submissions "
@@ -313,11 +382,14 @@ def write_report(result, reports_dir=None, run_date=None):
         lines.append("## :arrows_counterclockwise: Ticker mismatches — review & remap")
         lines.append("")
         lines.append("_SEC lists a different symbol than the universe for the same CIK. **Check direction "
-                     "before changing anything:** SEC's structured data can lag a rebrand (it still shows the "
-                     "retired symbol while your ticker is current, e.g. `FISV` vs your `FI` — leave as-is), so "
-                     "a mismatch is not automatically a stale row. A non-empty **Former Names** is a strong "
-                     "tell of a real entity rename (remap then). When remapping, update `Ticker` (and "
-                     "identifiers) on the row in `data/coverage_universe_tickers.csv` to SEC's symbol._")
+                     "before changing anything:** SEC's structured data can lag a rebrand, so a mismatch is "
+                     "not automatically a stale row. A non-empty **Former Names** is a strong tell of a real "
+                     "entity rename (remap then). When remapping, update `Ticker` (and identifiers) on the "
+                     "row in `data/coverage_universe_tickers.csv` to SEC's symbol. **When BOTH symbols are "
+                     "live in the wild** — different sources serve different strings and neither is stale — "
+                     "the answer is neither a remap nor 'leave as-is': record the pair in "
+                     "`data/ticker_aliases.json` so consumers can join it, and it will move to the settled "
+                     "section below._")
         lines.append("")
         lines.append("| Your Ticker | SEC Symbol(s) | CIK | Recorded Name | SEC Title | Former Names | Sector |")
         lines.append("|-------------|---------------|-----|---------------|-----------|--------------|--------|")
@@ -326,6 +398,24 @@ def write_report(result, reports_dir=None, run_date=None):
             lines.append(
                 f"| {r['ticker']} | **{r['sec_tickers']}** | {r['cik']} | "
                 f"{r['recorded_name']} | {r['sec_title']} | {former} | {r['sector_jp']} |"
+            )
+        lines.append("")
+
+    if result.get("settled"):
+        lines.append("## :white_check_mark: Settled symbol splits — no action")
+        lines.append("")
+        lines.append("_Both symbols are live in the wild and the pair is already recorded in "
+                     "`data/ticker_aliases.json`, anchored to the CIK/ISIN/FIGI that did not change. "
+                     "Consumers join through that store, so this is not a review item. It is listed "
+                     "rather than hidden because a settled split that disappears from the report is one "
+                     "nobody re-examines when a vendor finally moves._")
+        lines.append("")
+        lines.append("| Your Ticker | SEC Symbol(s) | CIK | Recorded Name | SEC Title |")
+        lines.append("|-------------|---------------|-----|---------------|-----------|")
+        for r in result["settled"]:
+            lines.append(
+                f"| {r['ticker']} | {r['sec_tickers']} | {r['cik']} | "
+                f"{r['recorded_name']} | {r['sec_title']} |"
             )
         lines.append("")
 

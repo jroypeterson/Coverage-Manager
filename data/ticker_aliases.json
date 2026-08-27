@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "generated_note": "Issuers the fleet's sources spell differently RIGHT NOW, anchored to the identifiers that did not change. See universe/aliases.py. Two independent sources are the bar for adding an entry, and every vendor symbol must be the canonical string or a declared alias. This file deliberately does NOT decide which symbol is 'current' -- ticker_change_check refuses that call because no source reliably answers it, and relocating the guess here would not make it better. Correct a stale entry by editing THIS file with new evidence and a new date -- never by editing a test assertion.",
+  "entries": [
+    {
+      "canonical": "FI",
+      "aliases": ["FISV"],
+      "company_name": "Fiserv Inc.",
+      "cik": "798354",
+      "isin": "US3377381088",
+      "composite_figi": "BBG000BJKPG0",
+      "kind": "symbol_split",
+      "verified": "2026-08-27",
+      "vendor_symbols": {
+        "yfinance": "FISV",
+        "openfigi": "FISV",
+        "sec_company_tickers": "FISV",
+        "nasdaq_directory": "FISV",
+        "ibkr": "FISV",
+        "finra": "FI",
+        "api_ninjas": "FI"
+      },
+      "sources": [
+        "OpenFIGI v3 mapping 2026-08-27, ID_ISIN US3377381088 (this row's own ISIN) -> ticker FISV, FISERV INC, Common Stock, compositeFIGI BBG000BJKPG0; ID_BB_GLOBAL BBG000BJKQW0 (this row's own FIGI) -> FISV, exchCode UN. TICKER 'FI' exchCode US -> 'No identifier found.'",
+        "Nasdaq Trader exchange directory, data/symbol_directory/symbols_*.csv: FISV present in 12 of 12 snapshots 2026-08-06..2026-08-26 (listed NASDAQ); FI absent from all 12.",
+        "SEC company_tickers.json via universe/ticker_change_check.py: CIK 798354 -> FISV (reports/ticker_change_check_2026-08-26.md).",
+        "yfinance 2026-08-27: FISV last 52.64 USD, market cap 27.99e9; FI -> HTTP 404 'Quote not found for symbol: FI'.",
+        "API Ninjas insider feed: data/../insider_ownership/data/api_ninjas_insider/FI_2025-07-25.json carries cik 798354, company_name 'FISERV INC', ticker 'FI'.",
+        "IBKR live position feed 2026-08-21: portfolio_daily/data/ibkr_positions.csv reports the holding as FISV.",
+        "FINRA short-interest series is keyed FI (Fiserv from 2023, Frank's International N.V. before 2021) -- sector_chart_pack/short_interest_history.py:_segment_to_current_listing, measured 2026-08-22."
+      ],
+      "note": "The two directions are genuinely opposed, which is why vendor_symbols is per-vendor rather than one 'true' symbol: yfinance serves only FISV, FINRA serves only FI. portfolio_daily hit both at once -- 'no fundamentals: FISV' (broker symbol vs the CM frame) and 'no short-interest data: FISV' (broker symbol vs FINRA's FI) -- and its public page invented an 'Unclassified' sector bucket holding this name alone. insider_ownership hit the mirror image, asking yfinance for FI and rendering every Fiserv stake as a share count with no dollar value. Entered 2026-08-27 for board row #345."
+    }
+  ]
+}

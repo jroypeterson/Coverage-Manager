@@ -203,3 +203,125 @@ def test_write_report_sec_unavailable_note(tmp_path):
     tcc.write_report(res, reports_dir=tmp_path, run_date="2026-06-15")
     md = (tmp_path / "ticker_change_check_2026-06-15.md").read_text(encoding="utf-8")
     assert "unavailable" in md.lower()
+
+
+# ── settled symbol splits (board #345) ───────────────────────────────────────
+#
+# A mismatch the alias store already adjudicated is not a review item. Before
+# this split, Fiserv's FI/FISV was re-reported every week under guidance that
+# said "leave as-is" -- a permanently-raised flag, which trains the reader to
+# skim the exact section the next real rename lands in.
+
+_FISERV_SEC = {798354: {"tickers": ["FISV"], "title": "FISERV INC"}}
+
+
+def _alias_index(monkeypatch, tmp_path, entries):
+    """Point the module's alias lookup at a synthetic store."""
+    import json
+
+    import universe.aliases as aliases_mod
+
+    path = tmp_path / "ticker_aliases.json"
+    path.write_text(json.dumps({"schema_version": aliases_mod.SCHEMA_VERSION,
+                                "entries": entries}), encoding="utf-8")
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", path)
+
+
+_FISERV_ALIAS = [{
+    "canonical": "FI", "aliases": ["FISV"], "cik": "798354",
+    "verified": "2026-08-27",
+    "sources": ["OpenFIGI 2026-08-27", "Nasdaq Trader 2026-08-26"],
+}]
+
+
+def test_a_mismatch_covered_by_the_alias_store_is_settled_not_a_change(monkeypatch, tmp_path):
+    _patch_sec(monkeypatch, _FISERV_SEC)
+    _alias_index(monkeypatch, tmp_path, _FISERV_ALIAS)
+    csv = _write_universe(tmp_path, [["FI", "798354", "Fiserv Inc.", "Financials", ""]])
+
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+    assert res["changes"] == []
+    assert [r["ticker"] for r in res["settled"]] == ["FI"]
+    assert res["settled"][0]["sec_tickers"] == "FISV"
+
+
+def test_an_uncovered_mismatch_is_still_a_change(monkeypatch, tmp_path):
+    """The store must not blanket-silence the section it lives in."""
+    _patch_sec(monkeypatch)
+    _alias_index(monkeypatch, tmp_path, _FISERV_ALIAS)
+    csv = _write_universe(tmp_path, [
+        ["MPW", "1287865", "Medical Properties Trust", "Healthcare Services", ""],
+    ])
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+    assert [r["ticker"] for r in res["changes"]] == ["MPW"]
+    assert res["settled"] == []
+
+
+def test_an_alias_for_a_DIFFERENT_symbol_does_not_settle_this_mismatch(monkeypatch, tmp_path):
+    """Settling keys on the pair, not on the row merely having any alias entry."""
+    _patch_sec(monkeypatch, {798354: {"tickers": ["ZZZZ"], "title": "FISERV INC"}})
+    _alias_index(monkeypatch, tmp_path, _FISERV_ALIAS)
+    csv = _write_universe(tmp_path, [["FI", "798354", "Fiserv Inc.", "Financials", ""]])
+
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+    assert [r["ticker"] for r in res["changes"]] == ["FI"]
+    assert res["settled"] == []
+
+
+def test_an_unreadable_alias_store_leaves_the_mismatch_as_a_change(monkeypatch, tmp_path):
+    """Degrade toward NOISE, never toward silence: a store we cannot read must
+    not be able to suppress a finding."""
+    import universe.aliases as aliases_mod
+
+    bad = tmp_path / "ticker_aliases.json"
+    bad.write_text("{not json", encoding="utf-8")
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", bad)
+    _patch_sec(monkeypatch, _FISERV_SEC)
+    csv = _write_universe(tmp_path, [["FI", "798354", "Fiserv Inc.", "Financials", ""]])
+
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+    assert [r["ticker"] for r in res["changes"]] == ["FI"]
+    assert res["settled"] == []
+
+
+def test_the_report_separates_settled_from_review_and_names_the_store(monkeypatch, tmp_path):
+    _patch_sec(monkeypatch, _FISERV_SEC)
+    _alias_index(monkeypatch, tmp_path, _FISERV_ALIAS)
+    csv = _write_universe(tmp_path, [["FI", "798354", "Fiserv Inc.", "Financials", ""]])
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+
+    paths = tcc.write_report(res, reports_dir=tmp_path, run_date="2026-08-27")
+    md = (tmp_path / "ticker_change_check_2026-08-27.md").read_text(encoding="utf-8")
+    assert "Settled symbol splits" in md
+    assert "ticker_aliases.json" in md
+    assert "Ticker mismatches — review & remap" not in md
+    csv_text = (tmp_path / "ticker_change_check_2026-08-27.csv").read_text(encoding="utf-8")
+    assert "settled,FI,FISV" in csv_text
+    assert paths["md_path"]
+
+
+def test_the_report_no_longer_teaches_readers_to_ignore_the_fiserv_pair(monkeypatch, tmp_path):
+    """The guidance string named FISV/FI as its worked example of 'leave as-is'.
+
+    That one sentence is why a live defect was dismissed weekly for months, so it
+    is pinned out rather than merely deleted.
+    """
+    _patch_sec(monkeypatch)
+    _alias_index(monkeypatch, tmp_path, [])
+    csv = _write_universe(tmp_path, [
+        ["MPW", "1287865", "Medical Properties Trust", "Healthcare Services", ""],
+    ])
+    res = tcc.check_ticker_changes(csv_path=csv, use_cache=False,
+                                   submissions_fetcher=_SUBS_EMPTY)
+    tcc.write_report(res, reports_dir=tmp_path, run_date="2026-08-27")
+    md = (tmp_path / "ticker_change_check_2026-08-27.md").read_text(encoding="utf-8")
+    # The guidance still discusses "leave as-is" as one of three verdicts, which
+    # is correct. What must never come back is naming this pair as the worked
+    # example of it -- that sentence is what made the dismissal automatic.
+    assert "FISV" not in md and "`FI`" not in md
+    assert "ticker_aliases.json" in md

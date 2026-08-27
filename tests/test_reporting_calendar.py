@@ -198,5 +198,5 @@ def test_manifest_lists_reporting_calendar_files(monkeypatch, tmp_path):
     names = {f["name"] for f in manifest["files"]}
     assert "reporting_calendar.json" in names
     assert "reporting_calendar_status.json" in names
-    # The universe-artifacts step still advertises exactly its own four files.
-    assert len(result["artifacts"]) == 4
+    # The universe-artifacts step still advertises exactly its own five files.
+    assert len(result["artifacts"]) == 5
