@@ -521,25 +521,54 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     #    along. Generalising to "recorded minus new" covers both, and a demotion
     #    falls out as new == 0.
     suspects = []
-    # ⛑ AN ALIAS WHOSE SOURCE SYMBOL IS ITSELF A COVERED ROW MERGES TWO COMPANIES.
+    # ⛑ RUN THE ALIAS STORE'S OWN VALIDATOR, DO NOT RE-IMPLEMENT ONE OF ITS RULES.
     #
-    # `aliases.check_universe` calls this its fatal case and the EXPORT path drops
-    # such an entry — but this module reads `data/ticker_aliases.json` directly,
-    # so nothing was checking it here (Codex round 4). Repro: `FISV -> FI` with
-    # both in the universe, `FISV` held and `FI` not. The feed normalises to `FI`;
-    # the plan promotes `FI`, demotes `FISV`, reports NO unjoined holding, and
-    # publishes the wrong company as owned — silently, because every other guard
-    # sees a tidy one-in-one-out swap.
+    # Four adversarial rounds over this feature found three separate roads to a
+    # wrong ownership record, and all three were the SAME structural fault: a
+    # check that existed on the PUBLISH side and not on the read side, because
+    # this module reads `data/ticker_aliases.json` directly and the export
+    # pipeline never runs for it.
+    #
+    # The first fix here was a hand-rolled version of `check_universe`'s fatal
+    # rule (an alias that is also a covered row — resolve through it and two
+    # separately-covered companies merge into one holding). That closed the
+    # instance and left the class open: a hand copy of one of three rules drifts
+    # from the original the first time the original changes. Calling the real
+    # validator closes all three and cannot drift.
+    #
+    # A ticker list is all this function is given, so only the rules that key on
+    # tickers can fire; the identity-anchor rule needs columns we do not have and
+    # skips itself on blanks, which is its documented behaviour, not a silent hole.
     if universe_tickers:
-        known = {t.strip().upper() for t in universe_tickers}
-        hijacked = sorted(a for a in SYMBOL_ALIASES if a in known)
-        if hijacked:
+        try:
+            import pandas as _pd
+
+            from universe import aliases as _aliases
+
+            frame = _pd.DataFrame({"Ticker": sorted({str(t).strip().upper()
+                                                     for t in universe_tickers if str(t).strip()})})
+            # merge_hazards, NOT check_universe: only the drift that would
+            # resolve one symbol onto the WRONG company blocks a write. A
+            # canonical missing from the universe resolves to NOTHING, which the
+            # share-count guard below already catches safely — and blocking on it
+            # would turn any caller holding a partial universe into an outage,
+            # the same "a guard can become the outage" this feature has already
+            # produced once. The full check still runs, as a warning.
+            problems = _aliases.merge_hazards(frame)
+            for note in _aliases.check_universe(frame):
+                if note not in problems:
+                    logger.warning("ticker alias store vs universe: %s", note)
+        except Exception as exc:            # noqa: BLE001 - a validator must not be the outage
+            logger.warning("could not validate the alias store against the universe "
+                           "(%s); relying on the share-count guard below", exc)
+            problems = []
+        if problems:
             plan.blocked_reason = (
-                f"{len(hijacked)} alias(es) name a symbol that is ALSO a covered row: "
-                f"{', '.join(f'{a} -> {SYMBOL_ALIASES[a]}' for a in hijacked)}. "
-                f"Resolving through them would merge two separately-covered companies "
-                f"into one holding. Fix data/ticker_aliases.json or the universe row, "
-                f"then re-run."
+                f"the ticker alias store disagrees with the universe, so resolving "
+                f"through it could merge or misroute a holding: "
+                + "; ".join(problems[:4])
+                + (f" ... +{len(problems) - 4} more" if len(problems) > 4 else "")
+                + ". Fix data/ticker_aliases.json or the universe row, then re-run."
             )
             return plan
 

@@ -357,6 +357,45 @@ def check_universe(df, index=None) -> list[str]:
     return problems
 
 
+def merge_hazards(df, index=None) -> list[str]:
+    """Only the drift that would MERGE two companies. Returns problem strings.
+
+    `check_universe` reports three kinds of drift and they do not carry the same
+    severity, which matters the moment a caller wants to *block* on one:
+
+      * an alias that is also a covered row in its own right — **fatal**, because
+        resolving through it collapses two separately-covered companies into one
+        holding, and every downstream guard then sees a tidy one-in-one-out swap;
+      * a canonical missing from the universe, or a moved identity anchor — real
+        findings, but the alias resolves to *nothing* rather than to the *wrong
+        thing*, and a consumer that can detect an unresolved symbol handles them
+        safely.
+
+    Splitting them here rather than by matching on message text: a caller
+    string-matching a warning is one reworded sentence away from silently
+    checking nothing, which is the failure class this file is full of.
+    """
+    idx = index if index is not None else load_aliases()
+    if not idx["entries"]:
+        return []
+
+    rows = {}
+    for _, row in df.iterrows():
+        ticker = _sym(row.get("Ticker"))
+        if ticker:
+            rows[ticker] = row
+
+    problems: list[str] = []
+    for entry in idx["entries"]:
+        for alias in entry["aliases"]:
+            if alias in rows:
+                problems.append(
+                    f"alias entry {entry['canonical']}: alias {alias} is ALSO a universe "
+                    f"row ({_cell(rows[alias].get('Company Name'))}) — resolving through "
+                    f"this entry would merge two separately-covered companies")
+    return problems
+
+
 def published_payload(index=None, df=None) -> dict:
     """The `exports/ticker_aliases.json` body.
 

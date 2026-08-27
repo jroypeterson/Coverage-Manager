@@ -493,7 +493,7 @@ def test_an_alias_whose_source_is_ALSO_a_covered_row_blocks(tmp_path):
         feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
         entries = _entries({"FISV": ("Portfolio", "Y"), "FI": ("Researching", "")})
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI", "FISV"])
-        assert plan.blocked_reason and "merge two separately-covered companies" in plan.blocked_reason
+        assert plan.blocked_reason and "disagrees with the universe" in plan.blocked_reason
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -571,3 +571,42 @@ def test_a_position_that_merely_SHRANK_is_not_blocked(tmp_path):
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_the_store_is_validated_by_its_OWN_validator_not_a_hand_copy(tmp_path, monkeypatch):
+    """The structural finding behind four rounds: a check on the publish side and
+    not on the read side.
+
+    The first fix was a hand-rolled copy of ONE of `check_universe`'s three rules.
+    A copy drifts from the original the moment the original changes, so this pins
+    that the real validator is what runs -- if it stops being called, a rule added
+    there would silently not apply here.
+    """
+    import universe.aliases as aliases_mod
+
+    called = {}
+    real = aliases_mod.check_universe
+
+    def spy(df, index=None):
+        called["df"] = df
+        return real(df, index)
+
+    monkeypatch.setattr(aliases_mod, "check_universe", spy)
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                       universe_tickers=["AAPL"])
+    assert "df" in called, "plan_sync must run the alias store's own validator"
+    assert list(called["df"]["Ticker"]) == ["AAPL"]
+
+
+def test_a_validator_failure_does_not_become_the_outage(tmp_path, monkeypatch):
+    """A guard that crashes is worse than the guard being absent -- the
+    share-count check below still covers the case that actually occurs."""
+    import universe.aliases as aliases_mod
+
+    monkeypatch.setattr(aliases_mod, "check_universe",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers=["AAPL"])
+    assert plan.blocked_reason is None

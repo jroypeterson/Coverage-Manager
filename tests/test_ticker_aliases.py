@@ -690,3 +690,40 @@ def test_acceptance_flags_an_extra_route_when_the_entry_declares_NONE(tmp_path):
     }), encoding="utf-8")
     problems = _check_ticker_aliases(tmp_path)
     assert any("does not declare" in p for p in problems)
+
+
+def test_merge_hazards_reports_ONLY_the_drift_that_resolves_to_a_WRONG_company(tmp_path):
+    """The three drift kinds do not carry the same severity, and a caller that
+    wants to BLOCK needs the distinction without matching on message text.
+
+    An alias that is also a covered row resolves one symbol onto the WRONG
+    company; a missing canonical resolves it onto NOTHING, which a consumer can
+    detect safely. Blocking on the second turns a partial universe into an outage.
+    """
+    from universe.aliases import merge_hazards
+
+    idx = load_aliases(write(tmp_path, [entry()]))
+
+    fatal = universe_df([
+        {"Ticker": "FI", "Company Name": "Fiserv Inc.", "CIK": "798354",
+         "ISIN": "US3377381088", "Composite FIGI": "BBG000BJKPG0"},
+        {"Ticker": "FISV", "Company Name": "Some Other Issuer", "CIK": "999",
+         "ISIN": "", "Composite FIGI": ""},
+    ])
+    assert any("merge two separately-covered companies" in p
+               for p in merge_hazards(fatal, idx))
+
+    # canonical absent: check_universe reports it, merge_hazards does NOT
+    absent = universe_df([{"Ticker": "AAPL", "Company Name": "Apple", "CIK": "320193",
+                           "ISIN": "", "Composite FIGI": ""}])
+    assert check_universe(absent, idx), "the full check still reports it"
+    assert merge_hazards(absent, idx) == [], "but it is not a merge hazard"
+
+
+def test_merge_hazards_is_silent_on_a_clean_universe(tmp_path):
+    from universe.aliases import merge_hazards
+
+    idx = load_aliases(write(tmp_path, [entry()]))
+    clean = universe_df([{"Ticker": "FI", "Company Name": "Fiserv Inc.", "CIK": "798354",
+                          "ISIN": "US3377381088", "Composite FIGI": "BBG000BJKPG0"}])
+    assert merge_hazards(clean, idx) == []
