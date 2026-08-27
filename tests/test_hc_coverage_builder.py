@@ -102,9 +102,12 @@ def test_the_published_csv_on_disk_carries_no_rating_column():
     # to -- so the only way it reaches that surface is inside the CSV itself.
     assert "LAST UPDATED" in lines[0], "the published CSV lost its provenance line"
     header = lines[2].split(",")
-    assert header[:4] == ["#", "Ticker", "Company Name", "Rating"], header[:4]
-    assert "Size" in header and "Fwd P/E" in header
+    assert header[:6] == ["#", "Ticker", "Company Name", "Rating",
+                          "Mkt Cap (USD $M)", "EV (USD $M)"], header[:6]
+    assert "Size" in header and "Fwd P/E (NTM)" in header
+    assert "% of 52W High" in header and "EV/EBITDA (TTM)" in header
     assert not any("Ramp" in h for h in header)
+    assert header[-3:] == ["Listing", "Exchange", "Country (HQ)"], header[-3:]
 
 
 # ── the size bucket ──────────────────────────────────────────────────────────
@@ -293,7 +296,7 @@ def test_every_column_with_a_number_format_also_declares_its_decimals():
             "%s: number format %r disagrees with DECIMALS=%d" % (col, fmt, want_decimals))
 
 
-@pytest.mark.parametrize("col", ["Fwd P/E", "2019", "2024", "YTD",
+@pytest.mark.parametrize("col", ["Fwd P/E (NTM)", "2019", "2024", "YTD",
                                  "Mkt Cap (USD $M)"])
 def test_the_columns_jp_asked_to_lose_decimals_have_none(col):
     """JP 2026-08-26: "the annual returns dont need decimal point precision. and
@@ -460,3 +463,56 @@ def test_the_annualised_columns_say_they_are_annualised():
     for c in b.ANNUALISED_RETURNS:
         assert "ann" in c.lower()
     assert set(b.RETURN_COLS) == set(b.CALENDAR_RETURNS) | set(b.ANNUALISED_RETURNS)
+
+
+# ── % of 52-week high, and the EV multiples ──────────────────────────────────
+
+def test_pct_of_high_is_a_percentage_of_the_high():
+    assert round(b.pct_of_high(270.0, 276.47), 1) == 97.7
+    assert b.pct_of_high(50.0, 100.0) == 50.0
+
+
+@pytest.mark.parametrize("px, hi", [(None, 100.0), (50.0, None), (50.0, 0),
+                                    (50.0, -10), ("", 100.0)])
+def test_pct_of_high_refuses_to_divide_by_a_missing_or_zero_high(px, hi):
+    """This column gets sorted, so an infinity or a crash is worse than a blank."""
+    assert b.pct_of_high(px, hi) is None
+
+
+def test_positive_multiple_passes_a_real_multiple():
+    assert b.positive_multiple(19.47) == 19.47
+
+
+@pytest.mark.parametrize("raw", [-4.2, 0, None, "", "n/a"])
+def test_a_non_positive_ev_multiple_is_blank(raw):
+    """A negative EV/EBITDA is a loss-making denominator showing through the
+    ratio, not a cheap company — and it sorts straight to the top of any
+    cheapest-first ranking. Guardant is the live case: EV/Sales 19.9, EV/EBITDA
+    blank."""
+    assert b.positive_multiple(raw) is None
+
+
+def test_every_valuation_heading_states_its_basis():
+    """JP asked to "note if its TTM or NTM or something else". The basis lives in
+    the heading rather than a footnote, because these are exactly the columns
+    where a silent basis change is invisible — this repo's own `Fwd P/E` column
+    mixed yfinance forward with FMP trailing under one heading for months.
+
+    Verified 2026-08-26: yfinance enterpriseToRevenue / enterpriseToEbitda and
+    FMP evToSalesTTM / enterpriseValueMultipleTTM are all trailing twelve months;
+    forwardPE is next-twelve-month.
+    """
+    assert "Fwd P/E (NTM)" in b.COLS
+    assert "EV/Sales (TTM)" in b.COLS
+    assert "EV/EBITDA (TTM)" in b.COLS
+    for col in b.COLS:
+        if col.startswith(("EV/", "Fwd P/E", "P/E")):
+            assert col.endswith(("(TTM)", "(NTM)")), (
+                "%s is a valuation multiple with no basis in its heading" % col)
+
+
+def test_percent_of_high_is_not_colour_scaled():
+    """The return columns centre on zero and this one does not — it runs 0..100 —
+    so a shared red/white/green scale would paint every row green. Different
+    question, different treatment."""
+    assert "% of 52W High" not in b.RETURN_COLS

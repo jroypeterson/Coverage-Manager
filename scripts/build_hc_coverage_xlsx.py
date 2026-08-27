@@ -108,7 +108,8 @@ SNAPSHOT_MAX_AGE_DAYS = 10
 LC_THRESHOLD_USD_M = 25000
 
 FIELDS = ["marketCap", "enterpriseValue", "regularMarketPrice", "currentPrice",
-          "currency", "forwardPE", "longName"]
+          "currency", "forwardPE", "fiftyTwoWeekHigh", "enterpriseToEbitda",
+          "enterpriseToRevenue", "longName"]
 
 # Order is JP's, 2026-08-26: size before sector, market cap and EV up front,
 # venue information last, performance most-recent-first. `Rating` keeps the slot
@@ -116,7 +117,8 @@ FIELDS = ["marketCap", "enterpriseValue", "regularMarketPrice", "currentPrice",
 # for market cap there too, so the two share the front and Rating leads.
 COLS = (["Ticker", "Company Name", "Rating", "Mkt Cap (USD $M)", "EV (USD $M)",
          "Size", "Sector", "Subsector", "Sub-subsector", "Core Coverage",
-         "Ccy", "Price (local)", "Fwd P/E"]
+         "Ccy", "Price (local)", "% of 52W High",
+         "Fwd P/E (NTM)", "EV/Sales (TTM)", "EV/EBITDA (TTM)"]
         + RETURN_COLS
         + ["Listing", "Exchange", "Country (HQ)"])
 
@@ -131,7 +133,9 @@ PUBLIC_COLS = [c for c in COLS if c not in PRIVATE_ONLY]
 WIDTH = {"Ticker": 11, "Company Name": 36, "Sector": 19, "Subsector": 26,
          "Sub-subsector": 20, "Core Coverage": 9, "Rating": 9, "Listing": 17,
          "Exchange": 16, "Country (HQ)": 15, "Ccy": 6, "Price (local)": 12,
-         "Mkt Cap (USD $M)": 15, "EV (USD $M)": 14, "Size": 7, "Fwd P/E": 9}
+         "Mkt Cap (USD $M)": 15, "EV (USD $M)": 14, "Size": 7,
+         "% of 52W High": 12, "Fwd P/E (NTM)": 12,
+         "EV/Sales (TTM)": 13, "EV/EBITDA (TTM)": 14}
 WIDTH.update({c: 9 for c in RETURN_COLS})
 
 HDR_FILL = PatternFill("solid", fgColor="1F3864")
@@ -149,11 +153,14 @@ SUMHDR = ["Subsector", "Companies", "Core", "Rated", "Total Mkt Cap (USD $M)"]
 # Fwd P/e doesnt as well". Market cap has always been whole millions; the commas
 # are display only, never in the CSV, where they would make the value text and
 # break sorting in the Sheet.
-DECIMALS = {"Mkt Cap (USD $M)": 0, "EV (USD $M)": 0, "Fwd P/E": 0,
-            "Price (local)": 2}
+DECIMALS = {"Mkt Cap (USD $M)": 0, "EV (USD $M)": 0, "Fwd P/E (NTM)": 0,
+            "Price (local)": 2, "% of 52W High": 0,
+            "EV/Sales (TTM)": 1, "EV/EBITDA (TTM)": 1}
 DECIMALS.update({c: 0 for c in RETURN_COLS})
 NUMFMT = {"Mkt Cap (USD $M)": "#,##0", "EV (USD $M)": "#,##0",
-          "Fwd P/E": "0", "Price (local)": "#,##0.00"}
+          "Fwd P/E (NTM)": "0", "Price (local)": "#,##0.00",
+          "% of 52W High": '0"%"',
+          "EV/Sales (TTM)": "0.0", "EV/EBITDA (TTM)": "0.0"}
 NUMFMT.update({c: "0" for c in RETURN_COLS})
 
 
@@ -171,6 +178,29 @@ def size_bucket(mcap_usd_m):
     if mcap_usd_m is None:
         return None
     return "LC" if mcap_usd_m >= LC_THRESHOLD_USD_M else "SMID"
+
+
+def pct_of_high(price, high):
+    """Where the price sits in its own 52-week range, as a percent of the high.
+
+    Blank unless both sides are real and the high is positive -- dividing by a
+    missing or zero high yields either a crash or an infinity, and this column
+    gets sorted."""
+    p, h = num(price), num(high)
+    if p is None or h is None or h <= 0:
+        return None
+    return 100.0 * p / h
+
+
+def positive_multiple(raw):
+    """A valuation multiple, or None if it is not positive.
+
+    Same rule as `forward_pe` and for the same reason: a negative EV/EBITDA is a
+    loss-making denominator showing through the ratio, not a cheap company, and it
+    sorts straight to the top of any "cheapest names" ranking.
+    """
+    v = num(raw)
+    return v if (v is not None and v > 0) else None
 
 
 def forward_pe(raw):
@@ -508,7 +538,13 @@ def build_records(asof):
             # figure is not NTM, and its currency and share basis are unvalidated
             # against the price (pence-vs-pounds alone is a 100x trap). A blank
             # here means "not known", which is a true statement.
-            "Fwd P/E": forward_pe(d.get("forwardPE")),
+            "Fwd P/E (NTM)": forward_pe(d.get("forwardPE")),
+            "% of 52W High": pct_of_high(px, num(d.get("fiftyTwoWeekHigh"))),
+            # Non-positive blanked for the same reason as Fwd P/E: a negative
+            # EV/EBITDA is a loss-making denominator showing through, not a cheap
+            # company, and it sorts to the top of any "cheapest" ranking.
+            "EV/Sales (TTM)": positive_multiple(d.get("enterpriseToRevenue")),
+            "EV/EBITDA (TTM)": positive_multiple(d.get("enterpriseToEbitda")),
         }
         rec.update({c: None for c in RETURN_COLS})
         rec.update(returns.get(t, {}))
@@ -675,7 +711,9 @@ def write_summary(wb, allr, mt, hs, asof, src):
         "Prices are in local trading currency; market cap is USD at spot FX on the build date. The LSE names quote in pence (GBp).",
         "FOOTNOTE ON THE RETURN COLUMNS (2019-2025, YTD): these are TOTAL returns on split- and dividend-adjusted prices, and they are NOT as of the build date above - they come from the Coverage Manager weekly performance snapshot named in the caption. YTD in particular is as of that snapshot, while Price and Mkt Cap are same-day. A blank is a company that did not trade that year, never a zero.",
         "Size: LC at or above USD 25,000M market cap, SMID below. That threshold is a policy choice, not a measurement - the reference sheet only pins it between USD 22.7bn (SMID) and USD 34.2bn (LC). Names near the line move with price and FX.",
-        "Fwd P/E is Yahoo's forwardPE (next twelve months) and is blank where Yahoo has none. It is deliberately never backfilled from a trailing P/E or from an annual FY1 estimate - both would be a different measure under the same heading.",
+        "EVERY VALUATION COLUMN STATES ITS BASIS IN THE HEADING. Fwd P/E (NTM) is Yahoo's forwardPE, next twelve months. EV/Sales (TTM) and EV/EBITDA (TTM) are trailing twelve months, from yfinance enterpriseToRevenue / enterpriseToEbitda, or FMP evToSalesTTM / enterpriseValueMultipleTTM where Yahoo had no answer - both trailing, verified 2026-08-26.",
+        "Fwd P/E is never backfilled from a trailing P/E or an annual FY1 estimate; either would be a different measure under the same heading, which is the mistake Coverage Manager's own Fwd P/E column made. All three multiples are blank where non-positive: a negative EV/EBITDA is a loss-making denominator showing through, not a cheap company, and it sorts to the top of any cheapest-first ranking.",
+        "% of 52W High is the current price over the 52-week high, so 100% means the name is at its high. It is NOT colour-scaled - the return columns centre on zero and these do not, so one scale cannot serve both.",
         "Rating is joined from Companies_Stocks_Sectors_Ratings/Ratings_CoreCoverage.xlsx (Core=Y names only), which this build never writes. It is omitted from the published CSV and the Google Sheet.",
         "Some rows are priced under a different symbol than the Ticker column shows - Coverage Manager keys them by its own convention and Yahoo needs another string. MED and MOVE are the ones that matter: their bare symbols collide with live US listings.",
     ]:
@@ -902,8 +940,9 @@ def main():
         "date. %d names: Sector (JP) in (Healthcare Services, MedTech). "
         "Price/market cap from Yahoo Finance that morning, FMP per row where Yahoo "
         "had no answer; market cap USD at spot FX, price in local currency. %s. "
-        "Size: LC at or above USD 25,000M, else SMID. Fwd P/E is Yahoo's next-twelve-"
-        "month figure, blank where absent or non-positive. Rating is joined by ticker "
+        "Size: LC at or above USD 25,000M, else SMID. Valuation columns state their "
+        "basis in the heading: Fwd P/E (NTM) forward, EV/Sales and EV/EBITDA trailing "
+        "twelve months. Rating is joined by ticker "
         "from Ratings_CoreCoverage.xlsx and is yours to edit - this build never "
         "writes it."
         % (asof, datetime.datetime.now().strftime("%H:%M"), len(recs), ret_note))
