@@ -861,6 +861,9 @@ def main():
             if feed.aliased:
                 print(f"  symbol alias(es) applied: {', '.join(feed.aliased)} (see board #345)")
 
+            if plan.withheld_reason:
+                print(f"  !! {plan.withheld_reason}")
+
             if plan.is_blocked:
                 return 2
             if args.dry_run:
@@ -872,7 +875,12 @@ def main():
             print(f"  wrote {positions.POSITIONS_PATH}")
             # A held ticker the universe does not know is NOT fatal, but it must not
             # exit 0 either -- a silent 0 is how it would go unread for months.
-            return 2 if plan.not_in_universe else 0
+            # Withheld work exits 2 for the same reason an unknown ticker does: the
+            # run did something CORRECT but incomplete, and a silent 0 is how that
+            # goes unread for months. A withheld demotion is a sale this run
+            # deliberately declined to record.
+            return 2 if (plan.not_in_universe or plan.withheld_demotions
+                         or plan.withheld_refreshes) else 0
 
         if args.pos_command == "add":
             try:

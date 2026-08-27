@@ -421,13 +421,19 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
                                             for k, s in m.items()}
                    for c, m in (top_vendors or {}).items() if isinstance(m, dict)}
         for canonical, mapping in derived.items():
-            if canonical not in present:
+            # An empty `mapping` means the entry declares NO vendor routes, which is
+            # legal -- and `published_payload` omits such an entry from the top-level
+            # map BY DESIGN. Requiring its presence anyway made the two sides
+            # contradict each other, so the first legal no-vendor entry would turn
+            # every weekly acceptance run permanently red. The feature's FOURTH
+            # normal-week-blocking guard; found by Fable.
+            if mapping and canonical not in present:
                 problems.append(
                     f"ticker_aliases.json: entry {canonical} declares vendor symbols "
                     f"({', '.join(sorted(mapping))}) but the top-level vendor_symbols "
                     f"map has no entry for it - consumers read that map, so they would "
                     f"send {canonical} to every vendor")
-            elif present[canonical] != mapping:
+            elif canonical in present and present[canonical] != mapping:
                 # BOTH directions, and "bidirectional" was a claim before it was
                 # true: v1 compared only keys MISSING from the top-level map, so an
                 # EXTRA route there passed clean — and the per-vendor loop below

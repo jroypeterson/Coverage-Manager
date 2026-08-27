@@ -566,11 +566,41 @@ Two rules worth carrying:
 rule, one implementation shared with `merge_hazards`, applied to the exact map
 `load_feed` used, standing alone so nothing can erase its result.
 
-🔻 **The share-count match is a HEURISTIC and its false-block half is open** — board row
-**#348**. The evasion direction is closed (subset match, capped at 3 names / 12
-candidates); a coincidence can still block a real sale, and the fix is a decision, not a
-patch. ⛑ **Do not "fix" it by widening the tolerance** — that moves the false-block rate
-and the miss rate in opposite directions and settles neither.
+### The share-count heuristic is GONE — a Fable review disproved its premise (2026-08-27)
+
+A sixth round (Codex hit a quota lockout; Fable 5 reviewed the FINAL STATE instead of a
+diff) killed the guard three rounds had been refining. Its premise was *"one position seen
+twice carries the same share count"*. The counter is one sentence and it is decisive:
+**a symbol change and a share-count change CO-OCCUR at a corporate action** — which is
+exactly the moment no alias entry exists yet. Reproduced: a **3-share DRIP** (100 → 103)
+made the numbers unequal, the match missed, and `Held=N` / Shares cleared / `Held Until`
+stamped was written for a real position. Splits, conversions and an added buy all do it.
+**A guard whose premise fails precisely when it is needed is not a guard**, and my board
+row claiming "the evasion direction is closed" was wrong — that was true only of the
+split-across-two-symbols evasion.
+
+**What replaced it asserts nothing about identity.** A demotion is the only destructive
+operation here, so it is the only one withheld:
+
+| While… | …then |
+|---|---|
+| a feed holding did not join the universe, **or** a promotion carries a demotion's share count | demotions are **WITHHELD**, not applied — and a refresh that would LOSE shares keeps its prior figures |
+| neither is true | everything applies immediately, as before |
+
+It cannot fabricate a sale at all, and it does not block the run — so an uncovered holding
+never stops an ordinary rebalance, which is what the round-3 version did. The cost is a
+`Held` that stays stale for a run, named in the summary and exiting 2 every time. That is
+this module's own stated trade: never read absence as sold.
+
+⛑ **A withheld row is left UNTOUCHED, not "refreshed with nothing".** The first attempt set
+`row = None`, which dropped the entry into the not-in-feed branch and **cleared Shares** —
+destroying the exact figures the withhold exists to protect. Ninety seconds between the fix
+and its own defect.
+
+🔻 Board row **#349** now carries the residual: the identity join. The brokers already know
+each holding's ISIN/CUSIP, so publishing an anchor in `held.json` and joining on THAT would
+remove the alias store from the ownership path entirely — the fix that retires the class
+rather than guarding it.
 
 ⛑ **The candidate cap is not tidiness.** Capping only the subset SIZE at 3 is still
 O(n³) in the number of unjoined holdings and took this repo's suite from 30 seconds to

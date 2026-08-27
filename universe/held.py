@@ -305,6 +305,13 @@ class SyncPlan:
     demotions: list[str] = field(default_factory=list)      # held -> not held
     refreshed: list[str] = field(default_factory=list)      # still held, figures updated
     not_in_universe: list[str] = field(default_factory=list)
+    #: Demotions held back because the join could not be trusted this run. They are
+    #: NOT applied and NOT a block -- see the withhold rule in `plan_sync`.
+    withheld_demotions: list[str] = field(default_factory=list)
+    #: Rows whose figures were NOT refreshed because they would have lost shares to
+    #: a holding that did not join. The row keeps its prior, trusted figures.
+    withheld_refreshes: list[str] = field(default_factory=list)
+    withheld_reason: str = ""
     migrated_legacy: list[str] = field(default_factory=list)
     already_sold: list[str] = field(default_factory=list)
     feed_as_of: str = ""
@@ -325,6 +332,14 @@ class SyncPlan:
             + (f"  {', '.join(self.demotions)}" if self.demotions else ""),
             f"refreshed       : {len(self.refreshed)}",
         ]
+        if self.withheld_demotions or self.withheld_refreshes:
+            out.append(
+                f"WITHHELD         : {len(self.withheld_demotions)} demotion(s)"
+                + (f" ({', '.join(self.withheld_demotions)})" if self.withheld_demotions else "")
+                + f", {len(self.withheld_refreshes)} figure update(s)"
+                + (f" ({', '.join(self.withheld_refreshes)})" if self.withheld_refreshes else "")
+                + " - the join could not be trusted this run"
+            )
         if self.migrated_legacy:
             out.append(
                 f"one-time migration of the retired 'Portfolio' Position value: "
@@ -604,7 +619,6 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     #    with the other's (Codex round 4). Same defect, two thirds of the way
     #    along. Generalising to "recorded minus new" covers both, and a demotion
     #    falls out as new == 0.
-    suspects = []
     # ⛑ RUN THE ALIAS STORE'S OWN VALIDATOR, DO NOT RE-IMPLEMENT ONE OF ITS RULES.
     #
     # Four adversarial rounds over this feature found three separate roads to a
@@ -661,37 +675,87 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
             )
             return plan
 
-    if plan.not_in_universe:
-        # ⛑ SUBSETS, NOT JUST SINGLE ROWS. Matching each unjoined holding on its
-        # own was evadable by arithmetic: a 30-share position arriving as unjoined
-        # 10 + 20 matched neither, and the demotion went through as a sale. Any
-        # combination that sums to the shares lost is the same hazard.
-        feed_shares = {t: feed.rows[t].shares for t in plan.not_in_universe
-                       if t in feed.rows and _finite(feed.rows[t].shares)}
-        for ticker in plan.demotions + plan.refreshed:
+    # ⛑ A DEMOTION IS THE ONLY DESTRUCTIVE OPERATION HERE, SO IT IS THE ONLY ONE
+    #    WITHHELD WHEN THE JOIN CANNOT BE TRUSTED.
+    #
+    # This replaces a share-count heuristic that matched "shares lost == shares
+    # unjoined" and blocked the whole run on a hit. Fable disproved its premise:
+    # **a symbol change and a share-count change CO-OCCUR at a corporate action**,
+    # which is precisely the moment no alias entry exists yet. Reproduced against
+    # these files -- a 3-share DRIP (100 -> 103) made the numbers unequal, the
+    # match missed, and a fabricated sale of the real position was WRITTEN:
+    # Held=N, Shares cleared, Held Until stamped. Splits, conversions and an added
+    # buy all do the same. A guard whose premise fails exactly when it is needed
+    # is not a guard.
+    #
+    # The replacement asserts nothing about identity. It says only: while some
+    # feed holding did not join, or while a promotion looks like the other half of
+    # a demotion, WE CANNOT TELL a sale from a re-spelling -- so promotions and
+    # refreshes still apply and the demotions are held back and named. That is
+    # strictly safer than the heuristic (it cannot fabricate a sale at all) and
+    # strictly cheaper than the round-3 version (it does not block the run, so an
+    # uncovered holding never stops an ordinary rebalance). The cost is a `Held`
+    # that stays stale for a run, reported every time and exiting non-zero -- the
+    # trade this module's own docstring already makes: never read absence as sold.
+    withhold_reasons = []
+    if plan.demotions and plan.not_in_universe:
+        withhold_reasons.append(
+            f"{len(plan.not_in_universe)} feed holding(s) did not join the universe "
+            f"({', '.join(plan.not_in_universe[:5])})")
+
+    # The same doubt without any unjoined row: a promotion carrying a demotion's
+    # share count is the shape of ONE position moving between two covered rows --
+    # the case where the universe holds two rows for one issuer and no alias links
+    # them. Zero unjoined holdings, so the check above cannot see it.
+    if plan.demotions and plan.promotions:
+        promoted = {t: feed.rows[t].shares for t in plan.promotions
+                    if t in feed.rows and _finite(feed.rows[t].shares)}
+        for ticker in plan.demotions:
             recorded = _shares_of(by_ticker.get(ticker, {}))
             if recorded is None:
                 continue
-            now = feed.rows[ticker].shares if ticker in feed.rows else 0.0
-            lost = recorded - now
-            if lost <= SHARE_MATCH_TOLERANCE:
-                continue          # nothing left, or the position grew
-            match = _subset_summing_to(feed_shares, lost)
-            if match:
-                suspects.append((ticker, "+".join(match), lost, now))
+            twin = [p for p, s in promoted.items()
+                    if abs(s - recorded) <= SHARE_MATCH_TOLERANCE]
+            if twin:
+                withhold_reasons.append(
+                    f"{ticker} would leave Held while {twin[0]} joins it carrying the "
+                    f"same {recorded:g} shares")
 
-    if suspects:
-        detail = "; ".join(
-            f"{a} loses {lost:g} share(s) (to {now:g}) while unjoined {b} carries {lost:g}"
-            for a, b, lost, now in suspects)
-        plan.blocked_reason = (
-            f"{len(suspects)} position(s) would lose exactly the share count of a feed "
-            f"holding that failed to join the universe: {detail}. That is one position "
-            f"under two symbols — the shape of a fabricated sale, not a sale. Add the "
-            f"name to the universe, or record the pair in data/ticker_aliases.json, "
-            f"then re-run."
+    # A REFRESH CAN LOSE SHARES TO AN UNJOINED SYMBOL TOO, and that is corruption
+    # rather than a fabricated sale: the position survives with the WRONG count.
+    # 30 shares held across two brokers under two spellings arrive as FI:10 plus an
+    # unjoined FISV:20, and writing 10 silently discards two thirds of the holding
+    # and one broker's cost basis. Same doubt, same answer -- hold the figures back
+    # rather than write a number we cannot trust.
+    if plan.not_in_universe:
+        for ticker in list(plan.refreshed):
+            recorded = _shares_of(by_ticker.get(ticker, {}))
+            now = feed.rows[ticker].shares if ticker in feed.rows else None
+            if recorded is None or now is None or not _finite(now):
+                continue
+            if recorded - now > SHARE_MATCH_TOLERANCE:
+                plan.refreshed.remove(ticker)
+                plan.withheld_refreshes.append(ticker)
+                withhold_reasons.append(
+                    f"{ticker} would drop {recorded - now:g} share(s) while "
+                    f"{len(plan.not_in_universe)} holding(s) did not join")
+
+    if withhold_reasons:
+        plan.withheld_demotions = list(plan.demotions)
+        plan.demotions = []
+        plan.withheld_reason = (
+            f"{len(plan.withheld_demotions)} demotion(s) and "
+            f"{len(plan.withheld_refreshes)} figure update(s) WITHHELD "
+            f"({', '.join(plan.withheld_demotions)}) because the join cannot be "
+            f"trusted this run: " + "; ".join(withhold_reasons)
+            + ". Everything else was applied. Nothing was marked sold and no figure was "
+            "overwritten with a number that could not be trusted -- "
+            "a sale that is real will apply on the next run once the holding is "
+            "covered or its symbols are recorded in data/ticker_aliases.json."
         )
-    elif len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
+        logger.warning("%s", plan.withheld_reason)
+
+    if len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
         plan.blocked_reason = (
             f"{len(plan.demotions)} names would leave Held in one run "
             f"(limit {MAX_DEMOTIONS_PER_RUN}): {', '.join(plan.demotions)}. "
@@ -713,6 +777,14 @@ def apply_plan(entries, feed: HeldFeed, plan: SyncPlan, today=None):
     for e in entries:
         e = dict(e)
         ticker = e["Ticker"].strip().upper()
+        if ticker in plan.withheld_refreshes:
+            # UNTOUCHED, not "refreshed with nothing". Setting `row = None` here
+            # dropped the entry into the not-in-feed branch below, which CLEARS
+            # Shares -- destroying the exact figures the withhold exists to
+            # protect. Caught by running it; the fix and its own defect were
+            # ninety seconds apart.
+            out.append(e)
+            continue
         row = feed.rows.get(ticker)
         if row is not None:
             e["Held"] = "Y"

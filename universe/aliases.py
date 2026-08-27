@@ -146,7 +146,11 @@ def load_aliases(path=None) -> dict:
 
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    # ValueError, not JSONDecodeError: invalid UTF-8 raises UnicodeDecodeError, which IS a
+    # ValueError but is NOT a JSONDecodeError, so it escaped this handler entirely -- turning a
+    # designed clean abort into a raw traceback, and the warn-only weekly validator into a hard
+    # validation_passed=False plus a heartbeat error. Found by Fable 2026-08-27.
+    except (OSError, ValueError) as exc:
         raise AliasError(f"{p.name}: unreadable ({exc})") from exc
 
     if not isinstance(raw, dict):

@@ -385,7 +385,7 @@ def test_the_landing_state_is_one_of_the_real_states():
     assert held_mod.DEMOTION_POSITION in pos.STATE_FLAGS
 
 
-def test_an_unjoined_feed_holding_alongside_a_demotion_BLOCKS(tmp_path):
+def test_an_unjoined_feed_holding_WITHHOLDS_the_demotion(tmp_path):
     """Codex round 2, Critical: the alias-store guards could not cover this.
 
     `_load_symbol_aliases` raises on an UNREADABLE store, but a MISSING one
@@ -404,10 +404,16 @@ def test_an_unjoined_feed_holding_alongside_a_demotion_BLOCKS(tmp_path):
         # that equality is the discriminator, not mere co-occurrence.
         entries[0]["Shares"] = "10.5"
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
-        assert plan.demotions == ["FI"]
-        assert plan.blocked_reason and "fabricated sale" in plan.blocked_reason
-        with pytest.raises(Exception):
-            held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        # WITHHELD, not blocked. Fable disproved the blocking version's premise:
+        # a symbol change and a share-count change CO-OCCUR at a corporate action,
+        # so "shares lost == shares unjoined" misses exactly when it is needed --
+        # a 3-share DRIP was enough to write a fabricated sale.
+        assert plan.demotions == []
+        assert plan.withheld_demotions == ["FI"]
+        assert plan.blocked_reason is None, "withholding must not block the run"
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        row = next(e for e in out if e["Ticker"] == "FI")
+        assert row["Held"] == "Y", "the position must survive untouched"
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -437,7 +443,7 @@ def test_the_guard_is_inert_without_a_universe_to_check_against(tmp_path):
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
 
 
-def test_an_ORDINARY_REBALANCE_is_not_blocked_by_the_false_sale_guard(tmp_path):
+def test_an_ORDINARY_REBALANCE_still_runs_though_its_demotion_waits(tmp_path):
     """Codex round 3: v1 of that guard blocked on mere CO-OCCURRENCE.
 
     Sell a covered name and buy an uncovered one in the same week -- an ordinary
@@ -454,9 +460,12 @@ def test_an_ORDINARY_REBALANCE_is_not_blocked_by_the_false_sale_guard(tmp_path):
         entries = _entries({"AAPL": ("Portfolio", "Y")})
         entries[0]["Shares"] = "4"          # nothing like the feed's 10.5
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL"])
-        assert plan.demotions == ["AAPL"]
         assert plan.not_in_universe == ["TSLA"]
+        # The run is NOT blocked -- that was the round-3 over-guard. The sale is
+        # merely deferred one run, and named, because an uncovered holding means
+        # we cannot tell a sale from a re-spelling.
         assert plan.blocked_reason is None
+        assert plan.withheld_demotions == ["AAPL"]
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -523,7 +532,7 @@ def test_one_blank_row_among_good_ones_is_also_refused(tmp_path):
         held_mod.load_feed(_write_feed(tmp_path, payload))
 
 
-def test_a_PARTIAL_alias_failure_blocks_even_with_no_demotion(tmp_path):
+def test_a_PARTIAL_alias_failure_WITHHOLDS_THE_FIGURES(tmp_path):
     """The guard's rule is "shares lost == shares unjoined"; a demotion is only
     its extreme case.
 
@@ -544,8 +553,16 @@ def test_a_PARTIAL_alias_failure_blocks_even_with_no_demotion(tmp_path):
         entries = _entries({"FI": ("Portfolio", "Y")})
         entries[0]["Shares"] = "30"
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
-        assert plan.demotions == [] and plan.refreshed == ["FI"]
-        assert plan.blocked_reason and "loses 20 share(s)" in plan.blocked_reason
+        assert plan.demotions == [] and plan.refreshed == []
+        assert plan.withheld_refreshes == ["FI"]
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        row = next(e for e in out if e["Ticker"] == "FI")
+        # Not a fabricated sale -- corruption: the position survives with the WRONG
+        # count. Writing 10 would discard two thirds of the holding and one
+        # broker's cost basis.
+        # The fixture sets no Average Cost, so the assertion is on what it DOES set:
+        # the share count survives untouched rather than being overwritten with 10.
+        assert row["Shares"] == "30"
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -651,6 +668,8 @@ def test_a_non_finite_feed_age_is_REFUSED(tmp_path):
 
 
 def test_a_split_across_TWO_unjoined_symbols_is_still_caught(tmp_path):
+    """Now covered by the withhold rule rather than by subset arithmetic -- which
+    is the point: the rule no longer depends on the share counts lining up."""
     """Single-row matching was evadable by arithmetic: a 30-share position
     arriving as unjoined 10 + 20 matched neither and went through as a sale."""
     monkeypatched = dict(held_mod.SYMBOL_ALIASES)
@@ -665,8 +684,8 @@ def test_a_split_across_TWO_unjoined_symbols_is_still_caught(tmp_path):
         entries = _entries({"FI": ("Portfolio", "Y")})
         entries[0]["Shares"] = "30"
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
-        assert plan.demotions == ["FI"]
-        assert plan.blocked_reason and "FISV+FISVA" in plan.blocked_reason
+        assert plan.demotions == []
+        assert plan.withheld_demotions == ["FI"]
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -685,3 +704,69 @@ def test_the_subset_search_is_capped_and_SAYS_SO(caplog):
     assert any("exceeds the" in r.message for r in caplog.records)
     # ...and a single-symbol match above the cap still works
     assert held_mod._subset_summing_to(many, 3.0) == ["T2"]
+
+
+# ── Fable review (2026-08-27) ────────────────────────────────────────────────
+
+def test_a_DRIP_sized_share_drift_no_longer_fabricates_a_sale(tmp_path):
+    """The finding that retired the share-count heuristic.
+
+    Its premise was "one position seen twice carries the SAME count". Fable's
+    counter: a symbol change and a share-count change CO-OCCUR at a corporate
+    action -- which is exactly when no alias entry exists yet. A 3-share DRIP made
+    the numbers unequal, the match missed, and Held=N / Shares cleared / Held Until
+    stamped was WRITTEN for a real position.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [{"ticker": "FISV", "shares": 103.0, "avg_cost": 50.0,
+                            "brokers": ["IBKR"]}]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "100"          # 100 -> 103: a dividend reinvestment
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
+        assert plan.withheld_demotions == ["FI"]
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        row = next(e for e in out if e["Ticker"] == "FI")
+        assert row["Held"] == "Y" and not row["Held Until"]
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_a_promotion_carrying_a_demotions_shares_withholds_it(tmp_path):
+    """Fable: the universe can hold TWO rows for one issuer with no alias linking
+    them (discovery auto-adds `FISV` while `FI` is covered).
+
+    Then the feed's FISV joins a real row, so there are ZERO unjoined holdings --
+    the other rule cannot see it -- and FI is demoted, promoting FISV. Exit 0, no
+    warning, a real position marked sold.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [{"ticker": "FISV", "shares": 100.0, "avg_cost": 50.0,
+                            "brokers": ["IBKR"]}]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"FI": ("Portfolio", "Y"), "FISV": ("Researching", "")})
+        entries[0]["Shares"] = "100"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI", "FISV"])
+        assert plan.not_in_universe == [], "the other rule is blind here by construction"
+        assert plan.promotions == ["FISV"]
+        assert plan.withheld_demotions == ["FI"]
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_an_ordinary_week_is_never_withheld(tmp_path):
+    """The fourth over-guard check: nothing unjoined, no twin promotion, so a real
+    sale applies immediately."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "MRNA": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers=["AAPL", "MRNA"])
+    assert plan.demotions == ["MRNA"]
+    assert plan.withheld_demotions == [] and plan.withheld_refreshes == []

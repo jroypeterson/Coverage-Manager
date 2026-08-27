@@ -727,3 +727,29 @@ def test_merge_hazards_is_silent_on_a_clean_universe(tmp_path):
     clean = universe_df([{"Ticker": "FI", "Company Name": "Fiserv Inc.", "CIK": "798354",
                           "ISIN": "US3377381088", "Composite FIGI": "BBG000BJKPG0"}])
     assert merge_hazards(clean, idx) == []
+
+
+def test_invalid_utf8_in_the_store_is_an_AliasError_not_a_traceback(tmp_path):
+    """Fable: UnicodeDecodeError IS a ValueError but is NOT a JSONDecodeError, so
+    it escaped the handler -- turning a designed clean abort into a raw traceback,
+    and the warn-only weekly validator into a hard validation_passed=False."""
+    bad = tmp_path / "ticker_aliases.json"
+    bad.write_bytes(b'{"schema_version": 1, "entries": [], "x": "\xff\xfe"}')
+    with pytest.raises(AliasError, match="unreadable"):
+        load_aliases(bad)
+
+
+def test_a_legal_entry_with_NO_vendor_routes_passes_acceptance(tmp_path):
+    """Fable, over-guard: `published_payload` omits an entry with empty
+    vendor_symbols from the top-level map BY DESIGN, while acceptance required its
+    presence -- so the first legal no-vendor entry would turn every weekly run
+    permanently red. The feature's FOURTH normal-week-blocking guard."""
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"BBB": "AAA"},
+        "vendor_symbols": {},
+        "entries": [{"canonical": "AAA", "aliases": ["BBB"], "vendor_symbols": {}}],
+    }), encoding="utf-8")
+    assert _check_ticker_aliases(tmp_path) == []
