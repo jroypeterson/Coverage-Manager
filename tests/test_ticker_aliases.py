@@ -411,3 +411,131 @@ def test_acceptance_does_not_raise_on_a_malformed_alias_export(tmp_path):
     (tmp_path / "ticker_aliases.json").write_text("[1, 2, 3]", encoding="utf-8")
     problems = check_exports(Path(tmp_path), strict=False)
     assert any("ticker_aliases.json" in p for p in problems)
+
+
+# --------------------------------------------------------------------------
+# Codex round 1 (2026-08-27) — three defects in the publish path
+# --------------------------------------------------------------------------
+#
+# All three share a shape: `check_universe` and the per-entry validator both
+# reported correctly, and the PUBLISH step ignored them. A validator whose finding
+# does not reach the artifact is a comment.
+
+def test_a_universe_contradicting_entry_is_EXCLUDED_from_the_export(tmp_path):
+    """Warning and publishing anyway is worse than not having the store.
+
+    Rename the canonical row and the published map sends a ticker that IS in the
+    universe to one that is not -- a working join broken by the thing meant to fix
+    joins. Excluding it degrades that name to passthrough, which is safe.
+    """
+    idx = load_aliases(write(tmp_path, [entry()]))
+    df = universe_df([{"Ticker": "FISV", "Company Name": "Fiserv Inc.", "CIK": "798354",
+                       "ISIN": "US3377381088", "Composite FIGI": "BBG000BJKPG0"}])
+    payload = published_payload(idx, df=df)
+    assert payload["alias_to_canonical"] == {}
+    assert payload["entries"] == []
+
+
+def test_a_clean_entry_still_publishes_when_the_universe_is_passed(tmp_path):
+    """The exclusion must not be a blanket silence."""
+    idx = load_aliases(write(tmp_path, [entry()]))
+    df = universe_df([{"Ticker": "FI", "Company Name": "Fiserv Inc.", "CIK": "798354",
+                       "ISIN": "US3377381088", "Composite FIGI": "BBG000BJKPG0"}])
+    assert published_payload(idx, df=df)["alias_to_canonical"] == {"FISV": "FI"}
+
+
+def test_the_export_step_refuses_to_publish_an_empty_map_over_a_full_one(monkeypatch, tmp_path):
+    """load-with-fallback + save-everything = data loss, on a Dropbox-synced source.
+
+    A MISSING `data/ticker_aliases.json` is a legitimate empty store, so the loader
+    is right to allow it -- but republishing `{}` over a working contract would
+    silently un-join every consumer with a green run to show for it.
+    """
+    import weekly_universe
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    (exports / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1, "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {}, "entries": []}), encoding="utf-8")
+
+    csv_path = tmp_path / "universe.csv"
+    csv_path.write_text("Ticker,Company Name,Sector (JP),Subsector (JP),Sub-subsector (JP),Core\n"
+                        "FI,Fiserv Inc.,Financials,,,\n", encoding="utf-8")
+
+    import universe.aliases as aliases_mod
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", tmp_path / "does_not_exist.json")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", csv_path)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports)
+
+    with pytest.raises(RuntimeError, match="refusing to publish an EMPTY"):
+        weekly_universe._step_export_artifacts(
+            {"rows": 1, "errors": [], "warnings": [], "passed": True})
+    # and the good file is untouched
+    kept = json.loads((exports / "ticker_aliases.json").read_text(encoding="utf-8"))
+    assert kept["alias_to_canonical"] == {"FISV": "FI"}
+
+
+def test_an_empty_map_over_an_already_empty_one_is_fine(monkeypatch, tmp_path):
+    """The guard must not block the legitimate no-splits state."""
+    import weekly_universe
+
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    (exports / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1, "alias_to_canonical": {}, "vendor_symbols": {},
+        "entries": []}), encoding="utf-8")
+    csv_path = tmp_path / "universe.csv"
+    csv_path.write_text("Ticker,Company Name,Sector (JP),Subsector (JP),Sub-subsector (JP),Core\n"
+                        "FI,Fiserv Inc.,Financials,,,\n", encoding="utf-8")
+
+    import universe.aliases as aliases_mod
+    monkeypatch.setattr(aliases_mod, "ALIASES_PATH", tmp_path / "does_not_exist.json")
+    monkeypatch.setattr(weekly_universe, "CSV_PATH", csv_path)
+    monkeypatch.setattr(weekly_universe, "EXPORTS_DIR", exports)
+
+    weekly_universe._step_export_artifacts(
+        {"rows": 1, "errors": [], "warnings": [], "passed": True})
+    assert json.loads((exports / "ticker_aliases.json").read_text(encoding="utf-8"))[
+        "alias_to_canonical"] == {}
+
+
+def test_acceptance_flags_a_top_level_vendor_map_that_contradicts_its_entry(tmp_path):
+    """The top-level map is what consumers READ; the per-entry check never saw it."""
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"FI": {"yfinance": "FI"}},          # <- entry says FISV
+        "entries": [{"canonical": "FI", "aliases": ["FISV"],
+                     "vendor_symbols": {"yfinance": "FISV"}}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("the routing map and its own evidence disagree" in p for p in problems)
+
+
+def test_acceptance_flags_a_top_level_vendor_symbol_nothing_declares(tmp_path):
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"FI": {"yfinance": "FSRV"}},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"]}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("neither FI nor a declared alias" in p for p in problems)
+
+
+def test_acceptance_flags_a_top_level_vendor_map_for_an_unknown_canonical(tmp_path):
+    from universe.export_acceptance import _check_ticker_aliases
+
+    (tmp_path / "ticker_aliases.json").write_text(json.dumps({
+        "schema_version": 1,
+        "alias_to_canonical": {"FISV": "FI"},
+        "vendor_symbols": {"ZZZ": {"yfinance": "ZZZ"}},
+        "entries": [{"canonical": "FI", "aliases": ["FISV"]}],
+    }), encoding="utf-8")
+    problems = _check_ticker_aliases(tmp_path)
+    assert any("not a canonical symbol in entries" in p for p in problems)

@@ -349,14 +349,40 @@ def check_universe(df, index=None) -> list[str]:
     return problems
 
 
-def published_payload(index=None) -> dict:
+def published_payload(index=None, df=None) -> dict:
     """The `exports/ticker_aliases.json` body.
 
     Consumers get resolution maps they can use without reimplementing the walk:
     `alias_to_canonical` for the inbound join, `vendor_symbols` for the outbound
     call. `entries` carries the evidence so a consumer can show its work.
+
+    ⛑ **Pass `df` (the universe) and a contradicted entry is EXCLUDED, loudly.**
+    Without it, `check_universe` only ever warned while this function published the
+    entry anyway — and the dangerous case is not a cosmetic disagreement. Rename the
+    canonical row `FI` to `FISV` without updating the store and the published map
+    says `FISV -> FI`, so every consumer takes a ticker that IS in the universe and
+    resolves it to one that is not: a working join turned into a broken one by the
+    thing meant to fix joins. Excluding it degrades that name to passthrough, which
+    is the pre-store behaviour and safe. `df=None` skips the check and is for
+    callers that genuinely have no universe to check against (tests).
     """
     idx = index if index is not None else load_aliases()
+    if df is not None:
+        problems = check_universe(df, idx)
+        if problems:
+            bad = {p.split(":", 1)[0].replace("alias entry ", "").strip()
+                   for p in problems if p.startswith("alias entry ")}
+            kept = [e for e in idx["entries"] if e["canonical"] not in bad]
+            logger.warning(
+                "ticker aliases: EXCLUDING %d entry(ies) that contradict the universe "
+                "from the published export (%s) - they would resolve a live universe "
+                "ticker onto one that is not there. Fix data/ticker_aliases.json; "
+                "problems: %s", len(idx["entries"]) - len(kept), ", ".join(sorted(bad)),
+                "; ".join(problems[:4]))
+            idx = {"schema_version": idx["schema_version"],
+                   "entries": kept,
+                   "by_canonical": {e["canonical"]: e for e in kept},
+                   "by_alias": {a: e for e in kept for a in e["aliases"]}}
     return {
         "schema_version": idx["schema_version"],
         "description": (

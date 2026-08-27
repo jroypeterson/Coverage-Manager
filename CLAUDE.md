@@ -466,6 +466,40 @@ so a typo'd vendor key cannot silently fall back to the canonical and reintroduc
 the universe — the fatal drift being an alias that becomes a covered row in its own
 right, which would merge two companies.
 
+### Codex round 1 (2026-08-27) — five defects, and four of them were in the PUBLISH path
+
+The store and its validators were fine. What shipped broken was everything downstream of
+them, which is the shape worth remembering: **a validator whose finding does not reach the
+artifact is a comment.**
+
+1. ⛑ **An unreadable store used to fabricate a SALE.** `held.py:_load_symbol_aliases`
+   degraded to `{}` on the strength of a comment claiming `MAX_DEMOTIONS_PER_RUN` would
+   abort the run. It does not — that guard fires above **five** demotions and a single
+   unjoined holding is **one**. Reproduced: with the store corrupted, the feed's `FISV`
+   fails to join `FI`, `plan_sync` returns `demotions=['FI']` with `blocked_reason=None`,
+   and `apply_plan` writes `Held=N`, clears Shares and Average Cost and stamps `Held Until`
+   — the exact error this module exists to prevent, introduced by the fix for a different
+   one. It now **raises `AliasStoreUnavailable`**. A *missing* file still yields an empty
+   map: that is a different and legitimate fact.
+2. **Two feed rows normalizing onto one ticker were CLOBBERED, not merged.** A name held at
+   two brokers under two spellings kept whichever row came last, silently dropping the
+   other broker's shares and cost basis. Now shares add, brokers union, and the cost basis
+   is **share-weighted** — with one side unknown the blend is `None`, never half-invented.
+3. **A universe-contradicting entry was warned about and published anyway.** Rename the
+   canonical row and the map sends a ticker that *is* in the universe to one that is not.
+   `published_payload(df=…)` now **excludes** such an entry, loudly.
+4. **An empty store would overwrite a working published map.** Load-with-fallback feeding
+   write-everything, on a Dropbox-synced source — the fleet's own data-loss shape. The
+   export step now refuses to publish `{}` over a non-empty `exports/ticker_aliases.json`.
+5. **Acceptance never read the top-level `vendor_symbols`** — the map consumers actually
+   use — so it could disagree with the per-entry evidence beside it and pass clean.
+
+All five are pinned by tests that fail when reverted (mutation-checked), and the two
+consumer readers had a sixth: a well-formed JSON document with `alias_to_canonical` as a
+*list* passed the schema check and then raised `AttributeError` on `.items()` inside a
+module whose whole contract is to fail open — a crash in a scheduled build. Fixed in both
+readers, not just the one Codex was looking at.
+
 ⛑ **`ticker_change_check` now sorts a covered mismatch into `settled`, not `changes`.**
 That module's guidance used to name `FISV`-vs-`FI` as its worked example of "leave
 as-is", so the pair was re-reported as a review item **every week for months** while

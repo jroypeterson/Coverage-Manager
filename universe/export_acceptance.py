@@ -347,6 +347,8 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
 
     from_entries: dict[str, str] = {}
     canonicals: set[str] = set()
+    entry_symbols: dict[str, set[str]] = {}
+    entry_vendors: dict[str, dict[str, str]] = {}
     for e in entries:
         if not isinstance(e, dict):
             problems.append("ticker_aliases.json: an entry is not an object")
@@ -364,8 +366,11 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
             alias = str(a).strip().upper()
             declared.add(alias)
             from_entries[alias] = canonical
+        entry_symbols[canonical] = declared
         vendors = e.get("vendor_symbols")
         if isinstance(vendors, dict):
+            entry_vendors[canonical] = {str(v): str(s).strip().upper()
+                                        for v, s in vendors.items()}
             for vendor, symbol in vendors.items():
                 if str(symbol).strip().upper() not in declared:
                     problems.append(
@@ -389,6 +394,43 @@ def _check_ticker_aliases(exports_dir: Path) -> list[str]:
         problems.append(
             f"ticker_aliases.json: {len(both)} symbol(s) are both a canonical and "
             f"an alias, so resolution is order-dependent: {both[:5]}")
+
+    # THE TOP-LEVEL `vendor_symbols` IS WHAT CONSUMERS ACTUALLY READ, and the
+    # per-entry check above never looked at it. Set `vendor_symbols.FI.yfinance`
+    # to "FI" while the entry says "FISV" and every check passed while consumers
+    # were routed to the symbol that 404s — a copy of the fast map disagreeing
+    # with the evidence it was derived from, which is the whole reason the two
+    # live in one file.
+    top_vendors = payload.get("vendor_symbols")
+    if top_vendors is not None and not isinstance(top_vendors, dict):
+        problems.append(
+            f"ticker_aliases.json: 'vendor_symbols' is {type(top_vendors).__name__}, "
+            f"expected an object - consumers cannot route a vendor call from this")
+    elif isinstance(top_vendors, dict):
+        for canonical, mapping in top_vendors.items():
+            c = str(canonical).strip().upper()
+            if c not in canonicals:
+                problems.append(
+                    f"ticker_aliases.json: vendor_symbols names {c}, which is not a "
+                    f"canonical symbol in entries")
+                continue
+            if not isinstance(mapping, dict):
+                problems.append(
+                    f"ticker_aliases.json: vendor_symbols[{c}] is "
+                    f"{type(mapping).__name__}, expected an object")
+                continue
+            declared = entry_vendors.get(c, {})
+            for vendor, symbol in mapping.items():
+                sym = str(symbol).strip().upper()
+                if sym not in entry_symbols.get(c, set()):
+                    problems.append(
+                        f"ticker_aliases.json: vendor_symbols[{c}][{vendor}] = {sym}, "
+                        f"which is neither {c} nor a declared alias of it")
+                elif declared.get(vendor, sym) != sym:
+                    problems.append(
+                        f"ticker_aliases.json: vendor_symbols[{c}][{vendor}] = {sym} but "
+                        f"the entry says {declared[vendor]} - the routing map and its "
+                        f"own evidence disagree, and consumers read the map")
 
     return problems
 

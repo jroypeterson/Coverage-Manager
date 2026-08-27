@@ -271,18 +271,78 @@ def test_the_alias_map_comes_from_the_published_store_not_a_hardcoded_dict():
     assert held_mod.SYMBOL_ALIASES.get("FISV") == "FI"
 
 
-def test_an_unreadable_alias_store_yields_an_empty_map_not_a_guess(tmp_path, monkeypatch):
-    """Degrading to "no aliases" is safe ONLY because the demotion guard aborts.
+def test_an_unreadable_alias_store_RAISES_rather_than_degrading(tmp_path, monkeypatch):
+    """This test asserted the OPPOSITE for a few hours, and the assertion was wrong.
 
-    An unjoined holding reads as a sale, and `MAX_DEMOTIONS_PER_RUN` refuses to
-    write one. Inventing an alias instead would merge two issuers with no trace.
+    It claimed degrading to an empty map was safe "because `MAX_DEMOTIONS_PER_RUN`
+    aborts". It does not: that guard fires above FIVE demotions and a single
+    unjoined holding is one. The next test reproduces what actually happened.
     """
     bad = tmp_path / "ticker_aliases.json"
     bad.write_text("{not json", encoding="utf-8")
     import universe.aliases as aliases_mod
 
     monkeypatch.setattr(aliases_mod, "ALIASES_PATH", bad)
-    assert held_mod._load_symbol_aliases() == {}
+    with pytest.raises(held_mod.AliasStoreUnavailable):
+        held_mod._load_symbol_aliases()
+
+
+def test_an_empty_alias_map_fabricates_a_SALE_of_a_real_position(tmp_path):
+    """The defect behind the fix above, pinned so the degrade-quietly option cannot
+    look attractive again.
+
+    With no alias joining the feed's `FISV` to the universe's `FI`, the row is
+    planned as a demotion, the guard does NOT block one demotion, and `apply_plan`
+    writes Held=N, clears Shares and Average Cost, and stamps a sale date.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        plan = held_mod.plan_sync(entries, feed)
+        assert plan.demotions == ["FI"]
+        assert plan.blocked_reason is None, (
+            "one demotion is well under MAX_DEMOTIONS_PER_RUN -- this is exactly why "
+            "an unreadable alias store must raise instead of degrading")
+        out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 8, 27))
+        row = next(e for e in out if e["Ticker"] == "FI")
+        assert row["Held"] == "N" and row["Held Until"] == "2026-08-27"
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_two_feed_rows_that_normalize_onto_one_ticker_are_MERGED(tmp_path):
+    """Assigning would have eaten one broker's shares entirely.
+
+    The same issuer held at two brokers under two spellings arrives as two rows;
+    `rows[t] = ...` kept whichever came last. Shares add, brokers union, and the
+    cost basis is share-weighted -- two lots at different prices have one blended
+    basis, and picking either lot's price misstates P&L on both.
+    """
+    payload = _feed_payload(tickers=())
+    payload["held"] = [
+        {"ticker": "FI", "shares": 10.0, "avg_cost": 50.0, "brokers": ["fidelity"]},
+        {"ticker": "FISV", "shares": 20.0, "avg_cost": 60.0, "brokers": ["ibkr"]},
+    ]
+    row = held_mod.load_feed(_write_feed(tmp_path, payload)).rows["FI"]
+    assert row.shares == 30.0
+    assert row.avg_cost == pytest.approx((10 * 50 + 20 * 60) / 30)
+    assert row.brokers == ["fidelity", "ibkr"]
+
+
+def test_a_merge_with_one_unknown_cost_basis_reports_UNKNOWN_not_a_half_blend(tmp_path):
+    """A blend needs both sides; inventing one from the half we have is worse than
+    admitting we do not know it."""
+    payload = _feed_payload(tickers=())
+    payload["held"] = [
+        {"ticker": "FI", "shares": 10.0, "avg_cost": None, "brokers": ["fidelity"]},
+        {"ticker": "FISV", "shares": 20.0, "avg_cost": 60.0, "brokers": ["ibkr"]},
+    ]
+    row = held_mod.load_feed(_write_feed(tmp_path, payload)).rows["FI"]
+    assert row.shares == 30.0
+    assert row.avg_cost is None
 
 
 def test_the_completed_migration_stays_inert_on_a_held_book(tmp_path):

@@ -205,7 +205,36 @@ def _step_export_artifacts(validation_result):
     from universe.aliases import published_payload as _alias_payload
 
     aliases_path = EXPORTS_DIR / "ticker_aliases.json"
-    aliases_path.write_text(json.dumps(_alias_payload(), indent=2) + "\n", encoding="utf-8")
+    # The universe is passed so an entry that CONTRADICTS it is excluded rather
+    # than published; see `published_payload`.
+    import pandas as _pd
+
+    alias_payload = _alias_payload(
+        df=_pd.read_csv(CSV_PATH, dtype=str, encoding="utf-8-sig").fillna(""))
+
+    # ⛑ NEVER OVERWRITE A NON-EMPTY PUBLISHED MAP WITH AN EMPTY ONE.
+    #
+    # `load_aliases` treats a MISSING source file as a legitimate empty store, and
+    # that is right: a fleet with no known symbol splits has no store. But this is
+    # a load-with-fallback feeding a write-everything publish, which is the fleet's
+    # own documented data-loss shape. `data/ticker_aliases.json` lives in Dropbox;
+    # delete it, or catch it mid-sync, and this step would cheerfully republish an
+    # empty contract over a working one — silently un-joining every consumer, with
+    # a green run to show for it. An empty result is only believable when the
+    # published file was already empty.
+    if not alias_payload["alias_to_canonical"] and aliases_path.exists():
+        try:
+            existing = json.loads(aliases_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            existing = {}
+        if isinstance(existing, dict) and existing.get("alias_to_canonical"):
+            raise RuntimeError(
+                f"refusing to publish an EMPTY ticker_aliases.json over one carrying "
+                f"{len(existing['alias_to_canonical'])} alias(es) — the curated source "
+                f"data/ticker_aliases.json is missing or empty. Restore it, or delete "
+                f"the published file deliberately if the store really is empty now.")
+
+    aliases_path.write_text(json.dumps(alias_payload, indent=2) + "\n", encoding="utf-8")
 
     # 4. Manifest — describes the contract for downstream consumers.
     manifest = {

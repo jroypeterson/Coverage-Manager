@@ -128,13 +128,30 @@ DEMOTION_POSITION = "Following for Interest"
 # Loaded once at import, deliberately: this module runs as a single short-lived
 # sync, and re-reading the file per row would let the map change mid-run -- which
 # is how a half-aliased book gets written.
+class AliasStoreUnavailable(Exception):
+    """The alias store could not be read. Callers MUST abort without writing."""
+
+
 def _load_symbol_aliases() -> dict[str, str]:
     """Broker/vendor symbol -> universe ticker, from the published alias store.
 
-    Degrades to an EMPTY map on any load failure, and says so. That is the safe
-    direction here only because of the guards below it: an unjoined holding looks
-    like a sale, and `MAX_DEMOTIONS_PER_RUN` aborts the whole run rather than
-    writing one. Guessing an alias instead would merge two issuers silently.
+    ⛑ AN UNREADABLE STORE RAISES. It must not degrade to an empty map, and the
+    first version of this function did exactly that on the strength of a comment
+    claiming `MAX_DEMOTIONS_PER_RUN` would abort the run. **It does not** — that
+    guard fires above FIVE demotions and a single unjoined holding is one.
+    Reproduced 2026-08-27 against these files: with the store corrupted, the feed's
+    `FISV` fails to join the universe's `FI`, `plan_sync` returns
+    `demotions=['FI']` with `blocked_reason=None`, and `apply_plan` writes
+    `Held=N`, clears Shares and Average Cost, and stamps `Held Until` — a
+    fabricated sale of a real position, which is the exact error this module was
+    written to eliminate. The comment was a prose claim with nothing enforcing it.
+
+    A MISSING file still yields an empty map, because that is a real and different
+    fact: a fleet with no known symbol splits has no store, and every ticker then
+    joins by its own name, which is the behaviour that predates the store. The
+    danger is only in *losing* a mapping that existed, and the publish side guards
+    that separately (`weekly_universe` refuses to overwrite a non-empty published
+    alias export with an empty one).
     """
     try:
         from universe.aliases import AliasError, load_aliases
@@ -144,13 +161,17 @@ def _load_symbol_aliases() -> dict[str, str]:
         return {alias: entry["canonical"]
                 for alias, entry in load_aliases()["by_alias"].items()}
     except AliasError as exc:
-        logger.warning(
-            "ticker alias store unreadable (%s) - broker symbols will NOT be joined "
-            "to universe tickers this run; a split holding will look like a sale and "
-            "the demotion guard should abort before anything is written", exc)
-        return {}
+        raise AliasStoreUnavailable(
+            f"ticker alias store unreadable ({exc}) - refusing to sync ownership. "
+            f"Without it a split holding does not join its universe row, reads as a "
+            f"sale, and is written as one: a single demotion is well under "
+            f"MAX_DEMOTIONS_PER_RUN, so nothing downstream would stop it."
+        ) from exc
 
 
+#: Resolved at import so the map cannot change mid-run and write a half-aliased
+#: book. An unreadable store therefore fails the import of any caller, which is
+#: the intended blast radius: this module's whole job is to decide what is owned.
 SYMBOL_ALIASES = _load_symbol_aliases()
 
 
@@ -275,6 +296,7 @@ def load_feed(path=None) -> HeldFeed:
 
     rows: dict[str, HeldRow] = {}
     aliased: list[str] = []
+    merged: list[str] = []
     for r in raw_rows:
         t = str(r.get("ticker", "")).strip().upper()
         if not t:
@@ -282,12 +304,38 @@ def load_feed(path=None) -> HeldFeed:
         if t in SYMBOL_ALIASES:
             aliased.append(f"{t}->{SYMBOL_ALIASES[t]}")
             t = SYMBOL_ALIASES[t]
+        shares = float(r.get("shares") or 0.0)
+        avg_cost = None if r.get("avg_cost") is None else float(r["avg_cost"])
+        brokers = list(r.get("brokers") or [])
+        prior = rows.get(t)
+        if prior is None:
+            rows[t] = HeldRow(ticker=t, shares=shares, avg_cost=avg_cost, brokers=brokers)
+            continue
+        # TWO FEED ROWS CAN NORMALIZE ONTO ONE TICKER, AND ASSIGNING WOULD EAT ONE.
+        # The same issuer held at two brokers under two spellings (Fidelity `FI`,
+        # IBKR `FISV`) arrives as two rows; `rows[t] = ...` kept whichever came
+        # last, silently dropping the other broker's shares and cost basis, and
+        # the survivor's broker list then understated where the position is held.
+        # Merge instead: shares add, brokers union, and the cost basis is
+        # SHARE-WEIGHTED because two lots at different prices have one blended
+        # basis and picking either lot's price would misstate P&L on both.
+        total = prior.shares + shares
+        if prior.avg_cost is None or avg_cost is None:
+            # A blend needs both sides. One missing basis makes the blend
+            # unknowable, and inventing it from the half we have is worse than
+            # admitting we do not know it.
+            merged_cost = None
+        elif total > 0:
+            merged_cost = (prior.avg_cost * prior.shares + avg_cost * shares) / total
+        else:
+            merged_cost = None
         rows[t] = HeldRow(
             ticker=t,
-            shares=float(r.get("shares") or 0.0),
-            avg_cost=(None if r.get("avg_cost") is None else float(r["avg_cost"])),
-            brokers=list(r.get("brokers") or []),
+            shares=total,
+            avg_cost=merged_cost,
+            brokers=sorted(set(prior.brokers) | set(brokers)),
         )
+        merged.append(t)
 
     feed = HeldFeed(
         schema=int(schema),
@@ -297,6 +345,10 @@ def load_feed(path=None) -> HeldFeed:
     )
     feed._broker_dates = [str(b.get("as_of") or "") for b in (payload.get("brokers") or [])]
     feed.aliased = aliased
+    if merged:
+        logger.warning("held feed: %s arrived under more than one symbol and were "
+                       "MERGED (shares summed, brokers unioned, cost basis "
+                       "share-weighted): %s", len(set(merged)), ", ".join(sorted(set(merged))))
     if aliased:
         # Never silent: an alias is a claim that two symbols are one company, and a
         # wrong one would merge two issuers' holdings without a trace.
