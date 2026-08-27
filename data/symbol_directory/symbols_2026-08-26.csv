@@ -1074,7 +1074,7 @@ BOT,"RoboStrategy, Inc. - Common Stock",NASDAQ,N
 BOTJ,"Bank of the James Financial Group, Inc. - Common Stock",NASDAQ,N
 BOW,Bowhead Specialty Holdings Inc. Common Stock,NYSE,
 BOX,"Box, Inc. Class A Common Stock",NYSE,
-BOXL,Boxlight Corporation - Class A Common Stock,NASDAQ,D
+BOXL,Boxlight Corporation - Class A Common Stock,NASDAQ,N
 BP,BP p.l.c. Common Stock,NYSE,
 BPAC,Blueport Acquisition Ltd - Class A Ordinary Shares,NASDAQ,N
 BPACR,Blueport Acquisition Ltd - Rights,NASDAQ,N
@@ -1129,9 +1129,9 @@ BRVE,"Braveheart Bio, Inc. - Common Stock",NASDAQ,N
 BRW,Saba Capital Income & Opportunities Fund SBI,NYSE,
 BRX,Brixmor Property Group Inc. Common Stock,NYSE,
 BRZE,"Braze, Inc. - Class A Common Stock",NASDAQ,N
-BSAA,BEST SPAC I Acquisition Corp. - Class A Ordinary Shares,NASDAQ,N
-BSAAR,BEST SPAC I Acquisition Corp. - Rights,NASDAQ,N
-BSAAU,BEST SPAC I Acquisition Corp. - Unit,NASDAQ,N
+BSAA,BEST SPAC I Acquisition Corp. - Class A Ordinary Shares,NASDAQ,D
+BSAAR,BEST SPAC I Acquisition Corp. - Rights,NASDAQ,D
+BSAAU,BEST SPAC I Acquisition Corp. - Unit,NASDAQ,D
 BSAC,Banco Santander - Chile ADS,NYSE,
 BSBK,Bogota Financial Corp. - Common Stock,NASDAQ,N
 BSBR,"Banco Santander Brasil SA American Depositary Shares, each representing one unit",NYSE,
@@ -2037,7 +2037,7 @@ DPZ,Domino's Pizza Inc - Common Stock,NASDAQ,N
 DQ,"DAQO New Energy Corp. American Depositary Shares, each representing five ordinary shares",NYSE,
 DRCT,"Direct Digital Holdings, Inc. - Class A Common Stock",NASDAQ,D
 DRD,DRDGOLD Limited American Depositary Shares,NYSE,
-DRDB,Roman DBDR Acquisition Corp. II - Ordinary shares,NASDAQ,N
+DRDB,Roman DBDR Acquisition Corp. II - Ordinary shares,NASDAQ,D
 DRDBU,Roman DBDR Acquisition Corp. II - Unit,NASDAQ,N
 DRDBW,Roman DBDR Acquisition Corp. II - Warrants,NASDAQ,N
 DRH,Diamondrock Hospitality Company - Common Stock,NASDAQ,N
@@ -3738,7 +3738,7 @@ KEYYU,Keystone Acquisition Corp. - Unit,NASDAQ,N
 KEYYW,Keystone Acquisition Corp. - Warrants,NASDAQ,N
 KF,"Korea Fund, Inc. (The) New Common Stock",NYSE,
 KFFB,Kentucky First Federal Bancorp - Common Stock,NASDAQ,N
-KFII,K&F Growth Acquisition Corp. II - Class A Ordinary shares,NASDAQ,N
+KFII,K&F Growth Acquisition Corp. II - Class A Ordinary shares,NASDAQ,D
 KFIIR,K&F Growth Acquisition Corp. II - Rights,NASDAQ,N
 KFIIU,K&F Growth Acquisition Corp. II - Unit,NASDAQ,N
 KFRC,"Kforce, Inc. Common Stock",NYSE,
@@ -4507,7 +4507,7 @@ MUZE,Muzero Acquisition Corp - Class A Ordinary Shares,NASDAQ,N
 MUZEU,Muzero Acquisition Corp - Unit,NASDAQ,N
 MUZEW,Muzero Acquisition Corp - Warrant,NASDAQ,N
 MVBF,MVB Financial Corp. - Common Stock,NASDAQ,N
-MVIS,"MicroVision, Inc. - Common Stock",NASDAQ,D
+MVIS,"MicroVision, Inc. - Common Stock",NASDAQ,N
 MVST,"Microvast Holdings, Inc. - Common Stock",NASDAQ,N
 MWA,MUELLER WATER PRODUCTS Common Stock,NYSE,
 MWC,"Micware Co., Ltd. - American Depositary Shares",NASDAQ,N
@@ -5660,9 +5660,9 @@ RCON,"Recon Technology, Ltd. - Class A Ordinary Shares",NASDAQ,D
 RCS,"PIMCO Strategic Income Fund, Inc.",NYSE,
 RCT,RedCloud Holdings plc - Ordinary Shares,NASDAQ,D
 RCUS,"Arcus Biosciences, Inc. Common Stock",NYSE,
-RDAC,Rising Dragon Acquisition Corp. - Ordinary Shares,NASDAQ,N
-RDACR,Rising Dragon Acquisition Corp. - Rights,NASDAQ,N
-RDACU,Rising Dragon Acquisition Corp. - Unit,NASDAQ,N
+RDAC,Rising Dragon Acquisition Corp. - Ordinary Shares,NASDAQ,D
+RDACR,Rising Dragon Acquisition Corp. - Rights,NASDAQ,D
+RDACU,Rising Dragon Acquisition Corp. - Unit,NASDAQ,D
 RDAG,Republic Digital Acquisition Company - Class A Ordinary Shares,NASDAQ,N
 RDAGU,Republic Digital Acquisition Company - Unit,NASDAQ,N
 RDAGW,Republic Digital Acquisition Company - Warrants,NASDAQ,N
@@ -6762,7 +6762,7 @@ TRTN$G,Triton International Limited 7.500% Series G Cumulative Redeemable Perpet
 TRTX,"TPG RE Finance Trust, Inc. Common Stock",NYSE,
 TRTX$C,"TPG RE Finance Trust, Inc. 6.25% Series C Cumulative Redeemable Preferred Stock, $0.001 par value per share",NYSE,
 TRU,TransUnion Common Stock,NYSE,
-TRUG,"TruGolf Holdings, Inc. - Class A Common Stock",NASDAQ,N
+TRUG,"TruGolf Holdings, Inc. - Class A Common Stock",NASDAQ,D
 TRUP,"Trupanion, Inc. - Common Stock",NASDAQ,N
 TRV,"The Travelers Companies, Inc. Common Stock",NYSE,
 TRVG,trivago N.V. - American Depositary Shares,NASDAQ,N
