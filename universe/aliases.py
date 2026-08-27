@@ -385,15 +385,37 @@ def merge_hazards(df, index=None) -> list[str]:
         if ticker:
             rows[ticker] = row
 
-    problems: list[str] = []
-    for entry in idx["entries"]:
-        for alias in entry["aliases"]:
-            if alias in rows:
-                problems.append(
-                    f"alias entry {entry['canonical']}: alias {alias} is ALSO a universe "
-                    f"row ({_cell(rows[alias].get('Company Name'))}) — resolving through "
-                    f"this entry would merge two separately-covered companies")
-    return problems
+    alias_map = {a: e["canonical"] for a, e in idx["by_alias"].items()}
+    names = {t: _cell(r.get("Company Name")) for t, r in rows.items()}
+    return merge_hazards_for_map(alias_map, rows.keys(), names)
+
+
+def merge_hazards_for_map(alias_map, universe_tickers, names=None) -> list[str]:
+    """`merge_hazards` over a plain {alias: canonical} dict. ONE implementation.
+
+    A consumer that has already applied an alias map — `universe/held.py` reads
+    the store at import and normalises its feed with it — needs to validate the
+    **exact bytes it used**, not a fresh read of the file, and not a hand-rolled
+    copy of this rule.
+
+    Both of those were live defects found in review on 2026-08-27: re-loading the
+    store validated a map that never touched the data (the file can change in
+    between; it lives in Dropbox), and an earlier attempt open-coded this rule in
+    the consumer, where it would drift from this one the first time this one
+    changed. Passing the map in fixes both without duplicating the rule.
+    """
+    known = {str(t).strip().upper() for t in universe_tickers if str(t).strip()}
+    names = names or {}
+    out = []
+    for alias, canonical in sorted(alias_map.items()):
+        alias, canonical = _sym(alias), _sym(canonical)
+        if alias in known:
+            label = f" ({names[alias]})" if names.get(alias) else ""
+            out.append(
+                f"alias entry {canonical}: alias {alias} is ALSO a universe row{label} "
+                f"— resolving through this entry would merge two separately-covered "
+                f"companies")
+    return out
 
 
 def published_payload(index=None, df=None) -> dict:

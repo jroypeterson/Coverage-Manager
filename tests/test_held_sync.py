@@ -493,7 +493,7 @@ def test_an_alias_whose_source_is_ALSO_a_covered_row_blocks(tmp_path):
         feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
         entries = _entries({"FISV": ("Portfolio", "Y"), "FI": ("Researching", "")})
         plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI", "FISV"])
-        assert plan.blocked_reason and "disagrees with the universe" in plan.blocked_reason
+        assert plan.blocked_reason and "merge two separately-covered companies" in plan.blocked_reason
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
@@ -573,40 +573,115 @@ def test_a_position_that_merely_SHRANK_is_not_blocked(tmp_path):
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
 
 
-def test_the_store_is_validated_by_its_OWN_validator_not_a_hand_copy(tmp_path, monkeypatch):
-    """The structural finding behind four rounds: a check on the publish side and
-    not on the read side.
+def test_the_validated_map_is_the_one_that_was_APPLIED(tmp_path, monkeypatch):
+    """Codex round 5: the check re-LOADED the store while `load_feed` had already
+    normalised the feed with the import-time map.
 
-    The first fix was a hand-rolled copy of ONE of `check_universe`'s three rules.
-    A copy drifts from the original the moment the original changes, so this pins
-    that the real validator is what runs -- if it stops being called, a rule added
-    there would silently not apply here.
+    Change the file in between -- Dropbox sync, a concurrent edit -- and it
+    validated bytes that never touched the data, then allowed the very swap it
+    exists to stop. The map passed to the validator must be `SYMBOL_ALIASES`.
     """
     import universe.aliases as aliases_mod
 
-    called = {}
-    real = aliases_mod.check_universe
+    seen = {}
+    real = aliases_mod.merge_hazards_for_map
 
-    def spy(df, index=None):
-        called["df"] = df
-        return real(df, index)
+    def spy(alias_map, universe_tickers, names=None):
+        seen["map"] = dict(alias_map)
+        return real(alias_map, universe_tickers, names)
 
-    monkeypatch.setattr(aliases_mod, "check_universe", spy)
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
-    held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
-                       universe_tickers=["AAPL"])
-    assert "df" in called, "plan_sync must run the alias store's own validator"
-    assert list(called["df"]["Ticker"]) == ["AAPL"]
+    monkeypatch.setattr(aliases_mod, "merge_hazards_for_map", spy)
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update({"ZZZ": "AAPL"})
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
+        held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                           universe_tickers=["AAPL"])
+        assert seen.get("map") == {"ZZZ": "AAPL"}, (
+            "the validator must see the map load_feed applied, not a fresh file read")
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
 
 
-def test_a_validator_failure_does_not_become_the_outage(tmp_path, monkeypatch):
-    """A guard that crashes is worse than the guard being absent -- the
-    share-count check below still covers the case that actually occurs."""
-    import universe.aliases as aliases_mod
+def test_a_confirmed_hazard_is_never_erased_by_a_later_failure(tmp_path, monkeypatch):
+    """Codex round 5: the `except` around the validators set `problems = []`.
 
-    monkeypatch.setattr(aliases_mod, "check_universe",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("AAPL",))))
-    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
-                              universe_tickers=["AAPL"])
-    assert plan.blocked_reason is None
+    So a hazard `merge_hazards` had ALREADY confirmed was discarded when a later
+    advisory call raised, and the plan proceeded to rewrite ownership onto the
+    wrong company. A fatal, once found, is never unfound -- which is why the
+    hazard check now stands alone rather than sharing a try block with anything.
+    """
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update({"FISV": "FI"})
+        feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(tickers=("FISV",))))
+        entries = _entries({"FISV": ("Portfolio", "Y"), "FI": ("Researching", "")})
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI", "FISV"])
+        assert plan.blocked_reason, "the confirmed merge hazard must survive"
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+# ── Codex round 5 (2026-08-27) ──────────────────────────────────────────────
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_a_non_finite_share_count_is_REFUSED(tmp_path, bad):
+    """NaN does not merely produce odd output -- it DISABLES the guards.
+
+    Every comparison against NaN is False, so a row with `shares: NaN` sailed
+    through load_feed, never matched the split heuristic, and let a real position
+    be written out as sold.
+    """
+    payload = _feed_payload(tickers=())
+    payload["held"] = [{"ticker": "NEWCO", "shares": bad, "avg_cost": 1.0, "brokers": ["IBKR"]}]
+    with pytest.raises(held_mod.HeldFeedError, match="non-finite share count"):
+        held_mod.load_feed(_write_feed(tmp_path, payload))
+
+
+def test_a_non_finite_feed_age_is_REFUSED(tmp_path):
+    """`NaN > limit` is False, so a NaN age reported the feed as FRESH."""
+    payload = _feed_payload(tickers=("AAPL",))
+    payload["stalest_age_days"] = float("nan")
+    with pytest.raises(held_mod.HeldFeedError, match="non-finite stalest_age_days"):
+        held_mod.load_feed(_write_feed(tmp_path, payload))
+
+
+def test_a_split_across_TWO_unjoined_symbols_is_still_caught(tmp_path):
+    """Single-row matching was evadable by arithmetic: a 30-share position
+    arriving as unjoined 10 + 20 matched neither and went through as a sale."""
+    monkeypatched = dict(held_mod.SYMBOL_ALIASES)
+    try:
+        held_mod.SYMBOL_ALIASES.clear()
+        payload = _feed_payload(tickers=())
+        payload["held"] = [
+            {"ticker": "FISV", "shares": 10.0, "avg_cost": 50.0, "brokers": ["IBKR"]},
+            {"ticker": "FISVA", "shares": 20.0, "avg_cost": 50.0, "brokers": ["IBKR"]},
+        ]
+        feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+        entries = _entries({"FI": ("Portfolio", "Y")})
+        entries[0]["Shares"] = "30"
+        plan = held_mod.plan_sync(entries, feed, universe_tickers=["FI"])
+        assert plan.demotions == ["FI"]
+        assert plan.blocked_reason and "FISV+FISVA" in plan.blocked_reason
+    finally:
+        held_mod.SYMBOL_ALIASES.clear()
+        held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+def test_the_subset_search_is_capped_and_SAYS_SO(caplog):
+    """Capping only the subset SIZE left O(n^3) in the candidate count and took
+    this suite from 30s to 888s -- a guard that can hang the lane it protects.
+
+    Above the cap, single-symbol matching still runs and the skip is logged; it is
+    never silently narrowed.
+    """
+    many = {f"T{i}": float(i + 1) for i in range(held_mod.MAX_SPLIT_CANDIDATES + 5)}
+    with caplog.at_level("WARNING"):
+        assert held_mod._subset_summing_to(many, 999999.0) == []
+    assert any("exceeds the" in r.message for r in caplog.records)
+    # ...and a single-symbol match above the cap still works
+    assert held_mod._subset_summing_to(many, 3.0) == ["T2"]

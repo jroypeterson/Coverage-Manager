@@ -137,6 +137,76 @@ class AliasStoreUnavailable(Exception):
 #: Same tolerance `lots.py` uses for its own reconciliation.
 SHARE_MATCH_TOLERANCE = 0.5
 
+#: Largest group of unjoined holdings the split check will try to combine. One
+#: issuer under two or three spellings is the real case; beyond that this stops
+#: being a guard and starts being a subset-sum solver on operator data.
+MAX_SPLIT_SUBSET = 3
+
+#: ...and how many unjoined holdings may be considered at all. Capping only the
+#: subset size still leaves O(n^3) in the number of candidates, which took this
+#: repo's suite from 30s to 888s. Above this, single-symbol matching still runs
+#: and the combination search is skipped WITH A WARNING.
+MAX_SPLIT_CANDIDATES = 12
+
+
+def _finite(value) -> bool:
+    """A usable number: not None, not NaN, not infinite.
+
+    ⛑ `float("nan")` and `float("inf")` survive every `float(...)` coercion in
+    this module, and they do not merely produce odd output — they DISABLE the
+    guards silently, because every comparison against NaN is False. A feed row
+    with `shares: NaN` sailed through `load_feed`, `abs(NaN - lost)` never matched
+    the split heuristic, and a real position was written out as sold; a
+    `stalest_age_days: NaN` cleared the freshness check the same way, since
+    `NaN > limit` is False. Both found by review, both on a path whose entire job
+    is to refuse untrustworthy input.
+    """
+    if value is None:
+        return False
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return False
+    return f == f and f not in (float("inf"), float("-inf"))
+
+
+def _subset_summing_to(candidates: dict, target: float) -> list[str]:
+    """Names of any subset of `candidates` whose shares sum to `target`. [] if none.
+
+    Single-row matching was evadable by arithmetic — a 30-share position arriving
+    as unjoined 10 + 20 matched neither and the demotion went through as a sale.
+
+    ⛑ BOUNDED ON BOTH AXES, and the second bound was learned the hard way: the
+    first version capped only the subset SIZE at 3, which is still O(n^3) in the
+    number of unjoined holdings and took the test suite from 30 seconds to
+    **888**. A guard that can hang the lane it protects is an outage with good
+    intentions — the third time this feature produced one. Above
+    `MAX_SPLIT_CANDIDATES` the combination search is skipped and SAID SO, never
+    silently: single-row matching still runs, so the common case is unaffected
+    and only the arithmetic-evasion case degrades.
+    """
+    from itertools import combinations
+
+    names = sorted(candidates)
+    for name in names:                       # single row: always, and cheap
+        if abs(candidates[name] - target) <= SHARE_MATCH_TOLERANCE:
+            return [name]
+
+    if len(names) > MAX_SPLIT_CANDIDATES:
+        logger.warning(
+            "split check: %d unjoined holdings exceeds the %d-name cap, so only "
+            "single-symbol matches were tested; a position split across several "
+            "unjoined symbols would not be detected this run",
+            len(names), MAX_SPLIT_CANDIDATES)
+        return []
+
+    for size in range(2, min(len(names), MAX_SPLIT_SUBSET) + 1):
+        for combo in combinations(names, size):
+            total = sum(candidates[n] for n in combo)
+            if abs(total - target) <= SHARE_MATCH_TOLERANCE:
+                return list(combo)
+    return []
+
 
 def _shares_of(entry) -> float | None:
     """A position row's share count as a float, or None when it is not recorded."""
@@ -298,6 +368,11 @@ def load_feed(path=None) -> HeldFeed:
     age = payload.get("stalest_age_days")
     if age is None:
         raise HeldFeedError("ownership feed carries no stalest_age_days — cannot judge freshness")
+    if not _finite(age):
+        # `NaN > limit` is False, so a NaN age reported the feed as FRESH.
+        raise HeldFeedError(
+            f"ownership feed carries a non-finite stalest_age_days ({age!r}) — it cannot "
+            f"be judged fresh or stale, and comparing against it silently reports FRESH")
     if float(age) > HELD_STALE_MAX_DAYS:
         raise HeldFeedError(
             f"ownership feed is {float(age):.1f}d old (limit {HELD_STALE_MAX_DAYS:.0f}d) — "
@@ -321,6 +396,15 @@ def load_feed(path=None) -> HeldFeed:
         if t in SYMBOL_ALIASES:
             aliased.append(f"{t}->{SYMBOL_ALIASES[t]}")
             t = SYMBOL_ALIASES[t]
+        if not _finite(r.get("shares") or 0.0):
+            raise HeldFeedError(
+                f"ownership feed row {t} carries a non-finite share count "
+                f"({r.get('shares')!r}) — every comparison against it is False, so it "
+                f"would DISABLE the guards below rather than trip them")
+        if r.get("avg_cost") is not None and not _finite(r["avg_cost"]):
+            raise HeldFeedError(
+                f"ownership feed row {t} carries a non-finite average cost "
+                f"({r.get('avg_cost')!r})")
         shares = float(r.get("shares") or 0.0)
         avg_cost = None if r.get("avg_cost") is None else float(r["avg_cost"])
         brokers = list(r.get("brokers") or [])
@@ -539,41 +623,51 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
     # A ticker list is all this function is given, so only the rules that key on
     # tickers can fire; the identity-anchor rule needs columns we do not have and
     # skips itself on blanks, which is its documented behaviour, not a silent hole.
+    # ⛑ VALIDATE THE MAP THAT WAS ACTUALLY APPLIED, AND NEVER DISCARD A HAZARD.
+    #
+    # Two defects lived in the first version of this block, both found by review:
+    #
+    #   * it RELOADED the store from disk while `load_feed` had already normalised
+    #     the feed with the import-time `SYMBOL_ALIASES`. Change the file in
+    #     between — Dropbox sync, a concurrent edit — and it validated bytes that
+    #     never touched the data, which is "the reviewed thing is not the
+    #     published thing" with a validator playing the reviewer;
+    #   * its `except` set `problems = []`, so a hazard `merge_hazards` had
+    #     ALREADY confirmed was erased when the advisory call raised afterwards.
+    #     A fatal, once found, is never unfound.
+    #
+    # The advisory `check_universe` pass was also dropped rather than kept. It was
+    # handed a frame carrying only `Ticker`, so its CIK/ISIN/FIGI rules skip on
+    # blanks every single time — a three-rule validator of which one rule could
+    # ever fire, logging as though all three had. A check that cannot match is
+    # worse than no check, because it reads like coverage.
     if universe_tickers:
+        # The store's OWN rule, applied to the exact map `load_feed` used. Not a
+        # fresh read (which would validate bytes that never touched the data) and
+        # not a hand copy (which would drift from the original). Both were live
+        # defects here before this line.
         try:
-            import pandas as _pd
+            from universe.aliases import merge_hazards_for_map
 
-            from universe import aliases as _aliases
-
-            frame = _pd.DataFrame({"Ticker": sorted({str(t).strip().upper()
-                                                     for t in universe_tickers if str(t).strip()})})
-            # merge_hazards, NOT check_universe: only the drift that would
-            # resolve one symbol onto the WRONG company blocks a write. A
-            # canonical missing from the universe resolves to NOTHING, which the
-            # share-count guard below already catches safely — and blocking on it
-            # would turn any caller holding a partial universe into an outage,
-            # the same "a guard can become the outage" this feature has already
-            # produced once. The full check still runs, as a warning.
-            problems = _aliases.merge_hazards(frame)
-            for note in _aliases.check_universe(frame):
-                if note not in problems:
-                    logger.warning("ticker alias store vs universe: %s", note)
-        except Exception as exc:            # noqa: BLE001 - a validator must not be the outage
-            logger.warning("could not validate the alias store against the universe "
-                           "(%s); relying on the share-count guard below", exc)
-            problems = []
-        if problems:
+            hazards = merge_hazards_for_map(SYMBOL_ALIASES, universe_tickers)
+        except ImportError:
+            hazards = []
+        if hazards:
             plan.blocked_reason = (
-                f"the ticker alias store disagrees with the universe, so resolving "
-                f"through it could merge or misroute a holding: "
-                + "; ".join(problems[:4])
-                + (f" ... +{len(problems) - 4} more" if len(problems) > 4 else "")
+                "the alias map applied to this feed would resolve a covered company "
+                "onto another: " + "; ".join(hazards[:4])
+                + (f" ... +{len(hazards) - 4} more" if len(hazards) > 4 else "")
                 + ". Fix data/ticker_aliases.json or the universe row, then re-run."
             )
             return plan
 
     if plan.not_in_universe:
-        feed_shares = {t: feed.rows[t].shares for t in plan.not_in_universe if t in feed.rows}
+        # ⛑ SUBSETS, NOT JUST SINGLE ROWS. Matching each unjoined holding on its
+        # own was evadable by arithmetic: a 30-share position arriving as unjoined
+        # 10 + 20 matched neither, and the demotion went through as a sale. Any
+        # combination that sums to the shares lost is the same hazard.
+        feed_shares = {t: feed.rows[t].shares for t in plan.not_in_universe
+                       if t in feed.rows and _finite(feed.rows[t].shares)}
         for ticker in plan.demotions + plan.refreshed:
             recorded = _shares_of(by_ticker.get(ticker, {}))
             if recorded is None:
@@ -582,10 +676,9 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None) -> SyncPlan:
             lost = recorded - now
             if lost <= SHARE_MATCH_TOLERANCE:
                 continue          # nothing left, or the position grew
-            for other, shares in feed_shares.items():
-                if abs(shares - lost) <= SHARE_MATCH_TOLERANCE:
-                    suspects.append((ticker, other, lost, now))
-                    break
+            match = _subset_summing_to(feed_shares, lost)
+            if match:
+                suspects.append((ticker, "+".join(match), lost, now))
 
     if suspects:
         detail = "; ".join(
