@@ -540,6 +540,44 @@ matching message text is one reworded sentence away from silently checking nothi
 test asserts the real validator is *called*, so a rule added there cannot fail to apply
 here.
 
+### Round 5, and the two rules that came out of six rounds
+
+Round 5 returned **five Criticals, three of them inside the round-4 fix made an hour
+earlier** — the guard failing open and erasing a hazard it had already confirmed; the
+guard validating a *fresh read* of the store while the feed had been normalised with the
+import-time map; and an advisory validator handed a ticker-only frame, so two of its
+three rules could never fire while it logged as though all three had. Plus a share
+heuristic evadable by arithmetic (30 arriving as unjoined 10 + 20), and NaN/inf sailing
+through every `float()` and **disabling** the guards, since every comparison against NaN
+is False.
+
+⛑ **Fixing a CLASS does not exempt the fix.** The round-4 change was the right call and
+still shipped three Criticals of its own.
+
+Two rules worth carrying:
+
+* **Validate the bytes that were APPLIED, not a fresh read of the same path.** The store
+  lives in Dropbox; it can change between import and use. A validator inspecting a
+  different copy permits exactly the swap it exists to stop.
+* **A fatal, once found, is never unfound.** A single `try` around a confirmed check and
+  an advisory one, with `except: problems = []`, discards the confirmed result.
+
+`aliases.merge_hazards_for_map(alias_map, tickers)` closes all three: the store's own
+rule, one implementation shared with `merge_hazards`, applied to the exact map
+`load_feed` used, standing alone so nothing can erase its result.
+
+🔻 **The share-count match is a HEURISTIC and its false-block half is open** — board row
+**#348**. The evasion direction is closed (subset match, capped at 3 names / 12
+candidates); a coincidence can still block a real sale, and the fix is a decision, not a
+patch. ⛑ **Do not "fix" it by widening the tolerance** — that moves the false-block rate
+and the miss rate in opposite directions and settles neither.
+
+⛑ **The candidate cap is not tidiness.** Capping only the subset SIZE at 3 is still
+O(n³) in the number of unjoined holdings and took this repo's suite from 30 seconds to
+**888**. A guard that can hang the lane it protects is an outage with good intentions —
+the third time in this one feature. Single-symbol matching always runs; the skip above
+the cap is logged, never silent.
+
 Two defects found in these rounds were **older than this session** and are handled
 differently on purpose: blank-ticker feed rows slipping past the empty-feed guard was
 fixed here (three lines inside a function this work rewrote), while a broker holding
