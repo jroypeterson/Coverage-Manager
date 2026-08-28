@@ -584,7 +584,7 @@ operation here, so it is the only one withheld:
 
 | While… | …then |
 |---|---|
-| a feed holding did not join the universe, **or** a promotion carries a demotion's share count | demotions are **WITHHELD**, not applied — and a refresh that would LOSE shares keeps its prior figures |
+| a feed holding did not join the universe, **or** any promotion coincides with a demotion | demotions are **WITHHELD**, not applied — and a refresh whose figures MOVE at all keeps its prior ones |
 | neither is true | everything applies immediately, as before |
 
 It cannot fabricate a sale at all, and it does not block the run — so an uncovered holding
@@ -592,10 +592,38 @@ never stops an ordinary rebalance, which is what the round-3 version did. The co
 `Held` that stays stale for a run, named in the summary and exiting 2 every time. That is
 this module's own stated trade: never read absence as sold.
 
-⛑ **A withheld row is left UNTOUCHED, not "refreshed with nothing".** The first attempt set
-`row = None`, which dropped the entry into the not-in-feed branch and **cleared Shares** —
-destroying the exact figures the withhold exists to protect. Ninety seconds between the fix
-and its own defect.
+⛑ **A withheld row is left UNTOUCHED, not "refreshed with nothing"** — and this cost two
+separate fixes. Setting `row = None` dropped the entry into the not-in-feed branch and
+**cleared Shares**, destroying the exact figures the withhold protects. I fixed that for
+withheld *refreshes* and shipped the identical erasure for withheld *demotions* in the same
+commit, whose message claimed the row was left untouched. Codex round 6 caught it.
+
+### Round 6 (cross-family) — three of the redesign's own claims were false
+
+Codex reviewed the Fable redesign and found the version above was not yet what it said:
+
+* **The share-count premise was still gating the covered-row path.** The twin rule required
+  the promoted row to carry the *same* count as the demoted one — the exact premise the
+  redesign existed to delete. A corporate action producing covered `NEW` at 103 against `OLD`
+  at 100 slipped through and `OLD` was stamped sold, because **the counts differ at precisely
+  the event that renames a symbol**. The comparison is gone: any demotion coinciding with any
+  promotion is deferred, since without an identity anchor a rename is indistinguishable from a
+  sale plus a purchase.
+* **The refresh guard kept the share-DIRECTION assumption.** `recorded > now` only, so a joined
+  leg at 35 against a stored 30 with an unjoined 20 wrote 35 and discarded 20 shares and their
+  basis. Now any movement while a holding is unjoined.
+* **Withholding had no RELEASE.** A single persistently-uncovered holding deferred every real
+  sale indefinitely, and exit 2 is a repeated warning, not a mechanism — recreating the
+  stale-held failure this module exists to prevent (ROIV, 19 days). **`--accept-partial-join`**
+  applies the withheld work on operator instruction, with the reasons still printed so the
+  decision is recorded rather than defaulted.
+
+⛑ **Two open rows are the honest state of this design, and neither is fixable with another
+guard.** **#350** — the withhold is *stateless*, so run 1 applies the promotion and run 2 has
+lost the signal it acted on. **#349** — settle rename-vs-sale from CM's own OpenFIGI/ISIN
+machinery. 🔻 **Do NOT reach for a broker-supplied identity**: measured 2026-08-27, Fidelity's
+positions export has no CUSIP column, the IBKR payload carries `symbol` only, and the confirms
+file that does have one covers **8 of 30 holdings — excluding FISV**.
 
 🔻 Board row **#349** now carries the residual: the identity join. The brokers already know
 each holding's ISIN/CUSIP, so publishing an anchor in `held.json` and joining on THAT would
