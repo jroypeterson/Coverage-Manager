@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "generated_at": "2026-08-26T21:40:27Z",
+  "generated_at": "2026-08-28T12:25:36Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -18,6 +18,12 @@
       "purpose": "Versioned status + validation contract (read schema_version before consuming)",
       "format": "json",
       "schema_version": 4
+    },
+    {
+      "name": "ticker_aliases.json",
+      "purpose": "Issuers whose ticker string differs between sources, anchored to the identifiers that did NOT change (CIK / ISIN / composite FIGI). `alias_to_canonical` maps any known symbol to the universe ticker \u2014 use it before joining a broker or vendor feed to universe.csv. `vendor_symbols` gives the symbol to send a named vendor: Fiserv is FISV at yfinance and FI at FINRA, so there is no single 'correct' string to rewrite to. Read its own schema_version; usually empty.",
+      "format": "json",
+      "schema_version": 1
     },
     {
       "name": "positions_and_researching.csv",

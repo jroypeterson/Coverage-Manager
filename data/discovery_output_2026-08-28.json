@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-28",
+  "candidates": [
+    {
+      "company": "Honeywell Aerospace Inc.",
+      "ticker": "HONA",
+      "exchange": "NASDAQ",
+      "market_cap": 50950152192,
+      "sector": "Industrials",
+      "subsector": "Aerospace & Defense",
+      "listing_date": "2026-06-29",
+      "trigger": "Spin-off",
+      "peers": ["ARXS", "MDA", "HAWK", "GEV", "CAT", "FDX"],
+      "reason": "Bucket 3 separation at $50.9B, more than five times the $10B bar. Separated from Honeywell on 2026-06-29 and has traded on Nasdaq for eight weeks; it was missed because the Form 10 lane keys its close condition on a registrant ticker that a 10-12B never carries, so CIK 2089271 kept reporting as 'still open, size unknown until it trades' every week while the shares were quoted.",
+      "business_summary": "We make the systems that fly, guide and power aircraft: avionics and flight-deck software, auxiliary power units, propulsion engines, wheels and brakes, and satellite and guidance hardware. We sell to airframers such as Airbus and Boeing and to defence primes and governments, but the money is in the installed base - 45% of our revenue is commercial aftermarket, where we sell spares, repairs and upgrades against equipment already flying, at far better margins than the original shipset. We book new equipment near cost to win a platform, then earn on it for the thirty years it stays in service, which is why our $18.2 billion backlog matters more than any single quarter's shipments."
+    }
+  ]
+}

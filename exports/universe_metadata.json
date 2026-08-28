@@ -9420,5 +9420,12 @@
     "subsector": "Biotech",
     "sub_subsector": "",
     "core": ""
+  },
+  "HONA": {
+    "name": "Honeywell Aerospace Inc",
+    "sector": "Industrials",
+    "subsector": "Aerospace & Defense",
+    "sub_subsector": "",
+    "core": ""
   }
 }
