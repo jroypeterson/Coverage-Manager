@@ -80,6 +80,49 @@ RATINGS_PATH = os.path.join(RATINGS_DIR, "Ratings_CoreCoverage.xlsx")
 
 SECTORS = ("Healthcare Services", "MedTech")
 
+# ⛑ SCOPE IS NOT `Sector (JP)` ALONE, and the reason is a near-miss.
+# On 2026-09-02 ARE, DOC, VTR and WELL moved to `Sector (JP)` = Real Estate so the
+# universe agrees with GICS (Health Care REITs; ARE is Office REITs). That is a
+# correct taxonomy fix and it would have silently dropped four names JP covers out
+# of this workbook -- and, through `docs/hc_coverage.csv`, out of his Google Sheet
+# -- on the next Friday build, with nothing anywhere reporting a change. JP:
+# *"I don't want those names to drop out of coverage list AA_Coverage."*
+# The distinction that resolves it: the GICS sector says which market an issuer
+# TRADES in, the subsector says what it IS. This workbook is about the latter, so
+# scope reads both. Any future sector re-map of a healthcare name must add its
+# subsector here or it leaves the book unannounced.
+SCOPE_SUBSECTORS = ("Healthcare Real Estate",)
+
+# Human-readable form of the same rule, used in the provenance line and the
+# Summary source note so the file states its own scope. One string, because two
+# copies would drift apart the first time the rule changed.
+SCOPE_DESCRIPTION = ("Sector (JP) in (Healthcare Services, MedTech), plus any row "
+                     "whose Subsector (JP) is Healthcare Real Estate")
+
+
+def in_scope(row):
+    """True when a universe row belongs in this workbook.
+
+    Takes a raw `exports/universe.csv` row (dict), not a built record.
+    """
+    return ((row.get("Sector (JP)") or "").strip() in SECTORS
+            or (row.get("Subsector (JP)") or "").strip() in SCOPE_SUBSECTORS)
+
+
+def split_sheets(recs):
+    """Split built records into the (MedTech, everything-else) sheet buckets.
+
+    `hs` is deliberately "not MedTech" rather than "== Healthcare Services": the
+    two sheets and the Summary's two blocks must add up to the Coverage List, so a
+    row admitted by SCOPE_SUBSECTORS under some third sector still has to land on
+    one of them. Grouping is by subsector inside each block, so the healthcare
+    REITs sit with the sixteen already there.
+    """
+    mt = [r for r in recs if r["Sector"] == "MedTech"]
+    hs = [r for r in recs if r["Sector"] != "MedTech"]
+    return mt, hs
+
+
 # Calendar-year total returns, read from Coverage Manager's weekly performance
 # snapshot rather than recomputed. JP, 2026-08-26: "You can just use a footnote to
 # note when the returns are as of instead of re-running all the returns just for
@@ -466,7 +509,7 @@ def load_ratings():
 
 def build_records(asof):
     rows = [r for r in csv.DictReader(open(UNIVERSE, encoding="utf-8"))
-            if r["Sector (JP)"] in SECTORS]
+            if in_scope(r)]
     print("in scope: %d rows" % len(rows))
     # FX FIRST. The ticker sweep is what exhausts the Yahoo budget, and a run
     # that has every price but no rate to convert it with is a wasted run.
@@ -915,17 +958,16 @@ def main():
 
     asof = datetime.date.today().isoformat()
     recs, returns_asof, ambiguous = build_records(asof)
-    mt = [r for r in recs if r["Sector"] == "MedTech"]
-    hs = [r for r in recs if r["Sector"] == "Healthcare Services"]
+    mt, hs = split_sheets(recs)
     if returns_asof:
         ret_note = ("Returns are from the Coverage Manager performance snapshot "
                     "built %s" % returns_asof.isoformat())
     else:
         ret_note = "Returns unavailable (no fresh performance snapshot)"
-    src = ("Source: Coverage Manager exports/universe.csv, filtered to Sector (JP) in "
-           "(Healthcare Services, MedTech). Price and market cap pulled %s from Yahoo "
-           "Finance, falling back to FMP per row where Yahoo had no answer. %s."
-           % (asof, ret_note))
+    src = ("Source: Coverage Manager exports/universe.csv, filtered to %s. Price and "
+           "market cap pulled %s from Yahoo Finance, falling back to FMP per row "
+           "where Yahoo had no answer. %s."
+           % (SCOPE_DESCRIPTION, asof, ret_note))
 
     # One line that travels WITH the data. The xlsx carries it as the subtitle
     # under the title; the CSV carries it as a preamble row, which is the only way
@@ -937,7 +979,7 @@ def main():
         "AA_Core Coverage - LAST UPDATED %s %s. Rebuilt automatically every Friday "
         "by Coverage Manager (scheduled task WeeklyCoverageBuilder), immediately "
         "after the weekly performance run so prices and returns share one as-of "
-        "date. %d names: Sector (JP) in (Healthcare Services, MedTech). "
+        "date. %d names: %s. "
         "Price/market cap from Yahoo Finance that morning, FMP per row where Yahoo "
         "had no answer; market cap USD at spot FX, price in local currency. %s. "
         "Size: LC at or above USD 25,000M, else SMID. Valuation columns state their "
@@ -945,7 +987,8 @@ def main():
         "twelve months. Rating is joined by ticker "
         "from Ratings_CoreCoverage.xlsx and is yours to edit - this build never "
         "writes it."
-        % (asof, datetime.datetime.now().strftime("%H:%M"), len(recs), ret_note))
+        % (asof, datetime.datetime.now().strftime("%H:%M"), len(recs),
+           SCOPE_DESCRIPTION, ret_note))
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)

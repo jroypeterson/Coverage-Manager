@@ -38,10 +38,28 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
 - `scripts/poll_ipo_replies.py` — applies JP's `add TICKER` / `decline TICKER` / `add all` replies (thread **and** top-level) to `data/candidate_ledger.csv`, shells `approve_candidates.py` for approvals, republishes `exports/`, and answers in-thread. Gated to `pending` ledger rows, gated to the approver user (`SLACK_APPROVER_USER_ID`, default JP), idempotent by message `ts` in `data/ipo_reply_state.json` — recorded on failure too, so a transient enrichment error cannot re-fire an approval. **Until 2026-08-05 nothing read the thread**, so every weekly post's "reply `add MU`" was a dead end and three names sat pending. Scheduled as `CoverageManager-IpoReplyPoll` (09:20/13:20/18:20, `run_poll_ipo_replies.bat`). Manual: `python scripts/poll_ipo_replies.py [--dry-run] [--no-publish] [--since YYYY-MM-DD]`.
 - `scripts/build_hc_coverage_xlsx.py` — **JP's `AA_Core Coverage` workbook**, at
   `Dropbox\Companies_Stocks_Sectors_Ratings\_Coverage\`, plus the flat CSV that
-  feeds a Google Sheet. Reads `exports/universe.csv` filtered to `Sector (JP)` in
-  {Healthcare Services, MedTech} (239 rows), prices each row, and joins JP's
-  ratings. Run by the Friday `WeeklyCoverageBuilder` (see below); manual:
+  feeds a Google Sheet. Reads `exports/universe.csv` filtered by `in_scope()`
+  (239 rows), prices each row, and joins JP's ratings. Run by the Friday
+  `WeeklyCoverageBuilder` (see below); manual:
   `python scripts/build_hc_coverage_xlsx.py [--out-dir DIR] [--no-archive]`.
+
+  ⛑ **SCOPE IS NOT `Sector (JP)` ALONE** — it is that sector pair **plus any row
+  whose `Subsector (JP)` is `Healthcare Real Estate`** (`SCOPE_SUBSECTORS`). On
+  2026-09-02 ARE, DOC, VTR and WELL were re-sectored to `Real Estate` so the
+  universe agrees with GICS (Health Care REITs; ARE is Office REITs). Under the
+  old sector-only filter that correct taxonomy fix would have dropped four covered
+  names out of this workbook and, through the public `docs/hc_coverage.csv`, out
+  of JP's Google Sheet on the next Friday build — no error, no warning, and a row
+  count nobody diffs. JP: *"I don't want those names to drop out of coverage list
+  AA_Coverage."* The distinction that resolves it: **the GICS sector says which
+  market an issuer trades in, the subsector says what it is**, and this workbook
+  is about the latter. Any future sector re-map of a healthcare name must add its
+  subsector to `SCOPE_SUBSECTORS` or it leaves the book unannounced. `hs` is
+  therefore `Sector != "MedTech"`, not `== "Healthcare Services"` — the two sheets
+  and the Summary's two blocks must add up to the Coverage List total printed one
+  line above them. `SCOPE_DESCRIPTION` is the one string both the xlsx subtitle
+  and the CSV preamble render, so the files cannot state a scope they no longer
+  have.
 
   **FILENAMES CARRY THE BUILD DATE** — `AA_Core Coverage auto-updated - 08.26.26.xlsx`
   (JP, 2026-08-26). "auto-updated" earns its place: the folder is his too, and the
@@ -150,7 +168,7 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
   cell and nothing here can write to any other cell of it, so anything the reader
   should see has to travel inside the data.
 
-  Tests: `tests/test_hc_coverage_builder.py` (74).
+  Tests: `tests/test_hc_coverage_builder.py` (80).
 
 - `config.py` — All paths, API keys, segment definitions
 - `data/coverage_universe_tickers.csv` — Master coverage universe

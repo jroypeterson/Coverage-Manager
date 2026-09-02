@@ -516,3 +516,65 @@ def test_percent_of_high_is_not_colour_scaled():
     so a shared red/white/green scale would paint every row green. Different
     question, different treatment."""
     assert "% of 52W High" not in b.RETURN_COLS
+
+
+# ── scope: a GICS sector fix must not silently empty the book ────────────────
+
+def test_a_healthcare_reit_stays_in_scope_after_its_sector_moves_to_real_estate():
+    """The near-miss of 2026-09-02.
+
+    ARE, DOC, VTR and WELL were re-sectored to Real Estate so the universe agrees
+    with GICS. Scope was `Sector (JP) in SECTORS` alone, so the next Friday build
+    would have dropped four covered names out of the workbook AND out of the
+    public `docs/hc_coverage.csv` the Google Sheet reads -- with no error, no
+    warning, and a row count nobody diffs. JP: "I don't want those names to drop
+    out of coverage list AA_Coverage."
+    """
+    welltower = {"Ticker": "WELL", "Sector (JP)": "Real Estate",
+                 "Subsector (JP)": "Healthcare Real Estate"}
+    assert b.in_scope(welltower)
+
+
+def test_scope_still_admits_the_two_named_sectors():
+    for sector in b.SECTORS:
+        assert b.in_scope({"Sector (JP)": sector, "Subsector (JP)": ""})
+
+
+def test_scope_does_not_swallow_the_rest_of_real_estate():
+    """The subsector is what says "this is healthcare", not the sector it trades
+    in. CIGI (Colliers, Real Estate, no HC subsector) must stay out, or the rule
+    is just "Real Estate is in scope" wearing a longer name."""
+    colliers = {"Ticker": "CIGI", "Sector (JP)": "Real Estate",
+                "Subsector (JP)": ""}
+    assert not b.in_scope(colliers)
+
+
+def test_scope_survives_a_missing_or_blank_subsector_key():
+    """`exports/universe.csv` has 185 rows with no subsector; a raw dict from
+    another caller may not carry the key at all. Neither is in scope, and neither
+    is a crash."""
+    assert not b.in_scope({"Sector (JP)": "Tech"})
+    assert not b.in_scope({"Sector (JP)": "Tech", "Subsector (JP)": None})
+
+
+def test_the_two_sheets_partition_the_coverage_list():
+    """`hs` is "not MedTech" rather than "== Healthcare Services" precisely so a
+    row admitted by SCOPE_SUBSECTORS under a third sector still lands on a sheet.
+    Split them by sector name and the Summary's two blocks stop adding up to the
+    total it prints one line above them."""
+    recs = [{"Sector": "MedTech"}, {"Sector": "Healthcare Services"},
+            {"Sector": "Real Estate"}]
+    mt, hs = b.split_sheets(recs)
+    assert len(mt) == 1
+    assert len(hs) == 2
+    assert len(mt) + len(hs) == len(recs)
+
+
+def test_the_scope_rule_travels_with_the_data():
+    """Every surface states its own scope -- the xlsx as a subtitle, the CSV as a
+    preamble row, because that preamble is the only thing that reaches the Google
+    Sheet. A scope that changed without the sentence changing would leave both
+    files asserting something false about themselves."""
+    assert "Healthcare Real Estate" in b.SCOPE_DESCRIPTION
+    for sector in b.SECTORS:
+        assert sector in b.SCOPE_DESCRIPTION
