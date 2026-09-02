@@ -223,6 +223,20 @@
   "ticker": "",
   "verdict": "not-relevant"
  },
+ "2105965": {
+  "accession": "0001628280-26-059592",
+  "doc": "westcoastcommunitybancorp1.htm",
+  "filed": "2026-08-31",
+  "first_seen": "2026-09-02",
+  "listing_kind": "new registration",
+  "parent": "",
+  "reason": "SIC 6022 is outside the covered sectors | listing kind unresolved: no parent named in the information statement and SEC shows no OTC quotation",
+  "registrant": "West Coast Community Bancorp",
+  "sector": "",
+  "sic": "6022",
+  "ticker": "",
+  "verdict": "not-relevant"
+ },
  "2128626": {
   "accession": "0001193125-26-352605",
   "doc": "ck0002128626-ex99_1.htm",

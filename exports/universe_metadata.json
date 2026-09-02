@@ -1030,7 +1030,7 @@
   },
   "ARE": {
     "name": "Alexandria Real Estate Equities Inc",
-    "sector": "Healthcare Services",
+    "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
     "core": ""
@@ -2374,7 +2374,7 @@
   },
   "DOC": {
     "name": "Healthpeak Properties Inc",
-    "sector": "Healthcare Services",
+    "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
     "core": ""
@@ -6882,7 +6882,7 @@
   },
   "VTR": {
     "name": "Ventas Inc",
-    "sector": "Healthcare Services",
+    "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
     "core": ""
@@ -6892,7 +6892,7 @@
     "sector": "Biopharma",
     "subsector": "Specialty & Generic Pharma",
     "sub_subsector": "",
-    "core": ""
+    "core": "Y"
   },
   "VTVT": {
     "name": "vTv Therapeutics Inc",
@@ -6945,7 +6945,7 @@
   },
   "WELL": {
     "name": "Welltower Inc",
-    "sector": "Healthcare Services",
+    "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
     "core": ""

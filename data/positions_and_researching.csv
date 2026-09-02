@@ -5,8 +5,10 @@ ACVA,2026-05-03,,,,,,,N,,,,,Y,,,Following for Interest
 ADI,2026-04-11,,,,91.1771,1.011,,Y,2026-08-21,,,,,,,Portfolio
 ADSK,2026-04-11,,,,264.11,10.0,,Y,2026-08-21,,,,,,,Portfolio
 AFRM,2026-04-11,,,,50.06,5.0,,Y,2026-08-21,,,,,,,Portfolio
+AHR,2026-09-02,,,,,,,,,,,,Y,,,Following for Interest
 ALMR,2026-04-17,,,,,,,N,,,,Y,,,,Researching
 AMZN,2026-04-11,,,,68.692,20.0,,Y,2026-08-21,,,,,,,Portfolio
+ARE,2026-09-02,,,,,,,,,,,,Y,,,Following for Interest
 ARXS,2026-05-03,,,,,,,N,,,,Y,,,,Researching
 BE,2026-04-11,,,,145.2776,1.0,,Y,2026-08-21,,,,,,,Portfolio
 BRO,2026-04-11,,,,67.6396,3.0,,Y,2026-08-21,,,,,,,Portfolio
@@ -25,6 +27,7 @@ CRWD,2026-04-11,,,,,,,N,,,,Y,,,,Researching
 CSU,2026-05-03,,,,,,,N,,,,,Y,,,Following for Interest
 CVNA,2026-05-03,,,,,,,N,,,,,Y,,,Following for Interest
 DBX,2026-05-03,,,,,,,N,,,,Y,,,,Researching
+DOC,2026-09-02,,,,,,,,,,,,Y,,,Following for Interest
 DOCS,2026-04-11,,,,25.749900000000004,40.0,,Y,2026-08-21,,,,,,,Portfolio
 EHC,2026-04-11,,,,92.8407,96.94,,Y,2026-08-21,,,,,,,Portfolio
 ENSG,2026-04-11,,,,162.7041,33.0,,Y,2026-08-21,,,,,,,Portfolio
@@ -38,6 +41,7 @@ FRPT,2026-06-06,,,,,,,N,,,,,Y,,,Following for Interest
 HOOD,2026-05-03,,,,,,,N,,,,Y,,,,Researching
 IDXX,2026-04-11,,,,561.85,4.0,,Y,2026-08-21,,,,,,,Portfolio
 ISRG,2026-07-24,,,,350.1277,3.0,,Y,2026-08-21,,,,,,,Portfolio
+JAN,2026-09-02,,,,,,,,,,,,Y,,,Following for Interest
 JPM,2026-05-03,,,,,,,N,,,,,Y,,,Following for Interest
 KKR,2026-05-03,,,,,,,N,,,,Y,,,,Researching
 KLRA,2026-04-17,,,,,,,N,,,,Y,,,,Researching
@@ -79,8 +83,9 @@ UPS,2026-05-03,,,,,,,N,,,,Y,,,,Researching
 V,2026-04-11,,,,135.747,1.004,,Y,2026-08-21,,,,,,,Portfolio
 VEEV,2026-07-24,,,,197.64,6.0,,Y,2026-08-21,,,,,,,Portfolio
 VLTO,2026-05-03,,,,,,,N,,,,Y,,,,Researching
+VTR,2026-09-02,,,,,,,,,,,,Y,,,Following for Interest
 WAY,2026-04-11,15.0,,,23.255,100.0,,Y,2026-08-21,,,,,,,Portfolio
-WELL,2026-04-11,,,,,,,N,,,,,,Y,,Ready to Buy
+WELL,2026-04-11,,,,,,,N,,,,,Y,Y,,Ready to Buy
 WMT,2026-05-03,,,,,,,N,,,,,Y,,,Following for Interest
 WOOF,2026-06-06,,,,,,,N,,,,,Y,,,Following for Interest
 WST,2026-04-11,,,,,,,N,,,,,,Y,,Ready to Buy
