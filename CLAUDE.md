@@ -1816,21 +1816,44 @@ moved with it the next day along with the rest of the subsector — see the
 Healthcare Real Estate`, so the lab-exposure rationale is intact and both remain
 in the AA_Core workbook.
 
-## `Healthcare Real Estate` — the whole subsector is `Sector (JP) = Real Estate` (2026-09-03)
+## `Healthcare Real Estate` — the landlord bucket, and it is uniform (2026-09-03)
 
-**19 of the 20 rows in the `Healthcare Real Estate` subsector carry
-`Sector (JP) = Real Estate`; `BKD` alone stays `Healthcare Services`, and that is
-not an oversight.** Brookdale Senior Living is `Healthcare / Medical Care
-Facilities` at the vendor — a senior-housing **operator** that *leases from* these
-landlords. It is not a REIT, so the GICS sector that applies to a REIT does not
-apply to it. JP's instruction was to make *the REITs* consistent, and BKD is the
-one row in the subsector that is not one.
+**All 19 rows in the `Healthcare Real Estate` subsector carry
+`Sector (JP) = Real Estate`. There is no exception, and the subsector now means
+one thing: the landlord.**
+
+It took two passes to get there, and the second one is the more interesting.
+`BKD` was the 20th row and it does **not** belong under Real Estate — Brookdale
+Senior Living is `Healthcare / Medical Care Facilities` at the vendor, a
+senior-housing **operator** that *leases from* these landlords. So the first pass
+left it on `Healthcare Services`, which made it the lone healthcare row in a
+subsector otherwise entirely Real Estate — consistent about the sector and
+incoherent about the bucket. **The wrong field had been identified.** JP: *"I
+want BKD in the coverage view but make its categorization consistent with changes
+made."*
+
+`BKD` is now `Healthcare Services / Post-Acute / Senior Housing`. `Post-Acute`
+already holds the operator peers (`ENSG`, `PACS`, `PNTG` skilled nursing, `EHC`
+inpatient rehab, `ADUS`/`AVAH` home health), so this reuses an existing bucket
+rather than minting a subsector for one name; the `Sub-subsector (JP)` records
+what it actually is, and reads deliberately against `JAN`/`NHP`'s
+`Senior Housing REIT` — **operator vs landlord, same words, opposite side of the
+lease.** It stays in the AA_Core coverage view on `Sector (JP)` alone (in
+`SECTORS`), so it never needed the `SCOPE_SUBSECTORS` clause and losing the
+`Healthcare Real Estate` subsector could not drop it. Verified: 239 rows, `BKD`
+present.
+
+⛑ **The lesson worth keeping: "make it consistent" did not mean "give it the
+same value".** BKD sharing a subsector with 19 REITs was the inconsistency;
+giving it their sector too would have made the taxonomy agree with itself and
+disagree with the world. When one row resists a sweep, check whether the sweep
+found the wrong field before you exempt the row.
 
 The migration ran in two steps: `ARE`, `DOC`, `VTR`, `WELL` on 2026-09-02 (the
 four that turned up in the S&P 500 Health Care gap check), then the remaining 15
 — `AHR CHCT CTRE DHC HR JAN KRC LTC MPT NHI NHP OHI SBRA STRW XRN` — on
 2026-09-03. Selection was gated on `YF Sector == "Real Estate"` rather than a
-hand-typed list, which is what isolated BKD.
+hand-typed list, which is what isolated `BKD` as not-a-REIT in the first place.
 
 ⛑ **`Subsector (JP)` deliberately did NOT change.** The subsector is the thing
 that says "this is healthcare", it is what `SCOPE_SUBSECTORS` keys the AA_Core

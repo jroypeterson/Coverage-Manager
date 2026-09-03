@@ -1479,8 +1479,8 @@
   "BKD": {
     "name": "Brookdale Senior Living Inc",
     "sector": "Healthcare Services",
-    "subsector": "Healthcare Real Estate",
-    "sub_subsector": "",
+    "subsector": "Post-Acute",
+    "sub_subsector": "Senior Housing",
     "core": ""
   },
   "BL": {
