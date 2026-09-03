@@ -1,7 +1,7 @@
 {
   "schema_version": 4,
-  "dataset_version": "2026-09-02",
-  "generated_at": "2026-09-02T20:38:14Z",
+  "dataset_version": "2026-09-03",
+  "generated_at": "2026-09-03T15:18:12Z",
   "source_path": "data/coverage_universe_tickers.csv",
   "row_count": 1347,
   "ticker_count": 1347,

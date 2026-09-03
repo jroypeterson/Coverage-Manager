@@ -87,6 +87,10 @@ SECTORS = ("Healthcare Services", "MedTech")
 # of this workbook -- and, through `docs/hc_coverage.csv`, out of his Google Sheet
 # -- on the next Friday build, with nothing anywhere reporting a change. JP:
 # *"I don't want those names to drop out of coverage list AA_Coverage."*
+# On 2026-09-03 the remaining 15 REITs in the subsector followed, so this clause
+# now carries NINETEEN rows rather than four -- which is the clearest evidence it
+# belongs here: had the fix been a per-name exception, the second migration would
+# have re-broken the book the day after the first was patched.
 # The distinction that resolves it: the GICS sector says which market an issuer
 # TRADES in, the subsector says what it IS. This workbook is about the latter, so
 # scope reads both. Any future sector re-map of a healthcare name must add its

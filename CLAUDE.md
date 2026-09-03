@@ -1804,13 +1804,46 @@ PBLS sorts near the BOTTOM of every cap-ranked screen and chart until FMP's
 share count is right or the first 10-Q lands. Do not "correct" it by hand —
 recheck after the first quarterly filing.
 
-**`KRC` under `Healthcare Services / Healthcare Real Estate` is a judgement
-call, not a misclassification.** FMP classifies Kilroy Realty as `REIT - Office`
-and on that alone it looks wrong. It is in the universe on its life-science lab
-exposure — the same rationale that puts Alexandria (`ARE`) there, and ARE is
-classified identically. Reclassifying KRC without also revisiting ARE would make
-the taxonomy less consistent, not more. Left as-is deliberately; if the HC-REIT
-sub-universe is ever revisited, revisit both together.
+**`KRC` under `Healthcare Services / Healthcare Real Estate` was a judgement
+call, not a misclassification — and it was RESOLVED on 2026-09-03 by revisiting
+both together, exactly as this note said it should be.** FMP classifies Kilroy
+Realty as `REIT - Office` and on that alone it looked wrong; it is in the universe
+on its life-science lab exposure, the same rationale that puts Alexandria (`ARE`)
+there. The note's rule was that moving KRC without ARE would make the taxonomy
+*less* consistent, not more. ARE moved to `Real Estate` on 2026-09-02, so KRC
+moved with it the next day along with the rest of the subsector — see the
+`Healthcare Real Estate` section below. Both are still `Subsector (JP) =
+Healthcare Real Estate`, so the lab-exposure rationale is intact and both remain
+in the AA_Core workbook.
+
+## `Healthcare Real Estate` — the whole subsector is `Sector (JP) = Real Estate` (2026-09-03)
+
+**19 of the 20 rows in the `Healthcare Real Estate` subsector carry
+`Sector (JP) = Real Estate`; `BKD` alone stays `Healthcare Services`, and that is
+not an oversight.** Brookdale Senior Living is `Healthcare / Medical Care
+Facilities` at the vendor — a senior-housing **operator** that *leases from* these
+landlords. It is not a REIT, so the GICS sector that applies to a REIT does not
+apply to it. JP's instruction was to make *the REITs* consistent, and BKD is the
+one row in the subsector that is not one.
+
+The migration ran in two steps: `ARE`, `DOC`, `VTR`, `WELL` on 2026-09-02 (the
+four that turned up in the S&P 500 Health Care gap check), then the remaining 15
+— `AHR CHCT CTRE DHC HR JAN KRC LTC MPT NHI NHP OHI SBRA STRW XRN` — on
+2026-09-03. Selection was gated on `YF Sector == "Real Estate"` rather than a
+hand-typed list, which is what isolated BKD.
+
+⛑ **`Subsector (JP)` deliberately did NOT change.** The subsector is the thing
+that says "this is healthcare", it is what `SCOPE_SUBSECTORS` keys the AA_Core
+workbook on, and it carries the `Sub-subsector (JP) = Senior Housing REIT` values
+on `JAN`/`NHP`. Row count through the workbook is **unchanged at 239** across both
+steps — verified, not assumed. What moved is only the answer to "which market does
+this issuer trade in".
+
+**Consequence, stated because it is real:** `Sector (JP) = Healthcare Services`
+went 103 → 84 and `Real Estate` went 2 → 21. Any consumer that counts or segments
+on `Sector (JP)` sees that shift; anything keyed on the subsector sees nothing. If
+a lane needs the HC-REITs back under healthcare, widen **that** lane on the
+subsector — do not mislabel the sector to sneak them in.
 
 ## Key conventions
 - Sector classification uses `Sector (JP)` and `Subsector (JP)` columns (user-defined taxonomy)
