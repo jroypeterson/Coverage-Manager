@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "dataset_version": "2026-09-04",
-  "generated_at": "2026-09-04T12:32:26Z",
+  "generated_at": "2026-09-04T12:34:31Z",
   "universe": "positions_union_core",
   "ticker_count": 345,
   "us_filer_count": 262,
