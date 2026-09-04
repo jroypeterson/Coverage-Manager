@@ -9427,5 +9427,40 @@
     "subsector": "Aerospace & Defense",
     "sub_subsector": "",
     "core": ""
+  },
+  "0625.HK": {
+    "name": "SHEIN Global Holdings Limited",
+    "sector": "Consumer",
+    "subsector": "E-Commerce",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "LFTO": {
+    "name": "Liftoff Mobile, Inc.",
+    "sector": "Tech",
+    "subsector": "Ad Tech / Mobile Marketing",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "AADX": {
+    "name": "Applied Aerospace & Defense, Inc.",
+    "sector": "Industrials",
+    "subsector": "Aerospace & Defense Components",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "LIME": {
+    "name": "Neutron Holdings, Inc.",
+    "sector": "Industrials",
+    "subsector": "Micromobility",
+    "sub_subsector": "",
+    "core": ""
+  },
+  "SSMR": {
+    "name": "Sunshine Silver Mining & Refining Company",
+    "sector": "Materials",
+    "subsector": "Precious Metals Mining",
+    "sub_subsector": "",
+    "core": ""
   }
 }

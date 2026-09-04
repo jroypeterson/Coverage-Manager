@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-04",
+  "candidates": [
+    {
+      "company": "SHEIN Global Holdings Limited",
+      "ticker": "0625.HK",
+      "exchange": "HKEX",
+      "market_cap": 26400000000,
+      "sector": "Consumer",
+      "subsector": "E-Commerce",
+      "listing_date": "2026-09-01",
+      "trigger": "IPO",
+      "peers": ["WMT", "LULU", "CROX", "FIVE", "CVNA"],
+      "reason": "Bucket 2: priced its HKEX IPO at HK$48.56 on 2026-08-31 for a market value of ~$26.4B, above the $25B any-sector bar. The 08-28, 08-21 and 08-14 reports each committed to adding it at pricing. Cap is the IPO valuation; the shares have since fallen ~21% to ~$20.8B.",
+      "business_summary": "We are an online fast-fashion and lifestyle retailer. We design and source apparel, beauty and homeware from a network of contract manufacturers, mostly in southern China, and sell it directly to consumers in the US, Europe, the Middle East and Asia through our own apps and websites. We make money on the gross margin between what we pay manufacturers and what shoppers pay us, and increasingly on marketplace commissions from third-party sellers we host. Our on-demand model starts with small production runs of a few hundred units and reorders only what sells, which is what lets us carry hundreds of thousands of SKUs without the inventory write-downs that define conventional apparel retail."
+    },
+    {
+      "company": "Liftoff Mobile, Inc.",
+      "ticker": "LFTO",
+      "exchange": "NASDAQ",
+      "market_cap": 3169885952,
+      "sector": "Tech",
+      "subsector": "Ad Tech / Mobile Marketing",
+      "listing_date": "2026-06-04",
+      "trigger": "Russell addition",
+      "peers": ["APP", "TTD", "GOOGL", "META"],
+      "reason": "Bucket 5: on FTSE Russell's Russell 2000 preliminary IPO-addition list dated 2026-08-21, effective 2026-09-21, at $3.17B. High-quality unit economics for the size - $870-880M FY26 revenue guidance at a 59% adjusted-EBITDA margin.",
+      "business_summary": "We are the growth and monetization engine for the mobile app economy. App developers who want users come to us to buy installs, and app publishers who want revenue let us fill their ad inventory; our Cortex machine-learning stack decides in real time which ad to show which person, and we take a margin on the media that flows through it. We generate revenue almost entirely from advertising spend routed through our platform - $220M in Q2 2026, up 35% year on year, our eleventh consecutive quarter of growth. Because the bidding, creative production and attribution all run on our own infrastructure, incremental spend drops through at high margin: we converted that into $132M of adjusted EBITDA in the quarter and $184M of trailing-twelve-month free cash flow."
+    },
+    {
+      "company": "Applied Aerospace & Defense, Inc.",
+      "ticker": "AADX",
+      "exchange": "NYSE",
+      "market_cap": 2160090880,
+      "sector": "Industrials",
+      "subsector": "Aerospace & Defense Components",
+      "listing_date": "2026-06-03",
+      "trigger": "Russell addition",
+      "peers": ["ARXS", "MDA", "HAWK", "CAT"],
+      "reason": "Bucket 5: on FTSE Russell's Russell 2000 preliminary IPO-addition list dated 2026-08-21, effective 2026-09-21, at $2.16B. Nearest adjacency in the book is the small space/defense-instrumentation cluster (ARXS, MDA, HAWK).",
+      "business_summary": "We design, engineer and manufacture mission-critical hardware for space, defense-aviation and precision-strike programmes - structures and assemblies that have to survive launch loads, re-entry heat and high-g flight. Our customers are prime contractors and next-generation space and defense companies who outsource the parts they cannot make to tolerance themselves; we bid on programmes, win multi-year positions on a platform, and earn revenue as we deliver against them plus aftermarket sustainment on legacy fleets. We run 11 purpose-built plants across six states with over 1.5 million square feet of production capacity. Revenue was $498.8M in 2025, up ~25%, and we carry a backlog of close to $1.1B, though we are not yet profitable - we lost $17M in 2025 and $15.1M in Q1 2026 as we scale capacity ahead of the programmes."
+    },
+    {
+      "company": "Neutron Holdings, Inc.",
+      "ticker": "LIME",
+      "exchange": "NASDAQ",
+      "market_cap": 2485807104,
+      "sector": "Industrials",
+      "subsector": "Micromobility",
+      "listing_date": "2026-07-01",
+      "trigger": "Russell addition",
+      "peers": ["UBER", "ACVA", "CVNA"],
+      "reason": "Bucket 5: on FTSE Russell's Russell 2000 preliminary IPO-addition list dated 2026-08-21, effective 2026-09-21, at $2.49B. Trades ~38% above its IPO valuation of ~$1.8B.",
+      "business_summary": "We rent e-scooters and e-bikes by the minute. We own the vehicles, deploy them on city streets under permits we negotiate with municipalities, and charge riders an unlock fee plus a per-minute rate through our app; a further slice of demand comes through Uber's app under a partnership that supplied roughly 14% of our revenue in 2025. We operated in about 230 cities across 29 countries at the end of 2025 and served 3.1 million monthly active users in Q1 2026, up 22% year on year. Revenue was $928M for the twelve months to 31 March 2026, having grown 29% in 2025 to $886.7M; the economics turn on vehicle lifetime and utilisation, which is why we design our own hardware rather than buying it."
+    },
+    {
+      "company": "Sunshine Silver Mining & Refining Company",
+      "ticker": "SSMR",
+      "exchange": "NYSE",
+      "market_cap": 2565520128,
+      "sector": "Materials",
+      "subsector": "Precious Metals Mining",
+      "listing_date": "2026-06-04",
+      "trigger": "Russell addition",
+      "peers": ["LIN"],
+      "reason": "Bucket 5: on FTSE Russell's Russell 2000 preliminary IPO-addition list dated 2026-08-21, effective 2026-09-21, at $2.57B. No adjacency to the coverage universe and pre-revenue - included because Bucket 5 is explicitly sector-agnostic. This is the clearest case for putting a relevance gate on Bucket 5.",
+      "business_summary": "We are restarting the Sunshine Mine in Idaho, one of the highest-grade primary silver deposits in the world, which has been idle for decades. We are pre-revenue: we hold the permits, the mine, an onsite refinery and the approvals needed to produce antimony as a by-product, and we are spending IPO proceeds on the development work needed to bring the complex back into production, currently targeted for 2028. When we produce, we will make money selling refined silver and antimony at prevailing market prices, so our earnings will be a function of grade, throughput and the metal price rather than of any contract we control. We raised $310.5M at $13.50 a share in June 2026 to fund that restart."
+    }
+  ]
+}

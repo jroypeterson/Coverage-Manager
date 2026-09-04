@@ -1,10 +1,10 @@
 {
   "schema_version": 4,
-  "dataset_version": "2026-09-03",
-  "generated_at": "2026-09-03T15:24:00Z",
+  "dataset_version": "2026-09-04",
+  "generated_at": "2026-09-04T12:32:25Z",
   "source_path": "data/coverage_universe_tickers.csv",
-  "row_count": 1347,
-  "ticker_count": 1347,
+  "row_count": 1352,
+  "ticker_count": 1352,
   "normalization_collisions": 0,
   "collision_examples": [],
   "validation_passed": true,
@@ -14,5 +14,5 @@
     "1 ticker-alias entry problem(s): alias entry FI: pinned cik 798354 != universe CIK 798354.0 \u2014 the identity anchor moved, so 'same issuer' is no longer evidenced",
     "185 ticker(s) missing Subsector (JP) value"
   ],
-  "last_discovery_run": "2026-08-28"
+  "last_discovery_run": "2026-09-04"
 }

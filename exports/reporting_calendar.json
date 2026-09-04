@@ -10,19 +10,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -170,19 +170,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -234,19 +234,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -266,19 +266,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -298,19 +298,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -330,19 +330,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -2864,19 +2864,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -3294,6 +3294,216 @@
       "fiscal_year": 2026,
       "fiscal_quarter": 3,
       "report_date": "2026-11-02",
+      "source": "finnhub",
+      "gating_eligible": true
+    }
+  },
+  "AHR": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 43,
+    "report_cadence_months": [
+      2,
+      3,
+      5,
+      8,
+      9,
+      11
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-08-06",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 19,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 3,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-06",
+        "period_end": "2026-06-30",
+        "eps_actual": 0.16,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-05-07",
+        "period_end": "2026-03-31",
+        "eps_actual": 0.13,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-02-26",
+        "period_end": null,
+        "eps_actual": 0.06,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-11-06",
+        "period_end": "2025-09-30",
+        "eps_actual": 0.33,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 2,
+        "report_date": "2025-08-07",
+        "period_end": "2025-06-30",
+        "eps_actual": 0.06,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 1,
+        "report_date": "2025-05-08",
+        "period_end": "2025-03-31",
+        "eps_actual": -0.04,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_date": "2025-02-27",
+        "period_end": null,
+        "eps_actual": -0.21,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 3,
+        "report_date": "2024-11-12",
+        "period_end": "2024-09-30",
+        "eps_actual": -0.03,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 2,
+        "report_date": "2024-08-05",
+        "period_end": "2024-06-30",
+        "eps_actual": 0.01,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "report_date": "2024-05-13",
+        "period_end": "2024-03-31",
+        "eps_actual": -0.04,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 4,
+        "report_date": "2024-03-21",
+        "period_end": null,
+        "eps_actual": -0.42,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 2,
+        "report_date": "2023-09-29",
+        "period_end": "2023-06-30",
+        "eps_actual": -0.0907,
+        "label_sources": [
+          "sec_xbrl"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "report_date": "2026-11-09",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -4642,19 +4852,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -5744,6 +5954,216 @@
       "report_date": "2026-11-10",
       "source": "finnhub",
       "gating_eligible": false
+    }
+  },
+  "ARE": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 27,
+    "report_cadence_months": [
+      1,
+      4,
+      7,
+      8,
+      10
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-08-03",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 50,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 2,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-03",
+        "period_end": "2026-06-30",
+        "eps_actual": -0.43,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-04-27",
+        "period_end": "2026-03-31",
+        "eps_actual": 1.73,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-01-26",
+        "period_end": null,
+        "eps_actual": 2.16,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-10-27",
+        "period_end": "2025-09-30",
+        "eps_actual": 2.22,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 2,
+        "report_date": "2025-07-21",
+        "period_end": "2025-06-30",
+        "eps_actual": 2.33,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 1,
+        "report_date": "2025-04-28",
+        "period_end": "2025-03-31",
+        "eps_actual": 2.3,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_date": "2025-01-27",
+        "period_end": null,
+        "eps_actual": 2.39,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 3,
+        "report_date": "2024-10-21",
+        "period_end": "2024-09-30",
+        "eps_actual": 2.37,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 2,
+        "report_date": "2024-07-22",
+        "period_end": "2024-06-30",
+        "eps_actual": 2.36,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "report_date": "2024-04-22",
+        "period_end": "2024-03-31",
+        "eps_actual": 2.35,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 4,
+        "report_date": "2024-01-29",
+        "period_end": null,
+        "eps_actual": 2.28,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 3,
+        "report_date": "2023-10-23",
+        "period_end": "2023-09-30",
+        "eps_actual": 2.26,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-26",
+      "source": "finnhub",
+      "gating_eligible": true
     }
   },
   "ARGX": {
@@ -13420,19 +13840,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -13663,19 +14083,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -14730,9 +15150,9 @@
       }
     ],
     "next_expected": {
-      "fiscal_year": 2026,
-      "fiscal_quarter": 4,
-      "report_date": "2026-09-02",
+      "fiscal_year": 2027,
+      "fiscal_quarter": 1,
+      "report_date": "2026-11-18",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -16248,19 +16668,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -16695,19 +17115,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 39,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -18221,19 +18641,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -18241,6 +18661,217 @@
     "cross_checks": {},
     "recent_quarters": [],
     "next_expected": null
+  },
+  "DOC": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 33,
+    "report_cadence_months": [
+      2,
+      4,
+      5,
+      7,
+      8,
+      10
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-08-04",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 50,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 2,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-04",
+        "period_end": "2026-06-30",
+        "eps_actual": 0.08,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-05-05",
+        "period_end": "2026-03-31",
+        "eps_actual": 0.28,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-02-02",
+        "period_end": null,
+        "eps_actual": 0.47,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-10-23",
+        "period_end": "2025-09-30",
+        "eps_actual": 0.46,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 2,
+        "report_date": "2025-07-24",
+        "period_end": "2025-06-30",
+        "eps_actual": 0.46,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 1,
+        "report_date": "2025-04-24",
+        "period_end": "2025-03-31",
+        "eps_actual": 0.46,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_date": "2025-02-03",
+        "period_end": null,
+        "eps_actual": 0.46,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 3,
+        "report_date": "2024-10-24",
+        "period_end": "2024-09-30",
+        "eps_actual": 0.45,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 2,
+        "report_date": "2024-07-25",
+        "period_end": "2024-06-30",
+        "eps_actual": 0.45,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "report_date": "2024-04-25",
+        "period_end": "2024-03-31",
+        "eps_actual": 0.45,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 4,
+        "report_date": "2024-02-08",
+        "period_end": null,
+        "eps_actual": 0.46,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 3,
+        "report_date": "2023-10-30",
+        "period_end": "2023-09-30",
+        "eps_actual": 0.45,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-21",
+      "source": "finnhub",
+      "gating_eligible": true
+    }
   },
   "DOCS": {
     "fye_month": 3,
@@ -19927,19 +20558,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -22743,19 +23374,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -23615,19 +24246,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -24273,19 +24904,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
-        "n_rows": 37,
+        "fetched_at": "2026-09-04",
+        "n_rows": 38,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -29159,6 +29790,68 @@
       "gating_eligible": false
     }
   },
+  "JAN": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 64,
+    "report_cadence_months": [
+      8,
+      9
+    ],
+    "monotonic": false,
+    "last_report_date": "2026-09-02",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 2,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 0,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-09-02",
+        "period_end": "2026-06-30",
+        "eps_actual": null,
+        "label_sources": [
+          "sec_xbrl"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-04",
+        "period_end": "2026-06-30",
+        "eps_actual": 0.05,
+        "label_sources": [
+          "sec_xbrl"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      }
+    ],
+    "next_expected": null
+  },
   "JNJ": {
     "fye_month": 12,
     "calendar_aligned": true,
@@ -31869,19 +32562,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -32094,8 +32787,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 2,
-      "report_date": "2026-09-02",
+      "fiscal_quarter": 3,
+      "report_date": "2026-12-09",
       "source": "finnhub",
       "gating_eligible": false
     }
@@ -33576,8 +34269,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 1,
-      "report_date": "2026-09-01",
+      "fiscal_quarter": 2,
+      "report_date": "2026-11-16",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -34200,13 +34893,7 @@
         "gating_eligible": true
       }
     ],
-    "next_expected": {
-      "fiscal_year": 2027,
-      "fiscal_quarter": 1,
-      "report_date": "2026-09-01",
-      "source": "finnhub",
-      "gating_eligible": false
-    }
+    "next_expected": null
   },
   "MMSI": {
     "fye_month": 12,
@@ -39103,19 +39790,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
-        "n_rows": 28,
+        "fetched_at": "2026-09-04",
+        "n_rows": 29,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -40175,9 +40862,9 @@
       }
     ],
     "next_expected": {
-      "fiscal_year": 2026,
-      "fiscal_quarter": 4,
-      "report_date": "2026-09-02",
+      "fiscal_year": 2027,
+      "fiscal_quarter": 1,
+      "report_date": "2026-11-03",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -41672,8 +42359,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 2,
-      "report_date": "2026-09-02",
+      "fiscal_quarter": 3,
+      "report_date": "2026-12-07",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -46031,19 +46718,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -46095,19 +46782,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
-        "n_rows": 49,
+        "fetched_at": "2026-09-04",
+        "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -46754,19 +47441,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -48382,19 +49069,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -48407,7 +49094,7 @@
     "fye_month": 12,
     "calendar_aligned": true,
     "filer_type": "us_gaap",
-    "typical_lag_days": 41,
+    "typical_lag_days": 40,
     "report_cadence_months": [
       3,
       5,
@@ -48415,29 +49102,43 @@
       11
     ],
     "monotonic": true,
-    "last_report_date": "2026-05-06",
+    "last_report_date": "2026-08-04",
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
-        "n_rows": 26,
+        "fetched_at": "2026-09-04",
+        "n_rows": 27,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 2,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": true,
         "error": null
       }
     },
     "cross_checks": {},
     "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-04",
+        "period_end": "2026-06-30",
+        "eps_actual": -0.12,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
       {
         "fiscal_year": 2026,
         "fiscal_quarter": 1,
@@ -48581,20 +49282,6 @@
         "report_date": "2023-11-08",
         "period_end": "2023-09-30",
         "eps_actual": 0.0036,
-        "label_sources": [
-          "sec_xbrl",
-          "finnhub"
-        ],
-        "sec_finnhub_agree": true,
-        "confidence": "high",
-        "gating_eligible": true
-      },
-      {
-        "fiscal_year": 2023,
-        "fiscal_quarter": 2,
-        "report_date": "2023-08-09",
-        "period_end": "2023-06-30",
-        "eps_actual": -0.11,
         "label_sources": [
           "sec_xbrl",
           "finnhub"
@@ -49036,19 +49723,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-07-31",
-        "n_rows": 48,
+        "fetched_at": "2026-09-04",
+        "n_rows": 49,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-07-31",
+        "fetched_at": "2026-09-04",
         "covered": false,
         "error": null
       }
@@ -56101,8 +56788,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 2,
-      "report_date": "2026-09-02",
+      "fiscal_quarter": 3,
+      "report_date": "2026-11-18",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -56993,6 +57680,427 @@
       "fiscal_year": 2026,
       "fiscal_quarter": 3,
       "report_date": "2026-11-02",
+      "source": "finnhub",
+      "gating_eligible": true
+    }
+  },
+  "VTR": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 29,
+    "report_cadence_months": [
+      2,
+      4,
+      5,
+      7,
+      8,
+      10,
+      11
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-07-29",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 50,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 2,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-07-29",
+        "period_end": "2026-06-30",
+        "eps_actual": 0.14,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-04-27",
+        "period_end": "2026-03-31",
+        "eps_actual": 0.12,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-02-05",
+        "period_end": null,
+        "eps_actual": 0.15,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-10-29",
+        "period_end": "2025-09-30",
+        "eps_actual": 0.88,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 2,
+        "report_date": "2025-07-30",
+        "period_end": "2025-06-30",
+        "eps_actual": 0.87,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 1,
+        "report_date": "2025-04-30",
+        "period_end": "2025-03-31",
+        "eps_actual": 0.84,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_date": "2025-02-12",
+        "period_end": null,
+        "eps_actual": 0.81,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 3,
+        "report_date": "2024-10-30",
+        "period_end": "2024-09-30",
+        "eps_actual": 0.8,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 2,
+        "report_date": "2024-08-01",
+        "period_end": "2024-06-30",
+        "eps_actual": 0.8,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "report_date": "2024-05-01",
+        "period_end": "2024-03-31",
+        "eps_actual": 0.78,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 4,
+        "report_date": "2024-02-14",
+        "period_end": null,
+        "eps_actual": 0.76,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 3,
+        "report_date": "2023-11-02",
+        "period_end": "2023-09-30",
+        "eps_actual": 0.75,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "report_date": "2026-10-27",
+      "source": "finnhub",
+      "gating_eligible": true
+    }
+  },
+  "VTRS": {
+    "fye_month": 12,
+    "calendar_aligned": true,
+    "filer_type": "us_gaap",
+    "typical_lag_days": 38,
+    "report_cadence_months": [
+      2,
+      5,
+      8,
+      11
+    ],
+    "monotonic": true,
+    "last_report_date": "2026-08-06",
+    "sources": {
+      "dates": {
+        "provider": "api_ninjas",
+        "fetched_at": "2026-09-04",
+        "n_rows": 50,
+        "error": null
+      },
+      "anchor": {
+        "provider": "finnhub",
+        "fetched_at": "2026-09-04",
+        "n_events": 3,
+        "error": null
+      },
+      "sec_label": {
+        "provider": "sec_xbrl",
+        "fetched_at": "2026-09-04",
+        "covered": true,
+        "error": null
+      }
+    },
+    "cross_checks": {},
+    "recent_quarters": [
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 2,
+        "report_date": "2026-08-06",
+        "period_end": "2026-06-30",
+        "eps_actual": 0.69,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2026,
+        "fiscal_quarter": 1,
+        "report_date": "2026-05-07",
+        "period_end": "2026-03-31",
+        "eps_actual": 0.59,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
+        "report_date": "2026-02-26",
+        "period_end": null,
+        "eps_actual": 0.57,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 3,
+        "report_date": "2025-11-06",
+        "period_end": "2025-09-30",
+        "eps_actual": 0.67,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 2,
+        "report_date": "2025-08-07",
+        "period_end": "2025-06-30",
+        "eps_actual": 0.62,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 1,
+        "report_date": "2025-05-08",
+        "period_end": "2025-03-31",
+        "eps_actual": 0.5,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
+        "report_date": "2025-02-27",
+        "period_end": null,
+        "eps_actual": 0.54,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 3,
+        "report_date": "2024-11-07",
+        "period_end": "2024-09-30",
+        "eps_actual": 0.75,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 2,
+        "report_date": "2024-08-08",
+        "period_end": "2024-06-30",
+        "eps_actual": 0.69,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2024,
+        "fiscal_quarter": 1,
+        "report_date": "2024-05-09",
+        "period_end": "2024-03-31",
+        "eps_actual": 0.67,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 4,
+        "report_date": "2024-02-28",
+        "period_end": null,
+        "eps_actual": 0.61,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2023,
+        "fiscal_quarter": 3,
+        "report_date": "2023-11-07",
+        "period_end": "2023-09-30",
+        "eps_actual": 0.78,
+        "label_sources": [
+          "sec_xbrl",
+          "finnhub"
+        ],
+        "sec_finnhub_agree": true,
+        "confidence": "high",
+        "gating_eligible": true
+      }
+    ],
+    "next_expected": {
+      "fiscal_year": 2026,
+      "fiscal_quarter": 3,
+      "report_date": "2026-11-04",
       "source": "finnhub",
       "gating_eligible": true
     }
