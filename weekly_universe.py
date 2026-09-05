@@ -305,8 +305,10 @@ def _step_export_artifacts(validation_result):
                 "purpose": (
                     "Positions and researching list joined with universe "
                     "metadata — all coverage universe columns plus Position, "
-                    "Position Date, Buy Price, Sell Price, First Buy Date, "
-                    "Average Cost, Shares, Notes appended at the end."
+                    "Position Date, First Buy Date, Average Cost, Shares, "
+                    "Notes appended at the end. (Buy Price / Sell Price were "
+                    "removed 2026-09-05; price targets live on the portfolio "
+                    "workbook's Decision Sheet.)"
                 ),
                 "format": "csv",
             },
@@ -314,7 +316,7 @@ def _step_export_artifacts(validation_result):
                 "name": "portfolio.json",
                 "purpose": (
                     "Position == 'Portfolio' rows only (names you own). "
-                    "{ticker: {position, position_date, buy_price, sell_price, "
+                    "{ticker: {position, position_date, "
                     "first_buy_date, average_cost, shares, notes, name, "
                     "sector, subsector, sub_subsector, <all universe columns...>}}."
                 ),
@@ -365,8 +367,7 @@ def _step_export_artifacts(validation_result):
                 "name": "watchlist.csv",
                 "purpose": (
                     "DEPRECATED back-compat (one cycle): legacy watchlist "
-                    "shape derived from positions_and_researching.csv. "
-                    "Sell Price is mapped to Target Price. Use "
+                    "shape derived from positions_and_researching.csv. Use "
                     "positions_and_researching.csv for new code."
                 ),
                 "format": "csv",
@@ -458,8 +459,8 @@ def _step_export_positions():
     And keeps writing the legacy back-compat artifacts for one cycle so
     sibling consumers (sigma-alert, earnings_agent, analyst-days) continue
     working until they migrate:
-      - watchlist.csv                   — derived from positions; legacy 5-col
-                                          schema (Sell Price -> Target Price)
+      - watchlist.csv                   — derived from positions; legacy
+                                          schema, minus the price columns
       - watchlist.json                  — same shape as before; auto-derived
       - watchlist_status.json           — same shape as before
 
@@ -542,8 +543,6 @@ def _step_export_positions():
             entry = {
                 "position": pos.published_position(e),
                 "position_date": e.get("Position Date", ""),
-                "buy_price": e.get("Buy Price"),
-                "sell_price": e.get("Sell Price"),
                 "first_buy_date": e.get("First Buy Date", ""),
                 "average_cost": e.get("Average Cost"),
                 "shares": e.get("Shares"),
@@ -631,7 +630,8 @@ def _step_export_positions():
 
     # ── BACK-COMPAT (one cycle): watchlist.csv / .json / _status.json ───────
     # Derived from positions via the universe.watchlist shim, which projects
-    # the new schema down to the legacy 5-col shape (Sell Price -> Target).
+    # the new schema down to the legacy shape. The price columns left both
+    # on 2026-09-05 -- see universe/positions.py.
     legacy_entries = wl.load(wl.WATCHLIST_PATH)  # via shim
     legacy_errors, legacy_warnings = wl.validate(legacy_entries, universe_csv_path=CSV_PATH)
     legacy_unique_cols = [c for c in wl.WATCHLIST_COLUMNS if c != "Ticker"]
@@ -649,8 +649,6 @@ def _step_export_positions():
             t = e["Ticker"]
             row = dict(universe_rows.get(t, {}))
             row["Ticker"] = t
-            row["Buy Price"] = "" if e.get("Buy Price") is None else e["Buy Price"]
-            row["Target Price"] = "" if e.get("Target Price") is None else e["Target Price"]
             row["Date Added"] = e.get("Date Added", "")
             row["Notes"] = e.get("Notes", "")
             writer.writerow(row)
@@ -661,8 +659,6 @@ def _step_export_positions():
         meta = metadata.get(meta_key, {})
         row = universe_rows.get(t, {})
         entry = {
-            "buy_price": e.get("Buy Price"),
-            "target_price": e.get("Target Price"),
             "date_added": e.get("Date Added", ""),
             "notes": e.get("Notes", ""),
             "name": meta.get("name", ""),

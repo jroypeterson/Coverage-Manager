@@ -32,7 +32,9 @@ logger = get_logger("universe.watchlist")
 
 # Path that read-only callers may inspect. Points at the new source file.
 WATCHLIST_PATH = positions.POSITIONS_PATH
-WATCHLIST_COLUMNS = ["Ticker", "Buy Price", "Target Price", "Date Added", "Notes"]
+# `Buy Price` / `Target Price` left this shape on 2026-09-05 along with the
+# columns behind them. Price targets moved to the workbook's Decision Sheet 2026-09-05; see universe/positions.py for why.
+WATCHLIST_COLUMNS = ["Ticker", "Date Added", "Notes"]
 
 
 # Re-export for callers that catch this exception type.
@@ -43,8 +45,6 @@ def _to_watchlist_shape(entry):
     """Project a positions-shape dict to the legacy watchlist shape."""
     return {
         "Ticker": entry["Ticker"],
-        "Buy Price": entry.get("Buy Price"),
-        "Target Price": entry.get("Sell Price"),  # semantic mapping
         "Date Added": entry.get("Position Date", ""),
         "Notes": entry.get("Notes", ""),
     }
@@ -117,12 +117,6 @@ def validate(entries, universe_csv_path=None):
                     f"{t}: missing universe metadata for {', '.join(missing)} — "
                     f"fix the universe CSV row before using this ticker"
                 )
-        buy = e.get("Buy Price")
-        tgt = e.get("Target Price")
-        if buy is not None and tgt is not None and tgt <= buy:
-            warnings.append(
-                f"{t}: target price ({tgt}) is not above buy price ({buy})"
-            )
     return errors, warnings
 
 

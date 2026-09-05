@@ -9,8 +9,23 @@ or trigger-ready for entry on either side). It is NOT mixed into
 canonical artifact consumed by sibling projects; position state is personal.
 
 Schema (`data/positions_and_researching.csv`):
-    Ticker, Position, Position Date, Buy Price, Sell Price,
+    Ticker, Position, Position Date,
     First Buy Date, Average Cost, Shares, Notes
+
+`Buy Price` / `Sell Price` were REMOVED on 2026-09-05 (JP: *"Decision sheet can
+own it"*). They are judgements with no external source of truth -- no broker can
+correct a price target the way the broker feed corrects `Held` -- so they belong
+where the reasoning that produced them lives: beside `Sell Triggers -
+Fundamental`, the KPIs and the DD link on the workbook's Decision Sheet, as
+`Buy Below` / `Sell Above`.
+
+Three facts decided it. Nothing wrote them here (the `positions add --buy/--sell`
+CLI had not set a target since 2026-05-03). Nothing meaningfully read them
+(`sigma_screener` loads only the ticker set). And the single populated value in
+91 rows was actively wrong: WAY's 4-month-old entry trigger of 15.0 sat 43%
+under the price on a name already held, and the Monday report printed it as
+"+74.93% vs Buy" every week. The workbook now renders a target older than 90
+days as "stale" instead of as a percentage.
 
 Position values:
     "Portfolio"              — names you own (any size, full or starter)
@@ -20,27 +35,16 @@ Position values:
                                 signal but have no intent to trade
                                 (passive tracking; no thesis work)
     "Ready to Buy"           — long thesis complete; waiting for the entry
-                                trigger (typically a price level on Buy Price)
+                                trigger (the level itself lives on the
+                                workbook's Decision Sheet, as `Buy Below`)
     "Ready to Short"         — short thesis complete; waiting for the entry
-                                trigger (typically a price level on Sell Price,
+                                trigger (`Sell Above` on the Decision Sheet,
                                 since short entry is at the high and cover
                                 is at the low)
 
 Rules:
   - Every ticker must exist in the coverage universe (strict subset).
   - Position must be one of the five enum values (case-sensitive).
-  - Buy Price semantics:
-      * Portfolio              — historical/avg entry reference (often blank)
-      * Researching            — forward entry target
-      * Following for Interest — informational only (typically blank)
-      * Ready to Buy           — entry trigger (the level you're waiting on)
-      * Ready to Short         — cover/exit target (low side of the short)
-  - Sell Price semantics:
-      * Portfolio              — exit target (sell-side trigger)
-      * Researching            — exit target once held
-      * Following for Interest — informational only (typically blank)
-      * Ready to Buy           — exit target once held
-      * Ready to Short         — short-entry trigger (the level you're waiting on)
   - First Buy Date / Average Cost / Shares will eventually be auto-populated
     from broker integration (IBKR / Fidelity); empty today.
   - Notes is free-form.
@@ -63,7 +67,6 @@ logger = get_logger("universe.positions")
 POSITIONS_PATH = DATA_DIR / "positions_and_researching.csv"
 POSITIONS_COLUMNS = [
     "Ticker", "Position Date",
-    "Buy Price", "Sell Price",
     "First Buy Date", "Average Cost", "Shares",
     "Notes",
     # DERIVED from portfolio_daily's broker feed -- see universe/held.py. Never
@@ -192,8 +195,6 @@ def load(path=POSITIONS_PATH):
             entry = {
                 "Ticker": ticker,
                 "Position Date": (row.get("Position Date") or "").strip(),
-                "Buy Price": _parse_price(row.get("Buy Price"), "Buy Price"),
-                "Sell Price": _parse_price(row.get("Sell Price"), "Sell Price"),
                 "First Buy Date": (row.get("First Buy Date") or "").strip(),
                 "Average Cost": _parse_price(row.get("Average Cost"), "Average Cost"),
                 "Shares": _parse_shares(row.get("Shares"), "Shares"),
@@ -279,8 +280,6 @@ def save(entries, path=POSITIONS_PATH):
             writer.writerow({
                 "Ticker": e["Ticker"],
                 "Position Date": e.get("Position Date", ""),
-                "Buy Price": "" if e.get("Buy Price") is None else e["Buy Price"],
-                "Sell Price": "" if e.get("Sell Price") is None else e["Sell Price"],
                 "First Buy Date": e.get("First Buy Date", ""),
                 "Average Cost": "" if e.get("Average Cost") is None else e["Average Cost"],
                 "Shares": "" if e.get("Shares") is None else e["Shares"],
@@ -350,12 +349,6 @@ def validate(entries, universe_csv_path=CSV_PATH):
                     f"fix the universe CSV row before using this ticker"
                 )
 
-        buy = e.get("Buy Price")
-        sell = e.get("Sell Price")
-        if buy is not None and sell is not None and sell <= buy:
-            warnings.append(
-                f"{t}: sell price ({sell}) is not above buy price ({buy})"
-            )
     return errors, warnings
 
 
@@ -384,7 +377,7 @@ def _append_universe_row(row, universe_csv_path=CSV_PATH):
         writer.writerows(existing_rows)
 
 
-def add(ticker, position, buy_price=None, sell_price=None, notes="",
+def add(ticker, position, notes="",
         first_buy_date="", average_cost=None, shares=None,
         path=POSITIONS_PATH, universe_csv_path=CSV_PATH, today=None,
         create_if_missing=False, sector_jp=None, exchange_hint=None,
@@ -431,15 +424,8 @@ def add(ticker, position, buy_price=None, sell_price=None, notes="",
         except EnrichError as e:
             raise PositionsError(f"could not enrich {ticker}: {e}") from e
 
-    buy = _parse_price(buy_price, "Buy Price") if buy_price not in (None, "") else None
-    sell = _parse_price(sell_price, "Sell Price") if sell_price not in (None, "") else None
     avg_cost = _parse_price(average_cost, "Average Cost") if average_cost not in (None, "") else None
     n_shares = _parse_shares(shares, "Shares") if shares not in (None, "") else None
-
-    if buy is not None and sell is not None and sell <= buy:
-        raise PositionsError(
-            f"sell price ({sell}) must be above buy price ({buy})"
-        )
 
     entries = load(path)
     existing = next((e for e in entries if e["Ticker"] == ticker), None)
@@ -451,10 +437,6 @@ def add(ticker, position, buy_price=None, sell_price=None, notes="",
         # use `set_state`, which touches one flag and leaves the rest alone.
         for _f in STATE_FLAGS:
             existing[_f] = "Y" if _f == position else ""
-        if buy is not None:
-            existing["Buy Price"] = buy
-        if sell is not None:
-            existing["Sell Price"] = sell
         if first_buy_date:
             existing["First Buy Date"] = first_buy_date
         if avg_cost is not None:
@@ -468,8 +450,6 @@ def add(ticker, position, buy_price=None, sell_price=None, notes="",
         entry = {
             "Ticker": ticker,
             "Position Date": (today or date.today().isoformat()),
-            "Buy Price": buy,
-            "Sell Price": sell,
             "First Buy Date": first_buy_date or "",
             "Average Cost": avg_cost,
             "Shares": n_shares,

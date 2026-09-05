@@ -101,7 +101,7 @@ def build_sigma_metadata(csv_path):
 
 def build_core_watchlist_payload(csv_path):
     """DEPRECATED — back-compat wrapper. Returns the union of portfolio +
-    researching, in the legacy watchlist shape (Sell Price -> Target Price).
+    researching, in the legacy watchlist shape.
 
     Use `build_portfolio_payload` and `build_researching_payload` for new code.
     Will be removed once sigma-alert's screener migrates to the new files.
@@ -116,8 +116,6 @@ def build_core_watchlist_payload(csv_path):
         meta_key = t.split()[0].split(".")[0].upper()
         meta = metadata.get(meta_key, {})
         out[t] = {
-            "buy_price": e.get("Buy Price"),
-            "target_price": e.get("Target Price"),
             "date_added": e.get("Date Added", ""),
             "notes": e.get("Notes", ""),
             "name": meta.get("name", ""),
@@ -168,8 +166,6 @@ def _build_position_payload(csv_path, position_value):
         out[t] = {
             "position": positions.published_position(e),
             "position_date": e.get("Position Date", ""),
-            "buy_price": e.get("Buy Price"),
-            "sell_price": e.get("Sell Price"),
             "first_buy_date": e.get("First Buy Date", ""),
             "average_cost": e.get("Average Cost"),
             "shares": e.get("Shares"),

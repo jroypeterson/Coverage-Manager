@@ -435,8 +435,9 @@ def build_parser():
             "trigger)."
         ),
     )
-    pos_add.add_argument("--buy", type=float, default=None, help="Buy price target (entry).")
-    pos_add.add_argument("--sell", type=float, default=None, help="Sell price target (exit).")
+    # --buy / --sell REMOVED 2026-09-05. Price targets moved to the workbook's
+    # Decision Sheet (`Buy Below` / `Sell Above`); see universe/positions.py.
+    # They had not been used to set a target since 2026-05-03.
     pos_add.add_argument("--first-buy-date", type=str, default="", help="First buy date (ISO).")
     pos_add.add_argument("--average-cost", type=float, default=None, help="Average cost basis.")
     pos_add.add_argument("--shares", type=int, default=None, help="Shares held.")
@@ -897,8 +898,6 @@ def main():
                 result = positions.add(
                     args.ticker,
                     position=args.position,
-                    buy_price=args.buy,
-                    sell_price=args.sell,
                     first_buy_date=args.first_buy_date,
                     average_cost=args.average_cost,
                     shares=args.shares,
@@ -934,11 +933,9 @@ def main():
             if not entries:
                 print("(positions file is empty)")
             else:
-                print(f"{'Ticker':<10}{'Position':<16}{'Buy':>10}{'Sell':>10}  {'Date':<12} Notes")
+                print(f"{'Ticker':<10}{'Position':<16}{'Date':<12} Notes")
                 for e in entries:
-                    buy = "" if e["Buy Price"] is None else f"{e['Buy Price']:g}"
-                    sell = "" if e["Sell Price"] is None else f"{e['Sell Price']:g}"
-                    print(f"{e['Ticker']:<10}{e['Position']:<16}{buy:>10}{sell:>10}  {e['Position Date']:<12} {e['Notes']}")
+                    print(f"{e['Ticker']:<10}{e['Position']:<16}{e['Position Date']:<12} {e['Notes']}")
                 counts = {
                     name: sum(1 for e in entries if e["Position"] == name)
                     for name in positions.POSITION_VALUES_ORDERED

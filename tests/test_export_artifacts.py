@@ -249,11 +249,11 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
 
     pos_csv = tmp_path / "positions_and_researching.csv"
     pos.add(
-        "AAPL", position="Researching", sell_price=220, notes="core long",
+        "AAPL", position="Researching", notes="core long",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
     )
     pos.add(
-        "MRNA", position="Researching", buy_price=40, notes="watching",
+        "MRNA", position="Researching", notes="watching",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-12",
     )
     # AAPL is OWNED. Since 2026-08-23 that is a broker-derived fact in the `Held`
@@ -298,7 +298,6 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert "AAPL" in portfolio
     assert "MRNA" not in portfolio
     assert portfolio["AAPL"]["position"] == "Portfolio"
-    assert portfolio["AAPL"]["sell_price"] == 220
     assert portfolio["AAPL"]["name"] == "Apple Inc"
 
     # researching.json: Researching rows only
@@ -306,7 +305,6 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert "MRNA" in researching
     assert "AAPL" not in researching
     assert researching["MRNA"]["position"] == "Researching"
-    assert researching["MRNA"]["buy_price"] == 40
 
     # Empty trigger-ready and following files in this fixture
     assert json.loads((exports_dir / "following_for_interest.json").read_text(encoding="utf-8")) == {}
@@ -325,7 +323,11 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     # consumer reading by name (they all use DictReader) is unaffected -- and they
     # now get the ownership fact and each state separately instead of a scalar that
     # can only say one thing at a time.
-    assert header[-16:] == ["Position Date", "Buy Price", "Sell Price",
+    # `Buy Price` / `Sell Price` left this header on 2026-09-05 -- price targets
+    # moved to the portfolio workbook's Decision Sheet. Count updated with the
+    # names: a slice width that no longer matches the list it asserts would pass
+    # or fail for the wrong reason.
+    assert header[-14:] == ["Position Date",
                             "First Buy Date", "Average Cost", "Shares", "Notes",
                             "Held", "Held As Of", "Previously Held", "Held Until",
                             "Researching", "Following for Interest",
@@ -334,7 +336,6 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     assert len(rows) == 2
     aapl_row = next(r for r in rows if r["Ticker"] == "AAPL")
     assert aapl_row["Position"] == "Portfolio"
-    assert aapl_row["Sell Price"] == "220.0"
 
     # Status file
     status = json.loads((exports_dir / "positions_status.json").read_text(encoding="utf-8"))
@@ -351,7 +352,6 @@ def test_positions_export_writes_artifacts(monkeypatch, tmp_path, fixture_csv):
     # with Sell Price mapped to Target Price
     legacy = json.loads((exports_dir / "watchlist.json").read_text(encoding="utf-8"))
     assert "AAPL" in legacy and "MRNA" in legacy
-    assert legacy["AAPL"]["target_price"] == 220  # was Sell Price
 
 
 def test_positions_export_routes_following_for_interest(monkeypatch, tmp_path, fixture_csv):
@@ -401,11 +401,11 @@ def test_positions_export_routes_ready_states(monkeypatch, tmp_path, fixture_csv
     # AAPL → Ready to Buy with a buy-trigger level; MRNA → Ready to Short
     # with a sell-trigger level (short entry is at the high).
     pos.add(
-        "AAPL", position="Ready to Buy", buy_price=180, notes="enter on dip",
+        "AAPL", position="Ready to Buy", notes="enter on dip",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08",
     )
     pos.add(
-        "MRNA", position="Ready to Short", sell_price=120, notes="short the bounce",
+        "MRNA", position="Ready to Short", notes="short the bounce",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08",
     )
 
@@ -424,8 +424,6 @@ def test_positions_export_routes_ready_states(monkeypatch, tmp_path, fixture_csv
 
     rtb = json.loads((exports_dir / "ready_to_buy.json").read_text(encoding="utf-8"))
     rts = json.loads((exports_dir / "ready_to_short.json").read_text(encoding="utf-8"))
-    assert "AAPL" in rtb and rtb["AAPL"]["buy_price"] == 180
-    assert "MRNA" in rts and rts["MRNA"]["sell_price"] == 120
 
     # Cross-check: rtb/rts entries do NOT leak into portfolio/researching.
     portfolio = json.loads((exports_dir / "portfolio.json").read_text(encoding="utf-8"))

@@ -134,7 +134,7 @@ def test_build_core_watchlist_payload_joins_universe_metadata(
     from universe import watchlist as wl
     monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
     pos.add(
-        "AAPL", position="Researching", sell_price=220, notes="core long",
+        "AAPL", position="Researching", notes="core long",
         path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11",
     )
 
@@ -144,7 +144,6 @@ def test_build_core_watchlist_payload_joins_universe_metadata(
     assert set(payload.keys()) == {"AAPL"}
     entry = payload["AAPL"]
     # Sell Price -> Target Price in the legacy shape
-    assert entry["target_price"] == 220
     assert entry["notes"] == "core long"
     assert entry["name"] == "Apple Inc"
     assert entry["sector"] == "Tech"
@@ -162,10 +161,8 @@ def test_build_portfolio_payload_filters_to_portfolio_rows(
 
     pos_csv = tmp_path / "positions_and_researching.csv"
     monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
-    pos.add("AAPL", position="Researching", sell_price=220,
-            path=pos_csv, universe_csv_path=fixture_csv)
-    pos.add("MRNA", position="Researching", buy_price=40,
-            path=pos_csv, universe_csv_path=fixture_csv)
+    pos.add("AAPL", position="Researching", path=pos_csv, universe_csv_path=fixture_csv)
+    pos.add("MRNA", position="Researching", path=pos_csv, universe_csv_path=fixture_csv)
     _mark_held(pos_csv, "AAPL")
 
     portfolio = build_portfolio_payload(fixture_csv)
@@ -173,9 +170,7 @@ def test_build_portfolio_payload_filters_to_portfolio_rows(
     assert set(portfolio.keys()) == {"AAPL"}
     assert set(researching.keys()) == {"MRNA"}
     assert portfolio["AAPL"]["position"] == "Portfolio"
-    assert portfolio["AAPL"]["sell_price"] == 220
     assert researching["MRNA"]["position"] == "Researching"
-    assert researching["MRNA"]["buy_price"] == 40
 
 
 def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_csv):
@@ -188,10 +183,8 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
     from universe import watchlist as wl
     monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
-    pos.add("MRNA", position="Researching", sell_price=100,
-            path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11")
-    pos.add("AAPL", position="Ready to Buy", buy_price=180,
-            path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08")
+    pos.add("MRNA", position="Researching", path=pos_csv, universe_csv_path=fixture_csv, today="2026-04-11")
+    pos.add("AAPL", position="Ready to Buy", path=pos_csv, universe_csv_path=fixture_csv, today="2026-05-08")
     _mark_held(pos_csv, "MRNA")
 
     target_dir = tmp_path / "sigma-alert"
@@ -221,7 +214,6 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     portfolio_payload = json.loads((target_dir / "portfolio.json").read_text())
     assert "MRNA" in portfolio_payload
     assert portfolio_payload["MRNA"]["position"] == "Portfolio"
-    assert portfolio_payload["MRNA"]["sell_price"] == 100
     assert portfolio_payload["MRNA"]["sector"] == "Biopharma"
 
     researching_payload = json.loads((target_dir / "researching.json").read_text())
@@ -236,7 +228,6 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     rtb_payload = json.loads((target_dir / "ready_to_buy.json").read_text())
     assert "AAPL" in rtb_payload
     assert rtb_payload["AAPL"]["position"] == "Ready to Buy"
-    assert rtb_payload["AAPL"]["buy_price"] == 180
 
     rts_payload = json.loads((target_dir / "ready_to_short.json").read_text())
     assert rts_payload == {}  # no Ready-to-Short rows

@@ -25,7 +25,6 @@ from reporting import watchlist_report as wr
 def df():
     return pd.DataFrame([{
         "Ticker": "AAPL", "Currency": "USD", "Current Price": 100.0,
-        "Buy Price": 90.0, "Target Price": 130.0,
         "% vs Buy": 11.1, "% vs Target": -23.1,
     }])
 
@@ -45,7 +44,7 @@ class TestRouting:
         ) is True
         assert sent["token"] == "xoxb-t"
         assert sent["channel"] == "C0B1CM66T19"
-        assert "AAPL" in sent["text"] and "tgt" in sent["text"]
+        assert "AAPL" in sent["text"]
 
     def test_it_never_falls_back_to_the_old_webhook(self, df, monkeypatch):
         """The failure mode worth a test: an unconfigured bot path quietly reverting
@@ -68,10 +67,14 @@ class TestRouting:
             df, "2026-08-11",
             {"SLACK_BOT_TOKEN": "t", "SLACK_PORTFOLIO_CHANNEL_ID": "C"}) is False
 
-    def test_the_summary_still_carries_price_buy_and_target_with_gaps(self, df):
+    def test_the_summary_carries_the_price_and_the_ytd_move(self, df):
+        """The buy/target gaps left this summary on 2026-09-05 along with the
+        columns behind them -- price targets moved to the workbook's Decision
+        Sheet. What remains must still name the ticker and carry a number, and
+        must NOT still advertise fields that no longer exist."""
         text = wr.format_slack_summary(df, "2026-08-11")
-        assert "buy" in text and "tgt" in text
-        assert "11.1" in text and "-23.1" in text, "the gap columns are the point"
+        assert "AAPL" in text and "100.00" in text
+        assert "buy" not in text and "tgt" not in text
 
 
 class TestPostToChannel:

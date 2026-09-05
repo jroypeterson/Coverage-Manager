@@ -59,8 +59,6 @@ def _build_rows(entries, universe_df):
             "Company": company,
             "Currency": currency,
             "Sector": str(u_row.get("Sector (JP)", "")).strip(),
-            "Buy Price": e.get("Buy Price"),
-            "Target Price": e.get("Target Price"),
             "Date Added": e.get("Date Added", ""),
             "Notes": e.get("Notes", ""),
         })
@@ -114,13 +112,10 @@ def build_report_df():
         r["1W %"] = returns.get("1W")
         r["YTD %"] = returns.get("YTD")
         r["1Y %"] = returns.get("1Y")
-        r["% vs Buy"] = _pct(price, r.get("Buy Price"))
-        r["% vs Target"] = _pct(price, r.get("Target Price"))
 
     cols = [
         "Ticker", "Company", "Sector", "Currency",
-        "Current Price", "Buy Price", "Target Price",
-        "% vs Buy", "% vs Target",
+        "Current Price",
         "1D %", "1W %", "YTD %", "1Y %",
         "Date Added", "Notes",
     ]
@@ -138,8 +133,8 @@ def _fmt_num(v, pct=False, prec=2):
 
 
 def write_html(df, path, today_str):
-    pct_cols = {"% vs Buy", "% vs Target", "1D %", "1W %", "YTD %", "1Y %"}
-    price_cols = {"Current Price", "Buy Price", "Target Price"}
+    pct_cols = {"1D %", "1W %", "YTD %", "1Y %"}
+    price_cols = {"Current Price"}
 
     header_html = "".join(f"<th>{c}</th>" for c in df.columns)
     body_rows = []
@@ -202,12 +197,9 @@ def format_slack_summary(df, today_str):
     lines = [f"*Watchlist — {today_str}*", f"{len(df)} positions", ""]
     for _, r in df.iterrows():
         price = _fmt_num(r.get("Current Price"))
-        buy = _fmt_num(r.get("Buy Price"))
-        tgt = _fmt_num(r.get("Target Price"))
-        vs_buy = _fmt_num(r.get("% vs Buy"), pct=True)
-        vs_tgt = _fmt_num(r.get("% vs Target"), pct=True)
         lines.append(
-            f"• *{r['Ticker']}* ({r.get('Currency','')}) {price} | buy {buy} ({vs_buy}) | tgt {tgt} ({vs_tgt})"
+            f"• *{r['Ticker']}* ({r.get('Currency','')}) {price} | "
+            f"YTD {_fmt_num(r.get('YTD %'), pct=True)}"
         )
     return "\n".join(lines)
 
