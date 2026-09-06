@@ -4,7 +4,9 @@
   "entries": [
     {
       "canonical": "FI",
-      "aliases": ["FISV"],
+      "aliases": [
+        "FISV"
+      ],
       "company_name": "Fiserv Inc.",
       "cik": "798354",
       "isin": "US3377381088",
@@ -30,6 +32,25 @@
         "FINRA short-interest series is keyed FI (Fiserv from 2023, Frank's International N.V. before 2021) -- sector_chart_pack/short_interest_history.py:_segment_to_current_listing, measured 2026-08-22."
       ],
       "note": "The two directions are genuinely opposed, which is why vendor_symbols is per-vendor rather than one 'true' symbol: yfinance serves only FISV, FINRA's short-interest series is keyed FI. Two published surfaces were corrupted in opposite directions: portfolio_daily could not join the broker's FISV to this row's FI, so the characteristics table warned 'not in the CM perf frame (no fundamentals): FISV' and the PUBLIC page invented an 'Unclassified' sector bucket holding this name alone; insider_ownership asked yfinance for FI and rendered every Fiserv stake as a share count with no dollar value. NOT this: portfolio_daily's 'no short-interest data: FISV' warning. Measured 2026-08-27, yfinance returns every short-interest field as null for BOTH FISV and FI (that lane reads yfinance .info, not FINRA), so it is a real vendor gap and the alias does not fix it. Entered 2026-08-27 for board row #345."
+    },
+    {
+      "canonical": "CSU",
+      "aliases": [
+        "CSU.TO"
+      ],
+      "company_name": "Constellation Software Inc.",
+      "isin": "CA21037X1006",
+      "composite_figi": "BBG000BMZ5P1",
+      "kind": "exchange_suffix",
+      "verified": "2026-09-06",
+      "vendor_symbols": {
+        "yfinance": "CSU.TO"
+      },
+      "sources": [
+        "Coverage universe row (data/coverage_universe_tickers.csv) 2026-09-06: CSU, Constellation Software Inc., Exchange TSX, Exchange Code TOR, Exchange Full Name Toronto, ISIN CA21037X1006, Composite FIGI BBG000BMZ5P1, Currency CAD, Year Listed 2007.",
+        "yfinance 2026-09-06: `CSU` -> HTTP 404 'Quote not found for symbol: CSU' and an empty history; `CSU.TO` -> 5 daily closes, last 3023.96, .info longName 'Constellation Software Inc.', exchange TOR, fullExchangeName Toronto, currency CAD, quoteType EQUITY. The two sources agree independently on issuer, venue and currency."
+      ],
+      "note": "Entered 2026-09-06. CSU reached the portfolio workbook on 2026-09-05 when the CM->sheet sync pulled in 21 Following-for-Interest names that had never had a row, and it was the only one of the 21 with no price: every refresh logged 'CSU: no price available' and the run went DEGRADED. ⚠ CSU.TO QUOTES IN CAD. The workbook's Last Price column carries no currency, so this price sits beside USD ones -- as 2715.HK's HKD price already does. Harmless for a Watchlist name (no Mkt Value, weight or cost basis is computed from it) and NOT harmless if this name is ever bought: the sizing block would read a CAD cost basis against a USD book. See the fleet rule that a number cannot state its own unit."
     }
   ]
 }
