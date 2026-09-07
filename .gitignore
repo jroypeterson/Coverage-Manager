@@ -45,3 +45,6 @@ data/ipo_reply_state.json
 
 # One-off enrich log for the 2026-08-06 biopharma batch.
 .health/enrich_*.log*
+
+# Codex loop per-target thread state (prior model output).
+.codex_loop/

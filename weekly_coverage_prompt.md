@@ -60,9 +60,39 @@ Use broad and narrow searches.
 
 If sender patterns are visible from prior emails, prioritize them. Key senders include:
 - StreetAccount (service@streetaccount.com)
-- E*Trade (E-tradeAlerts-DoNotReply@etrade.com)
+- Renaissance Capital (support@renaissancecapital.com) - the weekly filing recap
 - OpenAI scheduled tasks (noreply@tm.openai.com) for IPO summaries
 - Endpoints News, BioPharma Dive, Fierce Biotech for healthcare IPOs
+
+### Broker new-issue alerts - THE LATEST-STAGE SIGNAL, AND RUN THESE VERBATIM
+
+A brokerage new-issue alert means the deal is **being marketed right now** -
+days from pricing, not weeks. It is the last mile that `s1_watch` does not
+cover, and it names the company.
+
+**Run these four searches exactly. Do not paraphrase them into `subject:"IPO"`.**
+Fidelity's subject line is *"Fidelity New Issue Offering Equity Participation
+Announcement - <Company>"*, which contains no "IPO" string at all, so the
+generic subject search misses it outright. Measured 2026-09-06: Lyntris,
+Londian Wason and Robinhood Ventures II all reached the reports only because a
+body-text search happened to catch them.
+
+- `from:Fidelity.Alerts@fidelity.com ("New Issue" OR Participation) newer_than:10d`
+- `from:E-tradeAlerts-DoNotReply@etrade.com ("New Issue" OR IPO OR offering) newer_than:10d`
+- `from:noreply@robinhood.com (IPO OR "request shares" OR roadshow) newer_than:10d`
+- `from:schwab.com ("new issue" OR IPO) newer_than:10d`
+
+Two things to know when reading them:
+
+- **The company name is in the SUBJECT for Fidelity** and in the BODY for
+  E*Trade. Open E*Trade alerts; do not classify one from its subject.
+- **Separate an IPO from a follow-on.** E*Trade sends *"New follow-on offering
+  available"* far more often than *"New IPO available"*, and a follow-on by a
+  company that already trades is not a new listing. Only the IPO alerts are
+  discovery; the follow-ons matter only if the issuer is already covered.
+- Schwab has produced **no** new-issue alerts in the last six months. If that
+  search stays empty week after week, the alert subscription is probably off -
+  say so once in the report rather than reporting a quiet week forever.
 
 ## Time window
 Default review window: the past 7 calendar days.
@@ -313,19 +343,32 @@ names accumulate unnoticed between 2026-06-19 and 2026-07-28.
 
 ### Some names are now ADDED WITHOUT ASKING — report them first
 
-`sync_candidate_ledger.py` auto-adds **four** buckets (JP's decisions 2026-08-06 and
-2026-08-09):
+`sync_candidate_ledger.py` auto-adds **three** buckets (JP's decisions 2026-08-06,
+2026-08-09, amended 2026-09-06):
 
 - **Bucket 2** — any IPO / direct listing **≥ $25B, any sector**
 - **Bucket 3** — spin-off / carve-out / separation **> $10B**
 - **Bucket 1** — a listing in a **core sector** (Biopharma / MedTech / Healthcare
   Services / Life Science Tools), **any size, no floor**
-- **Bucket 5** — a **Russell** first-time addition inside **$2–20B**
 
-**Bucket 4 is now the only bucket that queues** — "strategically relevant $2–20B"
-is a judgement call by definition, and so is a `New candidate` trigger under any
-bucket (that is the coverage-gap shape: MU, Fabrinet, the optical complex). Both
-still wait for his `add TICKER` reply.
+**Buckets 4 and 5 queue.** Bucket 4 always did — "strategically relevant $2–20B"
+is a judgement call by definition — and so does a `New candidate` trigger under
+any bucket (the coverage-gap shape: MU, Fabrinet, the optical complex).
+
+**Bucket 5 auto-added from 2026-08-09 and was reversed on 2026-09-06.** The
+ruling rested on a measured claim — that the only two names JP ever declined,
+`DPC` and `EROC`, "fall in neither bucket". Both turned out to be on the first
+Russell list under the new rule and both sit inside $2–20B. And of the four names
+Bucket 5 did auto-add on 09-04, **three had been screened out on the merits, in
+writing, twice each, in June** (`LIME` micromobility, `SSMR` precious metals,
+`AADX` "defense — outside taxonomy"). Russell inclusion says a name is
+institutionally held; it does not say it belongs in this universe. So a Russell
+add now costs one `add TICKER` reply.
+
+**A previously DECLINED ticker is never auto-added, under any bucket.** It is
+re-queued with the decline named, so a genuinely new trigger still gets seen —
+seen, not silently written in. Reply `add TICKER` to override the earlier call.
+If you are reporting a name that carries a decline, say so and argue it.
 
 Two consequences for how you write the report:
 
@@ -350,11 +393,11 @@ Say explicitly that they are already in the universe, so he does not reply `add`
 for a name that is already there. If the script auto-added nothing, say nothing —
 an empty section is noise.
 
-### Two lanes now hand you findings — READ THEIR REPORTS
+### Three lanes now hand you findings — READ THEIR REPORTS
 
-The weekly pipeline runs two discovery lanes before you write. Both write a
+The weekly pipeline runs three discovery lanes before you write. Each writes a
 dated report into `reports/`, and **their findings belong in your report** —
-they are not decoration, they are the two classes of listing event the Finnhub
+they are not decoration, they are the classes of listing event the Finnhub
 IPO calendar structurally cannot see.
 
 **1. `reports/form10_watch_<date>.md` — Form 10-12B registrations.**
@@ -385,8 +428,112 @@ American, Cboe, IEX).
   bankrupt and combinations) on covered names are the exchange's own view that
   something is wrong with a listing. Surface new ones.
 
-If either report is absent, say so — do not write the section as though the lane
-found nothing. A missing report and a quiet week are different facts.
+**3. `reports/s1_watch_<date>.md` — S-1 / F-1 registrations.**
+Wired 2026-09-06. An S-1 (domestic) or F-1 (foreign private issuer) is the
+earliest public, structured signal that a company intends to go public —
+typically **four to eight weeks** before terms are set.
+
+Why it exists: measured against Renaissance Capital's 2026-09-06 filing recap,
+which named eight new or refreshed registrants — SB Energy, Accelevation,
+Syntiant, Oura, Wella, Tailored Brands, Cumberland Farms, Entrata. The
+hand-assembled "Pipeline / filings to monitor" section carried five of them
+(SB Energy, Oura, Wella, and the three post-Labor-Day launches) because that
+week's Gmail sweep happened to surface them; it missed Accelevation, Syntiant,
+Entrata, Tailored Brands and Cumberland Farms. **A section that is only as
+complete as one week's reading is not a lane.** This makes it systematic, from
+the SEC's own record.
+
+- Every row marked `relevant` goes in **"Pipeline / filings to monitor"**, with
+  its filing kind (`new filing` / `refiled / amended`), SIC and sector.
+- **Nothing in this report can be added, ever.** A registrant that has not
+  priced has no market cap, so no bucket test can run on it. It is a watch
+  entry. Do not put an S-1 filer in Recommendations, and never let one reach
+  `auto_add`.
+- **"Proposed raise" is not a valuation.** It is the number the registrant pays
+  SEC fees on — often a round placeholder ($100,000,000) on a first filing, and
+  even when real it is money raised, not market cap. The report marks
+  placeholders; repeat the marking, do not launder it into a size.
+- A `refiled / amended` row on a name that had gone quiet is the single best
+  public tell that a deal is being marketed. Say when a filing is a refresh.
+- Rows marked `inconclusive` include registrants whose SIC is unmapped **and**
+  out-of-sector registrants whose proposed raise is ≥$1B — the second group is
+  the Bucket 2 case the sector test is designed to miss. Check the implied cap
+  when terms are set.
+
+**The report has SEVEN sections and you must read six of them. Carrying only
+the pipeline table is the known failure mode.** Measured 2026-09-06: doing that
+delivers three of the eight names Renaissance listed that week, against five for
+the hand-written section this lane replaced.
+
+| Section | What to do with it |
+|---|---|
+| `Pipeline - companies coming public` | Every row goes in **"Pipeline / filings to monitor"**. |
+| `Coming public, outside the covered sectors` | **Also goes in the pipeline section.** This is the Bucket 2 candidate list. |
+| `Inconclusive - could not classify` | Give the count; name any row whose registrant looks like a real operating company. |
+| `Already trading - follow-on / resale` | Ignore unless a **covered** name is in it — then it is a shelf/resale on a company you own, worth one line. |
+| `Confidential submissions` | **Carry the confirmed table into the pipeline section**, marked "confidential submission, no public filing yet". Carry the UNCONFIRMED table only if a name is core-sector, and label it a press report. Never give either a size. |
+| `De-SPAC registrations` | Name them in the pipeline section as "de-SPAC, target not yet identified". **Claim no sector** — the filer is the SPAC. One line each; these are lead time on a listing the directory diff would catch at close anyway. |
+| `Not relevant` | Ignore. Shells and blank-check vehicles. |
+
+The out-of-sector section is where SB Energy, Wella, Accelevation and Aggreko
+appeared in the 09-06 run. Bucket 2 is **sector-agnostic at $25B+**, so a sector
+test cannot decide these — only a price can, and there is no price yet. Carry
+them with the sector named and "size unknown until it prices"; do not argue
+they are out of scope, and do not silently drop them because the SIC is not one
+of ours. That judgement is JP's to make when terms are set, and he can only make
+it if the name is in front of him.
+
+If any of the three reports is absent, say so — do not write the section as
+though the lane found nothing. A missing report and a quiet week are different
+facts.
+
+### Confidential submissions - the one signal you must go and FIND
+
+`s1_watch` sees a registration when it becomes public. Under the JOBS Act an
+emerging-growth company may submit its S-1 **confidentially** and need only make
+it public 15 days before the roadshow. That draft is not on EDGAR and **no lane
+can see it** - but companies routinely announce they have submitted, three to
+six months earlier. It is the earliest public signal that exists, and the only
+one in this report that depends on you looking rather than on a file being read
+for you.
+
+**Run these every week:**
+
+- `"confidentially submitted" draft registration statement S-1` (past 10 days)
+- `"confidential submission" IPO SEC` (past 10 days)
+- `"has confidentially filed" IPO` (past 10 days)
+- and the same three restricted to the core sectors: medtech, diagnostics,
+  healthcare services, health IT, semiconductors, instrumentation
+
+**Record what you find in `data/confidential_watch.json`.** The schema is
+enforced by `universe/confidential_watch.py` and a malformed entry stops the
+lane, so match it exactly:
+
+```json
+{"company": "Acme Robotics", "source_kind": "announcement",
+ "source_url": "https://...", "first_seen": "2026-09-11",
+ "note": "MedTech; Bucket 1 on pricing", "status": "open", "flipped_to": ""}
+```
+
+**`source_kind` is the whole point, and it has exactly two legal values:**
+
+| Value | Means | Looks like |
+|---|---|---|
+| `announcement` | **The company said so itself** - press release or its own filing. A fact, with a source. | "Acme today announced it has confidentially submitted a draft registration statement on Form S-1" |
+| `report` | **A journalist said so**, usually from unnamed sources. A rumour, and sometimes wrong. | "Acme has confidentially filed, according to people familiar with the matter" |
+
+These render in **separate tables under different headings**, and the second is
+labelled UNCONFIRMED. Never file a press report as an `announcement` to make the
+list look stronger: a rumour inheriting a fact's authority is exactly the error
+the fee-table "placeholder" marking exists to prevent one section above.
+
+**Never attach a size.** There is no public filing, so there is no fee table and
+no share count. Any dollar figure you have seen for one of these came from a
+journalist. The schema has no field for one, deliberately.
+
+**You do not close entries by hand.** `reconcile()` marks an entry `flipped` the
+week its company appears as a real registrant in this lane, and `expired` after
+550 days. Both are logged. Do not delete rows.
 
 ## Slack notification — post to #ipo-spinoffs-newissues
 
@@ -405,8 +552,25 @@ them across a channel-level lead message and its thread:
 
 | Where | What |
 |---|---|
-| channel | title, this week's framing, the **Recommendations**, the **pending-approval backlog**, and how to reply |
+| channel | a **metrics table**, then title, this week's framing, the **Recommendations**, the **pending-approval backlog**, how to reply, then **what each added company does** |
 | thread | every other section in report order, then one message per company briefing, then a files footer |
+
+**The lead's two script-generated blocks (added 2026-09-06, JP's request). Do not
+write either by hand and do not duplicate them in the report prose:**
+
+1. **Metrics table** (`reporting/weekly_metrics.py`) — universe rows before →
+   after, names added, awaiting-you and declined, each against a to-date column,
+   posted above a divider so "the universe moved five rows" and "here are five
+   companies" read as two different claims. Every figure is derived from the
+   report header, `candidate_ledger.csv` or the universe backups; a figure that
+   cannot be computed renders `n/a`, never `0`.
+2. **"Added this week — what each one does"** (`reporting/added_names.py`) — one
+   short business summary per added name, below a divider. It is sourced from
+   the **first paragraph of `#### 1. Business Description`** in
+   `reports/company_backgrounds_<date>.md`, falling back to the ledger `notes`
+   column. **So every added name needs a briefing with that heading**: if you
+   skip one, its Slack entry reads "No briefing written this week" and the
+   console warns. That is deliberate — a thin week should look thin.
 
 Rendering is `reporting/slack_blocks.py`. **Do not try to make tables render by hand.** Slack
 has no table primitive, and the previous approach — fencing every markdown table in a ``` block
@@ -629,7 +793,7 @@ Emphasize sector-relevant metrics. For capital-light: FCF. For leveraged: EBITDA
 ## Working method
 1. Read Coverage Manager/data/coverage_universe_tickers.csv and extract all tickers and company names.
 2. Pull the Finnhub IPO calendar for the last 10 days (primary IPO source).
-2b. **Read `reports/form10_watch_<date>.md` and `reports/symbol_directory_<date>.md`** — the pipeline wrote them before you started. They carry the two listing classes the IPO calendar cannot see (spin-offs and OTC uplistings) and the exchange's own record of what stopped trading. See "Two lanes now hand you findings" below.
+2b. **Read `reports/form10_watch_<date>.md`, `reports/s1_watch_<date>.md` and `reports/symbol_directory_<date>.md`** — the pipeline wrote all three before you started. They carry the listing classes the IPO calendar cannot see (spin-offs and OTC uplistings; S-1/F-1 filers four to eight weeks pre-pricing) and the exchange's own record of what stopped trading. See "Three lanes now hand you findings" below.
 3. Search Gmail for IPO summary emails and related new-listing emails from the last 7-10 days.
 4. Extract candidate newly public companies and relevant listing events from both sources.
 5. Augment with web search for major IPOs / direct listings / spin-offs / Russell additions.
