@@ -70,6 +70,7 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "resolve_cik_by_name",   # [4e/6], wired 2026-07-30
         "symbol_directory",      # [4f/6], wired 2026-08-06
         "form10_watch",          # [4g/6], wired 2026-08-06
+        "s1_watch",              # [4h/6], wired 2026-09-06
         "export_artifacts",
         "export_watchlist",
         "export_reporting_calendar",

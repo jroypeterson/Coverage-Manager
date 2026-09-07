@@ -195,6 +195,25 @@ def build_parser():
     form10_parser.add_argument("--no-parents", action="store_true",
                                help="Skip parent resolution (disables the Bucket 3 size proxy).")
 
+    s1_parser = subparsers.add_parser(
+        "s1-watch",
+        help=(
+            "Discover IPO candidates from SEC S-1 / F-1 registrations, four to "
+            "eight weeks BEFORE they price. A registrant that has not set terms "
+            "has no ticker and no market cap, so the Finnhub IPO calendar, the "
+            "symbol-directory diff and the Russell lane are all blind to it. "
+            "Routes on the registrant's own SIC. Adds nothing -- everything it "
+            "finds is a watch entry, because no bucket test can run on a "
+            "company that has not priced."
+        ),
+    )
+    s1_parser.add_argument("--days", type=int, default=14,
+                           help="Look-back window in days (default 14).")
+    s1_parser.add_argument("--dry-run", action="store_true",
+                           help="Report only; write no seen-ledger or report file.")
+    s1_parser.add_argument("--no-sizes", action="store_true",
+                           help="Skip fee-table fetches (no proposed-raise column).")
+
     symdir_parser = subparsers.add_parser(
         "symbol-directory",
         help=(
@@ -708,6 +727,35 @@ def main():
         # classify -- an unclassifiable registrant is where a miss would hide.
         actionable = [f for f in filings if f.verdict in ("relevant", "inconclusive")]
         raise SystemExit(2 if actionable else 0)
+
+    elif args.command == "s1-watch":
+        from pathlib import Path as _Path
+        from universe import s1_watch as _s1
+        from universe.ticker_change_check import _EDGAR_UA as _ua
+        status, regs, report, diag = _s1.run(
+            _Path(__file__).resolve().parent, ua=_ua, days=args.days,
+            dry_run=args.dry_run, fetch_sizes=not args.no_sizes)
+        if status != "ok":
+            print("ERROR: S-1/F-1 search unavailable - INCONCLUSIVE, not "
+                  "'no IPO filings this week'", file=sys.stderr)
+            raise SystemExit(2)
+        print(report)
+        if diag.get("reporting_unavailable"):
+            print(f"WARNING: {diag['reporting_unavailable']} SEC reporting-history "
+                  f"check(s) unavailable - some rows may be follow-ons",
+                  file=sys.stderr)
+        if not diag.get("state_saved", True):
+            print("WARNING: carry ledger not saved - next run loses the pipeline "
+                  "history", file=sys.stderr)
+        if diag.get("confidential_error"):
+            print(f"ERROR: confidential watch list unusable - "
+                  f"{diag['confidential_error']}", file=sys.stderr)
+            raise SystemExit(2)
+        # Exit 2 when there is something to look at. `is_coming_public` is the
+        # shared definition, so this cannot disagree with what the report shows
+        # or with what the weekly step counts -- a week whose only discoveries
+        # were out-of-sector Bucket 2 candidates used to exit 0.
+        raise SystemExit(2 if any(_s1.is_coming_public(r) for r in regs) else 0)
 
     elif args.command == "symbol-directory":
         from pathlib import Path as _Path

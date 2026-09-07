@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
@@ -53,18 +54,31 @@ SEEN_PATH = Path("data/form10_seen.json")
 
 # SIC ranges that map to JP's coverage sectors. A SpinCo is classified under the
 # business it operates, so this is the registrant's own sector, not the parent's.
+#
+# Audited 2026-09-06 against the buckets in `weekly_coverage_prompt.md`, which
+# name diagnostics and "semis / PA / instrumentation / automation" explicitly.
+# The map had neither: no 2835 (in-vitro diagnostics), no 8734 (testing labs),
+# no 6324 (hospital & medical service plans -- where every managed-care and
+# insurtech-health name files: Oscar, Alignment, Clover), and none of the
+# instrumentation codes. A diagnostics IPO filing under 2835 was `not-relevant`
+# in BOTH forward lanes. Shared deliberately, so the two cannot drift apart on
+# what "core" means.
 SIC_SECTORS = {
     "Biopharma": {"2833", "2834", "2836"},
     "MedTech": {"3826", "3827", "3841", "3842", "3843", "3844", "3845", "3851"},
     "Healthcare Services": {"8000", "8011", "8049", "8050", "8051", "8060",
-                            "8062", "8071", "8082", "8090", "8093", "8093"},
+                            "8062", "8071", "8082", "8090", "8093",
+                            "6324"},
+    "Diagnostics": {"2835", "8071", "8734"},
     "Life Science Tools": {"8731"},
     "Tech": {"3674", "3672", "3661", "3663", "3669", "3670", "3571", "3572",
              "3576", "3577", "3578", "7370", "7371", "7372", "7373", "7374",
-             "7379", "7389"},
+             "7379", "7389",
+             # Semi-cap, process control, instrumentation, automation.
+             "3559", "3823", "3825", "3829", "3827"},
 }
 CORE_SECTORS = {"Biopharma", "MedTech", "Healthcare Services",
-                "Life Science Tools"}
+                "Life Science Tools", "Diagnostics"}
 
 # Parent-naming language on the first page of a Form 10 information statement.
 # Each capture must END at a corporate designator. Without that anchor the
@@ -136,7 +150,26 @@ class WatchResult:
     window: tuple[str, str] = ("", "")
 
 
+#: SEC fair access is 10 requests/second per client. Both this lane and
+#: `s1_watch` call `_get` in tight sequential loops -- the S-1 lane makes
+#: ~250-300 requests in a run -- and neither had any spacing, so staying under
+#: the limit relied entirely on SEC being slow to answer. A block is not just
+#: this lane's problem: `crosscheck_foreign` (step 4c) runs AFTER these and hits
+#: the same host, so a throttle here would take down a step that has nothing to
+#: do with the one that earned it. 110ms costs ~30s on a weekly job.
+#: Indirection so tests exercise the call path without actually sleeping,
+#: matching `delisted_check._sleep`.
+_sleep = time.sleep
+SEC_MIN_INTERVAL = 0.11
+_last_request = 0.0
+
+
 def _get(url: str, ua: str, timeout: int = 30, accept: str = ""):
+    global _last_request
+    gap = SEC_MIN_INTERVAL - (time.monotonic() - _last_request)
+    if gap > 0:
+        _sleep(gap)
+    _last_request = time.monotonic()
     headers = {"User-Agent": ua}
     if accept:
         headers["Accept"] = accept

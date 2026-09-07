@@ -872,6 +872,61 @@ def _step_form10_watch():
         "inconclusive": len([f for f in filings if f.verdict == "inconclusive"]),
     }
 
+
+def _step_s1_watch():
+    """S-1 / F-1 registrations -- IPO candidates, four to eight weeks before terms.
+
+    Non-gating, and it never adds. A registrant that has not priced has no market
+    cap, so no bucket test can run on it; this feeds the report's watch section
+    only. Added 2026-09-06 after the Renaissance recap named eight registrants
+    that appeared in no Coverage Manager artifact -- two of them Bucket 1.
+    """
+    from pathlib import Path as _P
+    from universe import s1_watch as s1
+    from universe.ticker_change_check import _EDGAR_UA as _ua
+
+    status, regs, _, diag = s1.run(_P(__file__).resolve().parent, ua=_ua, days=14)
+    if status != "ok":
+        raise RuntimeError("S-1/F-1 search unavailable (inconclusive, not clean)")
+    # A run that could not verify its rows, or could not save its state, is
+    # DEGRADED -- not clean. Raising marks the step `failed:`, which reads as
+    # `partial` on the heartbeat; silently returning would make a run where SEC
+    # throttled most checks indistinguishable from a good one.
+    if not diag.get("state_saved", True):
+        raise RuntimeError("S-1 carry ledger not saved -- next week loses the "
+                           "pipeline history; report was still written")
+    if diag.get("reporting_unavailable"):
+        raise RuntimeError(
+            f"{diag['reporting_unavailable']} SEC reporting-history check(s) "
+            f"unavailable -- follow-ons may be listed as IPO candidates")
+    if diag.get("confidential_error"):
+        # Detected and then swallowed is the worst of both: the earliest signal
+        # the project has drops out of the report while the step stays green.
+        raise RuntimeError(
+            f"confidential watch list unusable ({diag['confidential_error']}) "
+            f"-- the confidential section is missing from this week's report")
+    # `s1.partition` is the SAME five-way split the report renders, so this
+    # summary cannot disagree with the artifact it describes. Counting
+    # independently already produced two divergences: follow-ons counted here as
+    # relevant-only while the report named relevant and inconclusive, and the
+    # out-of-sector group omitted entirely.
+    parts = s1.partition(regs)
+    return {
+        "registrants": len(regs),
+        "relevant": [f"{r.registrant} ({r.sector or 'sector unmapped'}, "
+                     f"{r.raise_label()})" for r in parts["pipeline"]],
+        # Every registrant coming public, including the out-of-sector ones. That
+        # group IS the Bucket 2 candidate list, and leaving it out of the summary
+        # meant a week whose only discoveries were Bucket 2 names logged nothing.
+        "coming_public": (len(parts["pipeline"]) + len(parts["other"])
+                          + len(parts["inconclusive"])),
+        "out_of_sector": [f"{r.registrant} (SIC {r.sic or '-'}, "
+                          f"{r.raise_label()})" for r in parts["other"]],
+        "follow_on": len(parts["followon"]),
+        "inconclusive": len(parts["inconclusive"]),
+    }
+
+
 def _step_ticker_change_check():
     """Discover ticker changes (renames) + SEC deregistrations via the stable
     CIK->ticker map. Companion to _step_delisted_check (price-feed based).
@@ -1455,6 +1510,36 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 logger.warning("  FORWARD LISTING: %s", name)
         else:
             steps["form10_watch"] = status
+
+    # Step 4h: S-1 / F-1 watch -- IPO candidates four to eight WEEKS before they
+    # price. The Finnhub calendar wants terms, the symbol-directory diff wants a
+    # listed symbol and the Russell lane wants an index membership; a company
+    # that has only filed has none of the three, so all of them are blind to it.
+    # Feeds the report's watch section. NEVER feeds auto_add -- a registrant with
+    # no price has no market cap, so no bucket test can run on it.
+    if dry_run:
+        logger.info("[4h/6] S-1/F-1 watch... SKIPPED (dry run)")
+        steps["s1_watch"] = "skipped (dry run)"
+    else:
+        logger.info("[4h/6] S-1 / F-1 IPO pipeline watch...")
+        status, s1_result = run_step("s1_watch", _step_s1_watch)
+        if s1_result:
+            steps["s1_watch"] = (
+                f"{s1_result['coming_public']} coming public "
+                f"({len(s1_result['relevant'])} in-sector), "
+                f"{s1_result['follow_on']} follow-on, "
+                f"{s1_result['inconclusive']} inconclusive "
+                f"of {s1_result['registrants']} registrants"
+            )
+            for name in s1_result["relevant"]:
+                logger.warning("  IPO PIPELINE: %s", name)
+            # The Bucket 2 group is logged too. A sector test cannot decide
+            # these, so a week whose only discoveries were out-of-sector names
+            # used to log nothing at all.
+            for name in s1_result["out_of_sector"]:
+                logger.warning("  IPO PIPELINE (out of sector): %s", name)
+        else:
+            steps["s1_watch"] = status
 
     # Step 4c: Foreign metadata cross-check vs SEC N-PORT (read-only). Wired
     # weekly on 2026-07-28 (Fable): the seven wrong ISINs corrected that day
