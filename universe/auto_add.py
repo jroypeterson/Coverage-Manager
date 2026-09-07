@@ -16,18 +16,48 @@ the outcome.
 | 2 | any IPO / direct listing >= $25B, any sector | **auto** — mandatory by rule |
 | 3 | spin-off / carve-out / separation > $10B | **auto** — mandatory by rule |
 | 1 | **core-sector** listing, ANY size | **auto** (2026-08-09) — but core is the *sector column*, see below |
-| 5 | Russell first-time addition, $2–20B | **auto** (2026-08-09) |
-| 4 | $2–20B "strategically relevant" | queue — explicitly a judgement call, and the only bucket left |
+| 5 | Russell first-time addition, $2–20B | **queue** — auto 2026-08-09, REVERSED 2026-09-06, see below |
+| 4 | $2–20B "strategically relevant" | queue — explicitly a judgement call |
 
-**Why 1 and 5 changed, and what the decision was actually based on.** They were held
-back as "undecided, so default to the status quo". Measured across the whole
-candidate ledger before putting it to JP: **31 candidates ever proposed, 29
-approved, 2 declined.** Of the names these two buckets would have auto-added,
-**Bucket 1 was 6-for-6 and Bucket 5 was 4-for-4** — and both declines (`DPC`
-Industrials $7.1B, `EROC` Energy $3.6B) fall in *neither* bucket, so the change
-would have produced **zero** wrong adds across the lane's entire history. JP had
-also overridden the report *to add* `BLSM` ($465M) after it was excluded on the
+**Why 1 auto-adds.** It was held back as "undecided, so default to the status
+quo". Measured across the ledger before putting it to JP: **31 candidates ever
+proposed, 29 approved, 2 declined**, and Bucket 1 was 6-for-6. JP had also
+overridden the report *to add* `BLSM` ($465M) after it was excluded on the
 sub-$1B biotech bar, i.e. he was already more inclusive than the queue was.
+
+**Why Bucket 5 auto-added, and why that was REVERSED on 2026-09-06.** The same
+2026-08-09 measurement said Bucket 5 was 4-for-4, and — this was the load-bearing
+clause — that both declines "fall in *neither* bucket, so the change would have
+produced **zero** wrong adds across the lane's entire history."
+
+**That claim was falsified by the first Russell list after the rule changed.**
+`DPC` (Industrials, $7.1B) and `EROC` (Energy, $3.6B) are both on it and both sit
+inside the $2–20B band, so the only two names JP has ever declined would have
+auto-added. Worse, of the four names Bucket 5 did auto-add on 2026-09-04, **three
+had been screened out on the merits, in writing, twice each, in June**:
+
+    LIME  Industrials ~$2.5B  "micromobility, no in-sheet peers, low relevance",
+                              reaffirmed 07-03 after pricing
+    SSMR  Materials    ~$2.6B  screened out 06-07 and 06-12, "precious metals"
+    AADX  Industrials  ~$2.2B  screened out 06-07 "defense - outside taxonomy",
+                              again 06-12
+    LFTO  Tech         ~$3.2B  WANTED - recommended three times in June, then
+                              lost to the pre-ledger carry-forward drop
+
+So the lane said no in June, no again in July, and yes in September, with nothing
+reconciling the answers. The one name it genuinely wanted arrived through Bucket 5
+only because a *different* defect had dropped it.
+
+Bucket 5 now queues. It costs one reply per Russell name and still surfaces
+everything — including LFTO, which is the case a narrower rule would have lost.
+A sector predicate was considered and rejected: core-only misses LFTO and AADX,
+`Tech` is too broad for exactly the reason Bucket 1 documents below, and
+"core-adjacent" is the judgement the queue exists to collect.
+
+**Prior prose exclusions are deliberately NOT machine-checked.** A fresh Russell
+addition is genuinely new information and should be reconsidered, not refused on
+a June verdict. Queueing dissolves the problem instead of parsing for it: JP sees
+the name and decides once, knowing both facts.
 
 **Bucket 1 is gated on the SECTOR COLUMN, not on the bucket's prose.** The written
 rule lists "healthcare services, MedTech, tools, diagnostics, HCIT, tech-enabled
@@ -87,7 +117,7 @@ BUCKET5_TRIGGERS = {"Russell addition"}
 # the queue exists to collect. A Tech core-adjacent name still queues.
 CORE_SECTORS = {"biopharma", "medtech", "healthcare services", "life science tools"}
 
-AUTO_BUCKETS = {1, 2, 3, 5}
+AUTO_BUCKETS = {1, 2, 3}
 
 
 @dataclass
@@ -137,8 +167,16 @@ def classify_bucket(candidate: dict) -> int | None:
     return None
 
 
-def decide(candidate: dict, *, in_universe: set[str], removed: set[str]) -> Decision:
-    """One candidate -> auto-add or queue, with the reason either way."""
+def decide(candidate: dict, *, in_universe: set[str], removed: set[str],
+           declined: set[str] | None = None) -> Decision:
+    """One candidate -> auto-add or queue, with the reason either way.
+
+    `declined` is the set of tickers already carrying a `declined` row in the
+    candidate ledger. It defaults to empty so existing callers keep working, but
+    every real caller passes it: omitting it restores the exact gap that let a
+    declined name auto-add.
+    """
+    declined = declined or set()
     ticker = str(candidate.get("ticker") or "").strip()
     upper = ticker.upper()
 
@@ -150,6 +188,17 @@ def decide(candidate: dict, *, in_universe: set[str], removed: set[str]) -> Deci
                         "before; a vendor screen will keep re-proposing it")
     if upper in in_universe:
         return Decision(ticker, False, None, "already in the universe")
+    if upper in declined:
+        # A DECIDED "no" is evidence, and it outranks any rule that would write
+        # the name in unasked. Without this, a declined name re-entered the
+        # universe the moment a vendor re-proposed it under a different bucket --
+        # and `DPC` and `EROC`, the only two names ever declined, both landed on
+        # the Russell list that Bucket 5 was auto-adding from. Re-queued rather
+        # than dropped: a decline is a judgement about a moment, and a genuinely
+        # new trigger deserves to be seen again -- but seen, not written.
+        return Decision(ticker, False, None,
+                        "declined previously - re-queued for a fresh look, never "
+                        "auto-added; reply `add` to override the earlier call")
 
     cap = _cap(candidate)
     if cap is None:
@@ -184,9 +233,17 @@ def decide(candidate: dict, *, in_universe: set[str], removed: set[str]) -> Deci
                         f"{candidate.get('trigger')} at ${cap / 1e9:,.2f}B, core "
                         f"sector at any size (JP's ruling 2026-08-09)")
     if bucket == 5:
-        return Decision(ticker, True, 5,
+        # Classified, named, and QUEUED. Bucket 5 auto-added between 2026-08-09
+        # and 2026-09-06; see the module docstring for why that was reversed.
+        # Still classified rather than falling through to the generic queue
+        # message, because "queued because it is a Russell add" and "queued
+        # because nothing matched" are different facts for the reader.
+        return Decision(ticker, False, 5,
                         f"Bucket 5 - Russell addition at ${cap / 1e9:,.1f}B, "
-                        f"inside the $2-20B band (JP's ruling 2026-08-09)")
+                        f"inside the $2-20B band. QUEUED for your reply: Russell "
+                        f"inclusion is sector-agnostic, so the index says a name "
+                        f"is institutionally held, not that it belongs here "
+                        f"(reversed from auto 2026-09-06)")
     return Decision(ticker, False, None,
                     f"queued - {candidate.get('trigger') or 'no trigger'} in "
                     f"{candidate.get('sector') or 'no sector'} at "
@@ -194,10 +251,11 @@ def decide(candidate: dict, *, in_universe: set[str], removed: set[str]) -> Deci
                     f"(Bucket 4 queues by decision, not by omission)")
 
 
-def plan(candidates: list[dict], *, in_universe: set[str],
-         removed: set[str]) -> tuple[list[Decision], list[Decision]]:
+def plan(candidates: list[dict], *, in_universe: set[str], removed: set[str],
+         declined: set[str] | None = None) -> tuple[list[Decision], list[Decision]]:
     """-> (auto, queued). Every candidate appears in exactly one list."""
-    decisions = [decide(c, in_universe=in_universe, removed=removed)
+    decisions = [decide(c, in_universe=in_universe, removed=removed,
+                        declined=declined)
                  for c in candidates]
     auto = [d for d in decisions if d.auto]
     queued = [d for d in decisions if not d.auto]

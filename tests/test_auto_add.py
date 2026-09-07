@@ -79,10 +79,15 @@ def test_a_core_sector_microcap_now_auto_adds():
     assert d.bucket == 1
 
 
-def test_a_russell_addition_in_band_now_auto_adds():
+def test_a_russell_addition_in_band_queues_and_says_why():
+    """Bucket 5 auto-added between 2026-08-09 and 2026-09-06. Reversed after the
+    first Russell list under the new rule: `DPC` and `EROC` -- the only two names
+    ever declined -- are both on it and both in band, and three of the four names
+    it did auto-add had been screened out on the merits in June."""
     d = auto_add.decide(c(trigger="Russell addition", market_cap=5e9), **EMPTY)
-    assert d.auto
-    assert d.bucket == 5
+    assert not d.auto
+    assert d.bucket == 5, "still classified, so the queue reason names the rule"
+    assert "QUEUED" in d.reason
 
 
 def test_a_russell_addition_outside_the_band_still_queues():
@@ -199,26 +204,51 @@ def test_every_reason_is_ascii_for_the_cp1252_console():
 # ------------------------------------------- replay against the real ledger
 
 
-def test_the_new_rules_would_have_auto_added_nothing_JP_declined():
-    """The evidence the 2026-08-09 ruling was actually made on.
+def test_a_declined_name_is_never_auto_added_whatever_the_bucket():
+    """Replaces the 2026-08-09 replay test, whose premise was falsified.
 
-    Buckets 1 and 5 were opened up because, replayed over every candidate the
-    lane has ever proposed, they auto-add only names JP approved. If a future
-    change to CORE_SECTORS or the Bucket 5 band would have swept in `DPC` or
-    `EROC` -- the only two he ever declined -- that is a regression against the
-    reasoning, not just against a number.
+    That test asserted the ruling's own evidence: buckets 1 and 5 auto-add only
+    names JP approved, because `DPC` and `EROC` "fall in neither bucket". Both
+    turned out to be on the first Russell list after the rule changed, and both
+    are inside the $2-20B band -- so the invariant it pinned was not true, and a
+    passing test was asserting a false claim about the world.
+
+    The guarantee that replaces it does not depend on any bucket's shape: a
+    DECIDED "no" outranks every rule that would write the name in unasked.
     """
     from universe import candidate_ledger as cl
 
     rows = cl.load()
-    declined = {r["ticker"].upper() for r in rows if r["status"] == "declined"}
+    declined = cl.declined_tickers(rows)
     assert declined, "ledger has no declines; this test would pass vacuously"
 
-    for row in rows:
-        d = auto_add.decide(dict(row), in_universe=set(), removed=set())
-        if d.auto:
-            assert row["ticker"].upper() not in declined, (
-                f"{row['ticker']} was DECLINED by JP but now auto-adds: {d.reason}")
+    for ticker in sorted(declined):
+        for trigger, cap in (("Russell addition", 5e9),      # the live case
+                             ("IPO", 30e9),                   # Bucket 2
+                             ("Spin-off", 12e9),              # Bucket 3
+                             ("IPO", 1e9)):                   # Bucket 1 shape
+            d = auto_add.decide(
+                c(ticker=ticker, trigger=trigger, market_cap=cap,
+                  sector="Biopharma"),
+                in_universe=set(), removed=set(), declined=declined)
+            assert not d.auto, f"{ticker} was DECLINED but auto-adds: {d.reason}"
+            assert "declined previously" in d.reason
+
+
+def test_a_declined_name_is_re_queued_not_dropped():
+    """A decline is a judgement about a moment. A genuinely new trigger deserves
+    to be seen again -- seen, not silently written in."""
+    d = auto_add.decide(c(ticker="DPC", trigger="Russell addition", market_cap=7.1e9),
+                        in_universe=set(), removed=set(), declined={"DPC"})
+    assert not d.auto
+    assert "re-queued" in d.reason and "reply `add`" in d.reason
+
+
+def test_the_declined_refusal_is_wired_into_the_real_caller():
+    """`declined` defaults to empty so old callers keep working, which means a
+    caller that forgets it silently restores the entire gap."""
+    src = (PROJECT_ROOT / "scripts" / "sync_candidate_ledger.py").read_text(encoding="utf-8")
+    assert src.count("declined=cl.declined_tickers") == 2,         "both auto_add.plan() call sites must pass the declined set"
 
 
 def test_every_core_sector_name_with_a_READABLE_cap_is_captured_by_bucket_1():

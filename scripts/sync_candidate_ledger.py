@@ -83,7 +83,8 @@ def main(argv: list[str] | None = None) -> int:
             df = read_universe_csv(CSV_PATH)
             in_universe = {str(t).strip().upper() for t in df["Ticker"] if str(t).strip()}
             auto, queued = auto_add.plan(valid, in_universe=in_universe,
-                                         removed=removed_tickers())
+                                         removed=removed_tickers(),
+                                         declined=cl.declined_tickers(cl.load()))
             print(f"auto-add plan: {len(auto)} would be added by rule, "
                   f"{len(queued)} queued")
             for d in auto:
@@ -129,8 +130,10 @@ def _auto_add(candidates: list[dict]) -> int:
 
     df = read_universe_csv(CSV_PATH)
     in_universe = {str(t).strip().upper() for t in df["Ticker"] if str(t).strip()}
+    # A decided "no" outranks any rule that would write the name in unasked.
     auto, queued = auto_add.plan(candidates, in_universe=in_universe,
-                                 removed=removed_tickers())
+                                 removed=removed_tickers(),
+                                 declined=cl.declined_tickers(cl.load()))
     if not auto:
         print(f"auto-add: none qualified ({len(queued)} queued for approval)")
         return 0

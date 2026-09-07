@@ -95,6 +95,19 @@ def by_ticker(rows: list[dict], ticker: str) -> dict | None:
     return None
 
 
+def declined_tickers(rows: list[dict]) -> set[str]:
+    """Upper-cased tickers carrying a `declined` row.
+
+    One definition, because `auto_add` refuses these and a second inlined
+    comprehension somewhere else is how the two drift apart. `revive()` clears
+    the status, so a name JP brings back is not in this set.
+    """
+    return {str(r.get("ticker") or "").strip().upper()
+            for r in rows
+            if str(r.get("status") or "").strip().lower() == "declined"
+            and str(r.get("ticker") or "").strip()}
+
+
 def pending(rows: list[dict]) -> list[dict]:
     return [r for r in rows if r.get("status") == "pending"]
 
