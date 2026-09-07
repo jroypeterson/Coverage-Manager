@@ -395,13 +395,36 @@ def _render_para(text: str) -> str:
     return "".join(out)
 
 
-def render_body(md: str) -> tuple[str, list[tuple[str, str]]]:
-    """Report markdown -> (html, [(anchor, title)]) for the section nav."""
+def render_body(md: str, *, with_children: bool = False, reserved=()):
+    """Report markdown -> (html, [(anchor, title)]) for the section nav.
+
+    With `with_children=True` a third value is returned: `{h2_anchor: [(anchor,
+    title), ...]}`, the H3s nested under each H2, for the table of contents. The
+    default two-value shape is deliberately unchanged -- it is the contract three
+    call sites and two tests already depend on, and a TOC is not a reason to
+    rewrite them.
+
+    `reserved` names ids the page has already used outside this function -- the
+    `decisions` strip and the `rules` block are rendered by `render`, not here.
+    Without it a report whose own H2 is `## Decisions` emitted a SECOND
+    `<section id="decisions">`, and every link to it -- including the TOC's --
+    silently landed on the ledger strip at the top of the page instead.
+    """
     nodes = slack_blocks.parse(md)
     parts: list[str] = []
     nav: list[tuple[str, str]] = []
+    kids: dict[str, list[tuple[str, str]]] = {}
+    used: set[str] = set(reserved)
+    current_h2 = ""
     open_section = False
     seen_heading = False
+
+    def uniq(base: str) -> str:
+        anchor, n = base, 2
+        while anchor in used:
+            anchor, n = f"{base}-{n}", n + 1
+        used.add(anchor)
+        return anchor
 
     for kind, payload in nodes:
         # The report's own header block (Review window / Universe checked against /
@@ -420,12 +443,26 @@ def render_body(md: str) -> tuple[str, list[tuple[str, str]]]:
             if level == 2:
                 if open_section:
                     parts.append("</section>")
-                anchor = _slug(title)
+                anchor = uniq(_slug(title))
                 nav.append((anchor, re.sub(r"[*`]", "", title)))
+                current_h2 = anchor
+                kids.setdefault(anchor, [])
                 parts.append(f'<section id="{anchor}"><h2>{_inline(title)}</h2>')
                 open_section = True
                 continue
-            parts.append(f'<h3 id="{_slug(title)}">{_inline(title)}</h3>')
+            h3 = uniq(_slug(title))
+            # Only H3 becomes a TOC entry. H4 and deeper are a briefing's own
+            # internal scaffolding -- "1. Business Description", "2. Financial
+            # Snapshot" -- and listing them put 30 rows under "Company
+            # briefings" where five companies were the useful unit.
+            if level == 3:
+                # `current_h2` is "" for an H3 that precedes any H2 -- which is
+                # every heading in the briefings file, where each company is an
+                # H3 and there is no H2 at all. Those are collected under the ""
+                # key rather than dropped, so the caller can re-parent them.
+                kids.setdefault(current_h2, []).append(
+                    (h3, re.sub(r"[*`]", "", title)))
+            parts.append(f'<h3 id="{h3}">{_inline(title)}</h3>')
         elif kind == "table":
             parts.append(_render_table(payload))
         elif kind == "code":
@@ -438,6 +475,14 @@ def render_body(md: str) -> tuple[str, list[tuple[str, str]]]:
 
     if open_section:
         parts.append("</section>")
+    if with_children:
+        # `used` carries EVERY id minted here, including the H4+ ones that never
+        # become TOC entries. A caller that renders a second document into the
+        # same page has to reserve those too -- otherwise a report H4 and a
+        # briefing heading that slug alike (both "1. Business Description", say)
+        # emit a duplicate id and one of the TOC links goes to the wrong place.
+        kids["__used__"] = [(a, "") for a in sorted(used)]
+        return "".join(parts), nav, kids
     return "".join(parts), nav
 
 
@@ -459,20 +504,75 @@ def _meta(md: str) -> dict:
     return out
 
 
+def _render_toc(nav: list[tuple[str, str]],
+                kids: dict[str, list[tuple[str, str]]]) -> str:
+    """A real, hierarchical table of contents.
+
+    JP, 2026-09-06: *"we need a clickable table of contents. I can click to it
+    all on my mobile to get to the different sections. right now it's hard for me
+    to know what is all in there."*
+
+    The page already had section anchors, but they rendered as `.secnav` -- a
+    wrap of 12px muted links inside the masthead. Three things were wrong with it
+    on a phone: the tap targets were far under the 44px minimum and sat a few
+    pixels apart, it listed only H2s so the twelve company briefings (all H3s
+    under one "Company briefings" heading) were invisible, and it existed only at
+    the very top, so once scrolled past there was no way back to it.
+
+    This replaces it with a numbered card of full-width rows, each H2 carrying its
+    own H3 children, plus a floating "Contents" pill that is reachable from any
+    scroll position. Deliberately plain anchors and no JavaScript: a table of
+    contents that depends on a script is a table of contents that can fail.
+    """
+    if not nav:
+        return ""
+    items = []
+    for n, (anchor, title) in enumerate(nav, 1):
+        sub = kids.get(anchor) or []
+        sub_html = ""
+        if sub:
+            sub_html = ('<ul class="toc-sub">' + "".join(
+                f'<li><a href="#{s_anchor}">{html.escape(s_title)}</a></li>'
+                for s_anchor, s_title in sub) + "</ul>")
+        items.append(
+            f'<li><a class="toc-row" href="#{anchor}">'
+            f'<span class="toc-n">{n:02d}</span>'
+            f'<span class="toc-t">{html.escape(title)}</span>'
+            + (f'<span class="toc-c">{len(sub)}</span>' if sub else "")
+            + "</a>" + sub_html + "</li>")
+    return ('<section id="contents" class="toc"><h2>Contents</h2>'
+            '<p class="sec-lede">Everything in this week&rsquo;s report. '
+            'Tap a line to jump to it.</p>'
+            f'<ol class="toc-list">{"".join(items)}</ol></section>')
+
+
 def render(md: str, *, report_date: str, decisions: list[Decision],
            generated: str = "", briefings_md: str = "") -> str:
-    body, nav = render_body(md)
+    # `render` owns these four ids; render_body must not mint a second one.
+    _RESERVED = ("contents", "decisions", "rules", "briefings")
+    body, nav, kids = render_body(md, with_children=True, reserved=_RESERVED)
 
     # The full briefings used to be four separate Slack thread replies. They are
     # reference, not a decision, so they live here — and the page is only "the
     # whole report" if they are actually on it.
     if briefings_md.strip():
-        brief_body, brief_nav = render_body(briefings_md)
+        brief_body, brief_nav, brief_kids = render_body(
+            briefings_md, with_children=True,
+            reserved=tuple(_RESERVED) + tuple(a for a, _ in nav)
+            + tuple(a for v in kids.values() for a, _ in v)
+            + tuple(a for a, _ in kids.get("__used__", [])))
         body += ('<section id="briefings"><h2>Company briefings</h2>'
                  '<p class="sec-lede">Full investment briefings for this week&rsquo;s '
                  'names &mdash; business, financials, bull and bear, catalysts.</p>'
                  f"{brief_body}</section>")
-        nav = nav + [("briefings", "Company briefings")] + brief_nav
+        # The briefings file has no H2 of its own -- every company is an H3 -- so
+        # its headings used to land in the nav as a flat run of company names
+        # with no parent. They belong UNDER "Company briefings", which is what
+        # makes the twelve of them collapsible-looking rather than a wall.
+        nav = nav + [("briefings", "Company briefings")]
+        kids = dict(kids)
+        kids["briefings"] = brief_nav + brief_kids.get("", [])
+    kids.pop("__used__", None)          # bookkeeping, never a TOC entry
     meta = _meta(md)
     open_n = sum(1 for d in decisions if d.status == "pending")
 
@@ -486,10 +586,17 @@ def render(md: str, *, report_date: str, decisions: list[Decision],
         for cls, n, label in tiles
     )
 
-    nav_html = "".join(
-        f'<a href="#{a}">{html.escape(t)}</a>' for a, t in
-        [("decisions", "Decisions"), ("rules", "The rules")] + nav
-    )
+    # "Decision status", not "Decisions": the report usually has its own
+    # `## Decisions` H2, and two rows both reading "Decisions" pointing at
+    # different places is worse than no TOC. This one is the live ledger strip.
+    #
+    # Listed only when it is actually rendered. `_render_decisions([])` emits
+    # nothing on a week with an empty ledger, and a contents row pointing at an
+    # element that does not exist is a link that silently does nothing.
+    decisions_html = _render_decisions(decisions)
+    full_nav = ([("decisions", "Decision status — live")] if decisions_html else []) \
+        + [("rules", "The rules")] + nav
+    toc_html = _render_toc(full_nav, kids)
 
     meta_html = "".join([
         f'<span>Report <b>{html.escape(report_date)}</b></span>',
@@ -507,16 +614,20 @@ def render(md: str, *, report_date: str, decisions: list[Decision],
         '<p class="eyebrow">Coverage Manager &middot; discovery lane</p>'
         "<h1>Weekly Coverage Universe Additions</h1>"
         f'<div class="mast-meta">{meta_html}</div>'
-        f'<nav class="secnav">{nav_html}</nav>'
         "</header>"
         f'<div class="tiles">{tile_html}</div>'
-        f"{_render_decisions(decisions)}"
+        f"{toc_html}"
+        f"{decisions_html}"
         f"{_RULES_HTML}"
         f"{body}"
         '<footer><span>Coverage Manager &middot; discovery lane</span>'
         '<span><a href="archive.html">Past weeks</a></span>'
         '<span><a href="https://github.com/jroypeterson/Coverage-Manager">Repo</a></span>'
         "</footer></div>"
+        # Reachable from any scroll position. A plain anchor, so it works with
+        # JavaScript disabled and needs no scroll listener.
+        '<a class="toc-fab" href="#contents" aria-label="Jump to contents">'
+        '<span aria-hidden="true">&#9776;</span> Contents</a>'
         f"<script>{_JS}</script></body></html>"
     )
 
@@ -664,9 +775,43 @@ h1{font-family:var(--serif);font-size:clamp(30px,4.4vw,46px);line-height:1.08;fo
 letter-spacing:-.015em;margin:0 0 14px;text-wrap:balance}
 .mast-meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--muted);font-family:var(--mono)}
 .mast-meta b{color:var(--ink-soft);font-weight:600}
-.secnav{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;font-size:12px}
-.secnav a{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:1px}
-.secnav a:hover{color:var(--open);border-bottom-color:var(--open)}
+.toc{scroll-margin-top:0}
+.toc-list{list-style:none;counter-reset:none;padding:0;margin:18px 0 0;
+border:1px solid var(--rule);border-radius:4px;overflow:hidden;background:var(--rule)}
+.toc-list>li{background:var(--surface);border-bottom:1px solid var(--rule)}
+.toc-list>li:last-child{border-bottom:none}
+/* 48px min height: a tap target, not a 12px link in a wrapped strip. */
+.toc-row{display:flex;align-items:center;gap:14px;min-height:48px;padding:11px 16px;
+text-decoration:none;color:var(--ink);font-size:15px;font-weight:600;line-height:1.35}
+.toc-row:hover{background:var(--surface-2)}
+.toc-n{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--faint);
+letter-spacing:.04em;flex:0 0 auto;min-width:22px}
+.toc-t{flex:1 1 auto;text-wrap:pretty}
+.toc-c{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);
+background:var(--surface-2);border:1px solid var(--rule);border-radius:100px;
+padding:2px 8px;flex:0 0 auto}
+.toc-sub{list-style:none;padding:0 16px 12px 52px;margin:0;display:flex;
+flex-direction:column;gap:1px}
+.toc-sub a{display:block;padding:9px 0;font-size:13.5px;color:var(--muted);
+text-decoration:none;border-bottom:1px solid var(--rule-soft)}
+.toc-sub li:last-child a{border-bottom:none}
+.toc-sub a:hover{color:var(--open)}
+@media(max-width:640px){.toc-sub{padding-left:38px}}
+/* Fixed, so the contents are one tap away from anywhere in a long report.
+   `safe-area-inset-bottom` keeps it clear of the iOS home indicator. */
+.toc-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));
+z-index:20;display:inline-flex;
+align-items:center;gap:8px;min-height:44px;padding:0 18px;border-radius:100px;
+background:var(--ink);color:var(--paper);font-size:13.5px;font-weight:650;
+text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.22)}
+.toc-fab:hover{background:var(--open)}
+@media print{.toc-fab{display:none}}
+/* The pill floats over the right ~120px of the viewport, which is exactly where
+   a horizontally-scrolling table's last column ends up on a phone -- the column
+   was unreadable until you scrolled past it. Pad the scroll container instead of
+   moving the pill: the padding scrolls WITH the table, so the last column can
+   always be brought out from under it. */
+@media(max-width:640px){.tw{padding-bottom:56px}}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;
 background:var(--rule);border:1px solid var(--rule);border-top:none;margin-bottom:52px}
 .tile{background:var(--surface);padding:16px 18px 15px}

@@ -423,3 +423,109 @@ def test_the_headline_falls_back_when_no_column_names_the_record():
     row = ["1", "A much longer descriptive label", "x", "y", "z", "w", "v"]
     out = wp._render_table([head, row])
     assert "<h4>A much longer descriptive label</h4>" in out
+
+
+# --------------------------------------------------------- table of contents
+#
+# JP, 2026-09-06: "we need a clickable table of contents. I can click to it all
+# on my mobile to get to the different sections. right now it's hard for me to
+# know what is all in there." The page had `.secnav` -- a wrap of 12px muted
+# links in the masthead, H2-only, and unreachable once scrolled past.
+
+
+def test_the_page_has_a_contents_section_with_a_row_per_h2():
+    page = wp.render(_sample_md(), report_date="2026-08-07",
+                     decisions=[_dec("CSQR", "pending")])
+    assert 'id="contents"' in page
+    toc = re.search(r'<section id="contents".*?</section>', page, re.S).group(0)
+    for title in ("Decision status", "The rules", "Recommendations", "Notes"):
+        assert title in toc
+
+
+def test_the_decision_row_is_omitted_when_the_strip_is_not_rendered():
+    """An empty ledger renders no strip, and a contents row pointing at an
+    element that does not exist is a link that silently does nothing."""
+    page = wp.render(_sample_md(), report_date="2026-08-07", decisions=[])
+    toc = re.search(r'<section id="contents".*?</section>', page, re.S).group(0)
+    assert "Decision status" not in toc
+    assert 'href="#decisions"' not in toc
+
+
+def test_h3s_nest_under_their_h2_in_the_contents():
+    md = ("## Recommendations\n\nLede.\n\n### CSQR — why it qualifies\n\nBody.\n"
+          "\n### VOGX — the argument against\n\nBody.\n")
+    _, nav, kids = wp.render_body(md, with_children=True)
+    assert [t for _, t in kids["recommendations"]] == [
+        "CSQR — why it qualifies", "VOGX — the argument against"]
+
+
+def test_h4_scaffolding_stays_out_of_the_contents():
+    """"1. Business Description" x5 per company put 30 rows under "Company
+    briefings" where five companies were the useful unit."""
+    md = ("## Briefs\n\n### ACME (ACM) — Quick Background\n\n"
+          "#### 1. Business Description\n\nBody.\n\n#### 2. Financial Snapshot\n\nBody.\n")
+    _, _, kids = wp.render_body(md, with_children=True)
+    assert [t for _, t in kids["briefs"]] == ["ACME (ACM) — Quick Background"]
+
+
+def test_a_reports_own_decisions_heading_does_not_collide_with_the_strip():
+    """Both rendered <section id="decisions">, so every link to the report's own
+    section -- the TOC's included -- landed on the ledger strip at the top."""
+    md = "## Decisions\n\nThe report's own decisions section.\n"
+    page = wp.render(md, report_date="2026-09-04", decisions=[])
+    ids = re.findall(r'<section id="([^"]+)"', page)
+    assert len(ids) == len(set(ids)), f"duplicate section ids: {ids}"
+    assert "decisions-2" in ids
+
+
+def test_the_contents_link_targets_exist_on_the_page():
+    """A TOC whose anchors go nowhere is worse than none."""
+    page = wp.render(_sample_md(), report_date="2026-08-07", decisions=[])
+    toc = re.search(r'<section id="contents".*?</section>', page, re.S).group(0)
+    targets = set(re.findall(r'id="([^"]+)"', page))
+    for href in re.findall(r'href="#([^"]+)"', toc):
+        assert href in targets, f"#{href} has no element on the page"
+
+
+def test_the_floating_contents_button_is_a_plain_anchor():
+    """No scroll listener and no JS: a TOC that needs a script can fail to one."""
+    page = wp.render(_sample_md(), report_date="2026-08-07", decisions=[])
+    assert '<a class="toc-fab" href="#contents"' in page
+    assert "toc-fab" in wp._CSS and "position:fixed" in wp._CSS
+
+
+def test_contents_rows_are_tappable_on_a_phone():
+    """The strip this replaced used 12px links a few pixels apart."""
+    assert "min-height:48px" in wp._CSS
+    assert "min-height:44px" in wp._CSS      # the floating button
+
+
+def test_report_h4_ids_are_reserved_against_the_briefings_pass():
+    """`used` carries every id minted, including H4s that never become TOC
+    entries. Without passing those through, a report H4 and a briefing heading
+    that slug alike -- both "1. Business Description" -- emit a duplicate id and
+    one of the TOC links silently goes to the wrong section."""
+    md = ("## Notes\n\n### ACME (ACM) — Quick Background\n\n"
+          "#### 1. Business Description\n\nReport copy.\n")
+    briefs = ("### WIDGET (WDG) — Quick Background\n\n"
+              "#### 1. Business Description\n\nBriefing copy.\n")
+    page = wp.render(md, report_date="2026-09-04", decisions=[], briefings_md=briefs)
+    ids = re.findall(r'id="([^"]+)"', page)
+    assert len(ids) == len(set(ids)), \
+        f"duplicate ids: {[i for i in ids if ids.count(i) > 1]}"
+
+
+def test_the_used_bookkeeping_key_never_reaches_the_contents():
+    page = wp.render(_sample_md(), report_date="2026-08-07", decisions=[])
+    assert "__used__" not in page
+
+
+def test_the_floating_pill_clears_the_ios_home_indicator():
+    assert "env(safe-area-inset-bottom" in wp._CSS
+
+
+def test_scrolling_tables_get_clearance_under_the_pill_on_mobile():
+    """The pill floats over the right ~120px of the viewport, which is exactly
+    where a wide table's last column lands on a phone. Padding the scroll
+    container means the column can be brought out from under it."""
+    assert ".tw{padding-bottom:56px}" in wp._CSS.replace(" ", "")

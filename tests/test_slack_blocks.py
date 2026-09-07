@@ -341,3 +341,114 @@ def test_form_10_watch_subsection_is_not_pulled_into_the_lead_by_the_watch_prefi
     lead, thread, _ = poster.route(md)
     assert "rows" not in lead
     assert "rows" in "\n".join(thread)
+
+
+# ------------------------------------------- caller-supplied cap (2026-09-06)
+#
+# A caller that wraps this output in blocks of its own cannot use the default:
+# the weekly lead adds a metrics table, two dividers and a link block, so a body
+# free to fill all 45 produced a 50+ message that `post` refused to send -- the
+# whole week invisible.
+
+
+def _many_blocks(n: int = 60) -> str:
+    """n headings -> n header blocks. Consecutive PARAGRAPHS buffer into one
+    section, so a wall of prose is one block, not many."""
+    return "\n\n".join(f"## Section {i}" for i in range(n))
+
+
+def test_a_caller_can_cap_the_body_below_the_block_limit():
+    assert len(sb.markdown_to_blocks(_many_blocks(), limit=20)) == 20
+
+
+def test_the_omission_notice_still_fires_under_a_custom_cap():
+    blocks = sb.markdown_to_blocks(_many_blocks(), limit=20)
+    assert blocks[-1]["type"] == "context"
+    assert "more block(s)" in blocks[-1]["elements"][0]["text"]
+
+
+def test_the_default_is_unchanged():
+    assert len(sb.markdown_to_blocks(_many_blocks())) == sb.MAX_BLOCKS
+
+
+def test_a_caller_cannot_raise_the_cap_above_slacks_own_limit():
+    assert len(sb.markdown_to_blocks(_many_blocks(), limit=999)) == sb.MAX_BLOCKS
+
+
+def test_a_body_that_fits_is_untouched_by_a_generous_cap():
+    assert len(sb.markdown_to_blocks(_many_blocks(5), limit=40)) == 5
+
+
+# ------------------------------- the assembled lead can never exceed the cap
+#
+# `post` RAISES over MAX_BLOCKS rather than truncating, so this is the failure
+# that makes a whole week invisible. The previous guard only fired when there
+# were business summaries to move, leaving a long week with no adds unguarded.
+
+
+def _assemble(poster, lead_md, head_n, what_n):
+    """Reproduce main()'s lead assembly with controllable part sizes."""
+    head = [{"type": "divider"}] * head_n
+    what = [{"type": "divider"}] * what_n
+    link = [{"type": "context", "elements": [{"type": "mrkdwn", "text": "x"}]}]
+
+    def _sep(blocks):
+        return [] if blocks and blocks[-1].get("type") == "divider" else [{"type": "divider"}]
+
+    budget = sb.MAX_BLOCKS - len(head) - len(link) - 2
+    body = sb.markdown_to_blocks(lead_md, limit=max(budget, 8))
+    lead = head + (_sep(head) if head else []) + body
+    if what:
+        lead += _sep(lead) + what
+    lead += link
+    if len(lead) > sb.MAX_BLOCKS and what:
+        lead = head + (_sep(head) if head else []) + body + link
+    if len(lead) > sb.MAX_BLOCKS:
+        keep = sb.MAX_BLOCKS - (len(lead) - len(body))
+        body = body[:max(keep, 1)]
+        lead = head + (_sep(head) if head else []) + body + link
+    return lead
+
+
+@pytest.mark.parametrize("sections", [0, 5, 20, 40, 60, 200])
+@pytest.mark.parametrize("head_n,what_n", [(0, 0), (4, 0), (0, 12), (4, 12)])
+def test_the_assembled_lead_never_exceeds_the_block_cap(sections, head_n, what_n):
+    poster = _load_poster()
+    md = "\n\n".join(f"## Section {i}\n\nBody {i}." for i in range(sections))
+    lead = _assemble(poster, md, head_n, what_n)
+    assert len(lead) <= sb.MAX_BLOCKS, (
+        f"{len(lead)} blocks with sections={sections} head={head_n} what={what_n}")
+
+
+def test_a_long_week_with_no_adds_is_guarded_too():
+    """The old guard was conditioned on there being summaries to move, so this
+    exact shape -- a big report, nothing added -- went over the cap and raised."""
+    poster = _load_poster()
+    md = "\n\n".join(f"## Section {i}\n\nBody {i}." for i in range(60))
+    assert len(_assemble(poster, md, head_n=4, what_n=0)) <= sb.MAX_BLOCKS
+
+
+def test_the_link_block_always_survives_the_trim():
+    """It is the only thing telling JP where the rest of the report went."""
+    poster = _load_poster()
+    md = "\n\n".join(f"## Section {i}\n\nBody {i}." for i in range(200))
+    lead = _assemble(poster, md, head_n=4, what_n=12)
+    assert lead[-1]["type"] == "context"
+
+
+# ------------------------------------------- the add-count cross-check (Codex)
+
+
+def test_the_report_s_own_add_count_is_parsed_for_the_cross_check():
+    """'the ledger says nothing was added' and 'the ledger could not be read'
+    produce the same empty section, so the report is the second opinion."""
+    poster = _load_poster()
+    assert poster._claimed_add_count(
+        "- **Added by rule \u2014 5** \u00b7 `0625.HK` Shein") == 5
+    assert poster._claimed_add_count("## Added without asking (3)\n") == 3
+
+
+def test_a_report_that_claims_no_count_returns_none_not_zero():
+    poster = _load_poster()
+    assert poster._claimed_add_count("## Notes\n\nNothing here.\n") is None
+    assert poster._claimed_add_count("") is None

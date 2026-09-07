@@ -367,8 +367,17 @@ def _chunk(text: str, limit: int = MRKDWN_LIMIT) -> list[str]:
     return [p for p in parts if p.strip()]
 
 
-def markdown_to_blocks(md: str) -> list[dict]:
-    """Render markdown to Block Kit, capped at MAX_BLOCKS."""
+def markdown_to_blocks(md: str, *, limit: int | None = None) -> list[dict]:
+    """Render markdown to Block Kit, capped at `limit` (default MAX_BLOCKS).
+
+    `limit` exists because a caller that adds blocks of its own around this
+    output cannot use the default. The weekly lead wraps the report body in a
+    metrics table, two dividers and a link block; with the body free to fill all
+    45, the assembled message came to 50+ and `post` refused to send it -- the
+    whole week invisible, which is the failure this module exists to prevent.
+    The overflow notice below is unchanged, so a trimmed body still says so.
+    """
+    cap = MAX_BLOCKS if limit is None else max(2, min(limit, MAX_BLOCKS))
     blocks: list[dict] = []
     buf: list[str] = []
 
@@ -410,11 +419,11 @@ def markdown_to_blocks(md: str) -> list[dict]:
 
     flush()
 
-    if len(blocks) > MAX_BLOCKS:
-        kept = blocks[: MAX_BLOCKS - 1]
+    if len(blocks) > cap:
+        kept = blocks[: cap - 1]
         kept.append({"type": "context", "elements": [{
             "type": "mrkdwn",
-            "text": (f":warning: {len(blocks) - MAX_BLOCKS + 1} more block(s) "
+            "text": (f":warning: {len(blocks) - cap + 1} more block(s) "
                      f"omitted - Slack caps a message at 50. Full text is in "
                      f"the report file."),
         }]})

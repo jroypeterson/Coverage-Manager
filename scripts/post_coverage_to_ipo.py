@@ -50,8 +50,10 @@ from reporting.pipeline_reversals import (  # noqa: E402
     SECTION_EXCLUDED, find_reversals, load_prior_reports,
 )
 from reporting.slack_blocks import (  # noqa: E402
-    MAX_BLOCKS, context_block, markdown_to_blocks,
+    MAX_BLOCKS, context_block, is_narrow, markdown_to_blocks, render_aligned,
 )
+from reporting import added_names as _added  # noqa: E402
+from reporting import weekly_metrics as _metrics  # noqa: E402
 
 SLACK_API = "https://slack.com/api/"
 
@@ -76,9 +78,15 @@ LEAD_SECTION_PREFIXES = ("recommendations", "pending approval",
 # of the thread rather than as a full section, because nobody decides from them.
 FOOTER_SECTION_PREFIXES = ("report files", "csv changes")
 
-# Soft ceiling on the whole channel-level lead, in characters. Diagnostic only --
-# nothing truncates. ~2,600 is roughly one phone screen of header + two tables.
+# Soft ceiling on the REPORT'S OWN PROSE in the lead, in characters. Diagnostic
+# only -- nothing truncates. ~2,600 is roughly one phone screen of header + two
+# tables. Deliberately still measured against `lead_md` alone after the 2026-09-06
+# rework: the metrics table and the business summaries are separate blocks JP
+# asked for, and folding them into this budget would turn a check on run-away
+# report prose into a check that fires on requested content.
 LEAD_SOFT_LIMIT = 2600
+
+DIVIDER = {"type": "divider"}
 
 
 class PostError(RuntimeError):
@@ -189,6 +197,99 @@ def route(md: str) -> tuple[str, list[str], list[str]]:
         else:
             thread.append(body)
     return "\n\n".join(lead_parts), thread, footer
+
+
+def metrics_blocks(summary_md: str, report_date: str) -> list[dict]:
+    """The before / after / to-date counters, as an aligned monospace table.
+
+    JP, 2026-09-06: the movement in the universe and the names that caused it
+    were reading as one claim. This is the first thing in the message and it is
+    fenced off by a divider from everything below, so "the universe moved five
+    rows" and "here are five companies" are visibly two different statements.
+
+    Never fatal. A metrics table that cannot be computed must not stop the report
+    that carries the decisions -- the fallback is to post the report without it
+    and say so on the console.
+    """
+    try:
+        m = _metrics.collect(summary_md, report_date=report_date)
+        rows = _metrics.as_rows(m)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"WARNING: metrics table unavailable ({type(exc).__name__}: {exc}); "
+              "posting the report without it", file=sys.stderr)
+        DEGRADED.append(f"metrics table ({type(exc).__name__})")
+        return []
+    if not is_narrow(rows):
+        # Falling back to a card render here would defeat the point -- the whole
+        # value is that four short columns line up. Report it instead.
+        print("WARNING: metrics table is too wide to align; skipping it",
+              file=sys.stderr)
+        DEGRADED.append("metrics table (too wide to align)")
+        return []
+    blocks = [context_block(f":bar_chart: *Where the universe stands* "
+                            f"— {report_date}", convert=False),
+              render_aligned(rows)]
+    line = _metrics.summary_line(m)
+    if line:
+        blocks.append(context_block(line, convert=False))
+    if m.coverage_note:
+        blocks.append(context_block(m.coverage_note, convert=False))
+    return blocks
+
+
+#: Sections that failed or degraded this run. `main` returns non-zero when it is
+#: non-empty: a post that silently lost its metrics table or its business
+#: summaries still looks like a successful post, and the scheduled task went
+#: green on it.
+DEGRADED: list[str] = []
+
+# How many adds the report itself claims, from either heading shape the
+# writer has used. `[^0-9]{0,4}` rather than a literal dash: the report top
+# has switched punctuation twice already.
+_ADD_COUNT_RE = re.compile(
+    r"\*\*Added by rule\s*[^0-9]{0,4}(\d+)"
+    r"|Added without asking[^\(]{0,40}\((\d+)\)",
+    re.I)
+
+
+def _claimed_add_count(summary_md: str) -> int | None:
+    """How many adds the REPORT says there were, or None if it does not say."""
+    m = _ADD_COUNT_RE.search(summary_md or "")
+    if not m:
+        return None
+    return int(m.group(1) or m.group(2))
+
+
+def added_blocks(report_date: str, briefings_md: str,
+                 summary_md: str = "") -> tuple[list[dict], int]:
+    """-> (blocks, count) for 'what each added company actually does'.
+
+    One short block per name. Sourced from the briefings, then the ledger; a name
+    with neither says so rather than rendering blank. Also never fatal.
+    """
+    try:
+        rows = _added.collect(report_date, briefings_md=briefings_md)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"WARNING: business summaries unavailable "
+              f"({type(exc).__name__}: {exc})", file=sys.stderr)
+        DEGRADED.append(f"business summaries ({type(exc).__name__})")
+        return [], 0
+    # A cross-check against the report's own count, because "the ledger says
+    # nothing was added" and "the ledger could not be read" produce the same
+    # empty section otherwise. The report is the second opinion.
+    claimed = _claimed_add_count(summary_md)
+    if claimed is not None and claimed != len(rows):
+        print(f"WARNING: the report describes {claimed} add(s) but the ledger "
+              f"yielded {len(rows)} summary row(s)", file=sys.stderr)
+        DEGRADED.append(f"add count mismatch (report {claimed}, ledger {len(rows)})")
+    if not rows:
+        return [], 0
+    md = _added.as_markdown(rows)
+    thin = [a.ticker for a in rows if a.source == "none"]
+    if thin:
+        print(f"WARNING: no business summary for {', '.join(thin)} - "
+              f"neither a briefing nor a ledger note", file=sys.stderr)
+    return markdown_to_blocks(md), len(rows)
 
 
 def split_briefings(md: str) -> list[tuple[str, str]]:
@@ -340,24 +441,99 @@ def main(argv: list[str] | None = None) -> int:
                 for b in thread_bodies + footer_bodies]
     moved = ", ".join(deferred) if deferred else "nothing else this week"
 
+    # Read once, up here: the business summaries in the LEAD are sourced from the
+    # same file the per-company thread replies use further down.
+    briefings_text = (briefs_p.read_text(encoding="utf-8", errors="replace")
+                      if briefs_p.exists() else "")
+
     thread_ts = a.thread_ts
+    overflow_blocks: list[dict] = []
     if a.update_ts or not thread_ts:
-        lead_blocks = markdown_to_blocks(lead_md) + [context_block(
+        head = metrics_blocks(summary_md, a.date)
+        what, n_added = added_blocks(a.date, briefings_text, summary_md)
+        link = [context_block(
             f":page_facing_up: *Full report:* {PAGES_URL}\n"
             f"On the page: {moved}, the full company briefings, and the auto-add "
             "rules.\nReply here to decide -- top-level or in thread, either is read.",
             convert=False)]
+
+        # Dividers are the whole point of the layout JP asked for: the counters,
+        # the decisions and the descriptions are three different kinds of claim
+        # and must not run together into one wall. `_sep` suppresses a second
+        # rule where the report's own markdown already ended on a `---`, which
+        # rendered as two grey lines with nothing between them.
+        def _sep(blocks: list[dict]) -> list[dict]:
+            return [] if blocks and blocks[-1].get("type") == "divider" else [DIVIDER]
+
+        # BUDGET the body rather than letting it fill the cap. `markdown_to_blocks`
+        # self-caps at MAX_BLOCKS, so on a long week `body` alone came back at 45
+        # and anything added to it -- the metrics head, a divider, the link --
+        # pushed `post` over its own refusal threshold and made the entire week
+        # invisible. That is the failure this script was written to prevent, and
+        # the previous guard could not catch it: it only fired when there were
+        # business summaries to move, so a long week with no adds was unguarded.
+        budget = MAX_BLOCKS - len(head) - len(link) - 2      # 2 dividers
+        body = markdown_to_blocks(lead_md, limit=max(budget, 8))
+
+        lead_blocks = head + (_sep(head) if head else []) + body
+        if what:
+            lead_blocks += _sep(lead_blocks) + what
+        lead_blocks += link
+
+        # Second step: if the summaries still do not fit, they move to the first
+        # thread reply rather than being dropped, and the console says so.
+        if len(lead_blocks) > MAX_BLOCKS and what:
+            overflow_blocks = what
+            lead_blocks = head + (_sep(head) if head else []) + body + link
+            print(f"NOTE: lead would be {len(head) + len(body) + len(what) + 2} "
+                  f"blocks (cap {MAX_BLOCKS}); the {n_added} business "
+                  f"summaries move to the first thread reply")
+
+        # Belt and braces. Nothing above should be able to exceed the cap now,
+        # but `post` raises rather than truncating, so a miscalculation here
+        # costs the week. Trim from the BODY (which the page carries in full),
+        # never from the link block that tells JP where the rest went.
+        if len(lead_blocks) > MAX_BLOCKS:
+            keep = MAX_BLOCKS - (len(lead_blocks) - len(body))
+            print(f"WARNING: lead still over cap; trimming body to {keep} block(s)",
+                  file=sys.stderr)
+            body = body[:max(keep, 1)]
+            lead_blocks = head + (_sep(head) if head else []) + body + link
+
         thread_ts = post(lead_blocks, token=token, channel=channel,
                          fallback=f"Weekly Coverage Universe Additions - {a.date}",
                          update_ts=a.update_ts,
                          dry_run=a.dry_run, preview=a.preview)
         print(f"lead {'updated' if a.update_ts else 'posted'}: ts={thread_ts}")
+        print(f"  metrics table: {'yes' if head else 'unavailable'}; "
+              f"business summaries: {n_added}")
         print(f"  deferred to the page: {len(deferred)} section(s)")
+
+        if overflow_blocks and not a.update_ts:
+            post(overflow_blocks, token=token, channel=channel,
+                 thread_ts=thread_ts, fallback="Added this week - what each does",
+                 dry_run=a.dry_run, preview=a.preview)
+            print("  threaded the business summaries (lead was at the block cap)")
 
     # An update rewrites the lead of a thread that already has its briefings. Posting
     # them again would double every company write-up under the same parent.
     if a.update_ts:
+        # An update that overflowed REMOVES the business summaries from a lead
+        # that had them, and posting the overflow again would duplicate a thread
+        # reply that is already there. Neither is silently acceptable: the
+        # operator has to know the rewrite lost a section, so this is degraded,
+        # not done, and it says what to run instead.
+        if overflow_blocks:
+            print("WARNING: the rewritten lead does not fit the business "
+                  "summaries, and they are NOT re-posted (an update cannot know "
+                  "whether the thread already carries them). Re-run without "
+                  "--update-ts for a clean post.", file=sys.stderr)
+            DEGRADED.append("business summaries dropped by --update-ts overflow")
         print("done - lead rewritten in place; briefings left as they were")
+        if DEGRADED:
+            print(f"DEGRADED: {len(DEGRADED)} section(s) - " + "; ".join(DEGRADED),
+                  file=sys.stderr)
+            return 1
         return 0
 
     # A name the report promised to add and then quietly excluded is the failure
@@ -399,8 +575,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  threaded reversal warning")
 
     briefings: list[tuple[str, str]] = []
-    if briefs_p.exists():
-        briefings = split_briefings(briefs_p.read_text(encoding="utf-8"))
+    if briefings_text:
+        briefings = split_briefings(briefings_text)
         if not briefings:
             print(f"WARNING: {briefs_p} parsed to zero briefings", file=sys.stderr)
     else:
@@ -423,6 +599,12 @@ def main(argv: list[str] | None = None) -> int:
     where = "thread" if a.thread_reference else "on the page"
     print(f"done - {len(deferred)} section(s) and {len(briefings)} briefing(s) "
           f"{where}; lead ts {thread_ts}")
+    if DEGRADED:
+        # The post went out, so this is not a failure -- but it is not a clean
+        # run either, and the caller must be able to tell the difference.
+        print(f"DEGRADED: {len(DEGRADED)} section(s) - " + "; ".join(DEGRADED),
+              file=sys.stderr)
+        return 1
     # Still non-zero when the briefings file is missing: the page renders the
     # summary either way, but a week with no write-ups is a degraded week and the
     # caller should see it.
