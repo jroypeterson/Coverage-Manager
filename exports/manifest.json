@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "generated_at": "2026-09-04T12:34:30Z",
+  "generated_at": "2026-09-07T20:11:47Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -27,12 +27,12 @@
     },
     {
       "name": "positions_and_researching.csv",
-      "purpose": "Positions and researching list joined with universe metadata \u2014 all coverage universe columns plus Position, Position Date, Buy Price, Sell Price, First Buy Date, Average Cost, Shares, Notes appended at the end.",
+      "purpose": "Positions and researching list joined with universe metadata \u2014 all coverage universe columns plus Position, Position Date, First Buy Date, Average Cost, Shares, Notes appended at the end. (Buy Price / Sell Price were removed 2026-09-05; price targets live on the portfolio workbook's Decision Sheet.)",
       "format": "csv"
     },
     {
       "name": "portfolio.json",
-      "purpose": "Position == 'Portfolio' rows only (names you own). {ticker: {position, position_date, buy_price, sell_price, first_buy_date, average_cost, shares, notes, name, sector, subsector, sub_subsector, <all universe columns...>}}.",
+      "purpose": "Position == 'Portfolio' rows only (names you own). {ticker: {position, position_date, first_buy_date, average_cost, shares, notes, name, sector, subsector, sub_subsector, <all universe columns...>}}.",
       "format": "json"
     },
     {
@@ -63,7 +63,7 @@
     },
     {
       "name": "watchlist.csv",
-      "purpose": "DEPRECATED back-compat (one cycle): legacy watchlist shape derived from positions_and_researching.csv. Sell Price is mapped to Target Price. Use positions_and_researching.csv for new code.",
+      "purpose": "DEPRECATED back-compat (one cycle): legacy watchlist shape derived from positions_and_researching.csv. Use positions_and_researching.csv for new code.",
       "format": "csv"
     },
     {

@@ -2,8 +2,6 @@
   "AAPL": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 67.5322,
     "shares": 13.036,
@@ -45,8 +43,6 @@
   "ADI": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 91.1771,
     "shares": 1.011,
@@ -88,8 +84,6 @@
   "ADSK": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 264.11,
     "shares": 10.0,
@@ -131,8 +125,6 @@
   "AFRM": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 50.06,
     "shares": 5.0,
@@ -174,8 +166,6 @@
   "AMZN": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 68.692,
     "shares": 20.0,
@@ -217,8 +207,6 @@
   "BE": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 145.2776,
     "shares": 1.0,
@@ -260,8 +248,6 @@
   "BRO": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 67.6396,
     "shares": 3.0,
@@ -303,8 +289,6 @@
   "BSX": {
     "position": "Portfolio",
     "position_date": "2026-07-13",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 56.11999999999999,
     "shares": 20.0,
@@ -346,8 +330,6 @@
   "CI": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 271.829,
     "shares": 40.532,
@@ -389,8 +371,6 @@
   "CPRT": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 33.1574,
     "shares": 7.0,
@@ -432,8 +412,6 @@
   "DOCS": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 25.749900000000004,
     "shares": 40.0,
@@ -475,8 +453,6 @@
   "EHC": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 92.8407,
     "shares": 96.94,
@@ -518,8 +494,6 @@
   "ENSG": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 162.7041,
     "shares": 33.0,
@@ -561,8 +535,6 @@
   "FI": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 56.5948,
     "shares": 4.0,
@@ -604,8 +576,6 @@
   "FIVE": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 102.212,
     "shares": 13.0,
@@ -647,8 +617,6 @@
   "FMS": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 22.0918,
     "shares": 452.656,
@@ -690,8 +658,6 @@
   "IDXX": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 561.85,
     "shares": 4.0,
@@ -733,8 +699,6 @@
   "ISRG": {
     "position": "Portfolio",
     "position_date": "2026-07-24",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 350.1277,
     "shares": 3.0,
@@ -776,8 +740,6 @@
   "KRC": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 28.365,
     "shares": 8.0,
@@ -819,8 +781,6 @@
   "LLY": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 1021.5,
     "shares": 1.0,
@@ -862,8 +822,6 @@
   "OPCH": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 27.945,
     "shares": 350.0,
@@ -905,8 +863,6 @@
   "PACS": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 35.985,
     "shares": 277.893,
@@ -948,8 +904,6 @@
   "Q": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 129.5413,
     "shares": 2.0,
@@ -991,8 +945,6 @@
   "SPCX": {
     "position": "Portfolio",
     "position_date": "2026-07-24",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 135.0,
     "shares": 100.0,
@@ -1034,8 +986,6 @@
   "SPOT": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 262.0,
     "shares": 2.0,
@@ -1077,8 +1027,6 @@
   "TSLA": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 155.28,
     "shares": 1.0,
@@ -1120,8 +1068,6 @@
   "ULS": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 85.255,
     "shares": 2.0,
@@ -1163,8 +1109,6 @@
   "V": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 135.747,
     "shares": 1.004,
@@ -1206,8 +1150,6 @@
   "VEEV": {
     "position": "Portfolio",
     "position_date": "2026-07-24",
-    "buy_price": null,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 197.64,
     "shares": 6.0,
@@ -1249,8 +1191,6 @@
   "WAY": {
     "position": "Portfolio",
     "position_date": "2026-04-11",
-    "buy_price": 15.0,
-    "sell_price": null,
     "first_buy_date": "",
     "average_cost": 23.255,
     "shares": 100.0,

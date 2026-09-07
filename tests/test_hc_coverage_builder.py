@@ -88,11 +88,17 @@ def test_public_schema_is_the_private_one_minus_exactly_the_private_columns():
         "public column ORDER must track COLS; the Sheet reads by position"
 
 
-def test_the_published_csv_on_disk_carries_no_rating_column():
+def test_the_published_csv_on_disk_has_the_expected_shape():
     """Belt and braces: check the artifact, not just the constant. A published
     artifact is the thing consumers read, and validating the source instead of the
-    artifact is how a BOM once emptied every export."""
-    path = b.PUBLIC_CSV
+    artifact is how a BOM once emptied every export.
+
+    ⛑ RENAMED 2026-09-07. This was `..._carries_no_rating_column` while its body
+    asserted `Rating` IS at index 3 -- the name predated JP's 2026-08-26 decision
+    to publish ratings to the Google file and had been contradicting its own
+    assertions ever since. The assertions were right; the name was the stale
+    part. `PRIVATE_ONLY` is empty deliberately, and that is checked below."""
+    path = os.path.join(b.PUBLIC_DIR, b.BOOKS["core"]["public_csv"])
     if not os.path.exists(path):
         pytest.skip("public CSV not built in this checkout")
     lines = open(path, encoding="utf-8").read().splitlines()
@@ -241,7 +247,7 @@ def test_a_workbook_open_in_excel_exits_3_not_1(monkeypatch, tmp_path):
     which is exactly why the handler had to cover the archive step and not just
     the copy. A test that reproduces the wrong failure proves nothing.
     """
-    current = tmp_path / ("%s.xlsx" % b.STEM)
+    current = tmp_path / ("%s.xlsx" % b.BOOK["stem"])
     current.write_bytes(b"pretend workbook")
 
     def locked(*a, **k):
@@ -255,7 +261,7 @@ def test_a_workbook_open_in_excel_exits_3_not_1(monkeypatch, tmp_path):
                         lambda asof: ([row], datetime.date(2026, 8, 21), []))
     monkeypatch.setattr(b.shutil, "move", locked)
     monkeypatch.setattr(b.shutil, "copy2", locked)
-    monkeypatch.setattr(b, "PUBLIC_CSV", str(tmp_path / "docs" / "hc_coverage.csv"))
+    monkeypatch.setattr(b, "PUBLIC_DIR", str(tmp_path / "docs"))
     monkeypatch.setattr("sys.argv", ["build", "--out-dir", str(tmp_path)])
 
     with pytest.raises(SystemExit) as e:
@@ -269,9 +275,52 @@ def test_a_workbook_open_in_excel_exits_3_not_1(monkeypatch, tmp_path):
 def test_the_stem_and_the_published_endpoint_are_decoupled():
     """The Sheet is one =IMPORTDATA() cell pointed at this exact URL and nothing
     in this repo can rewrite that cell, so renaming the workbook must never rename
-    the published CSV."""
-    assert b.STEM == "AA_Core Coverage"
-    assert os.path.basename(b.PUBLIC_CSV) == "hc_coverage.csv"
+    the published CSV. Each book owns BOTH names, and neither may drift."""
+    assert b.BOOKS["core"]["stem"] == "AA_Core Coverage"
+    assert b.BOOKS["core"]["public_csv"] == "hc_coverage.csv"
+    assert b.BOOKS["noncore"]["stem"] == "AA_NonCore Coverage"
+    assert b.BOOKS["noncore"]["public_csv"] == "noncore_coverage.csv"
+
+
+def test_the_two_books_do_not_share_an_endpoint_or_an_archive_glob():
+    """A shared public CSV would have one book silently overwrite the other's
+    Google Sheet; a shared archive glob would have one book file away the
+    other's current workbook."""
+    endpoints = [bk["public_csv"] for bk in b.BOOKS.values()]
+    assert len(set(endpoints)) == len(endpoints)
+    stems = [bk["stem"] for bk in b.BOOKS.values()]
+    assert len(set(stems)) == len(stems)
+    core_globs = set(b.BOOKS["core"]["globs"])
+    noncore_globs = set(b.BOOKS["noncore"]["globs"])
+    assert not (core_globs & noncore_globs)
+    # And the NonCore book's own current file must not match a Core glob.
+    import fnmatch
+    noncore_current = "AA_NonCore Coverage auto-updated - 09.07.26.xlsx"
+    assert not any(fnmatch.fnmatch(noncore_current, g) for g in core_globs),         "building the Core book would archive the NonCore book's current file"
+
+
+def test_the_two_books_partition_the_core_flagged_universe():
+    """Every Core=Y row lands in exactly one book, and neither book claims a row
+    the other does. Measured against the live universe, not a fixture."""
+    import csv as _csv
+    rows = list(_csv.DictReader(open(b.UNIVERSE, encoding="utf-8")))
+    core = {r["Ticker"] for r in rows if b.in_scope_core(r)}
+    noncore = {r["Ticker"] for r in rows if b.in_scope_noncore(r)}
+    core_y = {r["Ticker"] for r in rows
+              if (r.get("Core") or "").strip().upper() == "Y"}
+    assert not (core & noncore), sorted(core & noncore)[:10]
+    assert not (core_y - (core | noncore)), sorted(core_y - (core | noncore))[:10]
+
+
+def test_selecting_a_book_actually_changes_the_scope_predicate():
+    """`in_scope` dispatches through BOOK, so a caller that forgets
+    select_book() gets the Core book -- never a silently blended one."""
+    row = {"Sector (JP)": "Biopharma", "Subsector (JP)": "Biotech", "Core": "Y"}
+    b.select_book("core")
+    assert b.in_scope(row) is False
+    b.select_book("noncore")
+    assert b.in_scope(row) is True
+    b.select_book("core")          # restore the module default
 
 
 def test_the_ratings_workbook_is_scoped_to_core_coverage():
@@ -320,7 +369,7 @@ def test_every_return_column_gets_its_own_colour_scale():
     # Newest of OUR outputs, whatever today's date stamp is -- pinning the plain
     # stem made both of these skip silently the moment filenames gained a date.
     import glob as _g
-    hits = sorted(_g.glob(os.path.join(b.DEFAULT_OUT, "%s*.xlsx" % b.STEM)),
+    hits = sorted(_g.glob(os.path.join(b.DEFAULT_OUT, "%s*.xlsx" % b.BOOK["stem"])),
                   key=os.path.getmtime)
     path = hits[-1] if hits else ""
     if not os.path.exists(path):
@@ -343,7 +392,7 @@ def test_the_colour_scale_puts_white_at_zero_not_at_the_median():
     # Newest of OUR outputs, whatever today's date stamp is -- pinning the plain
     # stem made both of these skip silently the moment filenames gained a date.
     import glob as _g
-    hits = sorted(_g.glob(os.path.join(b.DEFAULT_OUT, "%s*.xlsx" % b.STEM)),
+    hits = sorted(_g.glob(os.path.join(b.DEFAULT_OUT, "%s*.xlsx" % b.BOOK["stem"])),
                   key=os.path.getmtime)
     path = hits[-1] if hits else ""
     if not os.path.exists(path):
@@ -578,3 +627,28 @@ def test_the_scope_rule_travels_with_the_data():
     assert "Healthcare Real Estate" in b.SCOPE_DESCRIPTION
     for sector in b.SECTORS:
         assert sector in b.SCOPE_DESCRIPTION
+
+
+def test_private_only_is_empty_deliberately_not_accidentally():
+    """`PRIVATE_ONLY` is the ONLY thing that withholds a column from the public
+    CSV, and it is empty -- so every column in COLS publishes, `Rating`
+    included. That is JP's explicit 2026-08-26 call, not an oversight, and this
+    test exists so the next person to read the (previously stale) "ratings are
+    dropped" comment checks here instead of assuming a filter is running."""
+    assert b.PRIVATE_ONLY == set()
+    assert b.PUBLIC_COLS == b.COLS
+    assert "Rating" in b.PUBLIC_COLS
+
+
+def test_both_books_publish_the_same_columns():
+    """JP asked for the NonCore sheet in "the same column format" as Core.
+    The two books share COLS by construction; this pins that they cannot be
+    given different schemas without failing here."""
+    import csv as _csv
+    paths = [os.path.join(b.PUBLIC_DIR, bk["public_csv"]) for bk in b.BOOKS.values()]
+    headers = []
+    for p in paths:
+        if not os.path.exists(p):
+            pytest.skip("both public CSVs not built in this checkout")
+        headers.append(list(_csv.reader(open(p, encoding="utf-8")))[2])
+    assert headers[0] == headers[1], "the two coverage books drifted apart"

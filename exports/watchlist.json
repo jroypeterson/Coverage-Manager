@@ -1,7 +1,5 @@
 {
   "2715.HK": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "",
@@ -37,8 +35,6 @@
     "Core": ""
   },
   "AAPL": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Apple Inc.",
@@ -74,8 +70,6 @@
     "Core": "Y"
   },
   "ADI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Analog Devices Inc",
@@ -111,8 +105,6 @@
     "Core": "Y"
   },
   "ADSK": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Autodesk Inc",
@@ -148,8 +140,6 @@
     "Core": ""
   },
   "AFRM": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Affirm Holdings Inc",
@@ -185,8 +175,6 @@
     "Core": "Y"
   },
   "ALMR": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-17",
     "notes": "",
     "name": "Alamar Biosciences, Inc.",
@@ -222,8 +210,6 @@
     "Core": ""
   },
   "AMZN": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Amazon.com, Inc.",
@@ -259,8 +245,6 @@
     "Core": "Y"
   },
   "ARXS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Arxis, Inc.",
@@ -296,8 +280,6 @@
     "Core": ""
   },
   "BE": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Bloom Energy Corporation",
@@ -333,8 +315,6 @@
     "Core": ""
   },
   "BRO": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Brown & Brown Inc.",
@@ -370,8 +350,6 @@
     "Core": ""
   },
   "BSX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-13",
     "notes": "",
     "name": "Boston Scientific Corp",
@@ -407,8 +385,6 @@
     "Core": "Y"
   },
   "CI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Cigna Group",
@@ -444,8 +420,6 @@
     "Core": "Y"
   },
   "CIGI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Colliers International Group Inc",
@@ -481,8 +455,6 @@
     "Core": "Y"
   },
   "CNI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Canadian National Railway Co",
@@ -518,8 +490,6 @@
     "Core": "Y"
   },
   "COIN": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Coinbase Global Inc",
@@ -555,8 +525,6 @@
     "Core": "Y"
   },
   "CP": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Canadian Pacific Kansas City Ltd",
@@ -592,8 +560,6 @@
     "Core": "Y"
   },
   "CPRT": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Copart Inc.",
@@ -629,8 +595,6 @@
     "Core": ""
   },
   "CROX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Crocs Inc",
@@ -666,8 +630,6 @@
     "Core": "Y"
   },
   "CRWD": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "CrowdStrike Holdings, Inc.",
@@ -703,8 +665,6 @@
     "Core": "Y"
   },
   "DBX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Dropbox, Inc.",
@@ -740,8 +700,6 @@
     "Core": "Y"
   },
   "DOCS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Doximity, Inc.",
@@ -777,8 +735,6 @@
     "Core": "Y"
   },
   "EHC": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Encompass Health Corp",
@@ -814,8 +770,6 @@
     "Core": "Y"
   },
   "ENSG": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Ensign Group Inc",
@@ -851,8 +805,6 @@
     "Core": "Y"
   },
   "FI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Fiserv Inc.",
@@ -888,8 +840,6 @@
     "Core": ""
   },
   "FICO": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Fair Isaac Corp",
@@ -925,8 +875,6 @@
     "Core": "Y"
   },
   "FIVE": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Five Below Inc",
@@ -962,8 +910,6 @@
     "Core": "Y"
   },
   "FMS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Fresenius Medical Care AG",
@@ -999,8 +945,6 @@
     "Core": "Y"
   },
   "HOOD": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Robinhood Markets Inc",
@@ -1036,8 +980,6 @@
     "Core": "Y"
   },
   "IDXX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "IDEXX Laboratories Inc",
@@ -1073,8 +1015,6 @@
     "Core": "Y"
   },
   "ISRG": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-24",
     "notes": "",
     "name": "Intuitive Surgical Inc",
@@ -1110,8 +1050,6 @@
     "Core": "Y"
   },
   "KKR": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "KKR & Co Inc",
@@ -1147,8 +1085,6 @@
     "Core": "Y"
   },
   "KLRA": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-17",
     "notes": "",
     "name": "Kailera Therapeutics, Inc.",
@@ -1184,8 +1120,6 @@
     "Core": ""
   },
   "KRC": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Kilroy Realty Corporation",
@@ -1221,8 +1155,6 @@
     "Core": ""
   },
   "LIN": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Linde plc",
@@ -1258,8 +1190,6 @@
     "Core": "Y"
   },
   "LLY": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Eli Lilly And Co",
@@ -1295,8 +1225,6 @@
     "Core": "Y"
   },
   "MA": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Mastercard Inc",
@@ -1332,8 +1260,6 @@
     "Core": "Y"
   },
   "MAIR": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-17",
     "notes": "",
     "name": "Madison Air Solutions Corporation",
@@ -1369,8 +1295,6 @@
     "Core": ""
   },
   "MCO": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Moody's Corp",
@@ -1406,8 +1330,6 @@
     "Core": "Y"
   },
   "MDA": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "MDA Space Ltd",
@@ -1443,8 +1365,6 @@
     "Core": ""
   },
   "MICC": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-11",
     "notes": "",
     "name": "The Magnum Ice Cream Company N.V.",
@@ -1480,8 +1400,6 @@
     "Core": ""
   },
   "MMED": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-17",
     "notes": "",
     "name": "MiniMed Group Inc",
@@ -1517,8 +1435,6 @@
     "Core": "Y"
   },
   "MNKD": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-15",
     "notes": "",
     "name": "MannKind Corp",
@@ -1554,8 +1470,6 @@
     "Core": ""
   },
   "MSFT": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Microsoft Corporation",
@@ -1591,8 +1505,6 @@
     "Core": "Y"
   },
   "MWH": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-28",
     "notes": "Largest US utility-scale solar + storage EPC/O&M; $8.2B backlog. Added from the 06-26 coverage recommendation.",
     "name": "SOLV Energy, Inc.",
@@ -1628,8 +1540,6 @@
     "Core": ""
   },
   "NFLX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Netflix Inc",
@@ -1664,9 +1574,42 @@
     "Sub-subsector (JP)": "",
     "Core": "Y"
   },
+  "NTRA": {
+    "date_added": "2026-08-14",
+    "notes": "",
+    "name": "Natera, Inc.",
+    "sector": "MedTech",
+    "subsector": "Diagnostics",
+    "Exchange": "NASDAQ",
+    "Exchange Code": "NMS",
+    "Exchange Full Name": "NasdaqGS",
+    "Listing Type": "Primary",
+    "Other Listings": "",
+    "Year Listed": "2015",
+    "ISIN": "US6323071042",
+    "FIGI": "BBG001J1BQ86",
+    "Composite FIGI": "BBG001J1BQ86",
+    "Share Class FIGI": "BBG001V0FSF8",
+    "CIK": "1604821",
+    "Company Name": "Natera, Inc.",
+    "Country (HQ)": "United States",
+    "Country (Listing)": "United States",
+    "Country (ISO)": "USA",
+    "Currency": "USD",
+    "Website": "https://www.natera.com",
+    "YF Sector": "Healthcare",
+    "YF Industry": "Diagnostics & Research",
+    "Sector (JP)": "MedTech",
+    "Subsector (JP)": "Diagnostics",
+    "Instrument Type": "Ordinary Share",
+    "IPO Date": "",
+    "Est Lockup 90d": "",
+    "Est Lockup 180d": "",
+    "LEI": "",
+    "Sub-subsector (JP)": "",
+    "Core": "Y"
+  },
   "NVDA": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "NVIDIA Corporation",
@@ -1702,8 +1645,6 @@
     "Core": "Y"
   },
   "OPCH": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Option Care Health Inc",
@@ -1739,8 +1680,6 @@
     "Core": "Y"
   },
   "PACS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "PACS Group Inc",
@@ -1776,8 +1715,6 @@
     "Core": "Y"
   },
   "PNTG": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Pennant Group Inc",
@@ -1813,8 +1750,6 @@
     "Core": "Y"
   },
   "Q": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Qnity Electronics Inc.",
@@ -1850,8 +1785,6 @@
     "Core": ""
   },
   "SGRY": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-14",
     "notes": "Is that FCF Yield a good stock price anchor at 10% or is something weird happening there?",
     "name": "Surgery Partners Inc",
@@ -1887,8 +1820,6 @@
     "Core": "Y"
   },
   "SPCX": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-24",
     "notes": "SpaceX Class A (Fidelity)",
     "name": "Space Exploration Technologies Corp.",
@@ -1924,8 +1855,6 @@
     "Core": ""
   },
   "SPGI": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "S&P Global Inc",
@@ -1961,8 +1890,6 @@
     "Core": "Y"
   },
   "SPOT": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Spotify Technology SA",
@@ -1998,8 +1925,6 @@
     "Core": "Y"
   },
   "TPL": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Texas Pacific Land Corp",
@@ -2035,8 +1960,6 @@
     "Core": "Y"
   },
   "TSLA": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Tesla, Inc.",
@@ -2072,8 +1995,6 @@
     "Core": "Y"
   },
   "UBER": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-11",
     "notes": "",
     "name": "Uber Technologies, Inc.",
@@ -2109,8 +2030,6 @@
     "Core": ""
   },
   "ULS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "UL Solutions Inc.",
@@ -2146,8 +2065,6 @@
     "Core": ""
   },
   "UPS": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "United Parcel Service Inc",
@@ -2183,8 +2100,6 @@
     "Core": "Y"
   },
   "V": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Visa Inc",
@@ -2220,8 +2135,6 @@
     "Core": "Y"
   },
   "VEEV": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-07-24",
     "notes": "",
     "name": "Veeva Systems Inc.",
@@ -2257,8 +2170,6 @@
     "Core": "Y"
   },
   "VLTO": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "Veralto Corp",
@@ -2294,8 +2205,6 @@
     "Core": "Y"
   },
   "WAY": {
-    "buy_price": 15.0,
-    "target_price": null,
     "date_added": "2026-04-11",
     "notes": "",
     "name": "Waystar Holding Corp",
@@ -2331,8 +2240,6 @@
     "Core": "Y"
   },
   "XE": {
-    "buy_price": null,
-    "target_price": null,
     "date_added": "2026-05-03",
     "notes": "",
     "name": "X-Energy, Inc.",

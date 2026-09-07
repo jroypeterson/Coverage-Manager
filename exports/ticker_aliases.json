@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Issuers whose ticker string differs between sources, anchored to the identifiers that did NOT change (CIK / ISIN / composite FIGI). `alias_to_canonical` maps any known symbol to the coverage universe ticker; `vendor_symbols` gives the symbol to send a named vendor. This file does not assert which symbol is 'current' — no source reliably says, which is why the join is aliased rather than rewritten.",
+  "description": "Issuers whose ticker string differs between sources, anchored to the identifiers that did NOT change (CIK / ISIN / composite FIGI). `alias_to_canonical` maps any known symbol to the coverage universe ticker; `vendor_symbols` gives the symbol to send a named vendor. This file does not assert which symbol is 'current' \u2014 no source reliably says, which is why the join is aliased rather than rewritten.",
   "alias_to_canonical": {
     "CSU.TO": "CSU",
     "FISV": "FI"
@@ -68,8 +68,7 @@
         "Coverage universe row (data/coverage_universe_tickers.csv) 2026-09-06: CSU, Constellation Software Inc., Exchange TSX, Exchange Code TOR, Exchange Full Name Toronto, ISIN CA21037X1006, Composite FIGI BBG000BMZ5P1, Currency CAD, Year Listed 2007.",
         "yfinance 2026-09-06: `CSU` -> HTTP 404 'Quote not found for symbol: CSU' and an empty history; `CSU.TO` -> 5 daily closes, last 3023.96, .info longName 'Constellation Software Inc.', exchange TOR, fullExchangeName Toronto, currency CAD, quoteType EQUITY. The two sources agree independently on issuer, venue and currency."
       ],
-      "note": "Entered 2026-09-06. CSU reached the portfolio workbook on 2026-09-05 when the CM->sheet sync pulled in 21 Following-for-Interest names that had never had a row, and it was the only one of the 21 with no price: every refresh logged 'CSU: no price available' and the run went DEGRADED. ⚠ CSU.TO QUOTES IN CAD. The workbook's Last Price column carries no currency, so this price sits beside USD ones -- as 2715.HK's HKD price already does. Harmless for a Watchlist name (no Mkt Value, weight or cost basis is computed from it) and NOT harmless if this name is ever bought: the sizing block would read a CAD cost basis against a USD book. See the fleet rule that a number cannot state its own unit."
+      "note": "Entered 2026-09-06. CSU reached the portfolio workbook on 2026-09-05 when the CM->sheet sync pulled in 21 Following-for-Interest names that had never had a row, and it was the only one of the 21 with no price: every refresh logged 'CSU: no price available' and the run went DEGRADED. \u26a0 CSU.TO QUOTES IN CAD. The workbook's Last Price column carries no currency, so this price sits beside USD ones -- as 2715.HK's HKD price already does. Harmless for a Watchlist name (no Mkt Value, weight or cost basis is computed from it) and NOT harmless if this name is ever bought: the sizing block would read a CAD cost basis against a USD book. See the fleet rule that a number cannot state its own unit."
     }
-  ],
-  "excluded_count": 0
+  ]
 }

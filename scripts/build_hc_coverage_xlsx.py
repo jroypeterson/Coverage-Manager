@@ -37,11 +37,161 @@ from openpyxl.utils import get_column_letter
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UNIVERSE = os.path.join(REPO, "exports", "universe.csv")
-RATINGS_DIR = r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings"
 # Moved here from Career\Pitches\Coverage on 2026-08-26 (JP), so the workbook,
 # its archive and the ratings workbook it joins all live under one root.
+#
+# ⛑ THIS PATH IS WHY `WeeklyCoverageBuilder` EXITED 1 ON 2026-08-28 AND 09-04
+# (board #331), and the shape of the failure is the lesson, not the typo.
+# The constant read `...\Companies_Stocks_Sectors_Ratings`. The folder on disk is
+# `...\Companies_Stocks_Sectors_Ratings_Coverage` — renamed 2026-08-27 20:29,
+# the day AFTER the last good build (the workbook and Sheet both stopped at
+# 2026-08-26) and the day BEFORE the first failure. Nothing in the repo could
+# know: it is a hardcoded user path outside the repo, so a rename in Dropbox
+# silently invalidates it [[feedback_no_hardcoded_user_paths]].
+#
+# What made it expensive is WHEN it failed. The path is only touched by
+# `shutil.copy2` at the very END of `main()`, so the job spent ~65 minutes
+# sweeping Yahoo for 240 tickers and then died on the last line with
+# `FileNotFoundError: [WinError 3]`. That is exactly the signature board #331
+# recorded from the outside — "a clean exit 1 after a full 65-minute run" —
+# and it is why `preflight_output_root()` below now runs BEFORE any network work.
+RATINGS_DIR = os.environ.get(
+    "CM_RATINGS_DIR",
+    r"C:\Users\jroyp\Dropbox\Companies_Stocks_Sectors_Ratings_Coverage")
 DEFAULT_OUT = os.path.join(RATINGS_DIR, "_Coverage")
-STEM = "AA_Core Coverage"
+
+
+def preflight_output_root(out_dir):
+    """Fail on a missing output root BEFORE the run spends an hour on Yahoo.
+
+    Raises SystemExit(1) with the path it wanted and what it found, because the
+    two failures this guards are indistinguishable from the log otherwise: a
+    folder that was renamed, and a folder that never existed. Creating it
+    silently would be worse than failing — `RATINGS_DIR` is JP's folder, and
+    conjuring an empty `_Coverage` beside a renamed original would leave two
+    plausible homes for the workbook and no signal that anything moved.
+    """
+    if os.path.isdir(out_dir):
+        return
+    parent = os.path.dirname(out_dir.rstrip("\\/"))
+    hint = ""
+    if not os.path.isdir(parent):
+        gparent = os.path.dirname(parent)
+        if os.path.isdir(gparent):
+            base = os.path.basename(parent).lower()
+            near = [d for d in os.listdir(gparent)
+                    if base in d.lower() or d.lower() in base]
+            if near:
+                hint = ("\n  Did you mean one of these, in %s?\n    %s"
+                        % (gparent, "\n    ".join(sorted(near)[:5])))
+    print("ERROR: the coverage output folder does not exist:\n  %s%s\n"
+          "  Set CM_RATINGS_DIR to the real root, or fix RATINGS_DIR in %s.\n"
+          "  Refusing to run: a 240-ticker Yahoo sweep would be thrown away at "
+          "the final copy." % (out_dir, hint, os.path.basename(__file__)),
+          file=sys.stderr)
+    raise SystemExit(1)
+# --- THE TWO BOOKS -----------------------------------------------------------
+# JP 2026-08-25, via #project-ideas: "I currently have a coverage sheet on my
+# drive AA_ Core Coverage[...] create another one that is the same column format
+# for non-core coverage. So AA_NonCore Coverage."
+#
+# ONE code path builds both. Every string that differs between them is DATA in
+# this table, never a second copy of the script -- this file already carries the
+# reason, at SCOPE_DESCRIPTION: "One string, because two copies would drift apart
+# the first time the rule changed." A forked builder is that same failure at the
+# scale of a whole file.
+#
+# WHAT "NON-CORE" MEANS HERE, and why it is not the obvious complement. Three
+# readings were measured against the live universe before choosing:
+#   * everything outside this workbook's sector scope -> 1,114 rows. That is the
+#     UNIVERSE minus healthcare, including every S&P 500 name CM tracks for the
+#     screens. It is not a coverage list and nobody would read it.
+#   * rows with Core != Y                             -> 1,043 rows. Same problem.
+#   * rows JP flags Core = Y that the Core book does NOT already hold -> 96.
+# The third is the only one that reads as "the rest of what I actually cover":
+# 58 Biopharma, 14 Tech, 9 Financials, 7 Industrials, 5 Consumer, and one each of
+# Real Estate / Materials / Energy. It also PARTITIONS cleanly -- every Core=Y
+# name lands in exactly one of the two books and the union is complete, so a name
+# can never be in both or in neither.
+#
+# The Core book's scope is a SECTOR rule, not the `Core` flag (see in_scope_core),
+# so 25 of its 240 rows are not flagged Core=Y. Those stay in the Core book and
+# are deliberately NOT repeated here.
+
+
+def in_scope_core(row):
+    return ((row.get("Sector (JP)") or "").strip() in SECTORS
+            or (row.get("Subsector (JP)") or "").strip() in SCOPE_SUBSECTORS)
+
+
+def in_scope_noncore(row):
+    return ((row.get("Core") or "").strip().upper() == "Y"
+            and not in_scope_core(row))
+
+
+def split_core(recs):
+    return ([r for r in recs if r["Sector"] == "MedTech"],
+            [r for r in recs if r["Sector"] != "MedTech"])
+
+
+def split_noncore(recs):
+    return ([r for r in recs if r["Sector"] == "Biopharma"],
+            [r for r in recs if r["Sector"] != "Biopharma"])
+
+
+BOOKS = {
+    "core": {
+        "stem": "AA_Core Coverage",
+        "title": "Healthcare Services & MedTech",
+        "public_csv": "hc_coverage.csv",
+        "in_scope": in_scope_core,
+        "split": split_core,
+        "buckets": ("MedTech", "Healthcare Services"),
+        "lead_sector": "MedTech",
+        # ONLY THESE ARE OURS TO MOVE. JP 2026-08-26: "I might put my own files
+        # in this coverage folder for different reasons. Don't move my files. You
+        # just archive the files you auto-generate in the folder but leave the
+        # ones I put there manually alone." So archiving matches an allow-list of
+        # names THIS SCRIPT has ever produced -- never "every xlsx in the
+        # folder", which would sweep his work into archive/ the first time he
+        # dropped a file here. Per-book, so building one book never archives the
+        # other book's files.
+        "globs": (
+            "AA_Core Coverage auto-updated - *.xlsx",
+            "AA_Core Coverage auto-updated - *.csv",
+            "AA_Core Coverage.xlsx",                      # stable-named era, to 2026-08-26
+            "AA_Core Coverage.csv",
+            "Coverage - HC Services and MedTech.xlsx",    # pre-rename era
+            "Coverage - HC Services and MedTech.csv",
+        ),
+    },
+    "noncore": {
+        "stem": "AA_NonCore Coverage",
+        "title": "Non-Core Coverage",
+        "public_csv": "noncore_coverage.csv",
+        "in_scope": in_scope_noncore,
+        "split": split_noncore,
+        "buckets": ("Biopharma", "Other sectors"),
+        "lead_sector": "Biopharma",
+        "globs": (
+            "AA_NonCore Coverage auto-updated - *.xlsx",
+            "AA_NonCore Coverage auto-updated - *.csv",
+        ),
+    },
+}
+
+# The active book. `select_book()` sets it, and every book-specific read goes
+# through it rather than through a module constant, so two builds in one process
+# cannot bleed into each other.
+BOOK = BOOKS["core"]
+
+
+def select_book(key):
+    global BOOK
+    BOOK = BOOKS[key]
+    return BOOK
+
+
 
 
 def dated_stem(day=None):
@@ -49,28 +199,13 @@ def dated_stem(day=None):
     filename, and "auto-updated" earns its place: this folder is his too, and the
     word is what tells him at a glance which files a machine owns."""
     d = day or datetime.date.today()
-    return "%s auto-updated - %s" % (STEM, d.strftime("%m.%d.%y"))
+    return "%s auto-updated - %s" % (BOOK["stem"], d.strftime("%m.%d.%y"))
 
-
-# ⛑ ONLY THESE ARE OURS TO MOVE. JP 2026-08-26: "I might put my own files in this
-# coverage folder for different reasons. Don't move my files. You just archive the
-# files you auto-generate in the folder but leave the ones I put there manually
-# alone." So archiving matches this allow-list of names THIS SCRIPT has ever
-# produced -- never "every xlsx in the folder", which would sweep his work into
-# archive/ the first time he dropped a file here.
-AUTO_GENERATED_GLOBS = (
-    "AA_Core Coverage auto-updated - *.xlsx",
-    "AA_Core Coverage auto-updated - *.csv",
-    "AA_Core Coverage.xlsx",                      # stable-named era, to 2026-08-26
-    "AA_Core Coverage.csv",
-    "Coverage - HC Services and MedTech.xlsx",    # pre-rename era
-    "Coverage - HC Services and MedTech.csv",
-)
 
 # NOT renamed alongside the workbook. The Google Sheet mirror is a single
 # =IMPORTDATA() cell pointed at this exact URL and nothing here can rewrite that
 # cell, so renaming the endpoint silently empties the Sheet.
-PUBLIC_CSV = os.path.join(REPO, "docs", "hc_coverage.csv")
+PUBLIC_DIR = os.path.join(REPO, "docs")
 
 RATINGS_PATH = os.path.join(RATINGS_DIR, "Ratings_CoreCoverage.xlsx")
 # Scope: rows flagged `Core` in the universe -- the names JP covers analytically
@@ -105,12 +240,12 @@ SCOPE_DESCRIPTION = ("Sector (JP) in (Healthcare Services, MedTech), plus any ro
 
 
 def in_scope(row):
-    """True when a universe row belongs in this workbook.
+    """True when a universe row belongs in the ACTIVE book.
 
     Takes a raw `exports/universe.csv` row (dict), not a built record.
+    Dispatches to BOOK["in_scope"] -- see the BOOKS table for what each means.
     """
-    return ((row.get("Sector (JP)") or "").strip() in SECTORS
-            or (row.get("Subsector (JP)") or "").strip() in SCOPE_SUBSECTORS)
+    return BOOK["in_scope"](row)
 
 
 def split_sheets(recs):
@@ -122,9 +257,7 @@ def split_sheets(recs):
     one of them. Grouping is by subsector inside each block, so the healthcare
     REITs sit with the sixteen already there.
     """
-    mt = [r for r in recs if r["Sector"] == "MedTech"]
-    hs = [r for r in recs if r["Sector"] != "MedTech"]
-    return mt, hs
+    return BOOK["split"](recs)
 
 
 # Calendar-year total returns, read from Coverage Manager's weekly performance
@@ -596,7 +729,8 @@ def build_records(asof):
         rec.update({c: None for c in RETURN_COLS})
         rec.update(returns.get(t, {}))
         recs.append(rec)
-    recs.sort(key=lambda r: (0 if r["Sector"] == "MedTech" else 1,
+    _lead = BOOK["lead_sector"]
+    recs.sort(key=lambda r: (0 if r["Sector"] == _lead else 1,
                              -(r["Mkt Cap (USD $M)"] or 0)))
     # REFUSE A PARTIAL BOOK. A rate-limited Yahoo response is indistinguishable
     # from a company that has no market cap, so a build that quietly drops a
@@ -640,7 +774,7 @@ def build_records(asof):
 
 def write_sheet(wb, title, rows, subtitle):
     ws = wb.create_sheet(title)
-    ws["A1"] = ("Healthcare Services & MedTech - Coverage List"
+    ws["A1"] = ("%s - Coverage List" % BOOK["title"]
                 if title == "Coverage List" else title)
     ws["A1"].font = TITLE_FONT
     ws["A2"] = subtitle
@@ -701,18 +835,19 @@ def write_sheet(wb, title, rows, subtitle):
 
 def write_summary(wb, allr, mt, hs, asof, src):
     ws = wb.create_sheet("Summary")
-    ws["A1"] = "Coverage Summary - Healthcare Services & MedTech"
+    ws["A1"] = "Coverage Summary - %s" % BOOK["title"]
     ws["A1"].font = TITLE_FONT
     nrated = sum(1 for r in allr if r["Rating"] not in (None, ""))
-    ws["A2"] = ("As of %s.  %d companies (%d MedTech, %d Healthcare Services).  "
+    _b0, _b1 = BOOK["buckets"]
+    ws["A2"] = ("As of %s.  %d companies (%d %s, %d %s).  "
                 "%d marked Core Coverage.  %d carry a Rating, %d blank."
-                % (asof, len(allr), len(mt), len(hs),
+                % (asof, len(allr), len(mt), _b0, len(hs), _b1,
                    sum(1 for r in allr if r["Core Coverage"] == "Y"), nrated,
                    len(allr) - nrated))
     ws["A2"].font = SUB_FONT
 
     row = 4
-    for sec, rows in (("MedTech", mt), ("Healthcare Services", hs)):
+    for sec, rows in ((_b0, mt), (_b1, hs)):
         ws.cell(row, 1, sec).font = Font(bold=True, size=11, color="1F3864")
         row += 1
         for j, h in enumerate(SUMHDR, start=1):
@@ -778,7 +913,7 @@ def archive_previous_autogenerated(out_dir, keep_names):
     ⛑ JP keeps his own files in this folder. "Don't move my files. You just
     archive the files you auto-generate in the folder but leave the ones I put
     there manually alone." So this matches an explicit allow-list of names this
-    script has produced (`AUTO_GENERATED_GLOBS`) rather than sweeping the folder
+    script has produced (BOOK["globs"]) rather than sweeping the folder
     by extension -- the lazy version would file his work under archive/ the first
     time he dropped a workbook here, and he would have no way to tell that from a
     file he had misplaced himself.
@@ -791,7 +926,7 @@ def archive_previous_autogenerated(out_dir, keep_names):
     arch_dir = os.path.join(out_dir, "archive")
     moved = []
     keep = {n.lower() for n in keep_names}
-    for pattern in AUTO_GENERATED_GLOBS:
+    for pattern in BOOK["globs"]:
         for path in _glob.glob(os.path.join(out_dir, pattern)):
             name = os.path.basename(path)
             if name.lower() in keep:
@@ -949,12 +1084,20 @@ def sync_ratings():
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--book", choices=sorted(BOOKS), default="core",
+                    help="Which coverage book to build. `core` = the HC Services + "
+                         "MedTech book JP has always had; `noncore` = the Core=Y "
+                         "names that book does not hold. See the BOOKS table.")
     ap.add_argument("--out-dir", default=DEFAULT_OUT)
     ap.add_argument("--no-archive", action="store_true")
     ap.add_argument("--sync-ratings", action="store_true",
                     help="Seed/refresh the ratings workbook, then exit. Never run by "
                          "the ordinary build.")
     args = ap.parse_args()
+    select_book(args.book)
+    public_csv = os.path.join(PUBLIC_DIR, BOOK["public_csv"])
+    # BEFORE any network work -- see preflight_output_root's docstring and #331.
+    preflight_output_root(args.out_dir)
 
     if args.sync_ratings:
         sync_ratings()
@@ -980,7 +1123,7 @@ def main():
     # last updated and any relevant background" to live in the file itself, so a
     # reader never has to come and ask which of these numbers is stale.
     provenance = (
-        "AA_Core Coverage - LAST UPDATED %s %s. Rebuilt automatically every Friday "
+        BOOK["stem"] + " - LAST UPDATED %s %s. Rebuilt automatically every Friday "
         "by Coverage Manager (scheduled task WeeklyCoverageBuilder), immediately "
         "after the weekly performance run so prices and returns share one as-of "
         "date. %d names: %s. "
@@ -1079,16 +1222,27 @@ def main():
     print("wrote %s" % private_csv)
 
     # docs/: PUBLIC. Served by GitHub Pages to anyone with the URL, and read by the
-    # Google Sheet. Ratings are dropped here -- see PRIVATE_ONLY.
-    os.makedirs(os.path.dirname(PUBLIC_CSV), exist_ok=True)
-    with open(PUBLIC_CSV, "w", newline="", encoding="utf-8") as fh:
+    # Google Sheet. `PRIVATE_ONLY` is what withholds a column here, and it is
+    # currently EMPTY -- so `Rating` publishes too. That is JP's explicit call
+    # (2026-08-26: he asked for it in the Google file as well as the local one),
+    # not an oversight. This comment used to say "Ratings are dropped here", which
+    # had been false since that day; corrected 2026-09-07 while adding the NonCore
+    # book, because a stale comment on the publish path is how a genuinely private
+    # column gets added in the belief that something is filtering it.
+    os.makedirs(PUBLIC_DIR, exist_ok=True)
+    with open(public_csv, "w", newline="", encoding="utf-8") as fh:
         csv.writer(fh).writerows(_flatten(PUBLIC_COLS, provenance))
     print("wrote %s  (public schema, %d of %d columns)"
-          % (PUBLIC_CSV, len(PUBLIC_COLS), len(COLS)))
+          % (public_csv, len(PUBLIC_COLS), len(COLS)))
     print("  NOTE: docs/ is only served after a git commit+push of this repo.")
 
+    # Bucket keys name the ACTIVE book's split, not the Core book's. They were
+    # hardcoded "medtech"/"hc_services", so the NonCore run reported 58 Biopharma
+    # names under a key called "medtech" -- a machine-readable summary that lies.
+    _b0, _b1 = (b.lower().replace(" ", "_") for b in BOOK["buckets"])
     print(json.dumps({
-        "asof": asof, "rows": len(recs), "medtech": len(mt), "hc_services": len(hs),
+        "asof": asof, "book": BOOK["stem"], "rows": len(recs),
+        _b0: len(mt), _b1: len(hs),
         "rated": sum(1 for r in recs if r["Rating"] not in (None, "")),
         "total_mkt_cap_usd_bn": round(sum(r["Mkt Cap (USD $M)"] or 0 for r in recs) / 1000, 1),
     }, indent=1))
