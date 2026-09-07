@@ -748,7 +748,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -776,7 +776,7 @@
     "Est Lockup 180d": "",
     "LEI": "549300CXXI18B214UN80",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "LLY": {
     "position": "Portfolio",

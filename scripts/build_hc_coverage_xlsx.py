@@ -27,7 +27,7 @@ cost three repair passes in July and August 2026. `normalize_ticker` reads their
 `Exchange` and yields `MED.SW` / `MOVE.SW`. Pass it the whole row, never just the
 ticker string; it needs `Company Name` and `Exchange` to do either job.
 """
-import argparse, csv, datetime, json, os, shutil, sys, tempfile, time
+import argparse, csv, datetime, json, math, os, shutil, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 import openpyxl
@@ -119,35 +119,78 @@ def preflight_output_root(out_dir):
 # are deliberately NOT repeated here.
 
 
+def is_core_flagged(row):
+    """THE scope rule for both books, as of 2026-09-07.
+
+    JP: "The AA_Core Coverage workbook should match the core column in my
+    coverage. [...] The AA_ documents should be derivatives of coverage manager
+    so they should always be in sync in terms of names."
+
+    ⛑ THIS REPLACED A SECTOR FILTER, and the change is a correctness fix rather
+    than a preference. The old scope was `Sector (JP) in (Healthcare Services,
+    MedTech)` plus a `Healthcare Real Estate` subsector clause, and it had two
+    defects that a flag-based scope cannot have:
+
+    1. **It never contained Biopharma.** 58 of JP's Core=Y names -- every large
+       pharma he covers, Lilly / Merck / Pfizer / Novo / Roche / Regeneron /
+       Vertex / AbbVie / Amgen -- were absent from a workbook called "Core
+       Coverage", along with his whole Tech, Financials, Industrials and
+       Consumer book. 96 covered names in total.
+    2. **A correct taxonomy fix could silently empty it.** On 2026-09-02 four
+       REITs were re-sectored to Real Estate to agree with GICS and would have
+       dropped straight out of the workbook and out of the Google Sheet, with no
+       error and a row count nobody diffs. The `SCOPE_SUBSECTORS` clause was
+       added to catch exactly that, and then had to be widened from 4 rows to 19
+       the next day when the rest of the subsector followed -- a patch chasing a
+       migration. The Core flag is not a fact about which market an issuer
+       trades in, so re-sectoring a name can no longer move it between books.
+
+    The 19 Healthcare Real Estate names were flagged `Core = Y` on 2026-09-07 so
+    the switch does not drop them.
+    """
+    return (row.get("Core") or "").strip().upper() == "Y"
+
+
 def in_scope_core(row):
-    return ((row.get("Sector (JP)") or "").strip() in SECTORS
-            or (row.get("Subsector (JP)") or "").strip() in SCOPE_SUBSECTORS)
+    return is_core_flagged(row)
 
 
 def in_scope_noncore(row):
-    return ((row.get("Core") or "").strip().upper() == "Y"
-            and not in_scope_core(row))
+    return not is_core_flagged(row)
 
 
-def split_core(recs):
-    return ([r for r in recs if r["Sector"] == "MedTech"],
-            [r for r in recs if r["Sector"] != "MedTech"])
+# Both books split Healthcare / everything else. The Core book used to split
+# MedTech / not-MedTech, which stops meaning anything once the book spans every
+# sector; and using ONE split for both keeps the two workbooks readable as a
+# pair rather than as two unrelated shapes.
+_HEALTHCARE_SECTORS = ("Biopharma", "MedTech", "Healthcare Services",
+                       "Life Science Tools")
 
 
-def split_noncore(recs):
-    return ([r for r in recs if r["Sector"] == "Biopharma"],
-            [r for r in recs if r["Sector"] != "Biopharma"])
+def _is_healthcare(rec):
+    return (rec["Sector"] in _HEALTHCARE_SECTORS
+            or rec["Subsector"] == "Healthcare Real Estate")
+
+
+def split_by_healthcare(recs):
+    return ([r for r in recs if _is_healthcare(r)],
+            [r for r in recs if not _is_healthcare(r)])
+
+
+split_core = split_by_healthcare
+split_noncore = split_by_healthcare
 
 
 BOOKS = {
     "core": {
         "stem": "AA_Core Coverage",
-        "title": "Healthcare Services & MedTech",
+        "title": "Core Coverage",
         "public_csv": "hc_coverage.csv",
         "in_scope": in_scope_core,
         "split": split_core,
-        "buckets": ("MedTech", "Healthcare Services"),
-        "lead_sector": "MedTech",
+        "buckets": ("Healthcare", "Other sectors"),
+        "lead_sector": "Biopharma",
+        "scope_description": "every row flagged `Core = Y` in Coverage Manager",
         # ONLY THESE ARE OURS TO MOVE. JP 2026-08-26: "I might put my own files
         # in this coverage folder for different reasons. Don't move my files. You
         # just archive the files you auto-generate in the folder but leave the
@@ -171,8 +214,9 @@ BOOKS = {
         "public_csv": "noncore_coverage.csv",
         "in_scope": in_scope_noncore,
         "split": split_noncore,
-        "buckets": ("Biopharma", "Other sectors"),
+        "buckets": ("Healthcare", "Other sectors"),
         "lead_sector": "Biopharma",
+        "scope_description": "every row NOT flagged `Core = Y` in Coverage Manager",
         "globs": (
             "AA_NonCore Coverage auto-updated - *.xlsx",
             "AA_NonCore Coverage auto-updated - *.csv",
@@ -208,35 +252,28 @@ def dated_stem(day=None):
 PUBLIC_DIR = os.path.join(REPO, "docs")
 
 RATINGS_PATH = os.path.join(RATINGS_DIR, "Ratings_CoreCoverage.xlsx")
-# Scope: rows flagged `Core` in the universe -- the names JP covers analytically
-# (310 of 1,346, spanning every sector, not just the HC segment). JP 2026-08-26:
-# "I just want stocks in there that are coded as part of core=Y in the coverage
-# manager." Seeding the whole universe made a 1,346-row sheet nobody would fill in.
+# The ratings workbook is seeded from the SAME `Core = Y` rule the books use.
+# JP 2026-08-26: "I just want stocks in there that are coded as part of core=Y in
+# the coverage manager." Seeding the whole universe made a sheet nobody would
+# fill in.
+#
+# ⛑ `SECTORS` AND `SCOPE_SUBSECTORS` ARE GONE (2026-09-07). They were the old
+# sector scope, and the long warning that used to sit here -- "SCOPE IS NOT
+# `Sector (JP)` ALONE", written after the 2026-09-02 REIT re-sector nearly
+# dropped four covered names out of the workbook and the Google Sheet, then
+# widened from 4 rows to 19 the next day when the rest of the subsector followed
+# -- described a hazard that the flag-based scope makes STRUCTURALLY IMPOSSIBLE.
+# `Core` is not a fact about which market an issuer trades in, so re-sectoring a
+# name can no longer move it between books or out of them. The warning is
+# preserved in `is_core_flagged()` as the reason the scope changed, rather than
+# deleted, because the next person to propose a sector filter here needs it.
 
-SECTORS = ("Healthcare Services", "MedTech")
-
-# ⛑ SCOPE IS NOT `Sector (JP)` ALONE, and the reason is a near-miss.
-# On 2026-09-02 ARE, DOC, VTR and WELL moved to `Sector (JP)` = Real Estate so the
-# universe agrees with GICS (Health Care REITs; ARE is Office REITs). That is a
-# correct taxonomy fix and it would have silently dropped four names JP covers out
-# of this workbook -- and, through `docs/hc_coverage.csv`, out of his Google Sheet
-# -- on the next Friday build, with nothing anywhere reporting a change. JP:
-# *"I don't want those names to drop out of coverage list AA_Coverage."*
-# On 2026-09-03 the remaining 15 REITs in the subsector followed, so this clause
-# now carries NINETEEN rows rather than four -- which is the clearest evidence it
-# belongs here: had the fix been a per-name exception, the second migration would
-# have re-broken the book the day after the first was patched.
-# The distinction that resolves it: the GICS sector says which market an issuer
-# TRADES in, the subsector says what it IS. This workbook is about the latter, so
-# scope reads both. Any future sector re-map of a healthcare name must add its
-# subsector here or it leaves the book unannounced.
-SCOPE_SUBSECTORS = ("Healthcare Real Estate",)
-
-# Human-readable form of the same rule, used in the provenance line and the
-# Summary source note so the file states its own scope. One string, because two
-# copies would drift apart the first time the rule changed.
-SCOPE_DESCRIPTION = ("Sector (JP) in (Healthcare Services, MedTech), plus any row "
-                     "whose Subsector (JP) is Healthcare Real Estate")
+# Human-readable form of the ACTIVE book's rule, rendered into the provenance
+# line and the Summary source note so each file states its own scope. One
+# string per book, because two copies would drift apart the first time the rule
+# changed -- which is exactly what happened to the sector-scope prose.
+def scope_description():
+    return BOOK["scope_description"]
 
 
 def in_scope(row):
@@ -249,13 +286,12 @@ def in_scope(row):
 
 
 def split_sheets(recs):
-    """Split built records into the (MedTech, everything-else) sheet buckets.
+    """Split built records into the active book's two sheet buckets.
 
-    `hs` is deliberately "not MedTech" rather than "== Healthcare Services": the
-    two sheets and the Summary's two blocks must add up to the Coverage List, so a
-    row admitted by SCOPE_SUBSECTORS under some third sector still has to land on
-    one of them. Grouping is by subsector inside each block, so the healthcare
-    REITs sit with the sixteen already there.
+    The second bucket is deliberately "everything else" rather than a named
+    sector: the two sheets and the Summary's two blocks must add up to the
+    Coverage List total printed one line above them, so no row may fall between
+    them. Grouping is by subsector inside each block.
     """
     return BOOK["split"](recs)
 
@@ -1114,7 +1150,7 @@ def main():
     src = ("Source: Coverage Manager exports/universe.csv, filtered to %s. Price and "
            "market cap pulled %s from Yahoo Finance, falling back to FMP per row "
            "where Yahoo had no answer. %s."
-           % (SCOPE_DESCRIPTION, asof, ret_note))
+           % (scope_description(), asof, ret_note))
 
     # One line that travels WITH the data. The xlsx carries it as the subtitle
     # under the title; the CSV carries it as a preamble row, which is the only way
@@ -1135,7 +1171,7 @@ def main():
         "from Ratings_CoreCoverage.xlsx and is yours to edit - this build never "
         "writes it."
         % (asof, datetime.datetime.now().strftime("%H:%M"), len(recs),
-           SCOPE_DESCRIPTION, ret_note))
+           scope_description(), ret_note))
 
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
@@ -1196,6 +1232,8 @@ def main():
     #      can only rename and move a Sheet -- it cannot write cells -- so the
     #      alternative was replacing the file every build and minting a new URL
     #      each time, which breaks every link to it.
+    _nonfinite = []
+
     def _flatten(cols, preamble=None):
         out = []
         if preamble:
@@ -1209,6 +1247,25 @@ def main():
                 if v is None:
                     row.append("")
                 elif isinstance(v, float):
+                    # ⛑ A NON-FINITE VALUE IS NOT A NUMBER, and it must not crash
+                    # the write NOR be published (2026-09-07). The first NonCore
+                    # build -- 1,024 rows, the first time this code met the whole
+                    # universe -- died here with `OverflowError: cannot convert
+                    # float infinity to integer`, AFTER the xlsx had already been
+                    # installed. So the workbook shipped and the CSVs did not:
+                    # the Google Sheet would have served the previous week's data
+                    # beside a current-dated workbook, with nothing saying so.
+                    #
+                    # `inf` reaches here from a vendor ratio with a ~zero
+                    # denominator (an EV/EBITDA on ~0 EBITDA, a % of a 0 high).
+                    # Blank is the honest rendering -- the same thing `None`
+                    # gets -- because "undefined" is what the value means.
+                    # `_nonfinite` collects them so the build NAMES the rows
+                    # instead of silently blanking them.
+                    if not math.isfinite(v):
+                        _nonfinite.append((r.get("Ticker"), c, v))
+                        row.append("")
+                        continue
                     dp = DECIMALS.get(c, 2)
                     row.append(int(round(v)) if dp == 0 else round(v, dp))
                 else:
@@ -1234,6 +1291,19 @@ def main():
         csv.writer(fh).writerows(_flatten(PUBLIC_COLS, provenance))
     print("wrote %s  (public schema, %d of %d columns)"
           % (public_csv, len(PUBLIC_COLS), len(COLS)))
+    if _nonfinite:
+        # Named, not counted: "3 non-finite values" sends nobody anywhere.
+        seen, uniq = set(), []
+        for tick, col, val in _nonfinite:
+            if (tick, col) not in seen:
+                seen.add((tick, col))
+                uniq.append((tick, col, val))
+        print("[WARN] %d non-finite value(s) rendered BLANK (undefined ratio, "
+              "usually a ~zero denominator at the vendor):" % len(uniq))
+        for tick, col, val in uniq[:20]:
+            print("         %-12s %-22s %s" % (tick, col, val))
+        if len(uniq) > 20:
+            print("         ... and %d more" % (len(uniq) - 20))
     print("  NOTE: docs/ is only served after a git commit+push of this repo.")
 
     # Bucket keys name the ACTIVE book's split, not the Core book's. They were

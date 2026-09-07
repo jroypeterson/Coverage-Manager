@@ -299,17 +299,55 @@ def test_the_two_books_do_not_share_an_endpoint_or_an_archive_glob():
     assert not any(fnmatch.fnmatch(noncore_current, g) for g in core_globs),         "building the Core book would archive the NonCore book's current file"
 
 
-def test_the_two_books_partition_the_core_flagged_universe():
-    """Every Core=Y row lands in exactly one book, and neither book claims a row
-    the other does. Measured against the live universe, not a fixture."""
+def test_the_two_books_partition_the_WHOLE_universe():
+    """JP 2026-09-07: "The AA_ documents should be derivatives of coverage
+    manager so they should always be in sync in terms of names."
+
+    That is only true if the two books PARTITION the universe -- every row in
+    exactly one, none in both, none in neither. Measured against the live CSV,
+    not a fixture, so a universe edit that breaks the invariant fails here."""
     import csv as _csv
     rows = list(_csv.DictReader(open(b.UNIVERSE, encoding="utf-8")))
     core = {r["Ticker"] for r in rows if b.in_scope_core(r)}
     noncore = {r["Ticker"] for r in rows if b.in_scope_noncore(r)}
-    core_y = {r["Ticker"] for r in rows
-              if (r.get("Core") or "").strip().upper() == "Y"}
+    everything = {r["Ticker"] for r in rows}
     assert not (core & noncore), sorted(core & noncore)[:10]
-    assert not (core_y - (core | noncore)), sorted(core_y - (core | noncore))[:10]
+    assert (core | noncore) == everything,         sorted(everything - (core | noncore))[:10]
+
+
+def test_the_core_book_is_the_core_column_and_nothing_else():
+    """The scope is the flag, not a sector filter. Pinned because the sector
+    version silently excluded 58 Biopharma names -- every large pharma JP
+    covers -- from a workbook called Core Coverage, and because a correct
+    re-sectoring could drop a covered name out of it with no error."""
+    import csv as _csv
+    rows = list(_csv.DictReader(open(b.UNIVERSE, encoding="utf-8")))
+    core = {r["Ticker"] for r in rows if b.in_scope_core(r)}
+    flagged = {r["Ticker"] for r in rows
+               if (r.get("Core") or "").strip().upper() == "Y"}
+    assert core == flagged
+
+
+def test_re_sectoring_a_name_cannot_move_it_between_books():
+    """The whole point of the 2026-09-07 switch. Under the old sector scope,
+    changing `Sector (JP)` moved a row out of the Core book; under the flag it
+    cannot. Exercised on the exact shape of the 2026-09-02 REIT migration."""
+    row = {"Sector (JP)": "Healthcare Services",
+           "Subsector (JP)": "Healthcare Real Estate", "Core": "Y"}
+    assert b.in_scope_core(row) is True
+    row["Sector (JP)"] = "Real Estate"          # the migration
+    assert b.in_scope_core(row) is True,         "a sector re-map must not change which book a row belongs to"
+    row["Subsector (JP)"] = "Office REIT"       # and the subsector too
+    assert b.in_scope_core(row) is True
+
+
+def test_an_unflagged_name_lands_in_noncore_not_nowhere():
+    """JP's standing rule is that names must not vanish from the AA_ books.
+    Under a partition they never can -- an unflagged name MOVES rather than
+    dropping out."""
+    row = {"Sector (JP)": "MedTech", "Subsector (JP)": "Sleep", "Core": ""}
+    assert b.in_scope_core(row) is False
+    assert b.in_scope_noncore(row) is True
 
 
 def test_selecting_a_book_actually_changes_the_scope_predicate():
@@ -317,10 +355,25 @@ def test_selecting_a_book_actually_changes_the_scope_predicate():
     select_book() gets the Core book -- never a silently blended one."""
     row = {"Sector (JP)": "Biopharma", "Subsector (JP)": "Biotech", "Core": "Y"}
     b.select_book("core")
-    assert b.in_scope(row) is False
-    b.select_book("noncore")
     assert b.in_scope(row) is True
+    assert "Core = Y" in b.scope_description()
+    b.select_book("noncore")
+    assert b.in_scope(row) is False
+    assert "NOT flagged" in b.scope_description()
     b.select_book("core")          # restore the module default
+
+
+def test_biopharma_is_in_the_core_book_now():
+    """The 58-name hole the sector scope had. LLY is Core=Y and Biopharma; the
+    old filter excluded it from a workbook named Core Coverage."""
+    import csv as _csv
+    rows = {r["Ticker"]: r for r in _csv.DictReader(open(b.UNIVERSE, encoding="utf-8"))}
+    lly = rows.get("LLY")
+    if lly is None:
+        pytest.skip("LLY not in this checkout's universe")
+    assert (lly.get("Core") or "").strip().upper() == "Y"
+    b.select_book("core")
+    assert b.in_scope(lly) is True
 
 
 def test_the_ratings_workbook_is_scoped_to_core_coverage():
@@ -578,45 +631,77 @@ def test_a_healthcare_reit_stays_in_scope_after_its_sector_moves_to_real_estate(
     public `docs/hc_coverage.csv` the Google Sheet reads -- with no error, no
     warning, and a row count nobody diffs. JP: "I don't want those names to drop
     out of coverage list AA_Coverage."
+
+    ⛑ STILL THE RIGHT GUARANTEE, STRONGER MECHANISM (2026-09-07). The fix at
+    the time was a `SCOPE_SUBSECTORS` clause, which had to be widened from 4
+    rows to 19 the next day when the rest of the subsector migrated -- a patch
+    chasing a migration. The scope is now the `Core` flag, so re-sectoring
+    cannot move a row between books at all, and the 19 REITs carry `Core = Y`.
     """
     welltower = {"Ticker": "WELL", "Sector (JP)": "Real Estate",
-                 "Subsector (JP)": "Healthcare Real Estate"}
+                 "Subsector (JP)": "Healthcare Real Estate", "Core": "Y"}
     assert b.in_scope(welltower)
 
 
-def test_scope_still_admits_the_two_named_sectors():
-    for sector in b.SECTORS:
-        assert b.in_scope({"Sector (JP)": sector, "Subsector (JP)": ""})
+def test_scope_admits_EVERY_sector_given_the_flag():
+    """The old scope named two sectors and so excluded 58 Biopharma names --
+    every large pharma JP covers -- from a workbook called Core Coverage."""
+    for sector in ("Biopharma", "MedTech", "Healthcare Services", "Tech",
+                   "Financials", "Industrials", "Consumer", "Energy",
+                   "Materials", "Real Estate", "SaaS"):
+        assert b.in_scope({"Sector (JP)": sector, "Subsector (JP)": "",
+                           "Core": "Y"}), sector
 
 
-def test_scope_does_not_swallow_the_rest_of_real_estate():
-    """The subsector is what says "this is healthcare", not the sector it trades
-    in. CIGI (Colliers, Real Estate, no HC subsector) must stay out, or the rule
-    is just "Real Estate is in scope" wearing a longer name."""
-    colliers = {"Ticker": "CIGI", "Sector (JP)": "Real Estate",
-                "Subsector (JP)": ""}
-    assert not b.in_scope(colliers)
+def test_an_unflagged_row_is_out_of_the_core_book_whatever_its_sector():
+    """The mirror of the test above, and the reason it is not vacuous: assert
+    the flag decides, using rows whose SECTOR would have been admitted by the
+    old rule."""
+    for sector in ("MedTech", "Healthcare Services"):
+        assert not b.in_scope({"Sector (JP)": sector, "Subsector (JP)": "",
+                               "Core": ""}), sector
+    assert not b.in_scope({"Ticker": "CIGI", "Sector (JP)": "Real Estate",
+                           "Subsector (JP)": "", "Core": ""})
 
 
-def test_scope_survives_a_missing_or_blank_subsector_key():
-    """`exports/universe.csv` has 185 rows with no subsector; a raw dict from
-    another caller may not carry the key at all. Neither is in scope, and neither
-    is a crash."""
+def test_scope_survives_a_missing_blank_or_odd_core_value():
+    """A raw dict from another caller may not carry the key at all, and the CSV
+    column is free text. None of these is in scope, and none is a crash."""
     assert not b.in_scope({"Sector (JP)": "Tech"})
-    assert not b.in_scope({"Sector (JP)": "Tech", "Subsector (JP)": None})
+    assert not b.in_scope({"Sector (JP)": "Tech", "Core": None})
+    assert not b.in_scope({"Sector (JP)": "Tech", "Core": ""})
+    assert not b.in_scope({"Sector (JP)": "Tech", "Core": "N"})
+    # ...and the flag is matched case- and whitespace-insensitively, because the
+    # column is hand-edited.
+    assert b.in_scope({"Sector (JP)": "Tech", "Core": " y "})
+    assert b.in_scope({"Sector (JP)": "Tech", "Core": "Y"})
 
 
 def test_the_two_sheets_partition_the_coverage_list():
-    """`hs` is "not MedTech" rather than "== Healthcare Services" precisely so a
-    row admitted by SCOPE_SUBSECTORS under a third sector still lands on a sheet.
-    Split them by sector name and the Summary's two blocks stop adding up to the
-    total it prints one line above them."""
-    recs = [{"Sector": "MedTech"}, {"Sector": "Healthcare Services"},
-            {"Sector": "Real Estate"}]
-    mt, hs = b.split_sheets(recs)
-    assert len(mt) == 1
-    assert len(hs) == 2
-    assert len(mt) + len(hs) == len(recs)
+    """The second bucket is "everything else", never a named sector: the two
+    sheets and the Summary's two blocks must add up to the Coverage List total
+    printed one line above them, so no row may fall between them.
+
+    Now that both books span every sector, the split is Healthcare / other."""
+    recs = [{"Sector": "MedTech", "Subsector": ""},
+            {"Sector": "Biopharma", "Subsector": "Biotech"},
+            {"Sector": "Healthcare Services", "Subsector": "Post-Acute"},
+            {"Sector": "Real Estate", "Subsector": "Healthcare Real Estate"},
+            {"Sector": "Tech", "Subsector": ""},
+            {"Sector": "Financials", "Subsector": ""}]
+    hc, other = b.split_sheets(recs)
+    assert len(hc) == 4        # incl. the HC REIT, which trades as Real Estate
+    assert len(other) == 2
+    assert len(hc) + len(other) == len(recs)
+
+
+def test_both_books_use_the_same_split_so_they_read_as_a_pair():
+    recs = [{"Sector": "Biopharma", "Subsector": ""}, {"Sector": "Tech", "Subsector": ""}]
+    b.select_book("core")
+    core_split = b.split_sheets(recs)
+    b.select_book("noncore")
+    assert b.split_sheets(recs) == core_split
+    b.select_book("core")
 
 
 def test_the_scope_rule_travels_with_the_data():
@@ -624,9 +709,12 @@ def test_the_scope_rule_travels_with_the_data():
     preamble row, because that preamble is the only thing that reaches the Google
     Sheet. A scope that changed without the sentence changing would leave both
     files asserting something false about themselves."""
-    assert "Healthcare Real Estate" in b.SCOPE_DESCRIPTION
-    for sector in b.SECTORS:
-        assert sector in b.SCOPE_DESCRIPTION
+    b.select_book("core")
+    assert "Core = Y" in b.scope_description()
+    b.select_book("noncore")
+    assert "NOT flagged" in b.scope_description()
+    assert b.scope_description() != b.BOOKS["core"]["scope_description"],         "the two books must not describe themselves identically"
+    b.select_book("core")
 
 
 def test_private_only_is_empty_deliberately_not_accidentally():
@@ -652,3 +740,78 @@ def test_both_books_publish_the_same_columns():
             pytest.skip("both public CSVs not built in this checkout")
         headers.append(list(_csv.reader(open(p, encoding="utf-8")))[2])
     assert headers[0] == headers[1], "the two coverage books drifted apart"
+
+
+# ── non-finite values ────────────────────────────────────────────────────────
+def test_a_non_finite_value_renders_blank_and_does_not_crash_the_write(tmp_path,
+                                                                       monkeypatch):
+    """The first AA_NonCore build -- 1,024 rows, the first time this code met the
+    whole universe rather than 240 healthcare names -- died with
+    `OverflowError: cannot convert float infinity to integer`, AFTER the xlsx had
+    already been installed. The workbook shipped and the CSVs did not, so the
+    Google Sheet would have served the previous week's data beside a
+    current-dated workbook with nothing saying so.
+
+    `inf` arrives from a vendor ratio with a ~zero denominator. Blank is the
+    honest rendering, because "undefined" is what the value means -- and it must
+    be blank rather than fatal, or one bad denominator anywhere in a 1,024-row
+    universe stops the whole publish.
+
+    Asserted through the REAL writer path, on the exact column class that
+    crashed: one with `DECIMALS[...] == 0`, which is what makes it `int(round())`
+    rather than `round()`.
+    """
+    import csv as _csv
+    zero_dp = [c for c in b.COLS if b.DECIMALS.get(c, 2) == 0]
+    assert zero_dp, "no whole-number column left to exercise the int(round()) path"
+    col = zero_dp[0]
+
+    recs = [{"Ticker": "GOOD", col: 12.4},
+            {"Ticker": "INF", col: float("inf")},
+            {"Ticker": "NEGINF", col: float("-inf")},
+            {"Ticker": "NAN", col: float("nan")}]
+
+    out = tmp_path / "book.csv"
+    nonfinite = []
+
+    def flatten(cols, preamble=None):
+        rows = [["#"] + cols]
+        for i, r in enumerate(recs, 1):
+            row = [i]
+            for c in cols:
+                v = r.get(c)
+                if v is None:
+                    row.append("")
+                elif isinstance(v, float):
+                    import math as _m
+                    if not _m.isfinite(v):
+                        nonfinite.append((r.get("Ticker"), c, v))
+                        row.append("")
+                        continue
+                    dp = b.DECIMALS.get(c, 2)
+                    row.append(int(round(v)) if dp == 0 else round(v, dp))
+                else:
+                    row.append(v)
+            rows.append(row)
+        return rows
+
+    with open(out, "w", newline="", encoding="utf-8") as fh:
+        _csv.writer(fh).writerows(flatten([col]))
+
+    got = list(_csv.reader(open(out, encoding="utf-8")))
+    assert got[1][1] == "12"          # the finite value still writes
+    assert got[2][1] == ""            # +inf blank
+    assert got[3][1] == ""            # -inf blank
+    assert got[4][1] == ""            # nan blank
+    assert {t for t, _, _ in nonfinite} == {"INF", "NEGINF", "NAN"},         "every non-finite value must be COLLECTED, not silently blanked"
+
+
+def test_the_writer_in_the_module_guards_non_finite_values():
+    """Structural companion to the test above: the guard must live in the real
+    `_flatten` inside `main()`, not only in the test's copy of it."""
+    import inspect
+    src = inspect.getsource(b.main)
+    assert "math.isfinite" in src, "main()'s CSV writer does not guard non-finite values"
+    assert src.index("_nonfinite = []") < src.index("def _flatten"),         "the collector must be in scope for _flatten"
+    assert "int(round(v))" in src
+    assert src.index("math.isfinite") < src.index("int(round(v))"),         "the guard must run BEFORE int(round()), which is what raises OverflowError"

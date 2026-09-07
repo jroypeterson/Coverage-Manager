@@ -51,7 +51,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -79,7 +79,7 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "ARE": {
     "position": "Following for Interest",
@@ -92,7 +92,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -120,7 +120,7 @@
     "Est Lockup 180d": "",
     "LEI": "MGCJBT4MKTQBVLNUIS88",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "CAT": {
     "position": "Following for Interest",
@@ -338,7 +338,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -366,7 +366,7 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "FDX": {
     "position": "Following for Interest",
@@ -502,7 +502,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "Senior Housing REIT",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -530,7 +530,7 @@
     "Est Lockup 180d": "2026-09-15",
     "LEI": "",
     "Sub-subsector (JP)": "Senior Housing REIT",
-    "Core": ""
+    "Core": "Y"
   },
   "JPM": {
     "position": "Following for Interest",
@@ -871,7 +871,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -899,7 +899,7 @@
     "Est Lockup 180d": "",
     "LEI": "ORQTRC074CWLT3DKHT41",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "WMT": {
     "position": "Following for Interest",

@@ -10,7 +10,7 @@
     "sector": "Real Estate",
     "subsector": "Healthcare Real Estate",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NYSE",
     "Exchange Code": "NYQ",
     "Exchange Full Name": "NYSE",
@@ -38,7 +38,7 @@
     "Est Lockup 180d": "",
     "LEI": "T6IZ0MBEG5ACZDTR7D06",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "WST": {
     "position": "Ready to Buy",
