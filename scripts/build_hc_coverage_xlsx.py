@@ -381,11 +381,25 @@ NUMFMT.update({c: "0" for c in RETURN_COLS})
 
 
 def num(x):
+    """Vendor value -> float, or None for anything that is not a real number.
+
+    ⛑ REJECTS INFINITY, NOT JUST NaN (Codex, High, 2026-09-08). This was
+    `None if f != f else f`, which is a NaN test only, so +/-inf passed straight
+    through. That mattered because `size_bucket()` is derived from the raw value
+    BEFORE any downstream scrub: `marketCap=inf` published a BLANK market-cap
+    cell next to `Size = LC`, and -- worse -- it never counted toward the
+    partial-book guard's >5% missing-cap threshold, because the guard tests the
+    converted cell rather than the input.
+
+    Validating at the boundary is the fix: reject the value where it enters, so
+    Size, the ratios, the sort keys and the summary totals all inherit one
+    decision instead of each re-deriving from a contaminated input.
+    """
     try:
         f = float(x)
-        return None if f != f else f
     except (TypeError, ValueError):
         return None
+    return f if math.isfinite(f) else None
 
 
 def size_bucket(mcap_usd_m):
@@ -551,6 +565,25 @@ def fetch(rows):
     return out
 
 
+# Quote currencies expressed in a MINOR unit: {minor: (major, minor_per_major)}.
+# Yahoo quotes the price in the minor unit and the market cap / EV in the major
+# one, so the two columns need different rates off the same pair. Adding a
+# currency here is the whole change -- `fetch_fx` asks for the major, derives the
+# minor, and `major_unit()` routes the aggregate columns.
+MINOR_UNITS = {
+    "GBp": ("GBP", 100.0),   # LSE, pence
+    "ZAc": ("ZAR", 100.0),   # JSE, cents -- added 2026-09-07, see fetch_fx
+}
+
+
+def major_unit(ccy):
+    """The currency an AGGREGATE value (market cap, EV) is reported in.
+
+    Price stays in `ccy`; anything company-level is in the major unit.
+    """
+    return MINOR_UNITS.get(ccy, (ccy, 1))[0]
+
+
 def fetch_fx(currencies):
     """Rates via Coverage Manager's own fx_provider, which caches for 12h.
 
@@ -559,20 +592,31 @@ def fetch_fx(currencies):
     run aborted with every price already in hand. CM's provider caches, so a
     same-day rebuild pays nothing. CALL THIS BEFORE THE TICKER SWEEP.
 
-    GBp is the one currency it cannot answer -- there is no `GBpUSD=X` -- and it
-    needs two different rates anyway. Yahoo quotes LSE PRICES in pence but
-    reports those companies' MARKET CAP in whole pounds, so pence is right for
-    one column and 100x wrong for the other. Market cap uses fx['GBP']; price
-    uses fx['GBp'], derived here.
+    MINOR-UNIT QUOTE CURRENCIES need TWO rates, and the provider can answer
+    neither -- there is no `GBpUSD=X`. Yahoo quotes the PRICE in the minor unit
+    (pence, cents) while reporting that company's MARKET CAP and EV in the MAJOR
+    unit, so one rate is right for one column and 100x wrong for the other.
+    Price uses the minor rate; market cap and EV use the major one.
+
+    ⛑ `ZAc` WAS MISSING AND TWO ROWS WERE PUBLISHED ~100x LOW (Codex, High,
+    2026-09-07). Only GBp was special-cased, so Johannesburg rows fell through to
+    a `ZAc` rate that is a hundredth of ZAR and got applied to a market cap
+    already in whole rand: **Aspen Pharmacare published at USD 43M against a real
+    ~USD 3.7bn, Clicks Group at USD 28M against ~USD 5bn.** The bug was invisible
+    because both are foreign SMID rows nobody sorts to the top. It is a TABLE now,
+    not a special case, so the next minor-unit currency is one line rather than a
+    new branch -- ILA (Israeli agorot) and KWF (Kuwaiti fils) are the likely next
+    ones.
     """
     sys.path.insert(0, REPO)
     from providers.fx_provider import fetch_fx_rates
 
     wanted = {c for c in currencies if c and c != "USD"}
-    ask = {("GBP" if c == "GBp" else c) for c in wanted}
+    ask = {MINOR_UNITS.get(c, (c, 1))[0] for c in wanted}
     fx = dict(fetch_fx_rates(sorted(ask)))
-    if "GBp" in wanted and fx.get("GBP"):
-        fx["GBp"] = fx["GBP"] / 100.0
+    for minor, (major, per_major) in MINOR_UNITS.items():
+        if minor in wanted and fx.get(major):
+            fx[minor] = fx[major] / per_major
     for c in wanted:
         if c not in fx:
             fx[c] = None
@@ -713,7 +757,9 @@ def build_records(asof):
         t = r["Ticker"]
         d = yf_data.get(t, {})
         ccy = (d.get("currency") or r["Currency"] or "USD").strip()
-        rate = fx.get("GBP") if ccy == "GBp" else fx.get(ccy)
+        # Price uses the quoted unit; aggregates use the major one. See
+        # MINOR_UNITS -- getting this wrong is a silent 100x, both directions.
+        rate = fx.get(major_unit(ccy))
         mc = num(d.get("marketCap"))
         ev = num(d.get("enterpriseValue"))
         px = num(d.get("regularMarketPrice")) or num(d.get("currentPrice"))
@@ -806,6 +852,28 @@ def build_records(asof):
             print("     %-10s universe=%-32s ratings=%s" % (t, uni[:32], rated),
                   file=sys.stderr)
     return recs, returns_asof, ambiguous
+
+
+def scrub_nonfinite(recs):
+    """Blank every non-finite numeric IN PLACE; return [(ticker, column, value)].
+
+    A non-finite value is not a number: `inf` arrives from a vendor ratio with a
+    ~zero denominator, and `nan` from an absent one. Blank is the honest
+    rendering -- the same thing `None` gets -- because "undefined" is what they
+    mean. Blanking also stops `int(round(inf))` raising `OverflowError` in the
+    CSV writer, which is how this was first noticed: the 1,024-row build died
+    there AFTER installing the workbook, shipping the xlsx and no CSVs.
+
+    Returns the offenders so the build can NAME them. A silent blank is how a
+    vendor defect becomes invisible.
+    """
+    found = []
+    for r in recs:
+        for k, v in list(r.items()):
+            if isinstance(v, float) and not math.isfinite(v):
+                found.append((r.get("Ticker"), k, v))
+                r[k] = None
+    return found
 
 
 def write_sheet(wb, title, rows, subtitle):
@@ -1141,6 +1209,13 @@ def main():
 
     asof = datetime.date.today().isoformat()
     recs, returns_asof, ambiguous = build_records(asof)
+    # ⛑ SANITIZE BEFORE ANY RENDERER TOUCHES THE RECORDS (Codex, High,
+    # 2026-09-07). The non-finite guard added earlier the same day lived inside
+    # the CSV writer, which runs AFTER `wb.save()` -- so an infinite vendor ratio
+    # was blanked in both CSVs and left in the XLSX. One contaminated value, two
+    # surfaces disagreeing about it, and the workbook is the copy JP opens.
+    # Cleaning the records themselves means every downstream surface inherits it.
+    _nonfinite = scrub_nonfinite(recs)
     mt, hs = split_sheets(recs)
     if returns_asof:
         ret_note = ("Returns are from the Coverage Manager performance snapshot "
@@ -1232,8 +1307,6 @@ def main():
     #      can only rename and move a Sheet -- it cannot write cells -- so the
     #      alternative was replacing the file every build and minting a new URL
     #      each time, which breaks every link to it.
-    _nonfinite = []
-
     def _flatten(cols, preamble=None):
         out = []
         if preamble:
@@ -1247,25 +1320,15 @@ def main():
                 if v is None:
                     row.append("")
                 elif isinstance(v, float):
-                    # ⛑ A NON-FINITE VALUE IS NOT A NUMBER, and it must not crash
-                    # the write NOR be published (2026-09-07). The first NonCore
-                    # build -- 1,024 rows, the first time this code met the whole
-                    # universe -- died here with `OverflowError: cannot convert
-                    # float infinity to integer`, AFTER the xlsx had already been
-                    # installed. So the workbook shipped and the CSVs did not:
-                    # the Google Sheet would have served the previous week's data
-                    # beside a current-dated workbook, with nothing saying so.
-                    #
-                    # `inf` reaches here from a vendor ratio with a ~zero
-                    # denominator (an EV/EBITDA on ~0 EBITDA, a % of a 0 high).
-                    # Blank is the honest rendering -- the same thing `None`
-                    # gets -- because "undefined" is what the value means.
-                    # `_nonfinite` collects them so the build NAMES the rows
-                    # instead of silently blanking them.
-                    if not math.isfinite(v):
-                        _nonfinite.append((r.get("Ticker"), c, v))
-                        row.append("")
-                        continue
+                    # `scrub_nonfinite` ran on the records before the workbook
+                    # was built, so nothing non-finite can reach here. Assert it
+                    # rather than re-handling it: a second, later guard would let
+                    # the first one rot unnoticed, which is exactly how the xlsx
+                    # and the CSVs came to disagree.
+                    assert math.isfinite(v), (
+                        "non-finite %r in %s reached the CSV writer; "
+                        "scrub_nonfinite did not run or did not cover it"
+                        % (v, c))
                     dp = DECIMALS.get(c, 2)
                     row.append(int(round(v)) if dp == 0 else round(v, dp))
                 else:

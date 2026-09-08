@@ -806,12 +806,110 @@ def test_a_non_finite_value_renders_blank_and_does_not_crash_the_write(tmp_path,
     assert {t for t, _, _ in nonfinite} == {"INF", "NEGINF", "NAN"},         "every non-finite value must be COLLECTED, not silently blanked"
 
 
-def test_the_writer_in_the_module_guards_non_finite_values():
-    """Structural companion to the test above: the guard must live in the real
-    `_flatten` inside `main()`, not only in the test's copy of it."""
+def test_scrub_nonfinite_blanks_and_names_every_offender():
+    """`inf`/`nan` must become blank AND be reported. A silent blank turns a
+    vendor defect into invisible missing data."""
+    recs = [{"Ticker": "GOOD", "EV (USD $M)": 12.4},
+            {"Ticker": "INF", "EV (USD $M)": float("inf")},
+            {"Ticker": "NEGINF", "Fwd P/E (NTM)": float("-inf")},
+            {"Ticker": "NAN", "EV/Sales (TTM)": float("nan")}]
+    found = b.scrub_nonfinite(recs)
+    assert recs[0]["EV (USD $M)"] == 12.4
+    assert recs[1]["EV (USD $M)"] is None
+    assert recs[2]["Fwd P/E (NTM)"] is None
+    assert recs[3]["EV/Sales (TTM)"] is None
+    assert {t for t, _, _ in found} == {"INF", "NEGINF", "NAN"}
+
+
+def test_the_scrub_runs_BEFORE_the_workbook_is_written():
+    """The defect this pins (Codex, High, 2026-09-07): the first version of the
+    non-finite guard lived inside the CSV writer, which runs AFTER `wb.save()`.
+    An infinite vendor ratio was blanked in both CSVs and left in the XLSX --
+    one contaminated value, two surfaces disagreeing, and the workbook is the
+    copy JP opens. Structural, and labelled as such: it reads main()'s source."""
     import inspect
     src = inspect.getsource(b.main)
-    assert "math.isfinite" in src, "main()'s CSV writer does not guard non-finite values"
-    assert src.index("_nonfinite = []") < src.index("def _flatten"),         "the collector must be in scope for _flatten"
-    assert "int(round(v))" in src
-    assert src.index("math.isfinite") < src.index("int(round(v))"),         "the guard must run BEFORE int(round()), which is what raises OverflowError"
+    assert "scrub_nonfinite(recs)" in src, "main() never scrubs the records"
+    assert src.index("scrub_nonfinite(recs)") < src.index("wb = openpyxl.Workbook()"),         "the scrub must run BEFORE the workbook is built"
+    assert src.index("scrub_nonfinite(recs)") < src.index("split_sheets(recs)"),         "the scrub must run before the records are split across sheets"
+
+
+# ── minor-unit quote currencies ──────────────────────────────────────────────
+
+def test_zac_is_mapped_so_johannesburg_rows_are_not_100x_low():
+    """⛑ The live defect (Codex, High, 2026-09-07). Only `GBp` was special-cased,
+    so JSE rows fell through to a ZAc rate — a hundredth of ZAR — applied to a
+    market cap Yahoo already reports in whole rand. **Aspen Pharmacare published
+    at USD 43M against a real ~USD 3.7bn; Clicks Group at USD 28M against ~USD
+    5bn.** Invisible because both are foreign SMID rows nobody sorts to the top."""
+    assert "ZAc" in b.MINOR_UNITS
+    assert b.MINOR_UNITS["ZAc"] == ("ZAR", 100.0)
+    assert b.major_unit("ZAc") == "ZAR"
+    assert b.major_unit("GBp") == "GBP"
+
+
+def test_major_unit_passes_ordinary_currencies_through_untouched():
+    for c in ("USD", "EUR", "JPY", "ZAR", "GBP", "AUD", "CHF"):
+        assert b.major_unit(c) == c
+
+
+def test_MARKET_CAP_uses_the_major_unit_rate():
+    """Price stays in the quoted unit; MARKET CAP uses the major one. Getting it
+    backwards is a silent 100x in either direction, which is why `MINOR_UNITS` is
+    a table and not a branch.
+
+    ⛑ NARROWED 2026-09-08 (Codex, Critical). This test was written as "market cap
+    AND EV use the major quote-currency rate", which is FALSE for EV and would
+    have defended the disproven model. Measured the same day: Yahoo's
+    `enterpriseValue` is `marketCap` (quote currency) PLUS net debt (reporting
+    currency) added as if they shared a unit -- `(EV - marketCap) / (totalDebt -
+    totalCash)` is 1.000 for TAK and 1.004 for NVO. EV is therefore in NO
+    currency and cannot be converted by any single rate; converting Takeda's as
+    JPY yields USD 33.3bn against a true ~USD 91.8bn, i.e. a PLAUSIBLE wrong
+    number, which is worse than an absurd one. EV must be computed from
+    single-currency primitives instead -- tracked separately, not asserted here."""
+    import inspect
+    src = inspect.getsource(b.build_records)
+    assert "major_unit(ccy)" in src,         "build_records must route the aggregate columns through major_unit()"
+    assert 'fx.get("GBP") if ccy == "GBp"' not in src,         "the old single-currency special case is still there"
+
+
+def test_fetch_fx_asks_for_the_major_and_derives_every_minor(monkeypatch):
+    """A minor unit has no pair of its own — there is no ZAcUSD=X — so the
+    provider must be asked for the major and the minor derived from it."""
+    asked = {}
+
+    def fake_rates(codes):
+        asked["codes"] = list(codes)
+        return {c: 0.5 for c in codes}
+
+    import types
+    mod = types.ModuleType("providers.fx_provider")
+    mod.fetch_fx_rates = fake_rates
+    monkeypatch.setitem(__import__("sys").modules, "providers.fx_provider", mod)
+    fx = b.fetch_fx(["ZAc", "GBp", "EUR", "USD"])
+    assert "ZAc" not in asked["codes"] and "GBp" not in asked["codes"],         "a minor unit must never be requested from the FX provider"
+    assert "ZAR" in asked["codes"] and "GBP" in asked["codes"]
+    assert fx["ZAc"] == 0.5 / 100.0
+    assert fx["GBp"] == 0.5 / 100.0
+    assert fx["ZAR"] == 0.5 and fx["GBP"] == 0.5
+
+
+def test_num_rejects_infinity_not_only_nan():
+    """⛑ Codex, High, 2026-09-08. `num` tested only for NaN, so +/-inf passed
+    through and `size_bucket` -- derived from the RAW value, before any
+    downstream scrub -- published a blank market-cap cell beside `Size = LC`.
+    Worse, such a row never counted toward the partial-book guard's >5%
+    missing-cap threshold, because that guard tests the converted cell rather
+    than the input. Validate at the boundary, once."""
+    assert b.num(float("inf")) is None
+    assert b.num(float("-inf")) is None
+    assert b.num(float("nan")) is None
+    assert b.num("12.5") == 12.5
+    assert b.num(None) is None
+    assert b.num("not a number") is None
+
+
+def test_an_infinite_market_cap_cannot_produce_a_size_bucket():
+    """The visible symptom: a blank market cap sitting next to Size = LC."""
+    assert b.size_bucket(b.num(float("inf"))) is None
