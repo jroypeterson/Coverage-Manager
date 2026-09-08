@@ -88,8 +88,14 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
   serves it and the Google Sheet reads it through a single `=IMPORTDATA()`. The CSV
   writer serialises whatever is in `COLS`, so **anything added to `COLS` is
   published unless it is also added to `PRIVATE_ONLY`** — which is how joining JP's
-  ratings would have published them (Codex, Critical, 2026-08-26). `Rating` is in
-  the local xlsx/csv only. **Never rename that path**: nothing here can rewrite the
+  ratings would have published them (Codex, Critical, 2026-08-26). **`PRIVATE_ONLY`
+  is now deliberately EMPTY and `Rating` IS published** — JP asked for it in the
+  Google file as well as the local one later that same day, so his ratings are
+  publicly readable at that URL by anyone with it. That is his explicit call; keep
+  the mechanism for the next sensitive column. (This paragraph said "`Rating` is in
+  the local xlsx/csv only" until 2026-09-08, three days after it stopped being
+  true — the test that asserts the real shape was renamed on 2026-09-07 and this
+  prose was not.) **Never rename that path**: nothing here can rewrite the
   Sheet's `IMPORTDATA` cell, so renaming the endpoint silently empties the Sheet.
 
   ⛑ **Symbols go through `ticker_utils.normalize_ticker`, FX through
@@ -133,7 +139,12 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
   % of 52W High, Fwd P/E (NTM), EV/Sales (TTM), EV/EBITDA (TTM), YTD, 2025..2019,
   3Y ann., 5Y ann., Listing, Exchange, Country` — size before sector, venue last,
   performance most-recent-first. `Ramp Effort` and the legacy-sheet matching behind
-  it are gone.
+  it are gone. **`Rpt Ccy` is APPENDED after `Country`** (2026-09-08): the Google
+  Sheet is one `=IMPORTDATA()` cell whose formulas reference columns by LETTER, so
+  appending is the only safe direction — inserting silently re-points every formula
+  to its right. Adding it to `COLS` with no `WIDTH` entry raised `KeyError` inside
+  `write_sheet` and would have crashed every build; `test_every_column_has_a_width`
+  pins that for the next appended column.
 
   ⛑ **EVERY VALUATION HEADING STATES ITS BASIS**, and a test enforces it for any
   column starting `EV/` or `P/E`. This repo's own `Fwd P/E` mixed yfinance's
@@ -143,6 +154,34 @@ When the user says "let's finish", "we're done", "wrap up", or anything similar 
   `enterpriseToEbitda` and FMP `evToSalesTTM` / `enterpriseValueMultipleTTM` are all
   TTM. Note `fmp_provider` already sidesteps a trap — `ratios-ttm` has no true EV/S
   and its `priceToSalesRatioTTM` is P/S, a different metric.
+
+  ⛑ **`EV`, `EV/Sales` AND `EV/EBITDA` ARE COMPUTED HERE, NOT TAKEN FROM THE
+  VENDOR** (2026-09-08, `bf057d6`). Yahoo's `enterpriseValue` is `marketCap` (in
+  the **quote** currency) plus `totalDebt - totalCash` (in the **reporting**
+  currency), summed as if they shared a unit — so it is a number in **no** currency
+  and no single FX rate converts it. Takeda published at **USD 5.1 trillion**.
+  `providers/valuation.derive_valuation` computes from primitives that each carry
+  one known currency; `enterpriseToRevenue` / `enterpriseToEbitda` are fetched only
+  for a consistency count and are **never published**.
+
+  🔻 **Do NOT "simplify" this by tagging EV with `financialCurrency` and
+  converting.** That was the first fix proposed and it is wrong: Takeda comes out at
+  ~USD 33bn against a true ~USD 91bn — a **plausible** wrong number, which is worse
+  than the absurd one it replaces, because absurd numbers get noticed and plausible
+  ones get used.
+
+  **A missing input blanks the FIELD, never the row**, and records which input was
+  absent; `Rpt Ccy` answers "what currency am I looking at" separately. The gate is
+  **missing-proof, not ratio-anomaly**: Novo's vendor EV was 37% high while sitting
+  INSIDE any sane EV/market-cap band, and CYH is correct while sitting outside one —
+  a ratio test flags the innocent and passes the guilty. `ev_blanked` has its own
+  35% abort, deliberately separate from the market-cap partial-book guard, because a
+  single dead reporting-currency rate must not abort a book whose caps are all fine.
+
+  **Known limit, stated so the figure does not imply more precision than it has:**
+  component EV omits minority interest and preferred, so it reads ~0.5% below
+  Yahoo's own primary-listing EV for TAK and ~2% for NVO — far inside the error of
+  any spot-FX conversion.
 
   ⛑ **`3Y ann.` / `5Y ann.` ARE CONVERTED TO A CAGR.** The performance snapshot's
   `3Y`/`5Y` are CUMULATIVE (`calc_period_return(hist, 365*3)`), so JNJ's raw 74.4
@@ -418,6 +457,62 @@ PROVIDER_PRIORITY (config.py, env-overridable)
 **Success rule**: Mkt Cap present AND at least one of (EV, Fwd P/E, EV/EBITDA, EV/S, Gross Mgn, Op Mgn, ROE, Rev Grw, EPS Grw). If primary returns partial, fields are merged from secondary without overwriting.
 
 **Why the default changed**: the refactor had drifted into an expensive path where ordinary report runs effectively paid the FMP multi-endpoint fan-out across the whole universe. `yf_first` keeps the normal report path faster while preserving FMP as fallback and as an explicit comparison mode.
+
+### ⛑ EV AND NET DEBT ARE COMPUTED AT THE CONVERSION SITE (2026-09-08, `11a60c6`)
+
+**`providers/valuation.py` is the ONE implementation** of `derive_valuation` /
+`_usable_rate` / `num` / `positive_multiple`. Both the coverage workbook
+(`scripts/build_hc_coverage_xlsx.py`) and the weekly performance report
+(`reporting/generate.py`) import it; **neither owns a copy.**
+
+**Why it lives beside the vendor and not beside a consumer.** `MINOR_UNITS` was
+defined inside the workbook script, so when the books were fixed on 2026-09-07 the
+performance report — a different lane reading the same vendor — kept publishing
+Aspen Pharmacare **100x low** for another day. `derive_valuation` was about to
+repeat that exactly. A rule that describes a VENDOR belongs beside the vendor.
+
+**The defect.** Yahoo's `enterpriseValue` = `marketCap` (quote ccy) + `totalDebt -
+totalCash` (reporting ccy), summed as if one unit. `yfinance_provider` then did
+`Net Debt = EV - marketCap`, which hands back the **reporting-currency leg** — and
+a comment beneath it declared all three fields to be in the quote currency. True of
+`Mkt Cap` alone. Novo's DKK 95bn published as USD 95bn.
+
+| Ticker | EV before → after (USD $M) | Net Debt before → after |
+|---|---|---|
+| TAK | 5,134,819 → **91,460** | 5,076,362 → **33,003** |
+| ARGX | 1,610,139 → **57,622** | 1,547,380 → **−5,137** (net *cash*) |
+| NVO | 301,493 → **215,216** | 101,072 → **14,795** |
+
+⛑ **THE PROVIDER STILL EMITS THE VENDOR'S BROKEN EV, AND THAT IS DELIBERATE.**
+`provider_chain._is_success` counts EV as a quality field and `_merge_partial`
+fills any `None` from the NEXT provider — and `fmp_provider` derives Net Debt by
+the **identical** `EV - Mkt Cap` subtraction. Leaving EV empty upstream would have
+pulled FMP's equally mixed-unit value in behind it and reintroduced the defect
+**through the fallback**. So `_convert_aggregates_to_usd` is the single authority:
+it OVERWRITES `Enterprise Value` / `Net Debt` / `EV/S` / `EV/EBITDA` from
+primitives, and BLANKS any row carrying none. Never read those four off a provider
+dict and treat them as convertible on one rate.
+
+⛑ **THE FX SET IS THE UNION OF QUOTE AND REPORTING CURRENCIES.** It was built from
+quote currencies alone, so an ADR's reporting rate was never requested and EV
+**blanked for the entire ADR book** — failing safe, but a silent outage. It would
+also have **partly worked by luck**, since other rows quote JPY and EUR. Correct by
+caller coincidence is not correct.
+
+⛑ **`_valuation` IS TRANSPORT AND IS POPPED AT THE CONVERSION SITE.**
+`calcs.build_result_row` does `row.update(fund)`, so any surviving key becomes a
+DataFrame column — and this one holds a **dict**, which openpyxl cannot write. That
+is a crash partway through the report, after all the expensive fetching.
+
+**Cache namespace is `yf2_`.** An entry under the old `yf_` carries no primitives,
+which the rule reads as unprovable, so it would publish a day of blank EV columns
+off a stale cache shape. Expect **one cold refetch** after this change; the
+fundamentals TTL is 24h, so that cost would have come within a day regardless.
+
+Tests: `tests/test_report_ev_from_primitives.py` (12, behavioural — they drive
+`_convert_aggregates_to_usd`, the function production calls, because a test of the
+shared helper proves nothing about the caller), `tests/test_derive_valuation.py`
+(30), `tests/test_fx_minor_units.py` (10).
 
 **Prices are NOT affected** — yfinance `batch_download_prices` remains primary for prices, with FMP historical as fallback for missing US tickers. `% 52Wk Hi` stays derived from price history.
 
