@@ -565,23 +565,13 @@ def fetch(rows):
     return out
 
 
-# Quote currencies expressed in a MINOR unit: {minor: (major, minor_per_major)}.
-# Yahoo quotes the price in the minor unit and the market cap / EV in the major
-# one, so the two columns need different rates off the same pair. Adding a
-# currency here is the whole change -- `fetch_fx` asks for the major, derives the
-# minor, and `major_unit()` routes the aggregate columns.
-MINOR_UNITS = {
-    "GBp": ("GBP", 100.0),   # LSE, pence
-    "ZAc": ("ZAR", 100.0),   # JSE, cents -- added 2026-09-07, see fetch_fx
-}
-
-
-def major_unit(ccy):
-    """The currency an AGGREGATE value (market cap, EV) is reported in.
-
-    Price stays in `ccy`; anything company-level is in the major unit.
-    """
-    return MINOR_UNITS.get(ccy, (ccy, 1))[0]
+# ⛑ MINOR_UNITS / major_unit MOVED TO `providers/fx_provider` ON 2026-09-08 and
+# are re-exported here for the callers in this file. They lived here first, and
+# that is exactly why `reporting/generate.py` -- the weekly performance report,
+# a different lane reading the same vendor -- kept publishing Aspen Pharmacare's
+# market cap 100x low after this file was fixed. A rule that describes a VENDOR
+# belongs beside the vendor, not beside one of its consumers.
+from providers.fx_provider import MINOR_UNITS, major_unit  # noqa: E402,F401
 
 
 def fetch_fx(currencies):
