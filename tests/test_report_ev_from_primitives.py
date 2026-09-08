@@ -186,3 +186,47 @@ def test_no_row_carries_a_non_scalar_value_after_conversion():
     for k, v in funds["TAK"].items():
         assert v is None or isinstance(v, (int, float, str)), (
             "column %r would reach openpyxl as %s" % (k, type(v).__name__))
+
+
+# ── the FX request set (found by review, 2026-09-08) ────────────────────────
+
+def test_the_production_path_requests_the_REPORTING_currency_too(monkeypatch):
+    """⛑ THE BUG THIS FILE'S OWN AUTHOR MISSED. `fx` was built from
+    `all_currencies` -- what each row QUOTES in. An ADR reports in a different
+    currency by definition, so Takeda's JPY rate was never requested and EV
+    blanked for the entire ADR book.
+
+    It failed SAFE (a blank, not a wrong number), which is the design working.
+    But a silent blanket blanking is still an outage, and every other test here
+    injects `fx=` and so never touches this branch -- the exact hole
+    `test_the_production_path_fetches_AGGREGATE_rates` exists for in
+    tests/test_fx_minor_units.py.
+
+    Note it would have partly worked BY LUCK: other rows in the real universe
+    quote JPY and EUR, so those ADRs would have resolved while a reporting
+    currency nothing quotes would not. Correct by coincidence is not correct.
+    """
+    g = _g()
+    asked = {}
+
+    def _fake_fetch(currencies):
+        asked["set"] = set(currencies)
+        return dict(FX)
+
+    monkeypatch.setattr(g, "fetch_aggregate_fx", _fake_fetch)
+    funds = {"TAK": _tak_row()}
+    g._convert_aggregates_to_usd(funds, {"TAK": "USD"})   # fx=None: production path
+    assert "JPY" in asked.get("set", set()), (
+        "asked for %s -- the reporting currency was never requested"
+        % sorted(asked.get("set", set())))
+    assert funds["TAK"]["Enterprise Value"] is not None, "ADR EV blanked"
+
+
+def test_an_adr_resolves_on_the_production_path_end_to_end(monkeypatch):
+    """The consequence, stated as a value rather than as a call argument."""
+    g = _g()
+    monkeypatch.setattr(g, "fetch_aggregate_fx", lambda c: dict(FX))
+    funds = {"TAK": _tak_row()}
+    g._convert_aggregates_to_usd(funds, {"TAK": "USD"})
+    assert 60e9 < funds["TAK"]["Enterprise Value"] < 130e9
+    assert 2.0 < funds["TAK"]["EV/S"] < 4.5

@@ -169,7 +169,28 @@ def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
     `fx` is injectable for tests only; production passes None and fetches.
     """
     if fx is None:
+        # ⛑ THE UNION OF BOTH CURRENCY SETS, not just the quote currencies.
+        # `all_currencies` holds what each row QUOTES in. EV and Net Debt also
+        # need the rate for what it REPORTS in, and for an ADR those differ by
+        # definition -- Takeda quotes USD and reports JPY. Requesting only the
+        # quote set left `fx` with no JPY, so `derive_valuation` could not prove
+        # the reporting leg and BLANKED EV for the whole ADR book.
+        #
+        # It failed safe rather than publishing a wrong number, which is the
+        # design working -- but silently blanking every ADR's EV is still a
+        # functional outage, and it only looked fine in testing because the
+        # verification passed `fx` in explicitly and so never exercised this
+        # branch. Same trap as `test_the_production_path_fetches_AGGREGATE_rates`
+        # in tests/test_fx_minor_units.py, which exists for exactly this reason.
+        #
+        # It would ALSO have partly worked by luck: JPY and EUR are quoted by
+        # other rows in the universe, so those ADRs would resolve while a
+        # reporting currency no row happens to quote would not. Correct by
+        # caller coincidence is not correct.
         wanted = {c for c in all_currencies.values() if c and c != "USD"}
+        wanted |= {(f.get("_valuation") or {}).get("financialCurrency")
+                   for f in all_fundamentals.values()}
+        wanted = {c for c in wanted if c and c != "USD"}
         fx = fetch_aggregate_fx(wanted) if wanted else {"USD": 1.0}
 
     converted, unconvertible = 0, []
