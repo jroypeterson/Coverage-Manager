@@ -10,8 +10,16 @@ from providers.yfinance_provider import fetch_fundamentals
 
 
 class TestCurrencyPrecedence:
-    """Mkt Cap / EV / Net Debt are price-derived, so USD conversion must use the
-    QUOTE currency (`currency`), not the reporting currency (`financialCurrency`).
+    """`currency` is the QUOTE currency, which is what `Mkt Cap` and `Price` need.
+
+    ⛑ THIS DOCSTRING USED TO READ "Mkt Cap / EV / Net Debt are price-derived, so
+    USD conversion must use the QUOTE currency." A GREEN test file asserting a
+    claim that is one-third false. It is right about `Mkt Cap`; EV is `Mkt Cap`
+    (quote) plus net debt (reporting) summed as if one unit, and `Net Debt` is
+    purely reporting. Corrected 2026-09-08 rather than patched around -- the
+    tests below were always testing the right thing (currency PRECEDENCE for the
+    cap), it was the sentence explaining them that generalised to two fields it
+    did not describe.
     """
 
     @patch("providers.yfinance_provider.cache_set")

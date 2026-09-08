@@ -115,7 +115,11 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
     currency = ""
 
     # Check cache for yfinance fundamentals (before Finnhub enrichment)
-    cache_key = f"yf_{yf_ticker}"
+    # ⛑ `yf2_` (2026-09-08). An entry cached under `yf_` predates `_valuation`
+    # and therefore carries no primitives -- which the new rule reads as "EV is
+    # unprovable" and blanks. Bumping the namespace refetches rather than
+    # publishing a day of blank EV columns off a stale cache shape.
+    cache_key = f"yf2_{yf_ticker}"
     if use_cache:
         cached = cache_get("fundamentals", cache_key, FUND_CACHE_TTL_HOURS)
         if cached is not None:
@@ -145,6 +149,16 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
         result["Enterprise Value"] = info.get("enterpriseValue")
         result["Price"] = info.get("currentPrice") or info.get("regularMarketPrice")
 
+        # ⛑ `ev - mc` IS NET DEBT IN THE REPORTING CURRENCY, and the comment
+        # block below used to label it the quote currency. Yahoo's EV is
+        # `marketCap` (quote) plus `totalDebt - totalCash` (reporting) summed as
+        # if one unit, so the subtraction returns exactly the reporting-currency
+        # leg back. For Novo that is DKK 95bn published as USD 95bn.
+        #
+        # It is kept ONLY so `_is_success` and `_merge_partial` behave as before;
+        # `reporting.generate` OVERWRITES both from `_valuation` below. Do not
+        # read `Enterprise Value` or `Net Debt` off this dict and treat them as
+        # convertible on one rate -- that is the bug.
         ev = info.get("enterpriseValue")
         mc = info.get("marketCap")
         if ev is not None and mc is not None:
@@ -152,15 +166,34 @@ def fetch_fundamentals(yf_ticker, finnhub_metrics=None, use_cache=True):
         else:
             result["Net Debt"] = None
 
+        # ⛑ THE PRIMITIVES, each carrying ONE known currency. This is what makes
+        # a correct EV computable downstream, where the FX rates live. Without
+        # it the report can only convert a number that is in no currency.
+        result["_valuation"] = {
+            "currency": info.get("currency"),
+            "financialCurrency": info.get("financialCurrency"),
+            "marketCap": info.get("marketCap"),
+            "totalDebt": info.get("totalDebt"),
+            "totalCash": info.get("totalCash"),
+            "totalRevenue": info.get("totalRevenue"),
+            "ebitda": info.get("ebitda"),
+        }
+
         result["Fwd P/E"] = info.get("forwardPE")
         result["EV/EBITDA"] = info.get("enterpriseToEbitda")
         result["EV/S"] = info.get("enterpriseToRevenue")
 
-        # Mkt Cap / EV / Net Debt are price-derived, so they are in the QUOTE
-        # currency (`currency`), not the reporting currency (`financialCurrency`).
-        # For foreign lines / ADRs where the two differ (e.g. NVO quotes USD but
-        # reports DKK) the reporting currency would mis-convert to USD. Quote
-        # currency first. NOTE: currency is cached alongside fundamentals, so a
+        # ⛑ THIS COMMENT USED TO SAY "Mkt Cap / EV / Net Debt are price-derived,
+        # so they are in the QUOTE currency". That is true of `Mkt Cap` ONLY, and
+        # the sentence is what made the other two look safe to convert on one
+        # rate for months. EV is `Mkt Cap` (quote) + net debt (reporting) summed
+        # raw -- no currency at all -- and `Net Debt` is purely reporting.
+        #
+        # `currency` is the QUOTE currency and is correct for `Mkt Cap` and
+        # `Price`: an ADR like NVO quotes USD while reporting DKK, so using the
+        # reporting currency here would mis-convert the cap. The reporting
+        # currency is carried separately in `_valuation` for the fields that
+        # actually need it. NOTE: currency is cached alongside fundamentals, so a
         # re-cache (`--refresh`, or 24h TTL expiry) is needed for existing rows.
         currency = info.get("currency") or info.get("financialCurrency") or ""
 

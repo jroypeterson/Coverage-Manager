@@ -39,6 +39,7 @@ from reporting.excel import write_excel_sheet
 from reporting.html import write_html_report, build_ticker_health_data
 from reporting.email import archive_old_files, send_email_report
 from providers.fx_provider import fetch_aggregate_fx, fetch_fx_rates, major_unit
+from providers.valuation import derive_valuation
 
 warnings.filterwarnings("ignore")
 logger = get_logger("generate_performance")
@@ -54,6 +55,89 @@ OUTPUT_PE_GROWTH_PNG = REPORTS_DIR / f"coverage_pe_vs_growth_{TODAY}.png"
 
 
 USD_AGGREGATE_FIELDS = ["Mkt Cap", "Enterprise Value", "Net Debt"]
+
+
+EV_DERIVED_FIELDS = ["Enterprise Value", "Net Debt", "EV/EBITDA", "EV/S"]
+
+
+def _blank_ev_fields(fund):
+    """Blank every field derived from the vendor's EV. Never a fallback.
+
+    ⛑ THE GATE IS MISSING-PROOF, NOT RATIO-ANOMALY. Novo's vendor EV was 37%
+    high while sitting INSIDE any sane EV/market-cap band; CYH is correct while
+    sitting well outside one. A ratio screen flags the innocent and passes the
+    guilty, so the only honest question is "are this field's own inputs present
+    and convertible". Blank the FIELDS, never the row -- Mkt Cap, Price and the
+    returns are proven independently of EV.
+    """
+    for f in EV_DERIVED_FIELDS:
+        fund[f] = None
+
+
+def _recompute_ev_from_primitives(all_fundamentals, all_currencies, fx, skip=()):
+    """Replace EV / Net Debt / EV-multiples with values computed from primitives.
+
+    Returns (computed, blanked). `skip` is the set of tickers the caller already
+    blanked for having no usable quote rate.
+
+    ⛑ `skip` IS NOT BOOKKEEPING. Found by this module's own test: a row whose
+    `Mkt Cap` had just been blanked for a dead rate got its EV recomputed anyway,
+    because `derive_valuation` reads the quote currency off the row's OWN
+    `_valuation` payload while the blanking decision was made from
+    `all_currencies`. Two sources of truth for one fact, and the row published an
+    ENTERPRISE VALUE WITH NO MARKET CAP -- internally impossible, and the kind of
+    thing a reader trusts because the number itself looks fine.
+
+    ⛑ WHY THIS OVERWRITES RATHER THAN FILLS A GAP. `yfinance_provider` still
+    populates `Enterprise Value` and `Net Debt` from the vendor, because
+    `provider_chain._is_success` counts EV as a quality field and `_merge_partial`
+    fills any None from the NEXT provider -- so leaving them empty upstream would
+    have pulled FMP's identically mixed-unit EV in behind it and reintroduced the
+    defect through the fallback. Making one site the authority is what closes
+    that door; a row with no primitives is blanked here rather than trusted.
+    """
+    computed, blanked = 0, 0
+    skip = set(skip)
+    for yf_t, fund in all_fundamentals.items():
+        if yf_t in skip:
+            continue          # already blanked; its market cap is unpublishable
+        prim = fund.get("_valuation")
+        if not isinstance(prim, dict):
+            # No primitives: an FMP/AlphaVantage row, or a cache entry predating
+            # them. We cannot show that its EV is in any single currency, so we
+            # do not publish it. Absent is a true statement; a mixed unit is not.
+            _blank_ev_fields(fund)
+            blanked += 1
+            continue
+        val = derive_valuation(prim, fx)
+        if val["ev_usd_m"] is None:
+            _blank_ev_fields(fund)
+            blanked += 1
+            continue
+        ev_usd = val["ev_usd_m"] * 1e6
+        fund["Enterprise Value"] = ev_usd
+        # Net debt is the reporting-currency leg, converted on the REPORTING
+        # rate -- the whole point. `derive_valuation` has already proven both
+        # rates usable, so this cannot divide or multiply by a dead one.
+        r_rate = fx.get(major_unit(prim.get("financialCurrency") or ""))
+        debt, cash = prim.get("totalDebt"), prim.get("totalCash")
+        fund["Net Debt"] = ((debt - cash) * r_rate
+                            if (debt is not None and cash is not None
+                                and r_rate is not None) else None)
+        fund["EV/S"] = val["ev_sales"]
+        fund["EV/EBITDA"] = val["ev_ebitda"]
+        computed += 1
+
+    # ⛑ `_valuation` IS TRANSPORT, AND IT MUST NOT REACH THE ROW. `calcs.
+    # build_result_row` does `row.update(fund)`, so every key here becomes a
+    # DataFrame column -- and this one holds a dict, which openpyxl cannot write.
+    # That is the shape of a crash AFTER the report is half-built, the same way
+    # an `inf` market cap once killed the coverage build after it had already
+    # installed the workbook. Consumed here, dropped here, for every row
+    # including the skipped and blanked ones.
+    for fund in all_fundamentals.values():
+        fund.pop("_valuation", None)
+    return computed, blanked
 
 
 def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
@@ -105,6 +189,7 @@ def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
             for field in USD_AGGREGATE_FIELDS:
                 if fund.get(field) is not None:
                     fund[field] = None
+            _blank_ev_fields(fund)
             unconvertible.append((yf_t, currency or "<no currency>"))
             continue
         for field in USD_AGGREGATE_FIELDS:
@@ -112,6 +197,16 @@ def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
             if val is not None:
                 fund[field] = val * rate
         converted += 1
+
+    # ⛑ EV AND NET DEBT ARE RECOMPUTED, NOT CONVERTED -- for EVERY row, USD ones
+    # included. The loop above is correct for `Mkt Cap` and only for `Mkt Cap`:
+    # it applies ONE rate to three fields, and two of them are not in that
+    # currency. See `providers/valuation.derive_valuation` for the measurement.
+    # A US row is included because the vendor's EV is broken there too for a
+    # separate reason -- argenx quotes AND reports USD and its EV was 25x its
+    # market cap -- so "same currency" is not the same claim as "correct".
+    ev_ok, ev_blanked = _recompute_ev_from_primitives(
+        all_fundamentals, all_currencies, fx, skip={t for t, _ in unconvertible})
 
     if converted:
         logger.info("Converted Mkt Cap/EV/Net Debt to USD for %d non-USD tickers",
@@ -122,6 +217,12 @@ def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
             "BLANKED rather than published unconverted: %s",
             len(unconvertible),
             ", ".join("%s(%s)" % (t, c) for t, c in sorted(unconvertible)[:15]))
+    logger.info("EV/Net Debt computed from primitives for %d ticker(s)", ev_ok)
+    if ev_blanked:
+        logger.warning(
+            "EV/Net Debt/EV-multiples BLANKED for %d ticker(s) whose inputs "
+            "could not be proven (no fallback to the vendor's mixed-unit EV)",
+            ev_blanked)
     return converted, len(unconvertible)
 
 def _load_phase1_tickers():
