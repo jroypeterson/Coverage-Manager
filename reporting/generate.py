@@ -39,7 +39,7 @@ from reporting.excel import write_excel_sheet
 from reporting.html import write_html_report, build_ticker_health_data
 from reporting.email import archive_old_files, send_email_report
 from providers.fx_provider import fetch_aggregate_fx, fetch_fx_rates, major_unit
-from providers.valuation import derive_valuation
+from providers.valuation import _usable_rate, derive_valuation
 
 warnings.filterwarnings("ignore")
 logger = get_logger("generate_performance")
@@ -117,13 +117,11 @@ def _recompute_ev_from_primitives(all_fundamentals, all_currencies, fx, skip=())
         ev_usd = val["ev_usd_m"] * 1e6
         fund["Enterprise Value"] = ev_usd
         # Net debt is the reporting-currency leg, converted on the REPORTING
-        # rate -- the whole point. `derive_valuation` has already proven both
-        # rates usable, so this cannot divide or multiply by a dead one.
-        r_rate = fx.get(major_unit(prim.get("financialCurrency") or ""))
-        debt, cash = prim.get("totalDebt"), prim.get("totalCash")
-        fund["Net Debt"] = ((debt - cash) * r_rate
-                            if (debt is not None and cash is not None
-                                and r_rate is not None) else None)
+        # rate -- the whole point. It comes back FROM `derive_valuation` rather
+        # than being re-derived here: re-deriving was a second implementation of
+        # a leg already proven, and it skipped `num()`, so a vendor string
+        # `"5.4e12"` raised TypeError and aborted the run (Fable, 2026-09-08).
+        fund["Net Debt"] = val["net_debt_usd"]
         fund["EV/S"] = val["ev_sales"]
         fund["EV/EBITDA"] = val["ev_ebitda"]
         computed += 1
@@ -205,8 +203,15 @@ def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
         # rather than a property. A test that passes a plain
         # `{"ZAc": <cents rate>}` proves the difference: it converted Aspen at
         # 1/100 until this line read `major_unit(currency)`.
+        # ⛑ `_usable_rate`, NOT `is None` (Fable, Medium, 2026-09-08). Codex
+        # round 3 fixed this class inside `derive_valuation` and it stayed live
+        # in this loop, which converts `Mkt Cap`. `fetch_fx_rates` does a bare
+        # `float(hist["Close"].iloc[-1])` with no finiteness check and caches the
+        # result for 12h, so 0.0 and NaN are both reachable: a 0.0 rate published
+        # `Mkt Cap = 0.0` under a USD heading, and NaN put a NaN into the
+        # DataFrame and on into openpyxl. A rate must be usable, not merely present.
         rate = fx.get(major_unit(currency)) if currency else None
-        if rate is None:
+        if not _usable_rate(rate):
             for field in USD_AGGREGATE_FIELDS:
                 if fund.get(field) is not None:
                     fund[field] = None

@@ -855,7 +855,7 @@ Outputs (in `reports/`, archived weekly):
 
 The check is **non-gating** — it never blocks the report or the published artifacts. After confirming a flag is real, the user manually:
 1. Removes the row from `data/coverage_universe_tickers.csv`
-2. Appends an entry to `data/delisted_tickers.csv` with the last-known sector + market cap (the `Last Mkt Cap (USD)` / `Last Price` can be pulled from the most recent `cache/fundamentals/yf_<TICKER>.json` before clearing it)
+2. Appends an entry to `data/delisted_tickers.csv` with the last-known sector + market cap (the `Last Mkt Cap (USD)` / `Last Price` can be pulled from the most recent `cache/fundamentals/yf2_<TICKER>.json` before clearing it — the namespace was `yf_` until 2026-09-08; entries under the old prefix are dead and deleting one does nothing)
 
 The check runs as step `[4/6]` of `weekly-universe`. CLI exit code is `2` when at
 least one flag is raised **or the run was degraded** — a run that failed to learn
@@ -1873,7 +1873,7 @@ quoteType with no usable fundamentals at all.
 Caught by `delisted_check`'s name-mismatch rule, which is exactly what it is for.
 Pinned by `test_foreign_rows_resolve_to_their_own_listing`. **When adding a
 non-US name, verify `normalize_ticker` returns a suffixed symbol** — a bare one
-for a foreign company is the tell. Poisoned `cache/fundamentals/yf_<T>.json`
+for a foreign company is the tell. Poisoned `cache/fundamentals/yf2_<T>.json` (⛑ the namespace bumped from `yf_` to `yf2_` on 2026-09-08 when `_valuation` was added — ~1,486 dead `yf_` files remain on disk, so deleting one of THOSE removes nothing and leaves the live poison in place for its 24h TTL)
 entries must be deleted when fixing one, or the wrong data is reused.
 
 **`enrich` is a SCHEDULED lane as of 2026-08-06** (`CoverageManager-EnrichWeekly`,

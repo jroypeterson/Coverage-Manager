@@ -116,7 +116,7 @@ def derive_valuation(payload, fx):
     far inside the error of any spot-FX conversion.
     """
     out = {"ev_usd_m": None, "ev_sales": None, "ev_ebitda": None,
-           "reporting_ccy": None, "reason": None}
+           "net_debt_usd": None, "reporting_ccy": None, "reason": None}
 
     quote = (payload.get("currency") or "").strip()
     report = (payload.get("financialCurrency") or "").strip()
@@ -162,10 +162,18 @@ def derive_valuation(payload, fx):
     if not _usable_rate(r_rate):
         out["reason"] = "no FX for %s" % report; return out
 
-    ev_usd = mc * q_rate + (debt - cash) * r_rate
+    # ⛑ `net_debt_usd` IS RETURNED, NOT RECOMPUTED BY THE CALLER (Fable, Low #4,
+    # 2026-09-08). `reporting/generate.py` used to re-derive this leg from the raw
+    # payload -- a SECOND implementation of a value this function had already
+    # proven, and it skipped `num()`, so a vendor string `"5.4e12"` passed the
+    # checks here and then raised TypeError on `debt - cash` in the caller,
+    # aborting the whole report. One computation, one place.
+    net_debt_usd = (debt - cash) * r_rate
+    ev_usd = mc * q_rate + net_debt_usd
     if not math.isfinite(ev_usd):
         out["reason"] = "non-finite EV"; return out
     out["ev_usd_m"] = ev_usd / 1e6
+    out["net_debt_usd"] = net_debt_usd if math.isfinite(net_debt_usd) else None
 
     # Belt and braces on the denominator itself. `r_rate` is positive and both
     # figures are checked positive above, so the product should be too -- but a
