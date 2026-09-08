@@ -36,6 +36,22 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# ⛑ MUST PRECEDE ANY `providers.*` / `universe.*` IMPORT (Codex, High,
+# 2026-09-08). This file lives in `scripts/`, so the documented invocation --
+# `python scripts/build_hc_coverage_xlsx.py`, which is also what
+# `run_weekly_coverage.bat:173` runs -- puts `scripts/` on sys.path and NOT the
+# repository root. A module-level `from providers... import` therefore died with
+# ModuleNotFoundError before `main()` was ever reached. Every other sibling
+# import in this file sits INSIDE a function after a local `sys.path.insert`,
+# which is why the problem only appeared when one moved to module scope.
+#
+# The test suite could not see it: `tests/conftest.py` inserts the repo root
+# itself, so the module imports cleanly under pytest and fails under the command
+# the scheduled task actually uses. Pinned by a subprocess smoke test that runs
+# the documented command with PYTHONPATH cleared.
+if REPO not in sys.path:
+    sys.path.insert(0, REPO)
+
 UNIVERSE = os.path.join(REPO, "exports", "universe.csv")
 # Moved here from Career\Pitches\Coverage on 2026-08-26 (JP), so the workbook,
 # its archive and the ratings workbook it joins all live under one root.
@@ -582,11 +598,18 @@ def fetch_fx(currencies):
     run aborted with every price already in hand. CM's provider caches, so a
     same-day rebuild pays nothing. CALL THIS BEFORE THE TICKER SWEEP.
 
-    MINOR-UNIT QUOTE CURRENCIES need TWO rates, and the provider can answer
-    neither -- there is no `GBpUSD=X`. Yahoo quotes the PRICE in the minor unit
-    (pence, cents) while reporting that company's MARKET CAP and EV in the MAJOR
-    unit, so one rate is right for one column and 100x wrong for the other.
-    Price uses the minor rate; market cap and EV use the major one.
+    MINOR-UNIT QUOTE CURRENCIES: Yahoo quotes the PRICE in the minor unit (pence,
+    cents) while reporting that company's MARKET CAP and EV in the MAJOR unit, so
+    one rate is right for one column and 100x wrong for the other.
+
+    ⛑ ASKING THE VENDOR FOR THE MINOR CODE FAILS IN BOTH DIRECTIONS, which is why
+    `providers.fx_provider.major_unit` is the single rule. Measured 2026-09-08:
+    `ZAcUSD=X` answers with the CENTS rate (0.000625) and `GBpUSD=X` answers with
+    the POUNDS rate (1.35547, byte-identical to `GBPUSD=X`). Nothing in the
+    response says which you got. (An earlier version of this docstring asserted
+    that `GBpUSD=X` does not exist and that PRICE "uses" the derived minor rate;
+    both were wrong -- the symbol responds, and this builder never converts price
+    at all, publishing it as `Price (local)`.)
 
     ⛑ `ZAc` WAS MISSING AND TWO ROWS WERE PUBLISHED ~100x LOW (Codex, High,
     2026-09-07). Only GBp was special-cased, so Johannesburg rows fell through to

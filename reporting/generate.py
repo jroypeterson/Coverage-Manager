@@ -38,7 +38,7 @@ from providers.provider_chain import fetch_all_fundamentals
 from reporting.excel import write_excel_sheet
 from reporting.html import write_html_report, build_ticker_health_data
 from reporting.email import archive_old_files, send_email_report
-from providers.fx_provider import fetch_aggregate_fx, fetch_fx_rates
+from providers.fx_provider import fetch_aggregate_fx, fetch_fx_rates, major_unit
 
 warnings.filterwarnings("ignore")
 logger = get_logger("generate_performance")
@@ -51,6 +51,78 @@ OUTPUT_PE_GROWTH_PNG = REPORTS_DIR / f"coverage_pe_vs_growth_{TODAY}.png"
 
 # ── Helper functions ───────────────────────────────────────────────────────
 
+
+
+USD_AGGREGATE_FIELDS = ["Mkt Cap", "Enterprise Value", "Net Debt"]
+
+
+def _convert_aggregates_to_usd(all_fundamentals, all_currencies, fx=None):
+    """Convert company AGGREGATES to USD in place. Returns (converted, blanked).
+
+    ⛑ AGGREGATES USE THE MAJOR UNIT (2026-09-08). This used
+    `fetch_fx_rates(currency)` on the raw quote code, and Yahoo answers a minor
+    code with a rate that is right for the PRICE and wrong for the AGGREGATES:
+    `ZAcUSD=X` returns the CENTS rate (0.000625 in the live cache), so a
+    Johannesburg market cap -- which Yahoo reports in whole rand -- was converted
+    at 1/100. **Aspen Pharmacare's R65.6bn published as USD 43M in this report**,
+    the same defect fixed in the coverage books on 2026-09-07 and not carried
+    across to this lane. `fetch_aggregate_fx` requests the major unit and returns
+    it under both keys, so looking up the raw quote currency cannot return the
+    minor rate.
+
+    ⛑ ONLY AN EXPLICIT "USD" BYPASSES CONVERSION (Codex, High). This read
+    `all_currencies.get(yf_t, "USD")` and skipped on a falsy value, so a MISSING
+    or EMPTY currency took the same path as a genuine US row and published the
+    raw aggregate under a USD heading. That state is reachable --
+    `provider_chain._is_success` documents currency as required and never checks
+    it -- so a Japanese payload with `Mkt Cap = 4e12` and `currency = ""` would
+    read as USD 4,000B and skew every cap-weighted basket built from it.
+
+    ⛑ AN UNUSABLE RATE BLANKS THE FIELD. This was `continue`, which left a
+    local-currency figure under a column headed USD -- a number that reads as
+    converted and is not. Absent is a true statement; a wrong unit is not.
+
+    `fx` is injectable for tests only; production passes None and fetches.
+    """
+    if fx is None:
+        wanted = {c for c in all_currencies.values() if c and c != "USD"}
+        fx = fetch_aggregate_fx(wanted) if wanted else {"USD": 1.0}
+
+    converted, unconvertible = 0, []
+    for yf_t, fund in all_fundamentals.items():
+        currency = all_currencies.get(yf_t)
+        if currency == "USD":
+            continue
+        # ⛑ LOOK UP THE MAJOR UNIT, not the raw quote code. `fetch_aggregate_fx`
+        # already aliases the major rate under the minor key, so this is
+        # belt-and-braces -- but without it the correctness of this function
+        # depends on WHICH dict the caller handed it, which is caller convention
+        # rather than a property. A test that passes a plain
+        # `{"ZAc": <cents rate>}` proves the difference: it converted Aspen at
+        # 1/100 until this line read `major_unit(currency)`.
+        rate = fx.get(major_unit(currency)) if currency else None
+        if rate is None:
+            for field in USD_AGGREGATE_FIELDS:
+                if fund.get(field) is not None:
+                    fund[field] = None
+            unconvertible.append((yf_t, currency or "<no currency>"))
+            continue
+        for field in USD_AGGREGATE_FIELDS:
+            val = fund.get(field)
+            if val is not None:
+                fund[field] = val * rate
+        converted += 1
+
+    if converted:
+        logger.info("Converted Mkt Cap/EV/Net Debt to USD for %d non-USD tickers",
+                    converted)
+    if unconvertible:
+        logger.warning(
+            "No usable currency/FX rate for %d ticker(s); Mkt Cap/EV/Net Debt "
+            "BLANKED rather than published unconverted: %s",
+            len(unconvertible),
+            ", ".join("%s(%s)" % (t, c) for t, c in sorted(unconvertible)[:15]))
+    return converted, len(unconvertible)
 
 def _load_phase1_tickers():
     """Read all five-state position tickers from exports.
@@ -340,50 +412,11 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     step_timings.append(("fundamentals", time.monotonic() - t0, f"{fund_count}/{len(yf_tickers)} tickers"))
     logger.info("Fundamentals loaded for %s tickers", fund_count)
 
-    # Convert Mkt Cap, EV, Net Debt to USD.
-    #
-    # ⛑ AGGREGATES USE THE MAJOR UNIT (2026-09-08). This used
-    # `fetch_fx_rates(currency)` on the raw quote code, and Yahoo answers a minor
-    # code with a rate that is right for the PRICE and wrong for the AGGREGATES:
-    # `ZAcUSD=X` returns the cents rate (0.000625 in the live cache), so a
-    # Johannesburg market cap -- which Yahoo reports in whole rand -- was
-    # converted at 1/100. Aspen Pharmacare's R65.6bn published as USD 43M in this
-    # report, the same defect that had the coverage books wrong until it was
-    # fixed there on 2026-09-07 and NOT carried across to this lane.
-    # `fetch_aggregate_fx` requests the major unit and returns it under both keys.
-    unique_currencies = {c for c in all_currencies.values() if c and c != "USD"}
-    fx_rates = fetch_aggregate_fx(unique_currencies) if unique_currencies else {"USD": 1.0}
-    usd_convert_fields = ["Mkt Cap", "Enterprise Value", "Net Debt"]
-    converted = 0
-    unconvertible = []
-    for yf_t, fund in all_fundamentals.items():
-        currency = all_currencies.get(yf_t, "USD")
-        if not currency or currency == "USD":
-            continue
-        rate = fx_rates.get(currency)
-        if rate is None:
-            # ⛑ BLANK, NEVER LEAVE THE RAW VALUE. This was `continue`, which left
-            # a local-currency figure sitting under a column headed USD -- a
-            # number that reads as converted and is not. Absent is a true
-            # statement; a wrong unit is not.
-            for field in usd_convert_fields:
-                if fund.get(field) is not None:
-                    fund[field] = None
-            unconvertible.append((yf_t, currency))
-            continue
-        for field in usd_convert_fields:
-            val = fund.get(field)
-            if val is not None:
-                fund[field] = val * rate
-        converted += 1
-    if converted:
-        logger.info("Converted Mkt Cap/EV/Net Debt to USD for %d non-USD tickers", converted)
-    if unconvertible:
-        logger.warning(
-            "No FX rate for %d ticker(s); Mkt Cap/EV/Net Debt BLANKED rather than "
-            "published unconverted: %s",
-            len(unconvertible),
-            ", ".join("%s(%s)" % (t, c) for t, c in sorted(unconvertible)[:15]))
+    # Convert Mkt Cap, EV, Net Debt to USD. Extracted so it can be driven
+    # directly by tests -- the first version of this fix was pinned only by
+    # helper unit tests and a source-text assertion, and Codex showed that five
+    # of the six would still have passed with this lane reverted.
+    _convert_aggregates_to_usd(all_fundamentals, all_currencies)
 
     # Build ticker health data (no extra API calls)
     health_data = build_ticker_health_data(df_unique, yf_tickers, ticker_map, all_results, all_fundamentals)
