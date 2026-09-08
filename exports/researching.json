@@ -51,7 +51,7 @@
     "sector": "MedTech",
     "subsector": "Life Science Tools",
     "sub_subsector": "",
-    "core": "",
+    "core": "Y",
     "Exchange": "NASDAQ",
     "Exchange Code": "NGM",
     "Exchange Full Name": "NasdaqGM",
@@ -79,7 +79,7 @@
     "Est Lockup 180d": "2026-10-13",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "Y"
   },
   "ARXS": {
     "position": "Researching",
