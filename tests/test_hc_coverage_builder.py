@@ -113,7 +113,11 @@ def test_the_published_csv_on_disk_has_the_expected_shape():
     assert "Size" in header and "Fwd P/E (NTM)" in header
     assert "% of 52W High" in header and "EV/EBITDA (TTM)" in header
     assert not any("Ramp" in h for h in header)
-    assert header[-3:] == ["Listing", "Exchange", "Country (HQ)"], header[-3:]
+    # Venue is last among JP's original columns; `Rpt Ccy` was APPENDED after
+    # them (the Sheet addresses columns by letter, so appending is the only safe
+    # direction). Same shape as the assertion in test_column_order_is_jps.
+    assert header[-4:-1] == ["Listing", "Exchange", "Country (HQ)"], header[-4:]
+    assert header[-1] == "Rpt Ccy", header[-1]
 
 
 # ── the size bucket ──────────────────────────────────────────────────────────
@@ -547,7 +551,11 @@ def test_column_order_is_jps():
     assert b.COLS[:6] == ["Ticker", "Company Name", "Rating",
                           "Mkt Cap (USD $M)", "EV (USD $M)", "Size"]
     assert b.COLS.index("Size") < b.COLS.index("Sector")
-    assert b.COLS[-3:] == ["Listing", "Exchange", "Country (HQ)"]
+    # Venue stays last among JP's original columns; `Rpt Ccy` was APPENDED after
+    # them on 2026-09-08 (the Sheet addresses columns by letter, so appending is
+    # the only safe direction). Asserted as "venue, then the appended tail".
+    assert b.COLS[-4:-1] == ["Listing", "Exchange", "Country (HQ)"]
+    assert b.COLS[-1] == "Rpt Ccy"
 
 
 def test_returns_run_most_recent_first():
@@ -913,3 +921,11 @@ def test_num_rejects_infinity_not_only_nan():
 def test_an_infinite_market_cap_cannot_produce_a_size_bucket():
     """The visible symptom: a blank market cap sitting next to Size = LC."""
     assert b.size_bucket(b.num(float("inf"))) is None
+
+
+def test_every_column_has_a_width_so_the_workbook_cannot_crash_on_a_new_one():
+    """⛑ Adding `Rpt Ccy` to COLS without a WIDTH entry raised KeyError inside
+    `write_sheet` and would have crashed every build. Caught by an existing test
+    that was not about columns at all -- pin it directly."""
+    missing = [c for c in b.COLS if c not in b.WIDTH]
+    assert not missing, "COLS entries with no WIDTH: %s" % missing
