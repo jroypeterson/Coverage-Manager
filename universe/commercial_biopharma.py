@@ -48,7 +48,7 @@ import logging
 import os
 
 from providers.fx_provider import fetch_aggregate_fx, major_unit
-from providers.valuation import derive_valuation, num
+from providers.valuation import num
 from ticker_utils import normalize_ticker
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,30 @@ def load_cached_primitives(cache_glob=CACHE_GLOB):
     return out
 
 
+def _revenue_usd_m(prim, fx):
+    """TTM revenue in USD, computed INDEPENDENTLY of the market cap.
+
+    ⛑ IT DOES NOT GO THROUGH `derive_valuation`, and that is the point. That
+    function is built for ENTERPRISE VALUE, so it returns early when `marketCap`
+    is missing -- which silently ANDed the revenue leg with cap-availability and
+    made the published rule ("revenue >= $1bn OR market cap >= $10bn") an AND in
+    that branch. A row with $5bn revenue and no cap classified `unknown` instead
+    of `commercial`.
+
+    Zero rows hit it on 2026-09-08, so this is a latent defect rather than a live
+    one -- fixed while it is free, because "OR" has to mean OR in every branch or
+    the rule string this module PUBLISHES is not the rule it applies.
+
+    Revenue needs only the REPORTING rate. Zero is a real answer; negative is
+    not (a contra-revenue restatement is not a revenue figure).
+    """
+    rev = num(prim.get("totalRevenue"))
+    rate = fx.get(major_unit((prim.get("financialCurrency") or "").strip()))
+    if rev is None or rate is None or rev < 0:
+        return None
+    return rev * rate / 1e6
+
+
 def _mkt_cap_usd_m(prim, fx):
     mc = num(prim.get("marketCap"))
     rate = fx.get(major_unit((prim.get("currency") or "").strip()))
@@ -119,14 +143,14 @@ def classify_row(row, prim, fx, fmp=None):
         # judgement outranks the measurement it exists to encode.
         rev = mcap = None
         if prim:
-            rev = derive_valuation(prim, fx)["revenue_usd_m"]
+            rev = _revenue_usd_m(prim, fx)
             mcap = _mkt_cap_usd_m(prim, fx)
         return "commercial", rev, mcap
 
     if not prim:
         return "unknown", None, None
 
-    rev = derive_valuation(prim, fx)["revenue_usd_m"]
+    rev = _revenue_usd_m(prim, fx)
     mcap = _mkt_cap_usd_m(prim, fx)
     # ⛑ SECOND SOURCE, FOR ZERO-VS-ABSENCE ONLY. yfinance reports a null for
     # both "no product" and "no figure". FMP resolves which, and 91% of the time
@@ -144,10 +168,19 @@ def classify_row(row, prim, fx, fmp=None):
     if (rev is not None and rev >= MIN_REVENUE_USD_M) or \
        (mcap is not None and mcap >= MIN_MKT_CAP_USD_M):
         return "commercial", rev, mcap
-    # ⛑ A row can fail the revenue leg on IGNORANCE while failing the cap leg on
-    # FACT. Only say "below the line" when the unmeasured leg could not have
-    # rescued it -- otherwise an absent revenue reads as a measured shortfall.
-    if rev is None:
+    # ⛑ `below_line` REQUIRES BOTH LEGS MEASURED, and the rule is symmetric.
+    # This is an OR of two thresholds, so a row is below the line only when BOTH
+    # were measured and BOTH failed. If either leg is unknown it could have
+    # rescued the row, and calling that a shortfall publishes a measurement we
+    # never made.
+    #
+    # Both directions are real. Revenue unknown with a small cap: a small cap
+    # does NOT imply small revenue -- Organon is $6.1bn revenue on a $3.6bn cap.
+    # Cap unknown with small revenue: a modest-revenue platform name can carry a
+    # $10bn+ cap -- Revolution Medicines has no meaningful revenue and a $44.9bn
+    # cap. Found by feeding the classifier its own edge cases rather than by
+    # reading it: the first version returned `below_line` for the second case.
+    if rev is None or mcap is None:
         return "unknown", rev, mcap
     return "below_line", rev, mcap
 

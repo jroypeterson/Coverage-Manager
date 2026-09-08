@@ -7,10 +7,10 @@
   "counts": {
     "biopharma_rows": 926,
     "commercial": 123,
-    "below_line": 713,
-    "unknown": 90
+    "below_line": 715,
+    "unknown": 88
   },
-  "resolved_fraction": 0.9028,
+  "resolved_fraction": 0.905,
   "tickers": [
     "000100.KS",
     "000661.SZ",
@@ -495,8 +495,8 @@
       "revenue_source": "fmp_corroborated_zero"
     },
     "AARTIDRUGS.NS": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
+      "status": "below_line",
+      "revenue_ttm_usd_m": 282.5,
       "mkt_cap_usd_m": 405.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm"
@@ -3148,8 +3148,8 @@
       "revenue_source": "yfinance_ttm"
     },
     "HIKAL.NS": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
+      "status": "below_line",
+      "revenue_ttm_usd_m": 127.0,
       "mkt_cap_usd_m": 319.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm"

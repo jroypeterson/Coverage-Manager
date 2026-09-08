@@ -208,3 +208,51 @@ def test_the_column_is_Y_or_blank_and_never_a_status_string():
     df = pd.DataFrame([{"Ticker": "A"}, {"Ticker": "B"}])
     cb.apply_to_frame(df, by)
     assert set(df[cb.COLUMN]) <= {"Y", ""}
+
+
+# ── the OR has to mean OR in every branch (found by executing, not reading) ──
+
+def test_the_revenue_leg_works_without_a_market_cap():
+    """⛑ The published rule is "revenue >= $1bn OR cap >= $10bn". The first
+    implementation routed revenue through `derive_valuation`, which is built for
+    ENTERPRISE VALUE and returns early when `marketCap` is missing -- silently
+    ANDing the revenue leg with cap-availability. A $5bn-revenue row with no cap
+    classified `unknown`. The rule string this module PUBLISHES has to be the
+    rule it applies."""
+    s, rev, cap = cb.classify_row(_row("R"), _prim(rev=5e9, cap=None), FX)
+    assert s == "commercial", "the revenue leg was disabled by a missing cap"
+    assert rev == 5000.0 and cap is None
+
+
+def test_the_market_cap_leg_works_without_a_revenue():
+    s, rev, cap = cb.classify_row(_row("C"), _prim(rev=None, cap=12e9), FX)
+    assert s == "commercial" and rev is None and cap == 12000.0
+
+
+@pytest.mark.parametrize("rev,cap,expected", [
+    (5e8,  2e9,  "below_line"),   # both measured, both fail
+    (5e8,  None, "unknown"),      # cap could have rescued it
+    (None, 2e9,  "unknown"),      # revenue could have rescued it
+    (None, None, "unknown"),
+])
+def test_below_line_requires_BOTH_legs_measured(rev, cap, expected):
+    """⛑ SYMMETRIC, and both directions are real. A small cap does not imply
+    small revenue (Organon: $6.1bn revenue on a $3.6bn cap); a modest revenue
+    does not imply a small cap (Revolution Medicines: no meaningful revenue,
+    $44.9bn cap). Calling either a shortfall publishes a measurement never made.
+    The second case returned `below_line` until an edge-case probe caught it."""
+    s, _, _ = cb.classify_row(_row("X"), _prim(rev=rev, cap=cap), FX)
+    assert s == expected
+
+
+def test_a_negative_revenue_is_not_a_revenue_figure():
+    """A contra-revenue restatement is not a measurement of revenue."""
+    s, rev, _ = cb.classify_row(_row("N"), _prim(rev=-1e9, cap=2e9), FX)
+    assert rev is None and s == "unknown"
+
+
+def test_revenue_is_converted_on_the_reporting_rate_without_a_cap():
+    """The independent path must still get the currency right."""
+    _, rev, _ = cb.classify_row(
+        _row("J"), _prim(rev=4.6e12, cap=None, rccy="JPY"), FX)
+    assert 20_000 < rev < 45_000, rev
