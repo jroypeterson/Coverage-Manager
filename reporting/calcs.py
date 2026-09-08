@@ -17,7 +17,7 @@ RETURN_COLS = PERIOD_COLS + ANNUAL_COLS
 # ── Fundamental column constants ──────────────────────────────────────────
 
 FUND_COLS = ["Fwd P/E", "EV/EBITDA", "EV/S", "PEG", "Gross Mgn", "Op Mgn", "ROE", "Rev Grw", "EPS Grw"]
-VAL_COLS = ["Mkt Cap", "Enterprise Value", "Net Debt", "Price", "% 52Wk Hi"]
+VAL_COLS = ["Mkt Cap", "Enterprise Value", "Net Debt", "Revenue (TTM)", "Price", "% 52Wk Hi"]
 FUND_PCT_COLS = {"Gross Mgn", "Op Mgn", "ROE", "Rev Grw", "EPS Grw"}
 FUND_RATIO_COLS = {"Fwd P/E", "EV/EBITDA", "EV/S", "PEG"}
 FUND_MONEY_COLS = {"Mkt Cap", "Enterprise Value", "Net Debt"}

@@ -130,6 +130,10 @@ def build_universe_metadata_with_stats(csv_path):
                 "subsector": row.get("Subsector (JP)", "").strip(),
                 "sub_subsector": row.get("Sub-subsector (JP)", "").strip(),
                 "core": row.get("Core", "").strip(),
+                # Additive, no schema bump -- same precedent as `core` and
+                # `sub_subsector`. It rides inside the metadata sigma-alert
+                # already receives, so no new file has to be pushed to it.
+                "commercial": row.get("Commercial Biopharma", "").strip(),
             }
             rows_kept += 1
 

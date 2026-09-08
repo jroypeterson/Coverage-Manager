@@ -93,6 +93,10 @@
       "name": "manifest.json",
       "purpose": "This file \u2014 directory of published artifacts",
       "format": "json"
+    },
+    {
+      "name": "commercial_biopharma.json",
+      "purpose": "The computed commercial-biopharma universe: Biopharma rows with TTM revenue >= $1bn USD OR market cap >= $10bn USD, plus every curated `Large Pharma` row. Carries the rule string, per-row status (commercial / below_line / unknown), the figures behind each, and which vendor produced the revenue. `unknown` means we could not measure it, NEVER that the company has no product."
     }
   ]
 }

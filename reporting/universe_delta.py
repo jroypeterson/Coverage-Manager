@@ -60,6 +60,7 @@ TRACKED_MODIFIED_FIELDS = (
     "Subsector (JP)",
     "Sub-subsector (JP)",
     "Core",
+    "Commercial Biopharma",
     "Country (HQ)",
 )
 

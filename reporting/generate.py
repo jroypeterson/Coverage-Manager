@@ -57,7 +57,8 @@ OUTPUT_PE_GROWTH_PNG = REPORTS_DIR / f"coverage_pe_vs_growth_{TODAY}.png"
 USD_AGGREGATE_FIELDS = ["Mkt Cap", "Enterprise Value", "Net Debt"]
 
 
-EV_DERIVED_FIELDS = ["Enterprise Value", "Net Debt", "EV/EBITDA", "EV/S"]
+EV_DERIVED_FIELDS = ["Enterprise Value", "Net Debt", "EV/EBITDA", "EV/S",
+                     "Revenue (TTM)"]
 
 
 def _blank_ev_fields(fund):
@@ -124,6 +125,14 @@ def _recompute_ev_from_primitives(all_fundamentals, all_currencies, fx, skip=())
         fund["Net Debt"] = val["net_debt_usd"]
         fund["EV/S"] = val["ev_sales"]
         fund["EV/EBITDA"] = val["ev_ebitda"]
+        # ⛑ Revenue in USD, from the primitive rather than derived as
+        # `EV / (EV/Sales)`. The derived form inherits any error in EITHER input
+        # and returns nothing at all for a row with no EV/Sales -- which is every
+        # pre-revenue biotech, i.e. exactly the population a commercial-stage
+        # classification has to separate. ZERO is a real answer here and is kept
+        # distinct from None.
+        fund["Revenue (TTM)"] = (val["revenue_usd_m"] * 1e6
+                                 if val["revenue_usd_m"] is not None else None)
         computed += 1
 
     # ⛑ `_valuation` IS TRANSPORT, AND IT MUST NOT REACH THE ROW. `calcs.

@@ -116,7 +116,8 @@ def derive_valuation(payload, fx):
     far inside the error of any spot-FX conversion.
     """
     out = {"ev_usd_m": None, "ev_sales": None, "ev_ebitda": None,
-           "net_debt_usd": None, "reporting_ccy": None, "reason": None}
+           "net_debt_usd": None, "revenue_usd_m": None,
+           "reporting_ccy": None, "reason": None}
 
     quote = (payload.get("currency") or "").strip()
     report = (payload.get("financialCurrency") or "").strip()
@@ -180,7 +181,19 @@ def derive_valuation(payload, fx):
     # tiny revenue times a tiny rate can underflow to exactly 0.0, and this is a
     # division. Guarding the RESULT (as positive_multiple does) is too late; the
     # exception is raised before it ever sees a value.
+    # ⛑ REVENUE IS RETURNED, NOT LEFT AS AN INTERMEDIATE. It is already computed
+    # here (`totalRevenue x fx(reporting)`) and it is the input to the commercial
+    # -biopharma classification and to the revenue-vs-market-cap screen. The
+    # alternative every consumer reached for first was deriving it as
+    # `EV / (EV/Sales)`, which inherits any error in EITHER input and returns
+    # nothing for the rows with no EV/Sales at all.
+    #
+    # Note ZERO is a real, publishable answer -- a pre-revenue biotech -- and is
+    # kept distinct from None. `ev_sales` still requires a POSITIVE denominator,
+    # so a zero-revenue row reports revenue 0.0 and no multiple.
     rev = num(payload.get("totalRevenue"))
+    if rev is not None and rev >= 0:
+        out["revenue_usd_m"] = rev * r_rate / 1e6
     if rev is not None and rev > 0 and rev * r_rate > 0:
         out["ev_sales"] = positive_multiple(ev_usd / (rev * r_rate))
     ebitda = num(payload.get("ebitda"))

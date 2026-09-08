@@ -301,3 +301,42 @@ def test_a_good_row_still_computes_after_all_that_tightening():
     assert v["reason"] is None
     assert 60_000 < v["ev_usd_m"] < 130_000
     assert v["ev_sales"] is not None and v["ev_ebitda"] is not None
+
+
+# ── revenue, the input the commercial classification needs ──────────────────
+
+def test_revenue_is_returned_in_usd_on_the_REPORTING_rate():
+    """Takeda reports JPY 4.6tn. Published as ~USD 30bn, which is its real
+    revenue. On the QUOTE rate (USD, 1.0) it would read 4,600,000 USD $M."""
+    v = b.derive_valuation(PAYLOADS["TAK"], FX)
+    assert v["revenue_usd_m"] is not None
+    assert 20_000 < v["revenue_usd_m"] < 45_000, v["revenue_usd_m"]
+
+
+def test_zero_revenue_is_an_ANSWER_and_not_a_blank():
+    """⛑ THE DISTINCTION THE WHOLE CLASSIFICATION RESTS ON. A pre-revenue
+    biotech has revenue of 0 -- a fact. A row we could not measure has None -- an
+    absence. Collapsing them would let 'we do not know' be published as
+    'pre-commercial', which is a far stronger claim than the data supports.
+
+    Measured 2026-09-08: of 331 Biopharma rows where yfinance returns null for
+    totalRevenue, FMP answers 264 and 240 of those are EXACTLY ZERO. So the
+    common case for a null here is a vendor representing zero as absent."""
+    p = dict(PAYLOADS["TAK"]); p["totalRevenue"] = 0
+    v = b.derive_valuation(p, FX)
+    assert v["revenue_usd_m"] == 0.0, "a real zero was reported as %r" % v["revenue_usd_m"]
+    assert v["ev_sales"] is None, "a multiple on a zero denominator"
+    assert v["ev_usd_m"] is not None, "revenue does not gate EV"
+
+    p2 = dict(PAYLOADS["TAK"]); p2["totalRevenue"] = None
+    assert b.derive_valuation(p2, FX)["revenue_usd_m"] is None
+
+
+def test_revenue_is_not_derived_from_ev_over_ev_sales():
+    """The tempting shortcut, and why it is not used: it inherits any error in
+    EITHER input, and returns NOTHING for a row with no EV/Sales -- which is
+    every pre-revenue biotech, i.e. exactly the population the classification has
+    to separate. Here EV/Sales is None and revenue is still known."""
+    p = dict(PAYLOADS["TAK"]); p["totalRevenue"] = 0
+    v = b.derive_valuation(p, FX)
+    assert v["ev_sales"] is None and v["revenue_usd_m"] is not None
