@@ -229,3 +229,75 @@ def test_a_minor_unit_quote_with_a_FOREIGN_reporting_currency():
     assert abs(v["ev_usd_m"] - (mc_usd_m + net_debt_m)) < 1.0, (
         "EV %.0f != mktcap %.0f + USD net debt %.0f -- the reporting leg was "
         "converted on the quote rate" % (v["ev_usd_m"], mc_usd_m, net_debt_m))
+
+
+# ── present-but-garbage inputs (Codex round 3, 2026-09-08) ──────────────────
+#
+# ⛑ THE CLASS: every guard below tested `is None` and nothing else, so a value
+# that was PRESENT but unusable walked straight through. Three of the four
+# produced a confident number with `reason: None` -- published as though proven
+# -- and the fourth crashed the build. Found by Codex feeding the function
+# garbage rather than absence, which is a question none of the other 22 tests
+# asked.
+
+def test_a_zero_reporting_rate_blanks_instead_of_CRASHING_the_build():
+    """⛑ Was `ZeroDivisionError` in the EV/Sales denominator -- an unhandled
+    exception in the Friday build, not a bad number.
+
+    Worse, the `dead_fx` guard that exists precisely to catch a dead rate runs
+    AFTER this loop, so the crash beat it every time: the guard could never
+    report the condition it was written for. Ordering made it unreachable."""
+    v = b.derive_valuation(PAYLOADS["TAK"], dict(FX, JPY=0.0))
+    assert v["ev_usd_m"] is None
+    assert v["ev_sales"] is None and v["ev_ebitda"] is None
+    assert v["reason"] == "no FX for JPY"
+
+
+def test_a_negative_reporting_rate_blanks_rather_than_publishing_a_number():
+    """Was USD 25,470M for Takeda with `reason: None`. A negative rate is
+    garbage, and garbage that is merely PRESENT used to pass `is None`."""
+    v = b.derive_valuation(PAYLOADS["TAK"], dict(FX, JPY=-FX["JPY"]))
+    assert v["ev_usd_m"] is None, "published an EV computed on a negative rate"
+    assert v["reason"] == "no FX for JPY"
+
+
+def test_a_zero_quote_rate_blanks_rather_than_publishing_a_near_zero_ev():
+    v = b.derive_valuation(PAYLOADS["TAK"], dict(FX, USD=0.0))
+    assert v["ev_usd_m"] is None
+    assert v["reason"] == "no FX for USD"
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_non_finite_rate_blanks(bad):
+    v = b.derive_valuation(PAYLOADS["TAK"], dict(FX, JPY=bad))
+    assert v["ev_usd_m"] is None and v["reason"] == "no FX for JPY"
+
+
+def test_a_zero_market_cap_is_a_vendor_BLANK_not_a_tiny_company():
+    """⛑ The sharpest one. `marketCap == 0` passed an `is None` check and made
+    EV collapse to net debt alone -- Takeda at USD 33,003M, which is to the
+    dollar the same plausible-wrong figure the REJECTED `financialCurrency` fix
+    produced. The defect this function was written to prevent, reachable again
+    through a different door."""
+    p = dict(PAYLOADS["TAK"])
+    p["marketCap"] = 0
+    v = b.derive_valuation(p, FX)
+    assert v["ev_usd_m"] is None, (
+        "published EV from a zero market cap -- that is net debt wearing an EV "
+        "label, and it lands in the plausible range")
+    assert v["reason"] == "no marketCap"
+
+
+def test_a_negative_market_cap_blanks():
+    p = dict(PAYLOADS["TAK"])
+    p["marketCap"] = -1.0
+    assert b.derive_valuation(p, FX)["reason"] == "no marketCap"
+
+
+def test_a_good_row_still_computes_after_all_that_tightening():
+    """⛑ A guard can become the outage -- this repo has done it three times in
+    one feature. Pin that the tightening did not blank the ordinary case."""
+    v = b.derive_valuation(PAYLOADS["TAK"], FX)
+    assert v["reason"] is None
+    assert 60_000 < v["ev_usd_m"] < 130_000
+    assert v["ev_sales"] is not None and v["ev_ebitda"] is not None

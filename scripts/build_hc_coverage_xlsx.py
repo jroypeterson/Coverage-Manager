@@ -915,6 +915,22 @@ def build_records(asof):
     return recs, returns_asof, ambiguous
 
 
+def _usable_rate(rate):
+    """A rate you can actually convert with: a positive, finite number.
+
+    Present-but-garbage is the case that bites. `fx.get(...) is not None` is true
+    for 0.0, for a negative, and for NaN, and each one produces a different
+    wrong answer rather than a blank.
+    """
+    if rate is None:
+        return False
+    try:
+        r = float(rate)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(r) and r > 0
+
+
 def derive_valuation(payload, fx):
     """`{ev_usd_m, ev_sales, ev_ebitda, reporting_ccy, reason}` for one row.
 
@@ -968,7 +984,13 @@ def derive_valuation(payload, fx):
     debt = num(payload.get("totalDebt"))
     cash = num(payload.get("totalCash"))
 
-    if mc is None:
+    if mc is None or mc <= 0:
+        # ⛑ `mc == 0` is NOT a small company, it is a vendor blank wearing a
+        # number (Codex, 2026-09-08). It sails past an `is None` check and makes
+        # EV collapse to net debt alone: Takeda came out at USD 33,003M -- which
+        # is, to the dollar, the same plausible-wrong figure the rejected
+        # financialCurrency fix produced. A wrong EV that looks reasonable is the
+        # one failure mode this whole function exists to prevent.
         out["reason"] = "no marketCap"; return out
     if not quote:
         out["reason"] = "no quote currency"; return out
@@ -979,11 +1001,23 @@ def derive_valuation(payload, fx):
     if debt is None or cash is None:
         out["reason"] = "no totalDebt/totalCash"; return out
 
+    # ⛑ A RATE MUST BE POSITIVE AND FINITE, not merely present (Codex,
+    # 2026-09-08). `fetch_aggregate_fx` can hand back 0.0 or a negative for a
+    # dead pair, and all three of those failed differently and badly:
+    #   0.0 on the reporting leg -> ZeroDivisionError in the EV/Sales
+    #     denominator. A CRASH, and it beat the `dead_fx` guard to the punch --
+    #     that guard runs AFTER this loop, so it could never report the thing it
+    #     exists to report. Ordering made a guard unreachable.
+    #   negative on the reporting leg -> a confident USD 25,470M for Takeda with
+    #     `reason: None`, i.e. published as though proven.
+    #   0.0 on the quote leg -> a near-zero EV, also with no reason.
+    # `is None` was the wrong test. "Can I actually convert with this?" is the
+    # right one, and it is asked of both legs before either is used.
     q_rate = fx.get(major_unit(quote))
     r_rate = fx.get(major_unit(report))
-    if q_rate is None:
+    if not _usable_rate(q_rate):
         out["reason"] = "no FX for %s" % quote; return out
-    if r_rate is None:
+    if not _usable_rate(r_rate):
         out["reason"] = "no FX for %s" % report; return out
 
     ev_usd = mc * q_rate + (debt - cash) * r_rate
@@ -991,11 +1025,16 @@ def derive_valuation(payload, fx):
         out["reason"] = "non-finite EV"; return out
     out["ev_usd_m"] = ev_usd / 1e6
 
+    # Belt and braces on the denominator itself. `r_rate` is positive and both
+    # figures are checked positive above, so the product should be too -- but a
+    # tiny revenue times a tiny rate can underflow to exactly 0.0, and this is a
+    # division. Guarding the RESULT (as positive_multiple does) is too late; the
+    # exception is raised before it ever sees a value.
     rev = num(payload.get("totalRevenue"))
-    if rev is not None and rev > 0:
+    if rev is not None and rev > 0 and rev * r_rate > 0:
         out["ev_sales"] = positive_multiple(ev_usd / (rev * r_rate))
     ebitda = num(payload.get("ebitda"))
-    if ebitda is not None and ebitda > 0:
+    if ebitda is not None and ebitda > 0 and ebitda * r_rate > 0:
         out["ev_ebitda"] = positive_multiple(ev_usd / (ebitda * r_rate))
     return out
 
