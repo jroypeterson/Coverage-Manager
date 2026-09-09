@@ -178,29 +178,35 @@ def summarize_move(
             ],
             messages=[{"role": "user", "content": user_prompt}],
         )
-    except anthropic.AuthenticationError:
-        logger.warning("Anthropic auth failed — check ANTHROPIC_API_KEY")
-        return ""
-    except anthropic.RateLimitError:
-        logger.warning("Anthropic rate limited for %s; skipping summary", ticker)
-        return ""
-    except anthropic.APIStatusError as e:
-        # An account-level billing failure is not a per-ticker hiccup -- see
-        # AnthropicCreditExhausted. Checked BEFORE the generic warning, because
-        # the credit error arrives as an ordinary 400 `invalid_request_error`
-        # and is otherwise indistinguishable from a malformed request.
-        if is_billing_error(e):
-            raise AnthropicCreditExhausted(str(e)) from e
-        logger.warning("Anthropic API status error for %s: %s", ticker, e)
-        return ""
-    except AnthropicCreditExhausted:
-        raise
+    # ⛑ ONE HANDLER, AND THE BILLING CHECK RUNS BEFORE ANY SUBCLASS DISPATCH
+    # (Codex, 2026-09-08 — a defect in the first version of this very fix).
+    #
+    # `AuthenticationError` and `RateLimitError` both SUBCLASS `APIStatusError`,
+    # and Python matches `except` clauses in order. With one clause per class the
+    # billing check sat in the `APIStatusError` handler — third — so a credit
+    # message arriving as either of the first two was swallowed exactly as
+    # before, and the "belt and braces" catch-all was unreachable for them.
+    # Reproduced: `AuthenticationError(<the real billing message>)` returned "".
+    #
+    # A flat `except Exception` with the billing test first cannot have that bug,
+    # because there is no ordering left to get wrong.
     except Exception as e:
-        # Belt and braces: the SDK does not guarantee which class carries this,
-        # and a credit error reaching the catch-all would be swallowed exactly
-        # as before.
         if is_billing_error(e):
             raise AnthropicCreditExhausted(str(e)) from e
+        if isinstance(e, anthropic.AuthenticationError):
+            # ⚑ Also account-level, and also blanks every summary while the run
+            # reports ok. Left as a warning here deliberately: an invalid key is
+            # a different remedy from an empty balance, and widening this change
+            # to cover it belongs on its own row, not smuggled in. Named so the
+            # next reader sees it was considered.
+            logger.warning("Anthropic auth failed — check ANTHROPIC_API_KEY")
+            return ""
+        if isinstance(e, anthropic.RateLimitError):
+            logger.warning("Anthropic rate limited for %s; skipping summary", ticker)
+            return ""
+        if isinstance(e, anthropic.APIStatusError):
+            logger.warning("Anthropic API status error for %s: %s", ticker, e)
+            return ""
         log_exception(logger, f"Anthropic summary failed for {ticker}", e)
         return ""
 

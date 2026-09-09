@@ -113,3 +113,78 @@ def test_a_credit_error_reaching_the_CATCH_ALL_still_raises(monkeypatch):
     with pytest.raises(A.AnthropicCreditExhausted):
         A.summarize_move(ticker="AAPL", company="Apple", sector="Tech",
                          weekly_pct=-12.0, headlines=[HEADLINE], api_key="sk-test")
+
+
+# ── Codex round 1 (2026-09-08): a defect in the first version of this fix ────
+
+def _auth_error(msg):
+    import httpx
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    resp = httpx.Response(401, request=req, json={"error": {"message": msg}})
+    return anthropic.AuthenticationError(msg, response=resp, body=None)
+
+
+def _rate_limit_error(msg):
+    import httpx
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    resp = httpx.Response(429, request=req, json={"error": {"message": msg}})
+    return anthropic.RateLimitError(msg, response=resp, body=None)
+
+
+def test_the_subclass_handlers_are_not_a_way_past_the_billing_check():
+    """⛑ Both SUBCLASS `APIStatusError`, and Python matches `except` in order.
+
+    The first version of this fix put the billing check in the `APIStatusError`
+    clause -- third, behind `AuthenticationError` and `RateLimitError` -- so a
+    credit message arriving as either of those was swallowed exactly as before,
+    and the "belt and braces" catch-all was unreachable for them. Found by Codex
+    reviewing the fix, not by the tests written alongside it.
+    """
+    assert issubclass(anthropic.AuthenticationError, anthropic.APIStatusError)
+    assert issubclass(anthropic.RateLimitError, anthropic.APIStatusError)
+
+
+@pytest.mark.parametrize("make", [_auth_error, _rate_limit_error])
+def test_a_billing_message_wearing_a_subclass_still_raises(monkeypatch, make):
+    """Reproduced before the fix: both returned ""."""
+    monkeypatch.setattr(A.anthropic, "Anthropic", _boom(make(REAL)))
+    with pytest.raises(A.AnthropicCreditExhausted):
+        A.summarize_move(ticker="AAPL", company="Apple", sector="Tech",
+                         weekly_pct=-12.0, headlines=[HEADLINE], api_key="sk-test")
+
+
+@pytest.mark.parametrize("make,msg", [
+    (_auth_error, "invalid x-api-key"),
+    (_rate_limit_error, "Number of requests has exceeded your rate limit"),
+])
+def test_an_ORDINARY_subclass_error_still_degrades_gracefully(monkeypatch, make, msg):
+    """The other side: the widened check must not turn every auth blip or rate
+    limit into a failed weekly report."""
+    monkeypatch.setattr(A.anthropic, "Anthropic", _boom(make(msg)))
+    assert A.summarize_move(ticker="AAPL", company="Apple", sector="Tech",
+                            weekly_pct=-12.0, headlines=[HEADLINE],
+                            api_key="sk-test") == ""
+
+
+def test_the_raised_message_CARRIES_the_vendor_wording(monkeypatch):
+    """⛑ Codex mutation: raising a tidy summary instead of `str(e)` passes a
+    type-only assertion while the fleet heartbeat classifier -- which greps the
+    heartbeat text for the vendor's phrases -- loses the thing it matches on.
+    The exception text is an interface here, not a message to a human.
+    """
+    monkeypatch.setattr(A.anthropic, "Anthropic", _boom(_status_error(REAL)))
+    with pytest.raises(A.AnthropicCreditExhausted) as ei:
+        A.summarize_move(ticker="AAPL", company="Apple", sector="Tech",
+                         weekly_pct=-12.0, headlines=[HEADLINE], api_key="sk-test")
+    assert "credit balance" in str(ei.value).lower()
+
+
+@pytest.mark.parametrize("phrase", [
+    "credit balance", "plans & billing", "plans and billing",
+    "purchase credits", "insufficient credit",
+])
+def test_every_declared_phrase_is_matched_on_its_own(phrase):
+    """⛑ Codex mutation: deleting `plans and billing` from the list passed,
+    because no test exercised the ampersand-less spelling in isolation. Each
+    phrase is a separate hedge against a rewording and must be pinned alone."""
+    assert A.is_billing_error(Exception(f"...{phrase}..."))

@@ -516,6 +516,50 @@ shared helper proves nothing about the caller), `tests/test_derive_valuation.py`
 
 **Prices are NOT affected** — yfinance `batch_download_prices` remains primary for prices, with FMP historical as fallback for missing US tickers. `% 52Wk Hi` stays derived from price history.
 
+### An out-of-credit Anthropic account raises; it does not blank a column (#330, 2026-09-08)
+
+`providers/anthropic_summary.py` is this repo's only Anthropic call site, and it
+caught `anthropic.APIStatusError` and returned `""`. A credit-balance failure
+arrives as an ordinary **400 `invalid_request_error`**, so on an empty account
+every movers *why* cell went blank, the loop made ~29 more doomed calls, and the
+run reported **`ok`** — the weekly report shipping without its explanations and
+looking entirely healthy. Nothing in this fleet checks the balance, so nothing
+else would have caught it.
+
+A credit error now raises `AnthropicCreditExhausted`, which routes through
+`run_step` → `failed:` → a `partial` heartbeat. **Every other failure still
+degrades to the headline-only view**, exactly as this module's docstring
+promises: a rate limit or one malformed reply is per-ticker and local and must
+not fail a weekly report; a credit failure is account-level and will fail the
+next thirty calls identically.
+
+⛑ **ONE `except Exception`, with the billing test before any subclass dispatch —
+and that ordering IS the fix.** The first version used one clause per class and
+put the billing check in the `APIStatusError` handler. `AuthenticationError` and
+`RateLimitError` **subclass** `APIStatusError` and their clauses came first, so a
+credit message arriving as either was swallowed exactly as before and the
+"belt and braces" catch-all was unreachable for them. Reproduced:
+`AuthenticationError(<the real billing message>)` returned `""`. Found by Codex
+reviewing the fix, not by the tests written alongside it.
+
+⛑ **The raised message carries the vendor's own wording (`str(e)`), and that is
+an interface.** `scheduled_jobs_monitor/heartbeat_sweep.py` greps heartbeat text
+for the billing phrases to report one account-level condition instead of N lane
+bugs; raising a tidy summary would pass a type-only assertion while silently
+removing the thing the fleet matches on.
+
+**Five phrases, matched loosely and case-insensitively** — the message is prose
+in a generic error body with no code to key on, so a rewording is likelier to
+keep one of five than all five. Each is pinned **individually**: a Codex mutation
+deleted `plans and billing` and passed, because no test exercised the
+ampersand-less spelling alone.
+
+🔻 **Known and deliberate:** an ordinary auth failure (`invalid x-api-key`) is
+*also* account-level and still returns `""`. An invalid key is a different remedy
+from an empty balance; widening this to cover it belongs on its own row rather
+than smuggled in here. Named in the code so the next reader sees it was
+considered. Tests: `tests/test_anthropic_credit_exhausted.py` (22).
+
 ### `Commercial Biopharma` — the computed category (`universe/commercial_biopharma.py`)
 
 A `Sector (JP) = Biopharma` row is **commercial** when **TTM revenue ≥ $1bn USD OR market
