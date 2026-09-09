@@ -925,8 +925,8 @@ BHRB,Burke & Herbert Financial Services Corp. - Common Stock,NASDAQ,N
 BHST,BioHarvest Sciences Inc. - Common Stock,NASDAQ,N
 BHV,BlackRock Virginia Municipal Bond Trust,NYSE,
 BHVN,Biohaven Ltd. Common Shares,NYSE,
-BIAF,"bioAffinity Technologies, Inc. - Common Stock",NASDAQ,D
-BIAFW,"bioAffinity Technologies, Inc. - Warrant",NASDAQ,D
+BIAF,"bioAffinity Technologies, Inc. - Common Stock",NASDAQ,N
+BIAFW,"bioAffinity Technologies, Inc. - Warrant",NASDAQ,N
 BID,Tribeca Strategic Acquisition Corp. - Class A Ordinary Shares,NASDAQ,N
 BIDU,"Baidu, Inc. - American Depositary Shares, each representing 8 ordinary share",NASDAQ,N
 BIDWR,Tribeca Strategic Acquisition Corp. - Rights,NASDAQ,N
@@ -1109,7 +1109,7 @@ BRLS,Borealis Foods Inc. - Class A Common Shares,NASDAQ,H
 BRLSW,Borealis Foods Inc. - Warrant,NASDAQ,H
 BRLT,"Brilliant Earth Group, Inc. - Class A Common Stock",NASDAQ,N
 BRN,"Barnwell Industries, Inc. Common Stock",NYSE American,
-BRNS,Barinthus Biotherapeutics plc - American Depositary Shares,NASDAQ,D
+BRNS,Barinthus Biotherapeutics plc - American Depositary Shares,NASDAQ,N
 BRNX,BrenX Ltd. - Ordinary Shares,NASDAQ,N
 BRO,"Brown & Brown, Inc. Common Stock",NYSE,
 BROS,Dutch Bros Inc. Class A Common Stock,NYSE,
@@ -2744,7 +2744,7 @@ GAINZ,Gladstone Investment Corporation - 4.875% Notes due 2028,NASDAQ,N
 GALT,Galectin Therapeutics Inc. - Common Stock,NASDAQ,N
 GAM,"General American Investors, Inc. Common Stock",NYSE,
 GAM$B,"General American Investors Company, Inc. Cumulative Preferred Stock",NYSE,
-GAME,"GameSquare Holdings, Inc. - Common stock",NASDAQ,D
+GAME,"GameSquare Holdings, Inc. - Common stock",NASDAQ,N
 GANX,"Gain Therapeutics, Inc. - Common Stock",NASDAQ,N
 GAP,"Gap, Inc. (The) Common Stock",NYSE,
 GASS,"StealthGas, Inc. - common stock",NASDAQ,N
@@ -3440,7 +3440,7 @@ INBK,First Internet Bancorp - Common Stock,NASDAQ,N
 INBKZ,First Internet Bancorp - Fixed-to-Floating Rate Subordinated Notes Due 2029,NASDAQ,N
 INBS,Intelligent Bio Solutions Inc.  - Common Stock,NASDAQ,N
 INBX,"Inhibrx Biosciences, Inc. - Common Stock",NASDAQ,N
-INCR,Intercure Ltd. - ordinary shares,NASDAQ,D
+INCR,Intercure Ltd. - ordinary shares,NASDAQ,N
 INCY,Incyte Corporation - Common Stock,NASDAQ,N
 INDB,Independent Bank Corp. - Common Stock,NASDAQ,N
 INDI,"indie Semiconductor, Inc. - Class A Common Stock",NASDAQ,N
@@ -4876,7 +4876,7 @@ NXRT,"NexPoint Residential Trust, Inc. Common Stock",NYSE,
 NXST,"Nexstar Media Group, Inc. - Common Stock",NASDAQ,N
 NXT,Nextpower Inc. - Common Stock,NASDAQ,N
 NXTC,"NextCure, Inc. - Common Stock",NASDAQ,N
-NXTS,Nexentis Technologies Inc. - Common Stock,NASDAQ,N
+NXTS,Nexentis Technologies Inc. - Common Stock,NASDAQ,D
 NXTT,Next Technology Holding Inc. - Ordinary Shares,NASDAQ,N
 NXXT,"NextNRG, Inc. - Common Stock",NASDAQ,D
 NYAX,Nayax Ltd. - Ordinary Shares,NASDAQ,N
@@ -5567,7 +5567,7 @@ QMCO,Quantum Corporation - Common Stock,NASDAQ,N
 QMLS,"QumulusAI, Inc. - Common Stock",NASDAQ,N
 QNBC,QNB Corp. - Common Stock,NASDAQ,N
 QNC,Quantum eMotion Corp. Common Shares,NYSE American,
-QNCX,"Quince Therapeutics, Inc. - Common Stock",NASDAQ,N
+QNCX,"Quince Therapeutics, Inc. - Common Stock",NASDAQ,D
 QNME,"Quanome Technologies, Inc. - Common Stock",NASDAQ,D
 QNRX,"Quoin Pharmaceuticals, Ltd. - American Depositary Shares",NASDAQ,N
 QNST,"QuinStreet, Inc. - Common Stock",NASDAQ,N
@@ -7340,7 +7340,7 @@ XBPEW,"XBP Global Holdings, Inc. - Warrant",NASDAQ,N
 XCBE,X3 Acquisition Corp. Ltd. - Class A Ordinary Shares,NASDAQ,N
 XCBEU,X3 Acquisition Corp. Ltd. - Unit,NASDAQ,N
 XCBEW,X3 Acquisition Corp. Ltd. - Warrant,NASDAQ,N
-XCH,XCHG Limited - ADS,NASDAQ,D
+XCH,XCHG Limited - ADS,NASDAQ,N
 XCUR,"Exicure, Inc. - Common Stock",NASDAQ,D
 XE,"X-Energy, Inc. - Class A Common Stock",NASDAQ,N
 XEL,Xcel Energy Inc. - Common Stock,NASDAQ,N
