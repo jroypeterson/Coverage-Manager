@@ -628,7 +628,7 @@ narrowing and cannot miss a rate the function reads. Pass `fx` explicitly for a 
 - **De-SPAC is a LINE, not a lane** (`s1_watch.search_despacs`). Measured: 131 S-4/F-4 registrants a quarter, **6** with a blank-check filer. Two reasons it does not earn a module: the filer is the SPAC (SIC 6770) so the **target's** sector — the only thing that decides a bucket — is not in the metadata, and de-SPACs clear neither Bucket 2 nor Bucket 3. The post-close ticker is caught by the symbol-directory diff anyway, so this buys lead time on a handful of names, claims no sector, and never raises.
 - `universe/symbol_directory.py` — **weekly US symbol-directory watch** (`cli.py symbol-directory`, and step `[4f/6]` of `weekly-universe`). Snapshots the two free Nasdaq Trader files (`nasdaqlisted.txt` + `otherlisted.txt`, covering Nasdaq/NYSE/Arca/American/Cboe/IEX — ~7,500 operating companies after dropping ETFs and test issues) and diffs against the prior snapshot. **Nasdaq keeps no archive**, so snapshots are committed to `data/symbol_directory/` — a missed week is a diff that can never be computed. **Absence from the directory is a candidate, not a verdict:** each covered US row that is missing gets adjudicated against SEC's per-CIK submissions endpoint into `delisted` (a filed Form 15-12B/12G/15D, or no registered ticker) / `listed` (a symbol-format mismatch — `FI` vs SEC's stale `FISV`, `SGMO` vs `SGMOQ`) / **`inconclusive`** (no CIK on the row, or the endpoint would not answer). Inconclusive is NEVER folded into delisted — deleting a live company from the universe is the one unrecoverable mistake here. Foreign lines are excluded by `Exchange` before comparison; they are absent from a US file by definition and flagging them would be an artefact of the question. Also surfaces Nasdaq's `Financial Status` field (D/E/Q/G/H/J/K — distinct states, mapped, not conflated), which nothing else in the fleet reads. Exit 2 on any covered name missing or removed. First live run 2026-08-06: 863 US rows checked, 31 absent → **10 confirmed delisted by Form 15** (ACLX, CCRN, CPRX, DAY, KZR, LYRA, NOTV, NUVL, PRTC, XOMA), 6 symbol mismatches, 15 inconclusive for want of a CIK. Tests: `tests/test_symbol_directory.py` (18).
 
-## Index membership snapshots — MSCI EAFE (2026-09-09, board #354)
+## Index membership snapshots — EAFE, Russell 1000/2000/3000, S&P 500 (2026-09-09, board #354)
 
 `python -m universe.index_membership`, and weekly step **`[4f2/6]`**. JP asked for the
 EAFE list and its weights to be **tracked**; that is the entire scope today. Nothing
@@ -661,11 +661,56 @@ Roche, not Roper. Any consumer joining this to coverage must key on `(ticker, ex
 or resolve by name. Both caveats are written into every snapshot's `caveats` array, not
 just this doc.
 
+### Extended the same day to five indices, and it found a live outage
+
+JP: *"lets fix the Russell and S&P500 issues if they are issues."* They were.
+
+| Index | Source kind | Live 2026-09-09 |
+|---|---|---|
+| MSCI EAFE | `ishares` — EFA `latest-holdings.csv` | 658, as-of 2026-09-08 |
+| Russell 1000/2000/3000 | `vanguard` — VONE/VTWO/VTHR holdings JSON, paginated at 500 | 1,024 / 1,986 / 2,966, as-of 2026-07-31 |
+| S&P 500 | `cm_cache` — CM's own `cache/constituents/sp500.json` | 503, observed 2026-09-08 |
+
+⛑ **THE VANGUARD ETF SEGMENT MUST BE LOWERCASE, and this was a silent live outage.**
+Measured 2026-09-09: `/api/VONE/...` answers **301** to the human page
+`/profile/vone/portfolio-holding/stock`, which serves 56 KB of HTML with **HTTP 200** —
+so urllib follows the redirect and the JSON decode fails on every retry. `/api/vone/...`
+returns the data. Vanguard made the path case-sensitive sometime after 2026-08-28, and
+**`sector_chart_pack/russell.py` had been failing ever since**, serving a frozen
+2026-07-31 membership list to the chart pack with nothing visibly wrong — its last-good
+fallback worked exactly as designed and thereby hid the outage. *A fallback that works is
+not evidence that the source does.* Both modules are fixed; the chart-pack fetch was
+re-verified live for all three funds.
+
+⛑ **`as_of_kind` separates a SOURCE date from an OBSERVATION date.** A fund states when
+its holdings are as of (`source`); a scraped constituent list states nothing, so the only
+honest stamp is when we looked (`observed`). Collapsing them would let today's scrape
+claim to be a membership record for today.
+
+⛑ **`STALE_DAYS` IS PER SOURCE.** iShares publishes daily (45 days means the fetch is
+broken); Vanguard publishes month-end and Russell reconstitutes annually, so 120. One flat
+45-day rule would have marked the Russell lane unfit on an ordinary week — a guard
+becoming the outage it was added to prevent.
+
+**S&P 500 carries no weights, deliberately** — a constituent list is not a weighted index,
+and `equity_weight_pct` is `None` rather than `0.0` there, because a zero would read as a
+claim rather than a gap. `_num` returns a **finite float or None**: Vanguard sends
+`percentWeight` as a string (summing it raised `TypeError: int + str`), and a bare
+`float(x or "nan")` yields NaN, which poisons any total it joins while comparing False
+against every threshold.
+
+**What is deliberately NOT done:** the four consumers (`sector_chart_pack`,
+`post_earnings_movers`, `forensic_triage`, `screens_equity/surprise_screens`) still read
+the old per-project caches, and `sigma-alert/sources/sp500.txt` still exists. Starting the
+archive is the half that cannot be bought back later; repointing consumers can be done any
+week and risks breaking working lanes. The transient cost is that the Vanguard fetch here
+duplicates `sector_chart_pack/russell.py` until that module is retired.
+
 Guards: a list under the credibility floor (400) is **refused, not written**; a failed
 fetch falls back to the last good snapshot and reports its age; past `STALE_DAYS` (45) it
 is reported **unfit** and the weekly step fails. Non-gating and late in the run — it must
 never fail the build that publishes the universe. Module `universe/index_membership.py`;
-tests `tests/test_index_membership.py` (13).
+tests `tests/test_index_membership.py` (28).
 
 ## Symbol aliases — one issuer, several live ticker strings (2026-08-27, board #345)
 

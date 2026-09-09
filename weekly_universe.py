@@ -909,11 +909,13 @@ def _step_index_membership():
     from universe import index_membership as im
 
     results = im.refresh_all()
-    bad = [r for r in results if r["status"] == "stale_unfit"]
+    bad = [r for r in results if r["status"] in ("stale_unfit", "failed")]
     if bad:
         raise RuntimeError(
-            "index membership unfit: "
-            + "; ".join(f"{r['key']} as_of {r['as_of']} age {r['age_days']}d" for r in bad))
+            "index membership degraded: "
+            + "; ".join(f"{r['key']} {r['status']}"
+                        + (f" as_of {r['as_of']} age {r['age_days']}d" if r["as_of"] else "")
+                        for r in bad))
     return {"results": results}
 
 

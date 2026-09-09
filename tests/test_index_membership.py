@@ -191,3 +191,126 @@ def test_the_weekly_step_fails_only_on_an_unfit_snapshot(out_dir, monkeypatch):
                                   "count": 658, "age_days": 131, "error": "x", "written": None}])
     with pytest.raises(RuntimeError, match="unfit"):
         weekly_universe._step_index_membership()
+
+
+# --- the multi-source extension (2026-09-09) ---------------------------------
+
+def test_the_vanguard_url_lowercases_the_etf():
+    """⛑ THE REGRESSION THAT FROZE THE RUSSELL LISTS FOR ~12 DAYS.
+
+    `/api/VONE/...` answers 301 to a human page that serves HTML with HTTP 200, so the
+    JSON decode fails on every retry; `/api/vone/...` returns the data. This asserts the
+    property, not the string, so a future URL change cannot quietly re-uppercase it.
+    """
+    captured = []
+
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self):
+            return json.dumps({"size": 1, "asOfDate": "2026-07-31T00:00:00-04:00",
+                               "fund": {"entity": []}}).encode()
+
+    import urllib.request as _u
+
+    def _fake(req, timeout=None):
+        captured.append(req.full_url)
+        return _Resp()
+
+    import pytest as _p
+    with _p.MonkeyPatch.context() as m:
+        m.setattr(_u, "urlopen", _fake)
+        with pytest.raises(im.IndexMembershipError):    # no holdings -> refuses
+            im._fetch_vanguard("VONE")
+    assert captured, "no request was made"
+    assert "/api/vone/" in captured[0]
+    assert "/api/VONE/" not in captured[0]
+
+
+@pytest.mark.parametrize("raw,want", [
+    ("2.9500", 2.95),        # Vanguard sends percentWeight as a STRING
+    ("1,234.5", 1234.5),
+    ("3.1%", 3.1),
+    (2.5, 2.5),
+    ("", None),              # never NaN — NaN poisons any total it joins
+    ("n/a", None),
+    (None, None),
+    (float("nan"), None),
+    (float("inf"), None),
+])
+def test_num_returns_a_finite_float_or_nothing(raw, want):
+    got = im._num(raw)
+    assert got == want
+    assert got is None or isinstance(got, float)
+
+
+def test_stale_days_is_per_source_because_the_cadences_differ():
+    """A flat 45-day rule would mark the Russell lane unfit on an ordinary week —
+    Vanguard publishes month-end holdings and Russell reconstitutes annually."""
+    assert im.stale_days_for("r1000") == 120
+    assert im.stale_days_for("eafe") == im.STALE_DAYS == 45
+    assert im.stale_days_for("sp500") == 45
+
+
+def test_sp500_comes_from_cm_cache_as_an_OBSERVATION_not_a_source_date(out_dir, monkeypatch, tmp_path):
+    """A scraped list states no effective date. Stamping it as though the index provider
+    said so would let today's scrape claim to be a membership record for today."""
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({
+        "_cached_at": "2026-09-08T19:01:55.529799+00:00",
+        "data": {"tickers": [f"T{i}" for i in range(500)] + ["BRK.B"],
+                 "info": {"T0": {"Company Name": "Zero Inc",
+                                 "GICS Sector": "Industrials",
+                                 "GICS Sub-Industry": "Conglomerates"}}}}), encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+
+    r = im.refresh("sp500")
+    assert r["status"] == "ok"
+    doc = json.loads((out_dir / "sp500_2026-09-08.json").read_text(encoding="utf-8"))
+    assert doc["as_of"] == "2026-09-08"
+    assert doc["as_of_kind"] == "observed"
+    assert doc["holdings"][0]["sector"] == "Industrials"
+    # Share classes normalise to the fleet's dash, same as the Vanguard leg.
+    assert doc["holdings"][-1]["ticker"] == "BRK-B"
+    # ⛑ NO INVENTED WEIGHTS. A constituent list is not a weighted index.
+    assert all(h["weight_pct"] is None for h in doc["holdings"])
+    assert doc["equity_weight_pct"] is None
+
+
+def test_an_sp500_cache_with_no_stamp_is_refused(out_dir, monkeypatch, tmp_path):
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({"data": {"tickers": ["A"], "info": {}}}), encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    with pytest.raises(im.IndexMembershipError, match="_cached_at"):
+        im._load_cm_sp500()
+
+
+def test_one_index_failing_does_not_skip_the_others(out_dir, monkeypatch):
+    """⛑ The first version raised out of the loop, so a Vanguard outage took the EAFE and
+    S&P snapshots with it — and a week not captured cannot be recaptured."""
+    def _collect(key):
+        if key.startswith("r"):
+            raise im.IndexMembershipError("vanguard down")
+        return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
+                                         "weight_pct": 0.1, "location": "", "exchange": "",
+                                         "market_currency": "", "market_value_usd": None}
+                                        for i in range(500)]
+    monkeypatch.setattr(im, "collect", _collect)
+
+    results = {r["key"]: r["status"] for r in im.refresh_all()}
+    assert results["eafe"] == "ok"
+    assert results["sp500"] == "ok"
+    assert results["r1000"] == results["r2000"] == results["r3000"] == "failed"
+
+
+def test_the_weekly_step_fails_on_a_failed_source_too(out_dir, monkeypatch):
+    """`failed` and `stale_unfit` are different states but the same operator signal:
+    this lane did not learn what it was asked to learn."""
+    import weekly_universe
+
+    monkeypatch.setattr(im, "refresh_all",
+                        lambda: [{"key": "r1000", "status": "failed", "as_of": None,
+                                  "count": None, "age_days": None, "error": "x",
+                                  "written": None}])
+    with pytest.raises(RuntimeError, match="degraded"):
+        weekly_universe._step_index_membership()
