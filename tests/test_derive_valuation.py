@@ -340,3 +340,64 @@ def test_revenue_is_not_derived_from_ev_over_ev_sales():
     p = dict(PAYLOADS["TAK"]); p["totalRevenue"] = 0
     v = b.derive_valuation(p, FX)
     assert v["ev_sales"] is None and v["revenue_usd_m"] is not None
+
+
+# ── revenue is gated on its OWN inputs (Codex Medium #6, 2026-09-08) ─────────
+
+def _rev_payload(**kw):
+    p = {"totalRevenue": 5e9, "currency": "USD", "financialCurrency": "USD",
+         "marketCap": 20e9, "totalDebt": 1e9, "totalCash": 2e9}
+    p.update(kw)
+    return p
+
+
+FXR = {"USD": 1.0, "EUR": 1.1}
+
+
+@pytest.mark.parametrize("missing,expected_reason", [
+    ({"marketCap": None}, "no marketCap"),
+    ({"marketCap": 0}, "no marketCap"),
+    ({"currency": ""}, "no quote currency"),
+    ({"totalDebt": None}, "no totalDebt/totalCash"),
+    ({"totalCash": None}, "no totalDebt/totalCash"),
+])
+def test_revenue_survives_every_missing_EV_input(missing, expected_reason):
+    """Revenue needs the figure, the reporting currency and its rate. Nothing else.
+
+    ⛑ Every one of these early-returned BEFORE revenue was computed, and
+    `reporting/generate.py` blanks `Revenue (TTM)` whenever `ev_usd_m` is None --
+    so a company with $5bn of proven revenue published a blank because its market
+    cap was absent, while the commercial-biopharma classifier, reading the same
+    primitives, correctly saw the $5bn. Two surfaces, one cache, opposite answers.
+    """
+    out = b.derive_valuation(_rev_payload(**missing), FXR)
+    assert out["ev_usd_m"] is None
+    assert out["reason"] == expected_reason
+    assert out["revenue_usd_m"] == pytest.approx(5000.0)
+
+
+@pytest.mark.parametrize("payload,fx", [
+    (_rev_payload(financialCurrency=""), FXR),         # no reporting currency
+    (_rev_payload(totalRevenue=None), FXR),            # no figure
+    (_rev_payload(totalRevenue=-1e9), FXR),            # not a revenue figure
+    (_rev_payload(financialCurrency="EUR"), {"USD": 1.0, "EUR": 0.0}),   # dead rate
+    (_rev_payload(financialCurrency="EUR"), {"USD": 1.0, "EUR": -1.0}),  # negative rate
+    (_rev_payload(financialCurrency="EUR"), {"USD": 1.0}),               # rate absent
+])
+def test_revenue_is_absent_when_its_OWN_inputs_are_not_provable(payload, fx):
+    """The other side of the classifier: the widened gate must not invent a figure."""
+    assert b.derive_valuation(payload, fx)["revenue_usd_m"] is None
+
+
+def test_a_zero_revenue_is_published_as_zero_not_as_absent():
+    """A pre-revenue biotech is a real answer, and distinct from `unknown`."""
+    out = b.derive_valuation(_rev_payload(totalRevenue=0), FXR)
+    assert out["revenue_usd_m"] == 0.0
+    assert out["ev_sales"] is None, "no multiple on a zero denominator"
+
+
+def test_a_healthy_row_is_unchanged_by_the_widened_revenue_gate():
+    out = b.derive_valuation(_rev_payload(ebitda=1e9), FXR)
+    assert out["ev_usd_m"] == pytest.approx(19000.0)
+    assert out["revenue_usd_m"] == pytest.approx(5000.0)
+    assert out["ev_sales"] == pytest.approx(3.8)

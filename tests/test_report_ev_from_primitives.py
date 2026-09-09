@@ -230,3 +230,59 @@ def test_an_adr_resolves_on_the_production_path_end_to_end(monkeypatch):
     g._convert_aggregates_to_usd(funds, {"TAK": "USD"})
     assert 60e9 < funds["TAK"]["Enterprise Value"] < 130e9
     assert 2.0 < funds["TAK"]["EV/S"] < 4.5
+
+
+# ── revenue must survive a row whose EV cannot be computed (Codex Medium #6) ──
+
+def _no_cap_row():
+    """Revenue is provable; the EV side is not. A real shape: `.info` returns a
+    reporting currency and revenue but no market cap for some rows."""
+    return {
+        "Mkt Cap": None,
+        "Enterprise Value": 1.0,      # vendor junk, must be blanked
+        "Net Debt": 1.0,
+        "EV/S": 1.0,
+        "EV/EBITDA": 1.0,
+        "Revenue (TTM)": 1.0,
+        "_valuation": {
+            "currency": "USD", "financialCurrency": "USD",
+            "marketCap": None, "totalDebt": 0.0, "totalCash": 0.0,
+            "totalRevenue": 5e9, "ebitda": None,
+        },
+    }
+
+
+def test_revenue_is_published_even_when_EV_cannot_be_computed():
+    """⛑ THE CALLER, not the helper. `_blank_ev_fields` lists `Revenue (TTM)`,
+    so a row with no market cap had its revenue blanked -- while the
+    commercial-biopharma classifier, reading the SAME primitives out of the SAME
+    cache, correctly saw $5bn. Two published surfaces, one source, opposite
+    answers, and neither wrong on its own terms.
+    """
+    g = _g()
+    funds = {"X": _no_cap_row()}
+    g._convert_aggregates_to_usd(funds, {"X": "USD"}, fx=FX)
+    row = funds["X"]
+    assert row["Enterprise Value"] is None, "EV must still be refused"
+    assert row["EV/S"] is None and row["EV/EBITDA"] is None
+    assert row["Revenue (TTM)"] == pytest.approx(5e9), (
+        "revenue was blanked because an unrelated field was missing")
+
+
+def test_revenue_is_still_blanked_when_ITS_own_inputs_fail():
+    """The other side: a row with no reporting currency proves no revenue."""
+    g = _g()
+    funds = {"X": _no_cap_row()}
+    funds["X"]["_valuation"]["financialCurrency"] = ""
+    g._convert_aggregates_to_usd(funds, {"X": "USD"}, fx=FX)
+    assert funds["X"]["Revenue (TTM)"] is None
+
+
+def test_a_row_with_no_primitives_at_all_still_blanks_revenue():
+    """An FMP/AlphaVantage row carries no `_valuation`, so nothing is proven."""
+    g = _g()
+    funds = {"X": {"Mkt Cap": 1e9, "Enterprise Value": 2e9, "Net Debt": 1e9,
+                   "EV/S": 3.0, "EV/EBITDA": 9.0, "Revenue (TTM)": 7e8}}
+    g._convert_aggregates_to_usd(funds, {"X": "USD"}, fx=FX)
+    assert funds["X"]["Revenue (TTM)"] is None
+    assert funds["X"]["Enterprise Value"] is None

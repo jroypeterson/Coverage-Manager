@@ -70,6 +70,14 @@ def _blank_ev_fields(fund):
     guilty, so the only honest question is "are this field's own inputs present
     and convertible". Blank the FIELDS, never the row -- Mkt Cap, Price and the
     returns are proven independently of EV.
+
+    ⛑ `Revenue (TTM)` IS IN THE LIST BUT IS RESTORED BY THE CALLER when its own
+    inputs hold (Codex Medium #6, 2026-09-08). It stays in `EV_DERIVED_FIELDS`
+    because the no-primitives path genuinely cannot prove it either, so blanking
+    remains the correct DEFAULT; what was wrong was treating a missing market cap
+    or debt figure as evidence about revenue. Revenue needs the figure, the
+    reporting currency and its rate -- nothing else -- and `derive_valuation` now
+    computes it before any EV gate.
     """
     for f in EV_DERIVED_FIELDS:
         fund[f] = None
@@ -113,6 +121,14 @@ def _recompute_ev_from_primitives(all_fundamentals, all_currencies, fx, skip=())
         val = derive_valuation(prim, fx)
         if val["ev_usd_m"] is None:
             _blank_ev_fields(fund)
+            # ⛑ ...but revenue is not an EV field (Codex Medium #6, 2026-09-08).
+            # A row with $5bn of revenue, a reporting currency and a live rate
+            # has PROVEN its revenue, whatever is missing from the EV side. It
+            # was published blank because a market cap was absent -- while the
+            # commercial-biopharma classifier, reading the same primitives,
+            # correctly saw the $5bn. Two surfaces, one cache, opposite answers.
+            if val["revenue_usd_m"] is not None:
+                fund["Revenue (TTM)"] = val["revenue_usd_m"] * 1e6
             blanked += 1
             continue
         ev_usd = val["ev_usd_m"] * 1e6

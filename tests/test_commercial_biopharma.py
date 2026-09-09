@@ -184,17 +184,45 @@ def test_the_export_carries_the_RULE_not_just_the_membership():
     assert pay["counts"]["biopharma_rows"] == 2
 
 
-def test_only_biopharma_rows_are_touched():
-    """The column must not silently clear a value on a MedTech row."""
+def test_a_row_that_leaves_biopharma_has_its_flag_CLEARED():
+    """A company moved out of Biopharma must not keep `Commercial Biopharma = Y`.
+
+    ⛑ This test asserted the OPPOSITE until 2026-09-08 (Codex High #3). It fed
+    `apply_to_frame` the sentinel "KEEPME" on a MedTech row and asserted it
+    survived, under the name `test_only_biopharma_rows_are_touched`. The sentinel
+    is what hid the defect: "KEEPME" is not a value this column can hold -- it is
+    `Y` or blank, which the test two below pins -- so the case that matters, a
+    real `Y` going stale, was never exercised. `classify` builds a record for
+    every Biopharma row, so absence from `by_ticker` means "not Biopharma now",
+    and a `Y` left behind is false rather than merely old.
+    """
     import pandas as pd
     rows = [_row("BIO"), _row("MED", sector="MedTech")]
     prims = {"BIO": _prim(rev=2e9, cap=3e9)}
     by, _ = cb.classify(rows, primitives=prims, fx=FX)
     df = pd.DataFrame([{"Ticker": "BIO", cb.COLUMN: ""},
-                       {"Ticker": "MED", cb.COLUMN: "KEEPME"}])
-    cb.apply_to_frame(df, by)
+                       {"Ticker": "MED", cb.COLUMN: "Y"}])
+    set_n, cleared = cb.apply_to_frame(df, by)
     assert df.loc[0, cb.COLUMN] == "Y"
-    assert df.loc[1, cb.COLUMN] == "KEEPME", "a non-Biopharma row was rewritten"
+    assert df.loc[1, cb.COLUMN] == "", "a departed row kept a flag that is now false"
+    assert (set_n, cleared) == (1, 1)
+
+
+def test_a_non_biopharma_row_that_is_already_blank_is_not_counted_as_cleared():
+    """The common case must stay a no-op, or `cleared` becomes meaningless.
+
+    Every MedTech/SaaS/Tech row in the universe is absent from `by_ticker`, so a
+    clear-on-absence rule that did not check the current value would report ~900
+    "cleared" rows every week and bury the one that matters.
+    """
+    import pandas as pd
+    rows = [_row("BIO"), _row("MED", sector="MedTech")]
+    prims = {"BIO": _prim(rev=2e9, cap=3e9)}
+    by, _ = cb.classify(rows, primitives=prims, fx=FX)
+    df = pd.DataFrame([{"Ticker": "BIO", cb.COLUMN: ""},
+                       {"Ticker": "MED", cb.COLUMN: ""}])
+    set_n, cleared = cb.apply_to_frame(df, by)
+    assert cleared == 0
 
 
 def test_the_column_is_Y_or_blank_and_never_a_status_string():
@@ -256,3 +284,142 @@ def test_revenue_is_converted_on_the_reporting_rate_without_a_cap():
     _, rev, _ = cb.classify_row(
         _row("J"), _prim(rev=4.6e12, cap=None, rccy="JPY"), FX)
     assert 20_000 < rev < 45_000, rev
+
+
+# ── a present-but-garbage FX rate (Codex High #1, 2026-09-08) ───────────────
+
+@pytest.mark.parametrize("bad_rate", [0.0, -1.0, float("nan"), float("inf")])
+def test_an_unusable_fx_rate_yields_unknown_not_a_confident_classification(bad_rate):
+    """`rate is None` passes 0.0, a negative, NaN and inf -- each wrongly.
+
+    ⛑ `providers/valuation.py` learned this on 2026-09-08 and grew `_usable_rate`
+    for exactly these values. This module was written the same day, kept the
+    `is None` test, and so reproduced the defect the fix had just retired: the
+    lesson stopped at the lane that learned it.
+
+    Measured before the fix on EUR revenue 5e9 / cap 20e9:
+
+        rate 0.0   -> ("below_line", 0.0, 0.0)
+        rate -1.0  -> ("below_line", -5000.0, -20000.0)
+        rate NaN   -> ("below_line", nan, nan)
+        rate inf   -> ("commercial", inf, inf)
+
+    A EUR 20bn company published as `below_line` on a dead pair, and -- worse --
+    counted as RESOLVED, so a sector full of these clears `check_floor` at 100%
+    and the guard against publishing a partial book passes vacuously.
+    """
+    row = _row("X")
+    prim = _prim(rev=5e9, cap=20e9, ccy="EUR", rccy="EUR")
+    status, rev, cap = cb.classify_row(row, prim, {"EUR": bad_rate})
+    assert status == "unknown"
+    assert rev is None and cap is None
+
+
+def test_a_usable_fx_rate_still_classifies():
+    """The other side of the classifier -- the guard must not blank a good row."""
+    status, rev, cap = cb.classify_row(
+        _row("X"), _prim(rev=5e9, cap=20e9, ccy="EUR", rccy="EUR"), {"EUR": 1.1})
+    assert status == "commercial"
+    assert rev == pytest.approx(5500.0)
+    assert cap == pytest.approx(22000.0)
+
+
+def test_an_unusable_rate_lowers_resolved_fraction_so_the_floor_can_see_it():
+    """The floor must be able to REFUSE on a sector of dead-FX rows.
+
+    This is the consequence that makes the bug above expensive rather than
+    merely wrong: `check_floor` exists to stop a wiped cache from blanking the
+    column, and a confident-but-garbage classification defeats it silently.
+    """
+    rows = [_row("A"), _row("B")]
+    prims = {"A": _prim(rev=5e9, cap=20e9, ccy="EUR", rccy="EUR"),
+             "B": _prim(rev=5e9, cap=20e9, ccy="EUR", rccy="EUR")}
+    _by, summary = cb.classify(rows, primitives=prims, fx={"EUR": 0.0})
+    assert summary["resolved_fraction"] == 0.0
+    with pytest.raises(cb.RefusedPartialBook):
+        cb.check_floor(summary)
+
+
+# ── the exchange must reach normalize_ticker as an EXCHANGE (Codex Medium #5) ──
+
+def test_a_foreign_row_resolves_its_suffixed_cache_key():
+    """`normalize_ticker(t, exchange)` passed the exchange as `company_name`.
+
+    The signature is `normalize_ticker(ticker, company_name="", exchange="")`, so
+    all three call sites here silently dropped the suffix:
+
+        normalize_ticker("1234", "TSE")           -> "1234"
+        normalize_ticker("1234", exchange="TSE")  -> "1234.T"
+
+    A bare foreign ticker whose fundamentals cache is keyed by its Yahoo symbol
+    therefore looked like a row with no primitives at all -- `unknown`, silently,
+    and only visible as a slightly lower resolved fraction.
+    """
+    from ticker_utils import normalize_ticker
+    yf_key = normalize_ticker("4503", exchange="TSE")
+    assert yf_key != "4503", "precondition: the exchange must change the symbol"
+
+    rows = [_row("4503", exch="TSE")]
+    prims = {yf_key: _prim(rev=5e11, cap=6e12, ccy="JPY", rccy="JPY")}
+    by, summary = cb.classify(rows, primitives=prims, fx=FX)
+    assert by["4503"]["status"] == "commercial"
+    assert summary["resolved_fraction"] == 1.0
+
+
+def test_a_negative_fmp_revenue_is_unmeasured_not_a_corroborated_zero():
+    """⛑ Codex Low #7, 2026-09-08. `revenue <= 0` fell through to the zero branch.
+
+    Before the fix:
+
+        classify_statement({"revenue": -1, "researchAndDevelopmentExpenses": 10})
+        -> ("zero", 0.0, ...)
+
+    which, with yfinance revenue absent and a $2bn cap, published a CONFIDENT
+    `below_line`. The yfinance leg already treats a negative as unmeasured, so
+    the two sources disagreed about the same fact through the same module.
+    """
+    assert classify_statement(
+        {"revenue": -1, "researchAndDevelopmentExpenses": 10})[0] == "no_data"
+    # and the row it feeds stays unknown rather than becoming a verdict
+    fmp = {"status": "no_data", "revenue": None}
+    s, _, _ = cb.classify_row(_row("NEG"), _prim(rev=None, cap=2e9), FX, fmp)
+    assert s == "unknown"
+
+
+def test_a_real_zero_is_still_corroborated_and_believed():
+    """The other side: the negative guard must not break the zero path."""
+    assert classify_statement(
+        {"revenue": 0, "researchAndDevelopmentExpenses": 48e6})[0] == "zero"
+
+
+def test_the_fx_fetch_set_is_scoped_to_the_rows_being_classified():
+    """⛑ Codex Medium #4, 2026-09-08. It scanned the WHOLE fundamentals cache.
+
+    `cache/fundamentals/` holds ~1,300 files for the entire universe and is never
+    pruned, so a currency entered the fetch list because some unrelated -- often
+    departed -- company reported in it. Scoping to the Biopharma rows under
+    classification is strictly narrowing: a rate this function actually reads is
+    by definition on one of these rows.
+    """
+    seen = {}
+
+    def _spy(currencies):
+        seen["wanted"] = set(currencies)
+        return {"USD": 1.0, "EUR": 1.1}
+
+    rows = [_row("BIO")]
+    prims = {
+        "BIO": _prim(rev=5e9, cap=20e9, ccy="EUR", rccy="EUR"),
+        # A departed company's stale cache entry, in a currency nothing here uses.
+        "GONE": _prim(rev=1e9, cap=1e9, ccy="ZAR", rccy="ZAR"),
+        "ALSOGONE": _prim(rev=1e9, cap=1e9, ccy="TRY", rccy="TRY"),
+    }
+    orig = cb.fetch_aggregate_fx
+    cb.fetch_aggregate_fx = _spy
+    try:
+        by, _ = cb.classify(rows, primitives=prims, fmp_revenue={})
+    finally:
+        cb.fetch_aggregate_fx = orig
+
+    assert seen["wanted"] == {"EUR"}, seen["wanted"]
+    assert by["BIO"]["status"] == "commercial"

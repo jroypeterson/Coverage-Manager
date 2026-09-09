@@ -45,9 +45,16 @@ carried honestly as `as_of`.
 import glob
 import json
 import logging
+import math
 import os
 
 from providers.fx_provider import fetch_aggregate_fx, major_unit
+# ⛑ `_usable_rate` is IMPORTED, not reimplemented (Codex High #1, 2026-09-08).
+# `valuation.py` learned on 2026-09-08 that `rate is not None` passes 0.0, a
+# negative and NaN, and that each one fails differently and confidently. This
+# module was written the same day and kept the `is None` test, so the lesson
+# stopped at the lane that learned it. A second copy would let them diverge again.
+from providers.valuation import _usable_rate
 from providers.valuation import num
 from ticker_utils import normalize_ticker
 
@@ -116,17 +123,25 @@ def _revenue_usd_m(prim, fx):
     """
     rev = num(prim.get("totalRevenue"))
     rate = fx.get(major_unit((prim.get("financialCurrency") or "").strip()))
-    if rev is None or rate is None or rev < 0:
+    # `_usable_rate`, not `rate is None`: a dead pair hands back 0.0, a negative
+    # or NaN, and every one of them classified CONFIDENTLY rather than blanking.
+    # Measured 2026-09-08 on EUR revenue 5e9 / cap 20e9: rate 0.0 -> below_line
+    # (0, 0); -1.0 -> below_line (-5000, -20000); NaN -> below_line; inf ->
+    # COMMERCIAL. All four counted as `resolved` for the floor guard, so a sector
+    # full of them passes `check_floor` vacuously at 100% resolved.
+    if rev is None or not _usable_rate(rate) or rev < 0:
         return None
-    return rev * rate / 1e6
+    out = rev * rate / 1e6
+    return out if math.isfinite(out) else None
 
 
 def _mkt_cap_usd_m(prim, fx):
     mc = num(prim.get("marketCap"))
     rate = fx.get(major_unit((prim.get("currency") or "").strip()))
-    if mc is None or rate is None or mc <= 0:
+    if mc is None or not _usable_rate(rate) or mc <= 0:
         return None
-    return mc * rate / 1e6
+    out = mc * rate / 1e6
+    return out if math.isfinite(out) else None
 
 
 def classify_row(row, prim, fx, fmp=None):
@@ -202,12 +217,36 @@ def classify(rows, primitives=None, fx=None, fmp_revenue=None):
     `fmp_revenue` is `{ticker: fetch_revenue(...) result}`, used only to turn a
     yfinance null into a corroborated zero. Absent, the classification still
     works -- more rows simply stay `unknown`, which is the honest degradation.
+
+    ⛑ THE FX SET COMES FROM THE ROWS BEING CLASSIFIED, NOT FROM THE WHOLE CACHE
+    (Codex Medium #4, 2026-09-08). It was built by scanning every entry in
+    `cache/fundamentals/`, which is ~1,300 files covering the entire universe --
+    so a currency reached the fetch list because SOME company somewhere reports
+    in it, including companies long gone from the universe whose stale cache
+    files are never pruned. Scoping it to the Biopharma rows actually being
+    classified is strictly narrowing: it cannot miss a rate this function needs,
+    because a rate it needs is by definition read off one of these rows.
+
+    ⛑ AND ON "CACHE-ONLY": the module docstring's cache-only claim is about
+    FUNDAMENTALS, which is where the ~17-minute metered cost lives. FX is not
+    covered by it -- `fetch_aggregate_fx` falls through to yfinance for any
+    currency whose 12-hour cache entry has expired, so this call CAN reach the
+    network. That is a handful of cheap quote lookups and it is left alone
+    deliberately: forcing FX cache-only would blank every row in an expired
+    currency, drop `resolved_fraction`, and trip `check_floor` -- turning a
+    documented imprecision into a weekly outage. Pass `fx` explicitly to make
+    the call offline.
     """
     primitives = load_cached_primitives() if primitives is None else primitives
     bio = [r for r in rows if (r.get("Sector (JP)") or "").strip() == SECTOR]
     if fx is None:
         wanted = set()
-        for p in primitives.values():
+        for r in bio:
+            p = (primitives.get(normalize_ticker(r["Ticker"],
+                                                 exchange=r.get("Exchange", "")))
+                 or primitives.get(r["Ticker"]))
+            if not p:
+                continue
             wanted.add((p.get("currency") or "").strip())
             wanted.add((p.get("financialCurrency") or "").strip())
         wanted = {c for c in wanted if c and c != "USD"}
@@ -216,7 +255,7 @@ def classify(rows, primitives=None, fx=None, fmp_revenue=None):
     by_ticker = {}
     for r in bio:
         t = r["Ticker"]
-        prim = (primitives.get(normalize_ticker(t, r.get("Exchange", "")))
+        prim = (primitives.get(normalize_ticker(t, exchange=r.get("Exchange", "")))
                 or primitives.get(t))
         status, rev, mcap = classify_row(r, prim, fx, (fmp_revenue or {}).get(t))
         by_ticker[t] = {
@@ -283,7 +322,7 @@ def backfill_fmp_revenue(rows, api_key, primitives=None, fx=None,
         if (r.get("Sector (JP)") or "").strip() != SECTOR:
             continue
         t = r["Ticker"]
-        prim = (primitives.get(normalize_ticker(t, r.get("Exchange", "")))
+        prim = (primitives.get(normalize_ticker(t, exchange=r.get("Exchange", "")))
                 or primitives.get(t))
         if prim and prim.get("totalRevenue") is not None:
             continue                       # yfinance already answered
@@ -312,7 +351,7 @@ def load_fmp_revenue(rows, primitives=None):
         if (r.get("Sector (JP)") or "").strip() != SECTOR:
             continue
         t = r["Ticker"]
-        prim = (primitives.get(normalize_ticker(t, r.get("Exchange", "")))
+        prim = (primitives.get(normalize_ticker(t, exchange=r.get("Exchange", "")))
                 or primitives.get(t))
         if prim and prim.get("totalRevenue") is not None:
             continue
@@ -355,6 +394,20 @@ def apply_to_frame(df, by_ticker):
     And the three-state detail would be actively WRONG on the CSV: "below_line"
     is not "pre-commercial" -- Harmony at $959M revenue is neither. The nuance
     lives in the JSON, where a reader can see the figure that produced it.
+
+    ⛑ A ROW ABSENT FROM `by_ticker` IS CLEARED, NOT SKIPPED (Codex High #3,
+    2026-09-08). `classify` builds a record for EVERY row whose `Sector (JP)` is
+    Biopharma, so absence has exactly one meaning: this row is not Biopharma now.
+    The previous `continue` read that as "leave whatever is there", which made the
+    flag permanent for any company that left the sector -- and `Commercial
+    Biopharma = Y` on a MedTech row is not stale, it is false. Trigger: a taxonomy
+    edit moving a flagged name to `Sector (JP) = MedTech` left `Y` in the CSV and
+    kept publishing `commercial: "Y"` in the exported metadata forever, because
+    nothing else ever revisits the cell.
+
+    The caller runs `check_floor` FIRST (`weekly_universe._step_commercial_biopharma`),
+    so a wiped cache raises before reaching here and cannot mass-clear the column.
+    That ordering is what makes clearing safe; do not call this without it.
     """
     if COLUMN not in df.columns:
         df[COLUMN] = ""
@@ -362,9 +415,8 @@ def apply_to_frame(df, by_ticker):
     for i in df.index:
         t = df.at[i, "Ticker"]
         rec = by_ticker.get(t)
-        if rec is None:
-            continue                      # not Biopharma: leave whatever is there
-        want = "Y" if rec["status"] == "commercial" else ""
+        # Not Biopharma any more -> the flag cannot be true, whatever it says.
+        want = "Y" if (rec is not None and rec["status"] == "commercial") else ""
         cur = (df.at[i, COLUMN] or "").strip()
         if cur != want:
             df.at[i, COLUMN] = want

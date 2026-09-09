@@ -516,6 +516,61 @@ shared helper proves nothing about the caller), `tests/test_derive_valuation.py`
 
 **Prices are NOT affected** — yfinance `batch_download_prices` remains primary for prices, with FMP historical as fallback for missing US tickers. `% 52Wk Hi` stays derived from price history.
 
+### `Commercial Biopharma` — the computed category (`universe/commercial_biopharma.py`)
+
+A `Sector (JP) = Biopharma` row is **commercial** when **TTM revenue ≥ $1bn USD OR market
+cap ≥ $10bn USD**, plus every curated `Subsector (JP) = Large Pharma` row unconditionally.
+That is the definition `PROJECT_IDEAS.md` records verbatim on 2026-09-07 ("the 121-name
+commercial universe"); it reproduces at **123 names**. Published as the `Commercial Biopharma`
+CSV column, as `commercial` in `universe_metadata.json`, and as `exports/commercial_biopharma.json`
+(which carries the **rule string**, so a changed line reads as a changed document rather than a
+list that quietly grew). Consumers: sigma-alert's subcategory and the chart-pack log-log screens.
+Weekly step `[4i/6]`, **before** `export_artifacts` — classify after it and the flag published
+this week is last week's. Read the module docstring before changing the rule; it records why the
+`or market cap` leg and the Large Pharma override are both load-bearing.
+
+**Three states, never two:** `commercial` / `below_line` / `unknown`. `unknown` means we could
+not measure it — never that the company has no product. `check_floor` refuses to rewrite the
+column below **85%** resolved, because a wiped cache is indistinguishable from a sector where
+nothing qualifies.
+
+#### Codex review, 2026-09-08 — 7 defects, and 4 of them were the fleet's own recorded classes
+
+Board row **#367** existed because eleven commits across three repos shipped in one session with
+no cross-family review (six earlier attempts died to a machine at 0.5 GB free). Every finding
+below was reproduced by execution before it was fixed, and every fix is mutation-checked.
+
+| # | Defect | Why it mattered |
+|---|---|---|
+| **H1** | `classify_row` tested `rate is None`, not usability | A dead FX pair returns 0.0/negative/NaN/inf. Measured on EUR rev 5e9 / cap 20e9: `0.0` → `below_line (0, 0)`; `-1.0` → `below_line (-5000, -20000)`; `inf` → **`commercial`**. All four counted as **resolved**, so `check_floor` passed **vacuously at 100%** — the guard against publishing a partial book, disabled by the thing it guards |
+| **H2** | sigma-alert's **cached** Open path omitted `commercial` | Open prefers that path whenever the cache is fresh — i.e. every normal morning. The subcategory predicate matched nothing and the alert was **dropped at render**: the exact invisibility the feature was added to fix |
+| **H3** | `apply_to_frame` skipped rows absent from `by_ticker` | `classify` covers every Biopharma row, so absence means "not Biopharma now". A company moved to MedTech kept `Commercial Biopharma = Y` **forever** — not stale, false |
+| **M4** | the FX fetch set was built from the **whole** fundamentals cache | ~1,300 files including departed companies, so currencies were fetched because something unrelated once reported in them |
+| **M5** | `normalize_ticker(t, r["Exchange"])` — positional | The signature is `(ticker, company_name="", exchange="")`, so the suffix was dropped: `("1234","TSE")` → `1234`, not `1234.T`. A foreign row's cache never resolved and it read as `unknown` |
+| **M6** | `Revenue (TTM)` blanked whenever EV could not be computed | Revenue needs the figure, the reporting currency and its rate — not a market cap. A row with $5bn published **blank** on the performance report while the classifier, reading the **same primitives from the same cache**, correctly saw $5bn |
+| **L7** | FMP `revenue <= 0` went through the **zero** branch | `revenue: -1` became a corroborated zero → a confident `below_line`. The yfinance leg already refuses a negative as unmeasured, so one module made its two sources disagree about one fact |
+
+⛑ **H1 is `a-lesson-stops-at-the-lane-that-learned-it`, exactly.** `providers/valuation.py`
+grew `_usable_rate` for these values **the same day**, after an earlier round found a
+`ZeroDivisionError` and a plausible-wrong Takeda figure. This module was written alongside it and
+kept `is None`. The fix **imports** `_usable_rate` rather than copying it — a second copy is how
+they diverge again.
+
+⛑ **H2 and M6 are both `test-the-seam`.** Every existing test of the sigma predicate hand-built
+an already-enriched alert dict, so both halves were tested and the join between them was not;
+`tests/test_screen_open_cached.py` now drives the real screener **and** asserts structurally that
+both alert constructors emit the same field set, so the *next* one-sided field fails too. M6's fix
+is tested against `_convert_aggregates_to_usd` — the function production calls — because a test of
+`derive_valuation` proves nothing about the caller that blanks its output.
+
+⛑ **The M4 fix is deliberately narrow, and FX is deliberately NOT forced cache-only.** The
+cache-only contract is about **fundamentals**, where the ~17-minute metered cost lives. FX falls
+through to yfinance for any currency whose **12-hour** cache entry has expired — and on
+2026-09-08 the live cache already had expired entries — so a hard cache-only FX would blank those
+rows, drop `resolved_fraction` and trip `check_floor` **every week**: a documented imprecision
+converted into an outage. Scoping the currency set to the rows being classified is strictly
+narrowing and cannot miss a rate the function reads. Pass `fx` explicitly for a genuinely offline call.
+
 **S&P 500 benchmark tab**: `reporting/generate.py` now builds the S&P 500 benchmark in price-only mode for speed. It still computes benchmark returns, but it does not do a second full fundamentals pull for the entire S&P 500 universe. Do not reintroduce benchmark fundamentals into the default report path unless you want a materially slower run.
 
 **Timing log**: Each run appends step timings to `reports/performance_timing.jsonl` (JSONL, one entry per run).

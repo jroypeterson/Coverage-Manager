@@ -64,8 +64,20 @@ def classify_statement(rec):
         return "no_data", None, ccy, per
     if rev > 0:
         return "positive", float(rev), ccy, per
-    # revenue == 0 (or negative, which is a contra-revenue restatement): believe
-    # it only if the company shows other signs of life on the same statement.
+    if rev < 0:
+        # ⛑ A NEGATIVE IS NOT A ZERO (Codex Low #7, 2026-09-08). The comment
+        # below used to read "(or negative, which is a contra-revenue
+        # restatement)" and fell through to the zero branch, so `revenue: -1`
+        # beside any life sign returned `("zero", 0.0)` -- and with yfinance
+        # revenue absent and a $2bn cap that publishes a CONFIDENT `below_line`.
+        # The yfinance leg already refuses a negative as unmeasured
+        # (`commercial_biopharma._revenue_usd_m`: `rev < 0 -> None`), so
+        # believing it here made the two sources disagree about the same fact.
+        # A contra-revenue restatement is a real accounting event, but it is not
+        # a revenue figure, and "we could not measure it" is the honest answer.
+        return "no_data", None, ccy, per
+    # revenue == 0: believe it only if the company shows other signs of life on
+    # the same statement.
     for f in _LIFE_SIGNS:
         v = rec.get(f)
         if isinstance(v, (int, float)) and v != 0:

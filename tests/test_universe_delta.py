@@ -372,6 +372,18 @@ def test_post_universe_delta_success_sends_block_kit_payload(tmp_path, monkeypat
 # ── Orchestration: baseline SHA captured BEFORE mutation ─────────────────────
 
 
+# The steps this test patches by hand, with bespoke return shapes it asserts on.
+# Everything else `main()` calls is stubbed inertly beside them; see the comment
+# in the test and `test_every_pipeline_step_main_calls_is_stubbed_by_the_orchestration_test`.
+_STUBBED_EXPLICITLY = {
+    "_step_validate", "_step_archive_universe", "_step_discovery",
+    "_step_delisted_check", "_step_export_artifacts", "_step_export_positions",
+    "_step_export_watchlist", "_step_export_reporting_calendar",
+    "_step_sigma_export", "_step_universe_delta_slack",
+    "_step_commercial_biopharma",
+}
+
+
 def test_baseline_sha_captured_before_mutation(monkeypatch):
     """weekly_universe.main captures the git HEAD SHA at step 0, before any
     mutation step. The captured SHA must reflect pre-discovery state regardless
@@ -431,6 +443,22 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
         call_order.append("sigma_export")
         return {"status": "unchanged", "tickers": 1}
 
+    # ⛑ EVERY step `main()` runs must be stubbed, not just the ones this test is
+    # ABOUT. `_step_commercial_biopharma` shipped on 2026-09-08 and was not added
+    # here, so this test called the real one: it classified the real universe,
+    # rewrote `data/coverage_universe_tickers.csv` and rewrote
+    # `exports/commercial_biopharma.json` -- production data, from `pytest`, on
+    # every run, silently and while green. Caught by noticing an unexplained
+    # `git diff` after a test run, not by any assertion.
+    # `test_main_writes_no_production_files` below is the guard that makes the
+    # NEXT unstubbed step fail instead of writing.
+    def fake_step_commercial_biopharma():
+        call_order.append("commercial_biopharma")
+        return {"summary": {"rule": "stub", "biopharma_rows": 1,
+                            "commercial": 1, "below_line": 0, "unknown": 0,
+                            "resolved_fraction": 1.0},
+                "set": 0, "cleared": 0, "artifacts": []}
+
     captured_baseline = {}
 
     def fake_step_delta_slack(baseline):
@@ -453,7 +481,63 @@ def test_baseline_sha_captured_before_mutation(monkeypatch):
     monkeypatch.setattr(weekly_universe, "_step_export_watchlist", fake_step_export_positions)
     monkeypatch.setattr(weekly_universe, "_step_export_reporting_calendar", fake_step_export_reporting_calendar)
     monkeypatch.setattr(weekly_universe, "_step_sigma_export", fake_step_sigma_export)
+    monkeypatch.setattr(weekly_universe, "_step_commercial_biopharma",
+                        fake_step_commercial_biopharma)
+
+    # ⛑ EVERY REMAINING `_step_*` IS STUBBED TOO. Ten of them were not, and this
+    # test has therefore been running the real weekly pipeline on every `pytest`
+    # run: `_step_cik_backfill`, `_step_s1_watch`, `_step_form10_watch`,
+    # `_step_symbol_directory`, `_step_ticker_change_check`,
+    # `_step_crosscheck_foreign`, `_step_verify_isin_issuers`,
+    # `_step_resolve_cik_by_name`, `_step_check_published_exports`,
+    # `_step_weekly_page` -- live SEC/EDGAR/Nasdaq calls, `data/s1_seen.json`
+    # rewritten, and ~50 seconds of wall clock on a unit-test suite.
+    #
+    # The stub returns a `defaultdict(int)` so `main()`'s summary block can index
+    # any key a real step would have returned without this test having to model
+    # ten different result shapes -- modelling them is what rots.
+    import collections as _collections
+
+    def _inert(name):
+        def _step(*a, **k):
+            call_order.append(name)
+            # `list` rather than `int`: main() both len()s and f-strings these
+            # values, and an empty list satisfies both while staying falsy so no
+            # conditional branch fires on stub data.
+            d = _collections.defaultdict(list)
+            d["status"] = "skipped (stubbed)"
+            return d
+        return _step
+
+    for _name in [n for n in dir(weekly_universe) if n.startswith("_step_")]:
+        if _name in _STUBBED_EXPLICITLY:
+            continue
+        monkeypatch.setattr(weekly_universe, _name, _inert(_name))
     monkeypatch.setattr(weekly_universe, "_step_universe_delta_slack", fake_step_delta_slack)
+
+    # ⛑ ASSERT THE NEGATIVE, AT RUNTIME, BEFORE main() RUNS. A stub list is only
+    # as good as the day it was written, and this one went stale: on 2026-09-08
+    # `_step_commercial_biopharma` was added and not stubbed, so this test called
+    # the REAL step -- it classified the live universe, rewrote
+    # `data/coverage_universe_tickers.csv` and rewrote
+    # `exports/commercial_biopharma.json` on every `pytest` run, green
+    # throughout. It was found by noticing an unexplained `git diff`, not by an
+    # assertion. Ten OTHER steps were unstubbed for longer, so the suite was
+    # running the real weekly pipeline: live SEC/EDGAR/Nasdaq calls,
+    # `data/s1_seen.json` rewritten, ~50s of wall clock. Stubbed, this test takes
+    # under a second.
+    #
+    # A real step is defined in `weekly_universe`; every double here is defined
+    # in this module. That distinction needs no list to maintain, so it cannot
+    # rot the way the list did.
+    unstubbed = sorted(
+        n for n in dir(weekly_universe)
+        if n.startswith("_step_")
+        and getattr(getattr(weekly_universe, n), "__module__", None) == "weekly_universe"
+    )
+    assert not unstubbed, (
+        "these pipeline steps are NOT stubbed, so main() runs them for real "
+        "against production data and the network: %s" % unstubbed)
 
     result = weekly_universe.main(skip_discovery=False, dry_run=False, log_audit=False)
 

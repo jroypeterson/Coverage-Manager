@@ -127,6 +127,30 @@ def derive_valuation(payload, fx):
     debt = num(payload.get("totalDebt"))
     cash = num(payload.get("totalCash"))
 
+    # ── REVENUE IS GATED ON ITS OWN INPUTS, BEFORE ANY EV GATE ────────────────
+    # ⛑ Codex Medium #6, 2026-09-08. Revenue needs exactly three things: the
+    # figure, the reporting currency, and a usable rate for it. It does NOT need
+    # a market cap, a quote currency, debt or cash -- yet every one of those
+    # early-returned above it, and `reporting/generate.py` blanks `Revenue (TTM)`
+    # whenever `ev_usd_m` is None. Trigger: `totalRevenue = 5e9`, reporting USD,
+    # `marketCap = None` -> the commercial-biopharma classifier correctly sees
+    # $5bn while the performance report published Revenue TTM as blank.
+    #
+    # This is the function's own stated rule finally applied to this field: "are
+    # THIS field's own inputs present and convertible". `_revenue_usd_m` in
+    # `universe/commercial_biopharma.py` exists solely because revenue could not
+    # be trusted to come out of here; the two now agree by construction.
+    #
+    # Zero stays a real, publishable answer (a pre-revenue biotech); a negative
+    # is not a revenue figure and stays absent.
+    _rev = num(payload.get("totalRevenue"))
+    if report and _rev is not None and _rev >= 0:
+        _r_rate_only = fx.get(major_unit(report))
+        if _usable_rate(_r_rate_only):
+            _rev_usd_m = _rev * _r_rate_only / 1e6
+            if math.isfinite(_rev_usd_m):
+                out["revenue_usd_m"] = _rev_usd_m
+
     if mc is None or mc <= 0:
         # ⛑ `mc == 0` is NOT a small company, it is a vendor blank wearing a
         # number (Codex, 2026-09-08). It sails past an `is None` check and makes
@@ -191,9 +215,9 @@ def derive_valuation(payload, fx):
     # Note ZERO is a real, publishable answer -- a pre-revenue biotech -- and is
     # kept distinct from None. `ev_sales` still requires a POSITIVE denominator,
     # so a zero-revenue row reports revenue 0.0 and no multiple.
+    # `revenue_usd_m` was already set above, on its own inputs alone. Only the
+    # MULTIPLE is computed here, because that one genuinely needs the EV.
     rev = num(payload.get("totalRevenue"))
-    if rev is not None and rev >= 0:
-        out["revenue_usd_m"] = rev * r_rate / 1e6
     if rev is not None and rev > 0 and rev * r_rate > 0:
         out["ev_sales"] = positive_multiple(ev_usd / (rev * r_rate))
     ebitda = num(payload.get("ebitda"))
