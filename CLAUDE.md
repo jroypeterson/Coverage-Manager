@@ -628,6 +628,45 @@ narrowing and cannot miss a rate the function reads. Pass `fx` explicitly for a 
 - **De-SPAC is a LINE, not a lane** (`s1_watch.search_despacs`). Measured: 131 S-4/F-4 registrants a quarter, **6** with a blank-check filer. Two reasons it does not earn a module: the filer is the SPAC (SIC 6770) so the **target's** sector — the only thing that decides a bucket — is not in the metadata, and de-SPACs clear neither Bucket 2 nor Bucket 3. The post-close ticker is caught by the symbol-directory diff anyway, so this buys lead time on a handful of names, claims no sector, and never raises.
 - `universe/symbol_directory.py` — **weekly US symbol-directory watch** (`cli.py symbol-directory`, and step `[4f/6]` of `weekly-universe`). Snapshots the two free Nasdaq Trader files (`nasdaqlisted.txt` + `otherlisted.txt`, covering Nasdaq/NYSE/Arca/American/Cboe/IEX — ~7,500 operating companies after dropping ETFs and test issues) and diffs against the prior snapshot. **Nasdaq keeps no archive**, so snapshots are committed to `data/symbol_directory/` — a missed week is a diff that can never be computed. **Absence from the directory is a candidate, not a verdict:** each covered US row that is missing gets adjudicated against SEC's per-CIK submissions endpoint into `delisted` (a filed Form 15-12B/12G/15D, or no registered ticker) / `listed` (a symbol-format mismatch — `FI` vs SEC's stale `FISV`, `SGMO` vs `SGMOQ`) / **`inconclusive`** (no CIK on the row, or the endpoint would not answer). Inconclusive is NEVER folded into delisted — deleting a live company from the universe is the one unrecoverable mistake here. Foreign lines are excluded by `Exchange` before comparison; they are absent from a US file by definition and flagging them would be an artefact of the question. Also surfaces Nasdaq's `Financial Status` field (D/E/Q/G/H/J/K — distinct states, mapped, not conflated), which nothing else in the fleet reads. Exit 2 on any covered name missing or removed. First live run 2026-08-06: 863 US rows checked, 31 absent → **10 confirmed delisted by Form 15** (ACLX, CCRN, CPRX, DAY, KZR, LYRA, NOTV, NUVL, PRTC, XOMA), 6 symbol mismatches, 15 inconclusive for want of a CIK. Tests: `tests/test_symbol_directory.py` (18).
 
+## Index membership snapshots — MSCI EAFE (2026-09-09, board #354)
+
+`python -m universe.index_membership`, and weekly step **`[4f2/6]`**. JP asked for the
+EAFE list and its weights to be **tracked**; that is the entire scope today. Nothing
+consumes it, and it does not move the S&P 500 or Russell collectors — those are the rest
+of #354.
+
+Source is the **same endpoint `foreign_identifiers.py` already calls weekly**:
+`https://www.ishares.com/us/products/239623/x/latest-holdings.csv` (EFA). Live
+2026-09-09: 658 equities, as-of 2026-09-04, weights summing to 99.41% of the fund.
+
+⛑ **Do NOT conclude from `sector_chart_pack/russell.py` that iShares is blocked.** That
+finding is true of the `.ajax?fileType=csv` product-page route, which returns 1.4 MB of
+HTML **with HTTP 200 and `content-type: text/csv`** (re-confirmed for EFA the same day).
+`/x/latest-holdings.csv` serves a real CSV. `parse_holdings` raises on the app shell
+rather than reading it as an empty fund.
+
+**Writes dated snapshots to gitignored `data/index_membership/`** — `eafe_<as_of>.json`
+plus `eafe_latest.json`. Same licensing rule as `data/crsp/`: kept on disk, never pushed,
+never in `exports/`. **A dated file is written once and never rewritten** — the fund
+republishes the same as-of for days, and the archive's whole value is that a past file
+says what it said at the time.
+
+⛑ **Reconstructing past membership from a current list is survivorship bias by
+construction**, and no vendor sells this history cheaply, so the snapshot is the only
+honest source. Starting it is worth more than the code.
+
+⛑ **EFA is a sampled fund, not the index** (658 vs MSCI EAFE's ~700), and the `Ticker`
+column is a **local exchange ticker with no ISIN anywhere in the file** — `ROP` here is
+Roche, not Roper. Any consumer joining this to coverage must key on `(ticker, exchange)`
+or resolve by name. Both caveats are written into every snapshot's `caveats` array, not
+just this doc.
+
+Guards: a list under the credibility floor (400) is **refused, not written**; a failed
+fetch falls back to the last good snapshot and reports its age; past `STALE_DAYS` (45) it
+is reported **unfit** and the weekly step fails. Non-gating and late in the run — it must
+never fail the build that publishes the universe. Module `universe/index_membership.py`;
+tests `tests/test_index_membership.py` (13).
+
 ## Symbol aliases — one issuer, several live ticker strings (2026-08-27, board #345)
 
 `data/ticker_aliases.json` (curated) → `exports/ticker_aliases.json` (published).

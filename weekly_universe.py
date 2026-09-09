@@ -892,6 +892,31 @@ def _step_symbol_directory():
     }
 
 
+def _step_index_membership():
+    """Weekly MSCI EAFE constituent + weight snapshot (board #354).
+
+    Same reason `symbol_directory` and `crsp_snapshot` run weekly: the source
+    publishes only a CURRENT list and keeps no archive, so a week not captured is
+    a week of membership history nobody can buy back. FTSE sells Russell history
+    and MSCI publishes none free.
+
+    Non-gating and deliberately late in the run -- it writes only into gitignored
+    `data/index_membership/` and no export or consumer reads it yet, so it must
+    never be able to fail the build that publishes the universe.
+
+    A STALE cached snapshot is a warning; only having nothing at all is an error.
+    """
+    from universe import index_membership as im
+
+    results = im.refresh_all()
+    bad = [r for r in results if r["status"] == "stale_unfit"]
+    if bad:
+        raise RuntimeError(
+            "index membership unfit: "
+            + "; ".join(f"{r['key']} as_of {r['as_of']} age {r['age_days']}d" for r in bad))
+    return {"results": results}
+
+
 def _step_form10_watch():
     """Form 10-12B registrations -- spin-offs and uplistings, before they list.
 
@@ -1534,6 +1559,22 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 )
         else:
             steps["symbol_directory"] = status
+
+    # Step 4f2: index membership -- EAFE constituents + weights, snapshotted so
+    # history accumulates. JP 2026-09-09: "I just want the EAFE list and weights
+    # tracked." Nothing consumes it yet; it is here for the cadence, not the read.
+    if dry_run:
+        logger.info("[4f2/6] Index membership... SKIPPED (dry run)")
+        steps["index_membership"] = "skipped (dry run)"
+    else:
+        logger.info("[4f2/6] Index membership snapshot (MSCI EAFE)...")
+        status, im_result = run_step("index_membership", _step_index_membership)
+        if im_result and im_result.get("results"):
+            steps["index_membership"] = "; ".join(
+                f"{r['key']} {r['status']} as_of {r['as_of']} ({r['count']} holdings)"
+                for r in im_result["results"])
+        else:
+            steps["index_membership"] = status
 
     # Step 4g: Form 10-12B watch -- spin-offs and OTC uplistings, 1-3 months
     # BEFORE they list. A spin-off has no offering, so the Finnhub IPO calendar
