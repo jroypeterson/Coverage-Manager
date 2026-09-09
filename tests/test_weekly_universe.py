@@ -71,6 +71,11 @@ def test_main_dry_run_skip_discovery_returns_standardized_shape(monkeypatch, fix
         "symbol_directory",      # [4f/6], wired 2026-08-06
         "form10_watch",          # [4g/6], wired 2026-08-06
         "s1_watch",              # [4h/6], wired 2026-09-06
+        # [4i/6], wired 2026-09-08. BEFORE export_artifacts on purpose: that step
+        # builds universe_metadata.json, which is how the `commercial` flag
+        # reaches sigma-alert. Classify after it and this week publishes last
+        # week's flag.
+        "commercial_biopharma",
         "export_artifacts",
         "export_watchlist",
         "export_reporting_calendar",
