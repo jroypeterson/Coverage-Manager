@@ -69,6 +69,25 @@ def build_parser():
         help="Report what would be filled without writing the CSV.",
     )
 
+    cbp_parser = subparsers.add_parser(
+        "backfill-commercial-revenue",
+        help=(
+            "Fill the FMP revenue cache for Biopharma rows where yfinance has "
+            "no revenue figure. Used ONLY to tell a real zero from an absence -- "
+            "yfinance returns null for both, and measured 2026-09-08 the answer "
+            "is a corroborated ZERO 91%% of the time. Run on demand (like "
+            "backfill-lei); the weekly step reads this cache and never fetches."
+        ),
+    )
+    cbp_parser.add_argument(
+        "--no-cache", action="store_true",
+        help="Bypass the 30-day cache and refetch from FMP.",
+    )
+    cbp_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Cap the number of tickers looked up in this run.",
+    )
+
     lei_parser = subparsers.add_parser(
         "backfill-lei",
         help=(
@@ -612,6 +631,24 @@ def main():
         # identity lanes: a run that could not answer must not report success.
         return 2 if res.undecided else 0
 
+    elif args.command == "backfill-commercial-revenue":
+        import csv as _csv
+
+        from config import API_KEYS, CSV_PATH
+        from universe import commercial_biopharma as _cb
+
+        with open(CSV_PATH, encoding="utf-8-sig") as _fh:
+            _rows = list(_csv.DictReader(_fh))
+        _out, _counts = _cb.backfill_fmp_revenue(
+            _rows, API_KEYS.get("FMP_API_KEY"),
+            use_cache=not args.no_cache, limit=args.limit)
+        print("FMP revenue backfill: %d asked" % len(_out))
+        for _k in ("zero", "positive", "empty_statement", "no_data"):
+            if _counts.get(_k):
+                print("  %-16s %d" % (_k, _counts[_k]))
+        print("`zero` is a corroborated pre-revenue answer. `positive` is shown "
+              "but NEVER used as a magnitude (different period and currency from "
+              "yfinance TTM). `empty_statement` is a zero we do not believe.")
     elif args.command == "backfill-lei":
         from universe import lei_backfill
 

@@ -137,6 +137,51 @@ def _find_last_discovery_run():
     return name.replace("discovery_output_", "") or None
 
 
+def _step_commercial_biopharma():
+    """Refresh the computed `Commercial Biopharma` column and its export.
+
+    ⛑ RUNS BEFORE `export_artifacts`, and the order is load-bearing: that step
+    builds `universe_metadata.json`, which is where the `commercial` key reaches
+    sigma-alert. Classify after it and the flag published this week is last
+    week's.
+
+    ⛑ CACHE-ONLY. `run_weekly_coverage.bat` runs this whole pipeline BEFORE
+    `cli.py performance`, the only lane that fetches fundamentals, so this reads
+    `cache/fundamentals/yf2_*.json` and never calls a vendor. Putting a metered
+    ~17-minute fetch ahead of the published contract is the wrong trade.
+
+    ⛑ A REFUSAL LEAVES THE PREVIOUS COLUMN IN PLACE. `check_floor` raises when
+    under 85% of Biopharma rows resolved -- a wiped cache looks exactly like a
+    sector where nothing qualifies -- and the step reports `failed:` rather than
+    publishing an empty category to sigma-alert and the chart pack. Last week's
+    flags are stale; an empty bucket is wrong.
+    """
+    import csv as _csv
+    import datetime as _dt
+    import json as _json
+
+    from universe import commercial_biopharma as cb
+    from ticker_utils import read_universe_csv, write_universe_csv
+
+    with open(CSV_PATH, encoding="utf-8-sig") as fh:
+        rows = list(_csv.DictReader(fh))
+    fmp = cb.load_fmp_revenue(rows)          # cache-only; no key, no network
+    by_ticker, summary = cb.classify(rows, fmp_revenue=fmp)
+    cb.check_floor(summary)                  # raises -> run_step records failed:
+
+    df = read_universe_csv(CSV_PATH)
+    set_n, cleared = cb.apply_to_frame(df, by_ticker)
+    write_universe_csv(df, CSV_PATH)
+
+    as_of = _dt.date.today().isoformat()
+    path = EXPORTS_DIR / "commercial_biopharma.json"
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        _json.dump(cb.published_payload(by_ticker, summary, as_of), fh, indent=2)
+    return {"summary": summary, "set": set_n, "cleared": cleared,
+            "artifacts": [str(path)]}
+
+
 def _step_export_artifacts(validation_result):
     """Write the published universe artifacts to the `exports/` directory.
 
@@ -1582,6 +1627,25 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         status, ii_result = run_step("verify_isin_issuers", _step_verify_isin_issuers)
         steps["verify_isin_issuers"] = (
             _isin_identity_step_status(ii_result) if ii_result else status)
+
+    # Step 4i: the computed Commercial Biopharma category. BEFORE export_artifacts
+    # on purpose -- that step is what carries the flag into universe_metadata.json.
+    if dry_run:
+        logger.info("[4i/6] Commercial Biopharma... SKIPPED (dry run)")
+        steps["commercial_biopharma"] = "skipped (dry run)"
+    else:
+        logger.info("[4i/6] Classifying Commercial Biopharma (cache-only)...")
+        status, cbp = run_step("commercial_biopharma", _step_commercial_biopharma)
+        steps["commercial_biopharma"] = status
+        if cbp:
+            sm = cbp["summary"]
+            artifacts.extend(cbp["artifacts"])
+            logger.info(
+                "  commercial %d / below %d / unknown %d of %d Biopharma "
+                "(%.1f%% resolved); column set %d, cleared %d",
+                sm["commercial"], sm["below_line"], sm["unknown"],
+                sm["biopharma_rows"], 100 * sm["resolved_fraction"],
+                cbp["set"], cbp["cleared"])
 
     # Step 5: Export artifacts (the new published contract)
     if dry_run:
