@@ -137,3 +137,48 @@ About a day, mostly moving code. History starts the day it ships.
 
 A renamed GICS key can silently collapse every company into `Unclassified`.
 Worth a guard whoever touches this next.
+
+---
+
+## MSCI EAFE — ADDED TO SCOPE 2026-09-09, and it is cheap
+
+JP, 2026-09-09: *"What about MSCI EFA? Can we get the constituents for that
+potentially? That would be good to track if possible."*
+
+**Yes. Tested live 2026-09-09, not assumed:**
+
+```
+https://www.ishares.com/us/products/239623/x/latest-holdings.csv
+-> HTTP 200, text/csv, 116 KB, "Fund Holdings as of Sep 04, 2026"
+-> 683 rows, 658 of them Asset Class == Equity
+-> columns: Ticker, Name, Sector, Asset Class, Market Value, Weight (%),
+   Quantity, Price, Location, Exchange, Currency, FX Rate, Market Currency
+-> Japan 167, UK 67, France 54, Germany 50, Australia 43, Switzerland 40
+-> zero blank tickers
+```
+
+**This is the SAME endpoint shape `universe/foreign_identifiers.py` already calls
+weekly** for IXUS (product 244048) and IEMG (244050) — `HOLDINGS_URL =
+"https://www.ishares.com/us/products/{pid}/x/latest-holdings.csv"`. So EFA is a
+row in the existing `FUNDS` table, not a new collector. Same cadence, same
+fallback behaviour, same licensing posture (gitignored, never in `exports/`).
+
+⛑ **Do not conclude from `russell.py` that iShares is blocked.** It is blocked on
+the path that file tested — the `.ajax?fileType=csv` product-page route, which
+returns the HTML app shell with HTTP 200 (re-confirmed for EFA on 2026-09-09,
+1.4 MB of HTML). The `/x/latest-holdings.csv` route works and is the one CM
+already uses. Two routes, one verdict each; the documented "iShares serves
+holdings through JavaScript" finding is true and narrower than it reads.
+
+⛑ **The ticker column is a LOCAL exchange ticker, not a fleet identity.** `ASML`
+(Euronext Amsterdam), `HSBA` (LSE), `NOVN` (SIX), `ROP` for Roche — and the file
+carries no ISIN or CUSIP at all. Joining EFA to coverage needs `(Ticker,
+Exchange)` or a name resolve; a bare ticker join would silently marry Roche to
+Roper Technologies. That resolver is the actual integration cost here, and it is
+the same one the Russell work paid for.
+
+**Also note EFA is a sampled fund, not the index.** 658 equities against MSCI
+EAFE's ~700 constituents. Same caveat already recorded for IWV and ACWI/URTH —
+fine for "what are the large and mid caps in developed ex-US", not a membership
+record. `IXUS` (already collected weekly) is the wider all-cap ex-US list and
+EAFE is roughly a developed-markets subset of it.
