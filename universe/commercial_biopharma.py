@@ -225,6 +225,14 @@ def classify(rows, primitives=None, fx=None, fmp_revenue=None):
             "mkt_cap_usd_m": None if mcap is None else round(mcap, 1),
             "subsector": (r.get("Subsector (JP)") or "").strip(),
             "revenue_source": _revenue_source(prim, (fmp_revenue or {}).get(t)),
+            # ⛑ THE REPORTING CURRENCY IS PART OF THE CONTRACT. A consumer that
+            # wants a FORWARD revenue has to get it from a vendor that publishes
+            # estimates in the company's own reporting currency (FMP does), and
+            # without this key it has no way to convert. Found by building the
+            # market-cap-vs-revenue screen: Novo's FY+1 estimate is ~DKK 2.0tn,
+            # which read as "$303,665M" against a $201,039M USD market cap.
+            # A figure whose unit is not stated is not a figure.
+            "reporting_ccy": ((prim or {}).get("financialCurrency") or "").strip() or None,
         }
 
     counts = {}
