@@ -5,6 +5,11 @@ Given a ticker's weekly move and recent news headlines, returns a 2-3 line
 unset or the API errors — the movers report degrades to a headline-list-only
 view in that case.
 
+⛑ ONE EXCEPTION: an out-of-credit error RAISES (`AnthropicCreditExhausted`).
+That failure is account-level, not per-ticker, so degrading silently turns a
+billing problem into a whole report shipped without its explanations while the
+run still says `ok`.
+
 Uses Claude Haiku 4.5 by default (cheap and fast for short structured
 summaries). The system prompt is large and stable across calls in a single
 movers run, so we attach a cache_control breakpoint to amortize cost over
@@ -18,6 +23,43 @@ import anthropic
 from logging_utils import get_logger, log_exception
 
 logger = get_logger("providers.anthropic_summary")
+
+
+class AnthropicCreditExhausted(RuntimeError):
+    """The Anthropic account is out of credit. NOT a per-ticker failure.
+
+    ⛑ WHY THIS RAISES WHERE EVERY OTHER ERROR HERE RETURNS "" (2026-09-08,
+    board #330). Every other failure in this module is per-ticker and local: a
+    rate limit, a malformed reply, one bad row. Degrading to a headline-only view
+    is the right answer for those, and the module docstring says so.
+
+    A credit-balance error is not local. It is account-level and it will fail the
+    NEXT thirty calls identically, so the graceful degradation quietly becomes a
+    whole-report degradation: measured on 2026-08-20, an empty account made every
+    `_why` cell blank while `movers` reported `ok` and the weekly report shipped
+    without its explanations, looking entirely healthy. There is no lane in this
+    fleet that checks the balance, so nothing else would have caught it.
+
+    Raising routes it through `run_step` -> `failed:` -> a `partial` heartbeat,
+    which is the fleet's designed path for "this ran and could not do its job",
+    and it stops the loop instead of making twenty-nine more doomed calls.
+    """
+
+
+# The vendor's own wording, matched loosely and case-insensitively. Three
+# independent phrases rather than one exact sentence: the message is prose in a
+# generic `invalid_request_error` body with no error code to key on, so a
+# rewording is far likelier to keep one of three than to keep all three. Matching
+# one exact sentence would silently demote this to an ordinary API error the day
+# Anthropic edits it -- failing safe, but failing silent on the one condition
+# this exists to catch.
+_BILLING_PHRASES = ("credit balance", "plans & billing", "plans and billing",
+                    "purchase credits", "insufficient credit")
+
+
+def is_billing_error(exc: BaseException) -> bool:
+    """True when this exception is the account being out of credit."""
+    return any(p in str(exc).lower() for p in _BILLING_PHRASES)
 
 
 # Cached system prompt. Stable across all per-ticker calls in a movers run.
@@ -143,9 +185,22 @@ def summarize_move(
         logger.warning("Anthropic rate limited for %s; skipping summary", ticker)
         return ""
     except anthropic.APIStatusError as e:
+        # An account-level billing failure is not a per-ticker hiccup -- see
+        # AnthropicCreditExhausted. Checked BEFORE the generic warning, because
+        # the credit error arrives as an ordinary 400 `invalid_request_error`
+        # and is otherwise indistinguishable from a malformed request.
+        if is_billing_error(e):
+            raise AnthropicCreditExhausted(str(e)) from e
         logger.warning("Anthropic API status error for %s: %s", ticker, e)
         return ""
+    except AnthropicCreditExhausted:
+        raise
     except Exception as e:
+        # Belt and braces: the SDK does not guarantee which class carries this,
+        # and a credit error reaching the catch-all would be swallowed exactly
+        # as before.
+        if is_billing_error(e):
+            raise AnthropicCreditExhausted(str(e)) from e
         log_exception(logger, f"Anthropic summary failed for {ticker}", e)
         return ""
 
