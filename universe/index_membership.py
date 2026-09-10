@@ -74,7 +74,8 @@ whole reason that source was chosen over SEC N-PORT, so it always paginates.
    good snapshot and reports its age; past `STALE_DAYS` the cache is reported unfit
    rather than silently used. Recovery path if it goes for good: SEC N-PORT for the same
    fund (CIK 1100663), the recipe proven in
-   `diagnostics/russell_membership_nport_vs_capband_2026-08-18.md`.
+   the WORKSPACE ROOT's `diagnostics/russell_membership_nport_vs_capband_2026-08-18.md`
+   -- not this repo's `diagnostics/`, which exists and does not hold it.
 
 ## What this list is and is not
 
