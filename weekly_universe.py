@@ -1284,10 +1284,22 @@ def _step_universe_delta_slack(baseline):
         logger.warning("YTD delta summary failed (posting without it): %s", e)
         ytd = None
 
+    # Coverage-in-the-indices reconciliation (board #354): how much of the
+    # universe sits inside each index, and which covered names entered or left
+    # one. Best-effort and SILENT when the membership archive is absent -- this
+    # step's product is the delta post, and a fleet with no snapshots yet must
+    # still get one. `reconcile` never raises; the try is for the import.
+    try:
+        from universe.index_reconciliation import reconcile as _reconcile_indices
+        index_rows = _reconcile_indices()
+    except Exception as e:                                      # noqa: BLE001
+        logger.warning("index reconciliation failed (posting without it): %s", e)
+        index_rows = None
+
     # Webhook resolution: real OS env first, then .env via API_KEYS. Mirrors
     # the health-heartbeat pattern.
     webhook = os.environ.get("SLACK_WEBHOOK_COVERAGE") or API_KEYS.get("SLACK_WEBHOOK_COVERAGE")
-    post_result = post_universe_delta(webhook, delta, ytd=ytd)
+    post_result = post_universe_delta(webhook, delta, ytd=ytd, index_rows=index_rows)
 
     # ALWAYS write the run snapshot — Slack success/failure is orthogonal to
     # what the universe state actually is. Next week's baseline must reflect
@@ -1299,7 +1311,8 @@ def _step_universe_delta_slack(baseline):
     # channel). send_alert never raises; a False is folded into this step's
     # failure below, exactly like the Slack path. This is NOT the old
     # EMAIL_ENABLED full-report email — that stays flag-disabled.
-    email_subject, email_body = format_universe_delta_email(delta, ytd=ytd)
+    email_subject, email_body = format_universe_delta_email(
+        delta, ytd=ytd, index_rows=index_rows)
     email_sent = email_alert_client.send_alert(
         "Coverage Manager", email_subject, email_body)
 
@@ -1325,6 +1338,7 @@ def _step_universe_delta_slack(baseline):
         "before_total": delta["before_stats"]["total"],
         "after_total": delta["after_stats"]["total"],
         "baseline_source": baseline_source,
+        "index_reconciliation": len(index_rows or []),
     }
 
 

@@ -476,10 +476,19 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
 
     weighted = [r["weight_pct"] for r in rows if r.get("weight_pct") is not None]
     doc = {
-        "schema_version": 2,
+        "schema_version": 3,
         "key": key,
         "index": src["index"],
         "fund": src["fund"],
+        # ⛑ THE STALENESS THRESHOLD TRAVELS ON THE SNAPSHOT, because the consumer
+        # that has to apply it lives in ANOTHER REPO and reads the JSON, not this
+        # module. `sector_chart_pack` previously carried its own flat 120 and this
+        # module its own per-kind table; two copies of a number that must agree is
+        # how the two lanes silently disagreed about what "stale" meant. Stated on
+        # the artifact, there is one authority and a cross-repo reader cannot drift
+        # from it. Schema 2 files predate this — a reader must have a fallback.
+        "kind": src["kind"],
+        "stale_days": stale_days_for(key),
         "as_of": as_of,
         # ⛑ A SOURCE DATE AND AN OBSERVATION DATE ARE DIFFERENT FACTS. See the docstring.
         "as_of_kind": as_of_kind,

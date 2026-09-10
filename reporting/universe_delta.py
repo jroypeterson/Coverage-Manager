@@ -597,7 +597,7 @@ def _format_ytd_block(ytd):
     return "\n".join(lines)
 
 
-def format_universe_delta_email(delta, ytd=None):
+def format_universe_delta_email(delta, ytd=None, index_rows=None):
     """(subject, body) for the [ClaudeFin] weekly universe-delta email alert.
 
     Short by design (root CONVENTIONS.md "Email alerts ([ClaudeFin])"): the
@@ -646,7 +646,7 @@ def format_universe_delta_email(delta, ytd=None):
     return subject, "\n".join(lines)
 
 
-def format_universe_delta_slack(delta, ytd=None):
+def format_universe_delta_slack(delta, ytd=None, index_rows=None):
     """Render the full delta as Slack mrkdwn (returned as a single string).
 
     Section order (top-down): header → caveat (if any) → Delta (week-over-week
@@ -656,7 +656,12 @@ def format_universe_delta_slack(delta, ytd=None):
     the running drift. See CLAUDE.md "Weekly universe delta -> Slack #coverage".
 
     `ytd` is the optional output of `compute_ytd_summary`; the block is
-    omitted when None (no history yet).
+    omitted when None (no history yet). `index_rows` is the optional output of
+    `universe.index_reconciliation.reconcile()` — how much of the universe sits
+    inside each index and which covered names entered or left one (board #354);
+    omitted when None or empty, so a fleet with no membership archive is unchanged.
+
+    Still pure: both extras arrive as data, and formatting them does no I/O.
 
     The wire-payload helper `_split_into_section_blocks` chunks it if needed.
     """
@@ -716,6 +721,16 @@ def format_universe_delta_slack(delta, ytd=None):
             lines.append(f"_+{total_pc - MAX_POSITION_CHANGES} more — see fallback file_")
         parts.append("\n".join(lines))
 
+    # 1b) Coverage-in-the-indices reconciliation (board #354). Sits with the
+    # week-over-week block rather than in the state blocks below because a covered
+    # name leaving the Russell 2000 is NEWS — every fund tracking the index is a
+    # forced seller — not context. Silent when there is no membership archive yet.
+    if index_rows:
+        from universe.index_reconciliation import format_slack as _fmt_idx
+        block = _fmt_idx(index_rows)
+        if block:
+            parts.append(block)
+
     # 2) After — current state.
     after_total = delta["after_stats"].get("total", 0)
     parts.append(
@@ -774,11 +789,13 @@ def _split_into_section_blocks(message):
 # ── Post + fallback ─────────────────────────────────────────────────────────
 
 
-def post_universe_delta(webhook_url, delta, fallback_dir=None, ytd=None):
+def post_universe_delta(webhook_url, delta, fallback_dir=None, ytd=None, index_rows=None):
     """Post the universe delta to Slack #coverage with fallback on failure.
 
     `ytd` (optional, from `compute_ytd_summary`) appends the year-to-date
-    block to the message.
+    block to the message. `index_rows` (optional, from
+    `universe.index_reconciliation.reconcile`) appends the coverage-in-the-
+    indices block.
 
     On any non-success path, writes TWO files to `fallback_dir`:
       - universe_delta_{TODAY}.json  (timestamped, historical)
@@ -787,7 +804,7 @@ def post_universe_delta(webhook_url, delta, fallback_dir=None, ytd=None):
     Returns {"posted": True/False, "reason": str | None}. Never raises.
     """
     fallback_dir = Path(fallback_dir or FALLBACK_DIR)
-    message = format_universe_delta_slack(delta, ytd=ytd)
+    message = format_universe_delta_slack(delta, ytd=ytd, index_rows=index_rows)
     body = {
         "blocks": _split_into_section_blocks(message),
         "text": message,

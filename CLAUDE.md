@@ -699,18 +699,60 @@ claim rather than a gap. `_num` returns a **finite float or None**: Vanguard sen
 `float(x or "nan")` yields NaN, which poisons any total it joins while comparing False
 against every threshold.
 
-**What is deliberately NOT done:** the four consumers (`sector_chart_pack`,
-`post_earnings_movers`, `forensic_triage`, `screens_equity/surprise_screens`) still read
-the old per-project caches, and `sigma-alert/sources/sp500.txt` still exists. Starting the
-archive is the half that cannot be bought back later; repointing consumers can be done any
-week and risks breaking working lanes. The transient cost is that the Vanguard fetch here
-duplicates `sector_chart_pack/russell.py` until that module is retired.
+### The consumer migration — `sector_chart_pack` done, 2026-09-10 (board #354)
+
+**`sector_chart_pack/russell.py` is RETIRED and the duplicate Vanguard fetch is gone.** That
+pack now reads these snapshots through one adapter (`sector_chart_pack/index_membership.py`),
+the same relationship `crsp.py` has with `data/crsp/` — it makes no network call at all. Five
+call sites moved, not the four the plan named: `cli.py`, `sp500_page.py`, `sp500_valuation.py`
+and **`weekly.py`**, whose weekly `russell_membership` step was a FETCH and is now a CHECK.
+
+⛑ **THE SNAPSHOT NOW STATES ITS OWN STALENESS THRESHOLD (`stale_days`, `kind`; schema 3), and
+that is the whole reason the migration was not a straight swap.** `russell.py` carried a flat
+`STALE_DAYS = 120`; this module defaults to **45** and grants 120 only to `vanguard`. Exporting
+this module's constant across the repo boundary would have tightened the Russell gate to 45 days
+**silently** — a behaviour change wearing a refactor's clothes. It would also have been wrong:
+measured 2026-09-10, all three Russell snapshots were as-of 2026-07-31, i.e. **41 days old on a
+completely healthy week**, four days short of a 45-day gate. Putting the threshold ON the
+artifact means one authority and no copy to drift; a consumer reads the JSON, not this module.
+
+**What is still open:** `post_earnings_movers`, `forensic_triage` and
+`screens_equity/surprise_screens` read their own caches, and `sigma-alert/sources/sp500.txt`
+still exists.
+
+### Coverage-vs-index reconciliation — `universe/index_reconciliation.py` (2026-09-10)
+
+The row's last piece: one line per index in the weekly #coverage post and the [ClaudeFin] email,
+saying how much of the universe is index-visible and which covered names entered or left.
+**A covered name leaving the Russell 2000 is forced selling by every fund tracking it**, and
+nothing watched for it — so the block sits with the week-over-week diffs, not in the state
+blocks. Live 2026-09-10: 121 of 503 S&P 500, 218 of 1,024 R1000, 436 of 1,986 R2000, 647 of
+2,966 R3000, against 1,137 US-listed rows.
+
+⛑ **THE JOIN IS RESTRICTED TO `Country (Listing) == United States`, AND THAT IS NOT TIDINESS.**
+Measured on the live files: a bare ticker join reports **`CSL`** (CSL Ltd, ASX) as Carlisle
+Companies in the R1000/R3000 and **`UCB`** (UCB SA, Euronext Brussels) as United Community Banks
+in the R2000/R3000 — two of JP's biopharma names published as Russell constituents. The filter
+removes both and costs nothing, because every index here is a US-listed fund's US holdings.
+**`eafe` is excluded from the reconciliation entirely** for the same reason in a stronger form:
+a filter cannot fix a local-exchange ticker, it needs a real `(ticker, exchange)` resolver.
+
+⛑ **IT COMPARES AGAINST THE PREVIOUS DISTINCT DATED SNAPSHOT AND NAMES THAT DATE — never "since
+last week".** Vanguard publishes month-end holdings, so `r1000_latest` carries the same `as_of`
+for four or five consecutive weekly runs; "0 entered, 0 left since last week" every week and
+then a jump reads as a broken diff rather than a monthly cadence. With one snapshot the line says
+*"first snapshot, no prior to compare"* — an absent baseline is not a finding of no change, and
+with the archive started 2026-09-08 that is the normal case for now. Best-effort and silent when
+the archive is absent: the step's product is the delta post. Tests:
+`tests/test_index_reconciliation.py` (12).
 
 Guards: a list under the credibility floor (400) is **refused, not written**; a failed
 fetch falls back to the last good snapshot and reports its age; past `STALE_DAYS` (45) it
 is reported **unfit** and the weekly step fails. Non-gating and late in the run — it must
 never fail the build that publishes the universe. Module `universe/index_membership.py`;
-tests `tests/test_index_membership.py` (28).
+tests `tests/test_index_membership.py` (32 — the last four came from `russell.py`'s suite when
+it was retired: the page-size and refuse-a-partial-list guards were pinned NOWHERE else, and
+deleting the file that held them would have left two documented invariants with zero tests).
 
 ## Symbol aliases — one issuer, several live ticker strings (2026-08-27, board #345)
 

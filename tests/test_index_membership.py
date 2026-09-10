@@ -314,3 +314,106 @@ def test_the_weekly_step_fails_on_a_failed_source_too(out_dir, monkeypatch):
                                   "written": None}])
     with pytest.raises(RuntimeError, match="degraded"):
         weekly_universe._step_index_membership()
+
+
+# --- the threshold travels on the artifact (board #354, consumer migration) ---
+
+def test_a_snapshot_states_its_own_staleness_threshold(out_dir, monkeypatch):
+    """⛑ THE CONSUMER THAT APPLIES THIS LIVES IN ANOTHER REPO.
+
+    `sector_chart_pack` reads these JSON files, not this module, so a threshold
+    kept only in Python here has to be copied there — and a copied number is a
+    number that drifts. Before this field, `russell.py` carried a flat 120 and
+    this module a per-kind table, and the straight swap between them would have
+    tightened the Russell gate to 45 days silently. The snapshot carrying its own
+    `stale_days` is what makes that impossible rather than merely noticed.
+    """
+    _serve(monkeypatch, _csv(500))
+    im.refresh("eafe")
+    doc = json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))
+    assert doc["schema_version"] == 3
+    assert doc["kind"] == "ishares"
+    assert doc["stale_days"] == im.stale_days_for("eafe") == 45
+
+
+def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypatch):
+    """Not one number on every file: the Russell lane's 120 is the whole point."""
+    def _collect(key):
+        return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
+                                         "weight_pct": 0.1, "location": "", "exchange": "",
+                                         "market_currency": "", "market_value_usd": None}
+                                        for i in range(3000)]
+    monkeypatch.setattr(im, "collect", _collect)
+    im.refresh_all()
+    got = {k: json.loads((out_dir / f"{k}_latest.json").read_text(encoding="utf-8"))["stale_days"]
+           for k in im.SOURCES}
+    assert got == {"eafe": 45, "sp500": 45, "r1000": 120, "r2000": 120, "r3000": 120}
+
+
+# --- Vanguard guards inherited from sector_chart_pack/russell.py -------------
+#
+# ⛑ THESE TWO MOVED HERE WHEN `russell.py` WAS RETIRED (board #354). They were
+# the only tests anywhere pinning the page size and the refuse-a-partial-list
+# rule, and the module docstring calls both load-bearing. Deleting the file that
+# held them would have left two documented invariants with zero tests — a green
+# suite that names a thing that is missing.
+
+def _vanguard_page(n, start, size, as_of="2026-07-31"):
+    return {"size": size, "asOfDate": as_of + "T00:00:00-04:00",
+            "fund": {"entity": [{"ticker": f"T{i}", "longName": f"Name {i}",
+                                 "percentWeight": "0.1"} for i in range(start, start + n)]}}
+
+
+class _JsonResp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def __enter__(self): return self
+
+    def __exit__(self, *a): return False
+
+    def read(self): return json.dumps(self._payload).encode()
+
+
+def test_vanguard_pagination_never_widens_past_500(monkeypatch):
+    """⛑ `count=5000` returns everything in one call but serves an OLDER snapshot
+    (2026-06-30 against 2026-07-31, measured 2026-08-18). Freshness is the whole
+    reason this source was chosen over SEC N-PORT, so it always paginates."""
+    import time
+    import urllib.request as _u
+
+    seen = []
+
+    def _fake(req, timeout=None):
+        seen.append(req.full_url)
+        start = int(req.full_url.split("start=")[1].split("&")[0])
+        return _JsonResp(_vanguard_page(min(500, 1200 - start + 1), start, 1200))
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    as_of, rows = im._fetch_vanguard("VTWO")
+    assert im.VANGUARD_PAGE == 500
+    assert all("count=500" in u for u in seen)
+    assert len(seen) >= 3                    # 1200 names cannot arrive in one page
+    assert len(rows) == 1200 and as_of == "2026-07-31"
+
+
+def test_a_vanguard_page_that_never_decodes_raises_rather_than_shrinking_the_index(monkeypatch):
+    """The endpoint intermittently answers HTTP 200 with the HTML app shell. Returning
+    the pages that did decode would quietly publish a Russell 2000 of 500 names."""
+    import time
+    import urllib.request as _u
+
+    calls = {"n": 0}
+
+    def _fake(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _JsonResp(_vanguard_page(500, 1, 1200))
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")   # HTML, not JSON
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    with pytest.raises(im.IndexMembershipError, match="undecodable"):
+        im._fetch_vanguard("VTWO")
+    assert calls["n"] == 1 + im.VANGUARD_RETRIES     # it retried before giving up

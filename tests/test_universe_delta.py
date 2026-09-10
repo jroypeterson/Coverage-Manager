@@ -791,7 +791,7 @@ def test_step_raises_runtime_error_on_slack_post_failure(monkeypatch, tmp_path):
     # Force Slack post to fail; email succeeds (and must NOT be a real send)
     monkeypatch.setattr(
         ud, "post_universe_delta",
-        lambda webhook, delta, fallback_dir=None, ytd=None: {"posted": False, "reason": "slack returned 500"},
+        lambda webhook, delta, fallback_dir=None, ytd=None, **kw: {"posted": False, "reason": "slack returned 500"},
     )
     from reporting import email_alert_client
     monkeypatch.setattr(email_alert_client, "send_alert", lambda *a, **kw: True)
@@ -831,7 +831,7 @@ def test_step_uses_os_environ_first_then_api_keys(monkeypatch, tmp_path):
     monkeypatch.setattr(weekly_universe, "DATA_DIR", tmp_path)
 
     captured = {}
-    def fake_post(webhook, delta, fallback_dir=None, ytd=None):
+    def fake_post(webhook, delta, fallback_dir=None, ytd=None, **kw):
         captured["webhook"] = webhook
         return {"posted": True, "reason": None}
     monkeypatch.setattr(ud, "post_universe_delta", fake_post)
@@ -923,7 +923,7 @@ def test_step_raises_on_email_alert_failure_after_side_effects(monkeypatch, tmp_
 
     monkeypatch.setattr(
         ud, "post_universe_delta",
-        lambda webhook, delta, fallback_dir=None, ytd=None: {"posted": True, "reason": None},
+        lambda webhook, delta, fallback_dir=None, ytd=None, **kw: {"posted": True, "reason": None},
     )
     from reporting import email_alert_client
     sent = {}
