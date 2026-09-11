@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-08",
-  "as_of": "2026-09-08",
+  "generated_at": "2026-09-11",
+  "as_of": "2026-09-11",
   "rule": "revenue_ttm_usd_m >= 1000 or mkt_cap_usd_m >= 10000",
   "source": "yfinance TTM revenue and market cap from the fundamentals cache; FMP used ONLY to tell a corroborated zero from an absence, never as a magnitude",
   "counts": {
     "biopharma_rows": 926,
-    "commercial": 123,
-    "below_line": 715,
-    "unknown": 88
+    "commercial": 129,
+    "below_line": 718,
+    "unknown": 79
   },
-  "resolved_fraction": 0.905,
+  "resolved_fraction": 0.9147,
   "tickers": [
     "000100.KS",
     "000661.SZ",
@@ -20,6 +20,7 @@
     "1093.HK",
     "1801.HK",
     "196170.KQ",
+    "207940",
     "2269.HK",
     "2359.HK",
     "300122.SZ",
@@ -29,6 +30,7 @@
     "4506.T",
     "4507.T",
     "4516.T",
+    "4519",
     "4527.T",
     "4528.T",
     "4536.T",
@@ -93,6 +95,7 @@
     "INDV",
     "INSM",
     "IPCALAB.NS",
+    "IPN",
     "JAZZ",
     "KRYS",
     "LABB.MX",
@@ -122,14 +125,17 @@
     "ROIV",
     "RPRX",
     "RVMD",
+    "SDZ",
     "SMMT",
     "SNY",
     "SOBI.ST",
     "SRPT",
+    "SUNPHARMA",
     "TAK",
     "TEVA",
     "TORNTPHARM.NS",
     "TRLV",
+    "UCB",
     "UTHR",
     "VIRP.PA",
     "VRTX",
@@ -139,24 +145,24 @@
   "detail": {
     "000100.KS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1705.4,
-      "mkt_cap_usd_m": 4419.0,
+      "revenue_ttm_usd_m": 1700.3,
+      "mkt_cap_usd_m": 4405.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "KRW"
     },
     "000661.SZ": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1643.1,
-      "mkt_cap_usd_m": 4617.1,
+      "revenue_ttm_usd_m": 1645.9,
+      "mkt_cap_usd_m": 4625.1,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "000963.SZ": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 6559.2,
-      "mkt_cap_usd_m": 7136.6,
+      "revenue_ttm_usd_m": 6570.6,
+      "mkt_cap_usd_m": 7148.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
@@ -164,127 +170,127 @@
     "002007.SZ": {
       "status": "unknown",
       "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": 3630.3,
+      "mkt_cap_usd_m": 3636.6,
       "subsector": "Biotech",
       "revenue_source": null,
       "reporting_ccy": "CNY"
     },
     "008930.KS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1052.2,
-      "mkt_cap_usd_m": 2919.5,
+      "revenue_ttm_usd_m": 1049.0,
+      "mkt_cap_usd_m": 2910.8,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "KRW"
     },
     "019170.KS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 178.6,
-      "mkt_cap_usd_m": 398.9,
+      "revenue_ttm_usd_m": 178.1,
+      "mkt_cap_usd_m": 397.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "KRW"
     },
     "068270.KS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3659.8,
-      "mkt_cap_usd_m": 31376.0,
+      "revenue_ttm_usd_m": 3648.9,
+      "mkt_cap_usd_m": 31282.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "KRW"
     },
     "1093.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 4669.6,
-      "mkt_cap_usd_m": 13700.8,
+      "revenue_ttm_usd_m": 4677.7,
+      "mkt_cap_usd_m": 13700.6,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "1801.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2341.2,
-      "mkt_cap_usd_m": 22282.5,
+      "revenue_ttm_usd_m": 2345.2,
+      "mkt_cap_usd_m": 22282.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "196170.KQ": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 189.8,
-      "mkt_cap_usd_m": 14398.3,
+      "revenue_ttm_usd_m": 189.2,
+      "mkt_cap_usd_m": 14355.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "KRW"
     },
     "2070.SR": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 463.0,
-      "mkt_cap_usd_m": 1020.7,
+      "revenue_ttm_usd_m": 462.7,
+      "mkt_cap_usd_m": 1020.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SAR"
     },
     "207940": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 3815.3,
+      "mkt_cap_usd_m": 49661.0,
       "subsector": "",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "KRW"
     },
     "2269.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3521.4,
-      "mkt_cap_usd_m": 25869.6,
+      "revenue_ttm_usd_m": 3527.5,
+      "mkt_cap_usd_m": 25869.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "2359.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 7679.4,
-      "mkt_cap_usd_m": 75036.7,
+      "revenue_ttm_usd_m": 7692.7,
+      "mkt_cap_usd_m": 75035.4,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "300122.SZ": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1200.5,
-      "mkt_cap_usd_m": 4820.6,
+      "revenue_ttm_usd_m": 1202.6,
+      "mkt_cap_usd_m": 4829.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "300765.SZ": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 648.2,
-      "mkt_cap_usd_m": 9450.9,
+      "revenue_ttm_usd_m": 649.3,
+      "mkt_cap_usd_m": 9467.3,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "3320.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 40569.0,
-      "mkt_cap_usd_m": 3597.2,
+      "revenue_ttm_usd_m": 40639.2,
+      "mkt_cap_usd_m": 3597.1,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "3692.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2369.9,
-      "mkt_cap_usd_m": 27895.5,
+      "revenue_ttm_usd_m": 2374.0,
+      "mkt_cap_usd_m": 27895.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "4015.SR": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 419.2,
-      "mkt_cap_usd_m": 2556.7,
+      "revenue_ttm_usd_m": 419.0,
+      "mkt_cap_usd_m": 2555.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SAR"
@@ -292,223 +298,223 @@
     "4016.SR": {
       "status": "below_line",
       "revenue_ttm_usd_m": 136.4,
-      "mkt_cap_usd_m": 625.6,
+      "mkt_cap_usd_m": 625.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SAR"
     },
     "4503.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 14793.9,
-      "mkt_cap_usd_m": 26597.2,
+      "revenue_ttm_usd_m": 14769.9,
+      "mkt_cap_usd_m": 26554.0,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4506.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3088.3,
-      "mkt_cap_usd_m": 4712.5,
+      "revenue_ttm_usd_m": 3083.3,
+      "mkt_cap_usd_m": 4704.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4507.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3663.4,
-      "mkt_cap_usd_m": 16042.2,
+      "revenue_ttm_usd_m": 3657.5,
+      "mkt_cap_usd_m": 16016.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4516.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1172.7,
-      "mkt_cap_usd_m": 1484.9,
+      "revenue_ttm_usd_m": 1170.8,
+      "mkt_cap_usd_m": 1482.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4519": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 8720.3,
+      "mkt_cap_usd_m": 69804.0,
       "subsector": "",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "JPY"
     },
     "4527.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2298.6,
-      "mkt_cap_usd_m": 4227.9,
+      "revenue_ttm_usd_m": 2294.9,
+      "mkt_cap_usd_m": 4221.0,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4528.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3281.0,
-      "mkt_cap_usd_m": 7410.6,
+      "revenue_ttm_usd_m": 3275.7,
+      "mkt_cap_usd_m": 7398.6,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4534.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 793.8,
-      "mkt_cap_usd_m": 730.7,
+      "revenue_ttm_usd_m": 792.5,
+      "mkt_cap_usd_m": 729.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4536.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1898.3,
-      "mkt_cap_usd_m": 3697.1,
+      "revenue_ttm_usd_m": 1895.3,
+      "mkt_cap_usd_m": 3691.1,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4547.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 641.4,
-      "mkt_cap_usd_m": 1087.1,
+      "revenue_ttm_usd_m": 640.3,
+      "mkt_cap_usd_m": 1085.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4552.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 269.6,
-      "mkt_cap_usd_m": 419.1,
+      "revenue_ttm_usd_m": 269.2,
+      "mkt_cap_usd_m": 418.4,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4553.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1820.9,
-      "mkt_cap_usd_m": 1109.5,
+      "revenue_ttm_usd_m": 1818.0,
+      "mkt_cap_usd_m": 1107.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4559.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 592.7,
-      "mkt_cap_usd_m": 567.7,
+      "revenue_ttm_usd_m": 591.7,
+      "mkt_cap_usd_m": 566.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4565.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 217.5,
-      "mkt_cap_usd_m": 736.3,
+      "revenue_ttm_usd_m": 217.1,
+      "mkt_cap_usd_m": 735.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4568.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 14461.0,
-      "mkt_cap_usd_m": 32561.2,
+      "revenue_ttm_usd_m": 14437.5,
+      "mkt_cap_usd_m": 32508.4,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4569.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 817.5,
-      "mkt_cap_usd_m": 412.2,
+      "revenue_ttm_usd_m": 816.2,
+      "mkt_cap_usd_m": 411.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4578.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 17045.4,
-      "mkt_cap_usd_m": 40326.3,
+      "revenue_ttm_usd_m": 17017.8,
+      "mkt_cap_usd_m": 40260.8,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4587.T": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 37.2,
-      "mkt_cap_usd_m": 916.6,
+      "revenue_ttm_usd_m": 37.1,
+      "mkt_cap_usd_m": 915.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "4967.T": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1089.3,
-      "mkt_cap_usd_m": 2859.2,
+      "revenue_ttm_usd_m": 1087.6,
+      "mkt_cap_usd_m": 2854.6,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "JPY"
     },
     "600085.SS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2365.0,
-      "mkt_cap_usd_m": 4977.9,
+      "revenue_ttm_usd_m": 2369.1,
+      "mkt_cap_usd_m": 4986.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "600161.SS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 842.6,
-      "mkt_cap_usd_m": 3752.1,
+      "revenue_ttm_usd_m": 844.1,
+      "mkt_cap_usd_m": 3758.6,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "600196.SS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 6348.3,
-      "mkt_cap_usd_m": 9055.7,
+      "revenue_ttm_usd_m": 6359.3,
+      "mkt_cap_usd_m": 9071.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "600276.SS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 4854.1,
-      "mkt_cap_usd_m": 45222.8,
+      "revenue_ttm_usd_m": 4862.5,
+      "mkt_cap_usd_m": 45301.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "6446.TW": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 659.4,
-      "mkt_cap_usd_m": 18471.2,
+      "revenue_ttm_usd_m": 656.0,
+      "mkt_cap_usd_m": 18376.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "TWD"
     },
     "6472.TW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 621.5,
-      "mkt_cap_usd_m": 1672.0,
+      "revenue_ttm_usd_m": 618.3,
+      "mkt_cap_usd_m": 1663.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "TWD"
     },
     "688506.SS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 378.1,
-      "mkt_cap_usd_m": 15051.0,
+      "revenue_ttm_usd_m": 378.7,
+      "mkt_cap_usd_m": 15077.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "688578.SS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 914.2,
-      "mkt_cap_usd_m": 7197.4,
+      "revenue_ttm_usd_m": 915.8,
+      "mkt_cap_usd_m": 7209.8,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
@@ -516,22 +522,22 @@
     "6919.TW": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.9,
-      "mkt_cap_usd_m": 4035.5,
+      "mkt_cap_usd_m": 4014.7,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "TWD"
     },
     "9926.HK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 514.3,
-      "mkt_cap_usd_m": 11300.2,
+      "revenue_ttm_usd_m": 515.2,
+      "mkt_cap_usd_m": 11300.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CNY"
     },
     "AAPG": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 95.8,
+      "revenue_ttm_usd_m": 96.0,
       "mkt_cap_usd_m": 1624.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -547,16 +553,16 @@
     },
     "AARTIDRUGS.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 282.5,
-      "mkt_cap_usd_m": 405.8,
+      "revenue_ttm_usd_m": 280.3,
+      "mkt_cap_usd_m": 402.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
     },
     "ABBOTINDIA.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 738.9,
-      "mkt_cap_usd_m": 5728.1,
+      "revenue_ttm_usd_m": 733.1,
+      "mkt_cap_usd_m": 5683.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -635,7 +641,7 @@
     },
     "ACB": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 227.9,
+      "revenue_ttm_usd_m": 226.7,
       "mkt_cap_usd_m": 245.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -659,7 +665,7 @@
     },
     "ACIU": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 21.6,
+      "revenue_ttm_usd_m": 21.5,
       "mkt_cap_usd_m": 277.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -771,8 +777,8 @@
     },
     "AFT.NZ": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 149.2,
-      "mkt_cap_usd_m": 264.8,
+      "revenue_ttm_usd_m": 148.4,
+      "mkt_cap_usd_m": 263.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "NZD"
@@ -803,8 +809,8 @@
     },
     "AGY.L": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 77.6,
-      "mkt_cap_usd_m": 407.3,
+      "revenue_ttm_usd_m": 77.4,
+      "mkt_cap_usd_m": 406.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "GBP"
@@ -883,8 +889,8 @@
     },
     "ALGEN.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 33.3,
-      "mkt_cap_usd_m": 35.5,
+      "revenue_ttm_usd_m": 33.2,
+      "mkt_cap_usd_m": 35.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -899,16 +905,16 @@
     },
     "ALK-B.CO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1062.5,
-      "mkt_cap_usd_m": 7063.0,
+      "revenue_ttm_usd_m": 1059.2,
+      "mkt_cap_usd_m": 7041.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "DKK"
     },
     "ALKEM.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1590.9,
-      "mkt_cap_usd_m": 6534.5,
+      "revenue_ttm_usd_m": 1578.5,
+      "mkt_cap_usd_m": 6483.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -939,8 +945,8 @@
     },
     "ALM.MC": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1345.6,
-      "mkt_cap_usd_m": 2622.3,
+      "revenue_ttm_usd_m": 1341.5,
+      "mkt_cap_usd_m": 2614.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -979,8 +985,8 @@
     },
     "ALSEN.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 6.8,
-      "mkt_cap_usd_m": 152.0,
+      "revenue_ttm_usd_m": 6.7,
+      "mkt_cap_usd_m": 151.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -1139,8 +1145,8 @@
     },
     "APLLTD.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 821.1,
-      "mkt_cap_usd_m": 1676.4,
+      "revenue_ttm_usd_m": 814.7,
+      "mkt_cap_usd_m": 1663.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -1179,8 +1185,8 @@
     },
     "APN.JO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2662.3,
-      "mkt_cap_usd_m": 4341.2,
+      "revenue_ttm_usd_m": 2637.3,
+      "mkt_cap_usd_m": 4300.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "ZAR"
@@ -1307,7 +1313,7 @@
     },
     "ASND": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1217.9,
+      "revenue_ttm_usd_m": 1214.2,
       "mkt_cap_usd_m": 17603.8,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -1412,7 +1418,7 @@
     "AVCT.L": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.2,
-      "mkt_cap_usd_m": 434.7,
+      "mkt_cap_usd_m": 433.6,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "GBP"
@@ -1491,24 +1497,24 @@
     },
     "BANB.SW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 875.5,
-      "mkt_cap_usd_m": 7278.1,
+      "revenue_ttm_usd_m": 869.3,
+      "mkt_cap_usd_m": 7226.6,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
     },
     "BAVA.CO": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 986.1,
-      "mkt_cap_usd_m": 2466.9,
+      "revenue_ttm_usd_m": 983.1,
+      "mkt_cap_usd_m": 2459.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "DKK"
     },
     "BAYN": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 52780.0,
-      "mkt_cap_usd_m": 56463.4,
+      "revenue_ttm_usd_m": 52620.9,
+      "mkt_cap_usd_m": 56293.1,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -1691,8 +1697,8 @@
     },
     "BIOA-B.ST": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 104.6,
-      "mkt_cap_usd_m": 3066.5,
+      "revenue_ttm_usd_m": 103.5,
+      "mkt_cap_usd_m": 3034.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SEK"
@@ -1707,8 +1713,8 @@
     },
     "BION.SW": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1309.4,
-      "mkt_cap_usd_m": 3673.1,
+      "revenue_ttm_usd_m": 1300.2,
+      "mkt_cap_usd_m": 3647.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -1747,8 +1753,8 @@
     },
     "BLISSGVS.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 106.0,
-      "mkt_cap_usd_m": 810.2,
+      "revenue_ttm_usd_m": 105.2,
+      "mkt_cap_usd_m": 803.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -1811,7 +1817,7 @@
     },
     "BNTX": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3082.5,
+      "revenue_ttm_usd_m": 3073.2,
       "mkt_cap_usd_m": 25097.8,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
@@ -1819,8 +1825,8 @@
     },
     "BOI.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 582.9,
-      "mkt_cap_usd_m": 533.2,
+      "revenue_ttm_usd_m": 581.1,
+      "mkt_cap_usd_m": 531.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -1843,8 +1849,8 @@
     },
     "BOT.AX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 24.4,
-      "mkt_cap_usd_m": 41.5,
+      "revenue_ttm_usd_m": 24.3,
+      "mkt_cap_usd_m": 41.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
@@ -1883,8 +1889,8 @@
     },
     "BSLN.SW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 305.7,
-      "mkt_cap_usd_m": 986.4,
+      "revenue_ttm_usd_m": 303.6,
+      "mkt_cap_usd_m": 979.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -1907,8 +1913,8 @@
     },
     "C43.F": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 119.4,
-      "mkt_cap_usd_m": 1155.8,
+      "revenue_ttm_usd_m": 119.1,
+      "mkt_cap_usd_m": 1152.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -2075,7 +2081,7 @@
     },
     "CGC": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 213.1,
+      "revenue_ttm_usd_m": 211.9,
       "mkt_cap_usd_m": 462.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -2131,8 +2137,8 @@
     },
     "CIPLA.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2960.7,
-      "mkt_cap_usd_m": 11794.1,
+      "revenue_ttm_usd_m": 2937.8,
+      "mkt_cap_usd_m": 11702.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -2179,8 +2185,8 @@
     },
     "CLN.WA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 68.6,
-      "mkt_cap_usd_m": 227.7,
+      "revenue_ttm_usd_m": 68.2,
+      "mkt_cap_usd_m": 226.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "PLN"
@@ -2203,8 +2209,8 @@
     },
     "CLS.JO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3096.4,
-      "mkt_cap_usd_m": 2831.6,
+      "revenue_ttm_usd_m": 3067.3,
+      "mkt_cap_usd_m": 2804.9,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "ZAR"
@@ -2370,12 +2376,12 @@
       "reporting_ccy": "USD"
     },
     "CPH": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "below_line",
+      "revenue_ttm_usd_m": 49.6,
+      "mkt_cap_usd_m": 262.3,
       "subsector": "Specialty & Generic Pharma",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "USD"
     },
     "CPHI": {
       "status": "below_line",
@@ -2444,7 +2450,7 @@
     "CRNO-B.ST": {
       "status": "unknown",
       "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": 141.2,
+      "mkt_cap_usd_m": 139.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SEK"
@@ -2540,7 +2546,7 @@
     "CTX.WA": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.6,
-      "mkt_cap_usd_m": 124.2,
+      "mkt_cap_usd_m": 123.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "PLN"
@@ -2572,7 +2578,7 @@
     "CURN.SW": {
       "status": "below_line",
       "revenue_ttm_usd_m": 13.3,
-      "mkt_cap_usd_m": 127.7,
+      "mkt_cap_usd_m": 126.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -2587,8 +2593,8 @@
     },
     "CUV.AX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 67.9,
-      "mkt_cap_usd_m": 294.0,
+      "revenue_ttm_usd_m": 67.5,
+      "mkt_cap_usd_m": 292.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
@@ -2692,15 +2698,15 @@
     "DHT-UN.TO": {
       "status": "below_line",
       "revenue_ttm_usd_m": 200.7,
-      "mkt_cap_usd_m": 710.0,
+      "mkt_cap_usd_m": 706.1,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "USD"
     },
     "DIVISLAB.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1184.6,
-      "mkt_cap_usd_m": 26812.9,
+      "revenue_ttm_usd_m": 1175.4,
+      "mkt_cap_usd_m": 26605.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -2747,8 +2753,8 @@
     },
     "DOCM.SW": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1460.8,
-      "mkt_cap_usd_m": 632.5,
+      "revenue_ttm_usd_m": 1450.5,
+      "mkt_cap_usd_m": 628.0,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -2819,8 +2825,8 @@
     },
     "EAPI.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 924.3,
-      "mkt_cap_usd_m": 90.6,
+      "revenue_ttm_usd_m": 921.5,
+      "mkt_cap_usd_m": 90.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -3083,7 +3089,7 @@
     },
     "EVO": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 834.3,
+      "revenue_ttm_usd_m": 831.8,
       "mkt_cap_usd_m": 646.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -3131,16 +3137,16 @@
     },
     "FAE.MC": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 827.1,
-      "mkt_cap_usd_m": 1643.0,
+      "revenue_ttm_usd_m": 824.6,
+      "mkt_cap_usd_m": 1638.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "FAGR.BR": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1196.4,
-      "mkt_cap_usd_m": 1842.8,
+      "revenue_ttm_usd_m": 1192.8,
+      "mkt_cap_usd_m": 1837.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -3179,8 +3185,8 @@
     },
     "FDC.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 231.0,
-      "mkt_cap_usd_m": 594.1,
+      "revenue_ttm_usd_m": 229.2,
+      "mkt_cap_usd_m": 589.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -3252,15 +3258,15 @@
     "GALD.SW": {
       "status": "commercial",
       "revenue_ttm_usd_m": 5923.0,
-      "mkt_cap_usd_m": 46881.6,
+      "mkt_cap_usd_m": 46550.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "USD"
     },
     "GALE.SW": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 5295.2,
-      "mkt_cap_usd_m": 5125.5,
+      "revenue_ttm_usd_m": 5257.8,
+      "mkt_cap_usd_m": 5089.2,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -3291,8 +3297,8 @@
     },
     "GBT.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 929.0,
-      "mkt_cap_usd_m": 110.0,
+      "revenue_ttm_usd_m": 926.2,
+      "mkt_cap_usd_m": 109.7,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -3347,16 +3353,16 @@
     },
     "GLAND.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 709.4,
-      "mkt_cap_usd_m": 5149.6,
+      "revenue_ttm_usd_m": 703.9,
+      "mkt_cap_usd_m": 5109.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
     },
     "GLENMARK.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1870.9,
-      "mkt_cap_usd_m": 7366.7,
+      "revenue_ttm_usd_m": 1856.5,
+      "mkt_cap_usd_m": 7309.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -3394,12 +3400,12 @@
       "reporting_ccy": "USD"
     },
     "GNFT": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "below_line",
+      "revenue_ttm_usd_m": 82.2,
+      "mkt_cap_usd_m": 761.1,
       "subsector": "",
-      "revenue_source": "fmp_positive_not_used",
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "EUR"
     },
     "GNLX": {
       "status": "below_line",
@@ -3451,8 +3457,8 @@
     },
     "GRANULES.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 594.1,
-      "mkt_cap_usd_m": 2340.3,
+      "revenue_ttm_usd_m": 589.5,
+      "mkt_cap_usd_m": 2322.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -3475,7 +3481,7 @@
     },
     "GRFS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 8632.1,
+      "revenue_ttm_usd_m": 8606.1,
       "mkt_cap_usd_m": 5305.1,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
@@ -3491,7 +3497,7 @@
     },
     "GSK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 44964.9,
+      "revenue_ttm_usd_m": 44851.3,
       "mkt_cap_usd_m": 97676.8,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
@@ -3572,15 +3578,15 @@
     "HIK.L": {
       "status": "commercial",
       "revenue_ttm_usd_m": 3419.0,
-      "mkt_cap_usd_m": 4474.4,
+      "mkt_cap_usd_m": 4463.1,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "USD"
     },
     "HIKAL.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 127.0,
-      "mkt_cap_usd_m": 320.0,
+      "revenue_ttm_usd_m": 126.0,
+      "mkt_cap_usd_m": 317.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -3603,7 +3609,7 @@
     },
     "HLN": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 15102.5,
+      "revenue_ttm_usd_m": 15064.4,
       "mkt_cap_usd_m": 40656.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -3611,8 +3617,8 @@
     },
     "HLUN-B.CO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 4039.0,
-      "mkt_cap_usd_m": 6773.5,
+      "revenue_ttm_usd_m": 4026.6,
+      "mkt_cap_usd_m": 6752.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "DKK"
@@ -3675,7 +3681,7 @@
     },
     "HYFT": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 11.3,
+      "revenue_ttm_usd_m": 11.2,
       "mkt_cap_usd_m": 60.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -3708,7 +3714,7 @@
     "IBT-B.ST": {
       "status": "unknown",
       "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": 89.8,
+      "mkt_cap_usd_m": 88.9,
       "subsector": "Biotech",
       "revenue_source": null,
       "reporting_ccy": "SEK"
@@ -3731,8 +3737,8 @@
     },
     "IDIA.SW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 246.8,
-      "mkt_cap_usd_m": 1678.9,
+      "revenue_ttm_usd_m": 245.0,
+      "mkt_cap_usd_m": 1667.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
@@ -3771,8 +3777,8 @@
     },
     "ILM1.DE": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2515.0,
-      "mkt_cap_usd_m": 320.4,
+      "revenue_ttm_usd_m": 2507.4,
+      "mkt_cap_usd_m": 319.5,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -3787,7 +3793,7 @@
     },
     "IMCC": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 33.2,
+      "revenue_ttm_usd_m": 33.1,
       "mkt_cap_usd_m": 1.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -3803,7 +3809,7 @@
     },
     "IMMP": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 14.4,
+      "revenue_ttm_usd_m": 14.3,
       "mkt_cap_usd_m": 52.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -3835,7 +3841,7 @@
     },
     "IMRN": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 5.6,
+      "revenue_ttm_usd_m": 5.5,
       "mkt_cap_usd_m": 13.9,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -3851,7 +3857,7 @@
     },
     "IMTX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 48.5,
+      "revenue_ttm_usd_m": 48.4,
       "mkt_cap_usd_m": 1430.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -3860,7 +3866,7 @@
     "IMU.AX": {
       "status": "below_line",
       "revenue_ttm_usd_m": 1.5,
-      "mkt_cap_usd_m": 24.7,
+      "mkt_cap_usd_m": 24.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
@@ -3915,8 +3921,8 @@
     },
     "INDOCO.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 197.6,
-      "mkt_cap_usd_m": 237.5,
+      "revenue_ttm_usd_m": 196.1,
+      "mkt_cap_usd_m": 235.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4019,27 +4025,27 @@
     },
     "IPCALAB.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1068.2,
-      "mkt_cap_usd_m": 5264.6,
+      "revenue_ttm_usd_m": 1059.9,
+      "mkt_cap_usd_m": 5223.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
     },
     "IPHA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 10.5,
+      "revenue_ttm_usd_m": 10.4,
       "mkt_cap_usd_m": 223.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "IPN": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 4976.6,
+      "mkt_cap_usd_m": 15244.2,
       "subsector": "",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "EUR"
     },
     "IPSC": {
       "status": "below_line",
@@ -4083,7 +4089,7 @@
     },
     "IVA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 7.9,
+      "revenue_ttm_usd_m": 7.8,
       "mkt_cap_usd_m": 1104.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -4147,8 +4153,8 @@
     },
     "JUBLPHARMA.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 908.0,
-      "mkt_cap_usd_m": 1667.0,
+      "revenue_ttm_usd_m": 901.0,
+      "mkt_cap_usd_m": 1654.1,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4323,8 +4329,8 @@
     },
     "LABB.MX": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1008.2,
-      "mkt_cap_usd_m": 742.6,
+      "revenue_ttm_usd_m": 1004.3,
+      "mkt_cap_usd_m": 739.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "MXN"
@@ -4339,8 +4345,8 @@
     },
     "LAURUSLABS.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 766.8,
-      "mkt_cap_usd_m": 11096.3,
+      "revenue_ttm_usd_m": 760.9,
+      "mkt_cap_usd_m": 11010.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4443,7 +4449,7 @@
     },
     "LKFT": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1152.2,
+      "revenue_ttm_usd_m": 1148.8,
       "mkt_cap_usd_m": 1816.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -4523,8 +4529,8 @@
     },
     "LUPIN.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3161.0,
-      "mkt_cap_usd_m": 10152.0,
+      "revenue_ttm_usd_m": 3136.5,
+      "mkt_cap_usd_m": 10073.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4571,16 +4577,16 @@
     },
     "MANKIND.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1554.6,
-      "mkt_cap_usd_m": 10060.3,
+      "revenue_ttm_usd_m": 1542.6,
+      "mkt_cap_usd_m": 9982.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
     },
     "MARKSANS.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 334.6,
-      "mkt_cap_usd_m": 1605.7,
+      "revenue_ttm_usd_m": 332.0,
+      "mkt_cap_usd_m": 1593.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4883,8 +4889,8 @@
     },
     "MYX.AX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 277.2,
-      "mkt_cap_usd_m": 186.9,
+      "revenue_ttm_usd_m": 275.3,
+      "mkt_cap_usd_m": 185.7,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
@@ -4908,7 +4914,7 @@
     "NANEXA.ST": {
       "status": "below_line",
       "revenue_ttm_usd_m": 3.5,
-      "mkt_cap_usd_m": 116.4,
+      "mkt_cap_usd_m": 115.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SEK"
@@ -4916,15 +4922,15 @@
     "NANOFS.ST": {
       "status": "below_line",
       "revenue_ttm_usd_m": 6.4,
-      "mkt_cap_usd_m": 88.1,
+      "mkt_cap_usd_m": 87.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "NATCOPHARM.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 367.6,
-      "mkt_cap_usd_m": 1588.6,
+      "revenue_ttm_usd_m": 364.7,
+      "mkt_cap_usd_m": 1576.3,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4955,7 +4961,7 @@
     },
     "NBTX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 37.9,
+      "revenue_ttm_usd_m": 37.8,
       "mkt_cap_usd_m": 1917.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -4980,7 +4986,7 @@
     "NECLIFE.NS": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.0,
-      "mkt_cap_usd_m": 24.9,
+      "mkt_cap_usd_m": 24.7,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -4995,16 +5001,16 @@
     },
     "NEU.AX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 50.2,
-      "mkt_cap_usd_m": 1890.2,
+      "revenue_ttm_usd_m": 49.9,
+      "mkt_cap_usd_m": 1877.7,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
     },
     "NEULANDLAB.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 63.9,
-      "mkt_cap_usd_m": 3247.4,
+      "revenue_ttm_usd_m": 63.4,
+      "mkt_cap_usd_m": 3222.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -5131,8 +5137,8 @@
     },
     "NSIS-B.CO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 4998.3,
-      "mkt_cap_usd_m": 31620.5,
+      "revenue_ttm_usd_m": 4983.2,
+      "mkt_cap_usd_m": 31523.8,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5195,7 +5201,7 @@
     },
     "NVO": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 51254.4,
+      "revenue_ttm_usd_m": 51097.6,
       "mkt_cap_usd_m": 201039.0,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
@@ -5212,7 +5218,7 @@
     "NWRN.SW": {
       "status": "below_line",
       "revenue_ttm_usd_m": 22.2,
-      "mkt_cap_usd_m": 312.1,
+      "mkt_cap_usd_m": 309.9,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5228,7 +5234,7 @@
     "NYKD.OL": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.5,
-      "mkt_cap_usd_m": 169.9,
+      "mkt_cap_usd_m": 168.5,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "USD"
@@ -5307,7 +5313,7 @@
     },
     "OGI": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 224.3,
+      "revenue_ttm_usd_m": 223.1,
       "mkt_cap_usd_m": 160.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -5386,12 +5392,12 @@
       "reporting_ccy": "USD"
     },
     "OPT": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "below_line",
+      "revenue_ttm_usd_m": 163.0,
+      "mkt_cap_usd_m": 357.8,
       "subsector": "",
-      "revenue_source": "fmp_positive_not_used",
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "GBP"
     },
     "OPTH": {
       "status": "below_line",
@@ -5435,8 +5441,8 @@
     },
     "ORNAV.HE": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 2393.6,
-      "mkt_cap_usd_m": 13000.6,
+      "revenue_ttm_usd_m": 2386.4,
+      "mkt_cap_usd_m": 12961.4,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5444,7 +5450,7 @@
     "ORY.MC": {
       "status": "below_line",
       "revenue_ttm_usd_m": 17.9,
-      "mkt_cap_usd_m": 267.9,
+      "mkt_cap_usd_m": 267.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5452,7 +5458,7 @@
     "OSE.PA": {
       "status": "below_line",
       "revenue_ttm_usd_m": 3.1,
-      "mkt_cap_usd_m": 84.2,
+      "mkt_cap_usd_m": 83.9,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5491,8 +5497,8 @@
     },
     "OXB.L": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 228.5,
-      "mkt_cap_usd_m": 767.2,
+      "revenue_ttm_usd_m": 227.9,
+      "mkt_cap_usd_m": 765.2,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "GBP"
@@ -5627,16 +5633,16 @@
     },
     "PHM.MC": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 254.3,
-      "mkt_cap_usd_m": 1608.9,
+      "revenue_ttm_usd_m": 253.6,
+      "mkt_cap_usd_m": 1604.0,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "PHN.MI": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 161.6,
-      "mkt_cap_usd_m": 882.1,
+      "revenue_ttm_usd_m": 161.1,
+      "mkt_cap_usd_m": 879.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -5715,7 +5721,7 @@
     },
     "POM": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 59.6,
+      "revenue_ttm_usd_m": 59.7,
       "mkt_cap_usd_m": 6.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -5739,16 +5745,16 @@
     },
     "PPGN.SW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 533.7,
-      "mkt_cap_usd_m": 1795.1,
+      "revenue_ttm_usd_m": 532.1,
+      "mkt_cap_usd_m": 1782.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "PPLPHARMA.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 971.0,
-      "mkt_cap_usd_m": 3167.5,
+      "revenue_ttm_usd_m": 963.5,
+      "mkt_cap_usd_m": 3142.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -5948,14 +5954,14 @@
     "RAC.AX": {
       "status": "below_line",
       "revenue_ttm_usd_m": 2.0,
-      "mkt_cap_usd_m": 301.7,
+      "mkt_cap_usd_m": 299.7,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "AUD"
     },
     "RADX": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 9.8,
+      "revenue_ttm_usd_m": 9.7,
       "mkt_cap_usd_m": 30.4,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -6011,7 +6017,7 @@
     },
     "RDY": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3493.5,
+      "revenue_ttm_usd_m": 3466.5,
       "mkt_cap_usd_m": 9887.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -6019,8 +6025,8 @@
     },
     "REC.MI": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3146.8,
-      "mkt_cap_usd_m": 12376.5,
+      "revenue_ttm_usd_m": 3137.3,
+      "mkt_cap_usd_m": 12339.1,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -6076,7 +6082,7 @@
     "RIG2.F": {
       "status": "unknown",
       "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": 7467.9,
+      "mkt_cap_usd_m": 7445.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": null,
       "reporting_ccy": "HUF"
@@ -6195,16 +6201,16 @@
     },
     "ROVI.MC": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 899.2,
-      "mkt_cap_usd_m": 3489.1,
+      "revenue_ttm_usd_m": 896.5,
+      "mkt_cap_usd_m": 3478.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "RPGLIFE.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 77.5,
-      "mkt_cap_usd_m": 488.9,
+      "revenue_ttm_usd_m": 76.9,
+      "mkt_cap_usd_m": 485.2,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -6275,16 +6281,16 @@
     },
     "SANN.SW": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 95.4,
-      "mkt_cap_usd_m": 320.3,
+      "revenue_ttm_usd_m": 94.7,
+      "mkt_cap_usd_m": 318.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "CHF"
     },
     "SANOFI.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 190.4,
-      "mkt_cap_usd_m": 756.7,
+      "revenue_ttm_usd_m": 188.9,
+      "mkt_cap_usd_m": 750.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -6346,12 +6352,12 @@
       "reporting_ccy": "USD"
     },
     "SDZ": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 11676.0,
+      "mkt_cap_usd_m": 36206.8,
       "subsector": "",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "USD"
     },
     "SEER": {
       "status": "below_line",
@@ -6428,7 +6434,7 @@
     "SIGHT.PA": {
       "status": "below_line",
       "revenue_ttm_usd_m": 0.8,
-      "mkt_cap_usd_m": 31.2,
+      "mkt_cap_usd_m": 31.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -6499,8 +6505,8 @@
     },
     "SLV.WA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 96.9,
-      "mkt_cap_usd_m": 132.1,
+      "revenue_ttm_usd_m": 96.3,
+      "mkt_cap_usd_m": 131.4,
       "subsector": "",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "PLN"
@@ -6555,7 +6561,7 @@
     },
     "SNY": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 56902.4,
+      "revenue_ttm_usd_m": 56730.8,
       "mkt_cap_usd_m": 103621.0,
       "subsector": "Large Pharma",
       "revenue_source": "yfinance_ttm",
@@ -6563,16 +6569,16 @@
     },
     "SOBI.ST": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3194.8,
-      "mkt_cap_usd_m": 16625.4,
+      "revenue_ttm_usd_m": 3161.0,
+      "mkt_cap_usd_m": 16449.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "SEK"
     },
     "SPARC.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 201.4,
-      "mkt_cap_usd_m": 695.8,
+      "revenue_ttm_usd_m": 199.9,
+      "mkt_cap_usd_m": 690.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -6643,8 +6649,8 @@
     },
     "STAR.NS": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 527.9,
-      "mkt_cap_usd_m": 1154.5,
+      "revenue_ttm_usd_m": 523.8,
+      "mkt_cap_usd_m": 1145.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -6674,12 +6680,12 @@
       "reporting_ccy": "USD"
     },
     "SUNPHARMA": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 6270.7,
+      "mkt_cap_usd_m": 47361.4,
       "subsector": "",
-      "revenue_source": null,
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "INR"
     },
     "SUPN": {
       "status": "below_line",
@@ -6691,8 +6697,8 @@
     },
     "SVE.WA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 11.4,
-      "mkt_cap_usd_m": 46.5,
+      "revenue_ttm_usd_m": 11.3,
+      "mkt_cap_usd_m": 46.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "PLN"
@@ -6747,7 +6753,7 @@
     },
     "TAK": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 30044.4,
+      "revenue_ttm_usd_m": 29995.6,
       "mkt_cap_usd_m": 58552.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -6892,7 +6898,7 @@
     "TLX.AX": {
       "status": "below_line",
       "revenue_ttm_usd_m": 890.8,
-      "mkt_cap_usd_m": 4050.0,
+      "mkt_cap_usd_m": 4023.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "USD"
@@ -6900,7 +6906,7 @@
     "TNG.PA": {
       "status": "below_line",
       "revenue_ttm_usd_m": 8.4,
-      "mkt_cap_usd_m": 286.1,
+      "mkt_cap_usd_m": 285.3,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -6931,8 +6937,8 @@
     },
     "TORNTPHARM.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1658.5,
-      "mkt_cap_usd_m": 19901.1,
+      "revenue_ttm_usd_m": 1645.7,
+      "mkt_cap_usd_m": 19747.0,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"
@@ -7020,10 +7026,10 @@
     "TUB": {
       "status": "unknown",
       "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "mkt_cap_usd_m": 9100.7,
       "subsector": "",
       "revenue_source": null,
-      "reporting_ccy": null
+      "reporting_ccy": "EUR"
     },
     "TVGN": {
       "status": "below_line",
@@ -7066,12 +7072,12 @@
       "reporting_ccy": "USD"
     },
     "UCB": {
-      "status": "unknown",
-      "revenue_ttm_usd_m": null,
-      "mkt_cap_usd_m": null,
+      "status": "commercial",
+      "revenue_ttm_usd_m": 9885.2,
+      "mkt_cap_usd_m": 45747.5,
       "subsector": "",
-      "revenue_source": "fmp_positive_not_used",
-      "reporting_ccy": null
+      "revenue_source": "yfinance_ttm",
+      "reporting_ccy": "EUR"
     },
     "UNCY": {
       "status": "unknown",
@@ -7115,7 +7121,7 @@
     },
     "VALN": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 166.3,
+      "revenue_ttm_usd_m": 165.8,
       "mkt_cap_usd_m": 660.9,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
@@ -7171,8 +7177,8 @@
     },
     "VETO.PA": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 611.5,
-      "mkt_cap_usd_m": 911.4,
+      "revenue_ttm_usd_m": 609.6,
+      "mkt_cap_usd_m": 908.6,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
@@ -7187,16 +7193,16 @@
     },
     "VIRP.PA": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 1703.7,
-      "mkt_cap_usd_m": 3080.8,
+      "revenue_ttm_usd_m": 1698.6,
+      "mkt_cap_usd_m": 3071.5,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "EUR"
     },
     "VISTN.OL": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 46.9,
-      "mkt_cap_usd_m": 92.1,
+      "revenue_ttm_usd_m": 46.5,
+      "mkt_cap_usd_m": 91.4,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "NOK"
@@ -7475,8 +7481,8 @@
     },
     "ZEAL.CO": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 722.5,
-      "mkt_cap_usd_m": 3129.7,
+      "revenue_ttm_usd_m": 720.3,
+      "mkt_cap_usd_m": 3120.1,
       "subsector": "Biotech",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "DKK"
@@ -7523,7 +7529,7 @@
     },
     "ZYBT": {
       "status": "below_line",
-      "revenue_ttm_usd_m": 17.3,
+      "revenue_ttm_usd_m": 17.4,
       "mkt_cap_usd_m": 74.9,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
@@ -7531,8 +7537,8 @@
     },
     "ZYDUSLIFE.NS": {
       "status": "commercial",
-      "revenue_ttm_usd_m": 3016.0,
-      "mkt_cap_usd_m": 12053.2,
+      "revenue_ttm_usd_m": 2992.6,
+      "mkt_cap_usd_m": 11959.8,
       "subsector": "Specialty & Generic Pharma",
       "revenue_source": "yfinance_ttm",
       "reporting_ccy": "INR"

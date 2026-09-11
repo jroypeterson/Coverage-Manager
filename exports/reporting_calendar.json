@@ -4640,19 +4640,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "covered": false,
         "error": null
       }
@@ -13232,8 +13232,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 2,
-      "report_date": "2026-09-08",
+      "fiscal_quarter": 3,
+      "report_date": "2026-12-08",
       "source": "finnhub",
       "gating_eligible": false
     }
@@ -15172,8 +15172,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2026,
-      "fiscal_quarter": 3,
-      "report_date": "2026-09-09",
+      "fiscal_quarter": 4,
+      "report_date": "2026-12-02",
       "source": "finnhub",
       "gating_eligible": false
     }
@@ -15800,9 +15800,9 @@
       }
     ],
     "next_expected": {
-      "fiscal_year": 2026,
-      "fiscal_quarter": 4,
-      "report_date": "2026-09-10",
+      "fiscal_year": 2027,
+      "fiscal_quarter": 1,
+      "report_date": "2026-11-18",
       "source": "finnhub",
       "gating_eligible": false
     }
@@ -49597,19 +49597,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_rows": 0,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "covered": false,
         "error": null
       }
@@ -59875,19 +59875,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-09",
-        "n_rows": 43,
+        "fetched_at": "2026-09-08",
+        "n_rows": 44,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "covered": false,
         "error": null
       }
@@ -59907,19 +59907,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_rows": 49,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-09",
+        "fetched_at": "2026-09-08",
         "covered": false,
         "error": null
       }

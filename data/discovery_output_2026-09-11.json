@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-11",
+  "candidates": [
+    {
+      "company": "SoundHound AI, Inc.",
+      "ticker": "SOUN",
+      "exchange": "NASDAQ",
+      "market_cap": 2789024512,
+      "sector": "SaaS",
+      "subsector": "Conversational AI",
+      "listing_date": "2022-04-28",
+      "trigger": "New candidate",
+      "peers": ["LPSN", "U", "TWLO", "NICE", "VERI"],
+      "reason": "Bucket 4 coverage gap with a concrete trigger: SoundHound closed its acquisition of LivePerson (LPSN, a covered SaaS row) on 2026-09-04, issuing 37M Class A shares and retiring LivePerson's debt. The enterprise digital-messaging business the universe tracked through LPSN now sits inside SOUN, so declining this leaves the exposure uncovered rather than unchanged. $2.74B (FMP) / $2.79B (yfinance), inside the $2-20B band; FY26 revenue guided $230-260M after a Q2 of $61.9M (+45% y/y).",
+      "business_summary": "We build voice and conversational AI that answers on behalf of other companies. Our drive-thru and phone agents take orders for restaurant chains including Five Guys, IHOP and Jersey Mike's; our embedded voice assistant ships inside cars from Stellantis, Hyundai/Kia and several Chinese OEMs; and with the LivePerson acquisition we now also run the enterprise chat and messaging layer for large contact centres. We charge subscriptions and per-query usage fees on the enterprise side and per-unit royalties on the automotive side, which gives us revenue that recurs for the life of a vehicle. Q2 2026 revenue was $61.9M, up 45% year over year at a 58% non-GAAP gross margin, and we are still loss-making - a $42.8M GAAP net loss in the quarter against $203M of cash and no debt."
+    },
+    {
+      "company": "Evolution Metals & Technologies Corp.",
+      "ticker": "EMAT",
+      "exchange": "NASDAQ",
+      "market_cap": 1915145984,
+      "sector": "Materials",
+      "subsector": "Rare Earth & Critical Materials",
+      "listing_date": "2026-06-30",
+      "trigger": "Russell addition",
+      "peers": ["SSMR", "LIN", "MP"],
+      "reason": "Carried from the 2026-09-04 report, which said 'reply add EMAT' - but EMAT had no ledger row, so that reply would have been ignored by the poller. Queued here so the instruction is live. The case has weakened since: both vendors now put it below the $2B Bucket 5 floor ($1.83B FMP / $1.92B yfinance, against $1.95B / $2.05B a week ago), and fiscal 2026 revenue is guided at $5-8M against a $400-460M fiscal 2027 guide that depends entirely on ramping Pohang magnet capacity before the 1 Jan 2027 DFARS deadline. Verified FTSE Russell 2000 preliminary IPO addition dated 2026-08-21, effective 2026-09-21.",
+      "business_summary": "We are building a rare-earth permanent-magnet supply chain that does not run through China. Our operating asset is a plant in Pohang, South Korea, which we are expanding toward roughly 10,000 metric tons a year of rare-earth magnet capacity, including about 6,000 tons of high-performance sintered NdFeB magnets, and we have Tier-1 OEM quality certifications across six magnet grades. Our customers are defence primes and automotive and industrial OEMs who from 1 January 2027 face a DFARS rule barring Chinese-origin magnets in US defence hardware. We are pre-scale today - $1.9M of revenue in Q1 2026 and $1.6M in Q2, with fiscal 2026 guided to $5-8M - so essentially all of the $400-460M fiscal 2027 guidance is capacity that has not yet been built or sold."
+    }
+  ]
+}

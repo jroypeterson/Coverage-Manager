@@ -3,18 +3,27 @@
   "company": "Anthropic",
   "first_seen": "2026-09-04",
   "flipped_to": "",
-  "note": "Renaissance 09-06: S-1 flip expected any day; late Sept / early Oct listing",
-  "source_kind": "report",
-  "source_url": "https://ipos.renaissancecapital.com/",
+  "note": "Company's own 2026-06-01 statement; upgraded from report to announcement 09-11. Reuters 09-04: prospectus public late Sept, roadshow Oct, listing early Nov. Bucket 2 on any plausible size",
+  "source_kind": "announcement",
+  "source_url": "https://www.anthropic.com/news/confidential-draft-s1-sec",
   "status": "open"
  },
  {
   "company": "Inspire Brands",
   "first_seen": "2026-09-04",
   "flipped_to": "",
-  "note": "Dunkin owner; press reports point to as early as YE 2026. Bucket 2 only if >= $25B",
-  "source_kind": "report",
-  "source_url": "https://ipos.renaissancecapital.com/",
+  "note": "Company's own 2026-05-08 statement; upgraded from report to announcement 09-11. Dunkin / Arby's / BWW / Jimmy John's / Sonic owner, reserved ticker DNKN. Bucket 2 only if >= $25B",
+  "source_kind": "announcement",
+  "source_url": "https://stories.inspirebrands.com/inspire-brands-proposed-public-offering/",
+  "status": "open"
+ },
+ {
+  "company": "Brooks Automation Holdings, Inc.",
+  "first_seen": "2026-09-11",
+  "flipped_to": "",
+  "note": "Announced 2026-09-10. Semiconductor wafer/reticle automation and contamination control; THL-owned since the 2022 Azenta separation. Core adjacency (semis / instrumentation / automation) - Bucket 1 adjacency on pricing",
+  "source_kind": "announcement",
+  "source_url": "https://www.prnewswire.com/news-releases/brooks-automation-holdings-inc-announces-confidential-submission-of-draft-registration-statement-for-proposed-initial-public-offering-302874604.html",
   "status": "open"
  }
 ]

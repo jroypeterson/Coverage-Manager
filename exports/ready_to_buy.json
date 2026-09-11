@@ -38,7 +38,8 @@
     "Est Lockup 180d": "",
     "LEI": "T6IZ0MBEG5ACZDTR7D06",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "WST": {
     "position": "Ready to Buy",
@@ -79,6 +80,7 @@
     "Est Lockup 180d": "",
     "LEI": "5493007NKRGM1RJQ1P16",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   }
 }

@@ -38,7 +38,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "ALMR": {
     "position": "Researching",
@@ -79,7 +80,8 @@
     "Est Lockup 180d": "2026-10-13",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "ARXS": {
     "position": "Researching",
@@ -120,7 +122,8 @@
     "Est Lockup 180d": "2026-10-12",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "CIGI": {
     "position": "Researching",
@@ -161,7 +164,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "CNI": {
     "position": "Researching",
@@ -202,7 +206,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "COIN": {
     "position": "Researching",
@@ -243,7 +248,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "CP": {
     "position": "Researching",
@@ -284,7 +290,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "CROX": {
     "position": "Researching",
@@ -325,7 +332,8 @@
     "Est Lockup 180d": "",
     "LEI": "969500YEQRY2T8Z7W336",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "CRWD": {
     "position": "Researching",
@@ -366,7 +374,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "DBX": {
     "position": "Researching",
@@ -407,7 +416,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "FICO": {
     "position": "Researching",
@@ -448,7 +458,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "HOOD": {
     "position": "Researching",
@@ -489,7 +500,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "KKR": {
     "position": "Researching",
@@ -530,7 +542,8 @@
     "Est Lockup 180d": "",
     "LEI": "549300JOHU21WRN2Z451",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "KLRA": {
     "position": "Researching",
@@ -571,7 +584,8 @@
     "Est Lockup 180d": "2026-10-13",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "LIN": {
     "position": "Researching",
@@ -612,7 +626,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "MA": {
     "position": "Researching",
@@ -653,7 +668,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "MAIR": {
     "position": "Researching",
@@ -694,7 +710,8 @@
     "Est Lockup 180d": "2026-10-12",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "MCO": {
     "position": "Researching",
@@ -735,7 +752,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "MDA": {
     "position": "Researching",
@@ -776,7 +794,8 @@
     "Est Lockup 180d": "2026-09-07",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "MICC": {
     "position": "Researching",
@@ -817,7 +836,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "MMED": {
     "position": "Researching",
@@ -858,7 +878,8 @@
     "Est Lockup 180d": "2026-09-01",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "MNKD": {
     "position": "Researching",
@@ -899,7 +920,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "MSFT": {
     "position": "Researching",
@@ -940,7 +962,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "MWH": {
     "position": "Researching",
@@ -981,7 +1004,8 @@
     "Est Lockup 180d": "2026-08-09",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "NFLX": {
     "position": "Researching",
@@ -1022,7 +1046,8 @@
     "Est Lockup 180d": "",
     "LEI": "549300Y7VHGU0I7CE873",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "NTRA": {
     "position": "Researching",
@@ -1063,7 +1088,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "NVDA": {
     "position": "Researching",
@@ -1104,7 +1130,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "PNTG": {
     "position": "Researching",
@@ -1145,7 +1172,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "SGRY": {
     "position": "Researching",
@@ -1186,7 +1214,8 @@
     "Est Lockup 180d": "",
     "LEI": "549300LC82HG33S19I03",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "SPGI": {
     "position": "Researching",
@@ -1227,7 +1256,8 @@
     "Est Lockup 180d": "",
     "LEI": "Y6X4K52KMJMZE7I7MY94",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "TPL": {
     "position": "Researching",
@@ -1268,7 +1298,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "UBER": {
     "position": "Researching",
@@ -1309,7 +1340,8 @@
     "Est Lockup 180d": "",
     "LEI": "549300B2FTG34FILDR98",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   },
   "UPS": {
     "position": "Researching",
@@ -1350,7 +1382,8 @@
     "Est Lockup 180d": "",
     "LEI": "D01LMJZU09ULLNCY6Z23",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "VLTO": {
     "position": "Researching",
@@ -1391,7 +1424,8 @@
     "Est Lockup 180d": "",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": "Y"
+    "Core": "Y",
+    "Commercial Biopharma": ""
   },
   "XE": {
     "position": "Researching",
@@ -1432,6 +1466,7 @@
     "Est Lockup 180d": "2026-10-20",
     "LEI": "",
     "Sub-subsector (JP)": "",
-    "Core": ""
+    "Core": "",
+    "Commercial Biopharma": ""
   }
 }

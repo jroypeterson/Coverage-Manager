@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "generated_at": "2026-09-08T01:03:31Z",
+  "generated_at": "2026-09-11T12:35:54Z",
   "description": "Coverage Manager published universe artifacts. Downstream projects should read these files instead of importing Coverage Manager code or hitting fundamentals providers directly. Files are committed to git so consumers get history, reproducibility, and rollback.",
   "files": [
     {
@@ -93,10 +93,6 @@
       "name": "manifest.json",
       "purpose": "This file \u2014 directory of published artifacts",
       "format": "json"
-    },
-    {
-      "name": "commercial_biopharma.json",
-      "purpose": "The computed commercial-biopharma universe: Biopharma rows with TTM revenue >= $1bn USD OR market cap >= $10bn USD, plus every curated `Large Pharma` row. Carries the rule string, per-row status (commercial / below_line / unknown), the figures behind each, and which vendor produced the revenue. `unknown` means we could not measure it, NEVER that the company has no product."
     }
   ]
 }
