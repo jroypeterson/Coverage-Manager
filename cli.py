@@ -960,6 +960,17 @@ def main():
             if plan.withheld_reason:
                 print(f"  !! {plan.withheld_reason}")
 
+            if plan.held_without_row:
+                # Named individually: "3 holdings have no row" sends nobody anywhere,
+                # and the whole point is that these are names JP actually owns.
+                print(f"  !! {len(plan.held_without_row)} broker holding(s) are in the "
+                      f"coverage universe but have NO row in "
+                      f"{positions.POSITIONS_PATH.name}, so they are NOT in `Held`: "
+                      f"{', '.join(plan.held_without_row)}")
+                print("     These are positions the book will omit. Add a row "
+                      "(`python cli.py pos add <TICKER> ...`) or decide they should "
+                      "not be covered -- board #347 leaves that call to JP.")
+
             if plan.is_blocked:
                 return 2
             if args.dry_run:
@@ -975,8 +986,14 @@ def main():
             # run did something CORRECT but incomplete, and a silent 0 is how that
             # goes unread for months. A withheld demotion is a sale this run
             # deliberately declined to record.
+            # ⛑ `held_without_row` joins the non-zero set (board #347). A broker
+            # holding that IS covered but has no positions row was dropped from `Held`
+            # with every counter empty and exit 0 -- the fleet publishing a book
+            # missing a real position on a green run. Same reasoning as the line
+            # above: the run did something correct but incomplete.
             return 2 if (plan.not_in_universe or plan.withheld_demotions
-                         or plan.withheld_refreshes) else 0
+                         or plan.withheld_refreshes
+                         or plan.held_without_row) else 0
 
         if args.pos_command == "add":
             try:

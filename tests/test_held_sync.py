@@ -877,3 +877,68 @@ def test_accept_partial_join_is_the_RELEASE_from_an_indefinite_defer(tmp_path):
     finally:
         held_mod.SYMBOL_ALIASES.clear()
         held_mod.SYMBOL_ALIASES.update(monkeypatched)
+
+
+# ---------------------------------------------------------------------------
+# Board #347 — a broker holding with no positions row
+#
+# `plan_sync` iterates the EXISTING entries, so a feed holding with no row is never
+# promoted and never reported. `not_in_universe` does not catch it either: that check
+# compares against the UNIVERSE, and a freshly bought name IS in the universe. The two
+# checks look past each other and the gap between them is exactly a new purchase.
+#
+# Reproduced from the row verbatim: positions holds AAPL; the feed carries AAPL and a
+# newly bought MSFT; the universe carries both. Before this, `promotions=[]`,
+# `not_in_universe=[]`, `blocked_reason=None`, and the fleet published a book missing a
+# real position on a green run.
+# ---------------------------------------------------------------------------
+
+def test_a_held_name_with_no_positions_row_is_REPORTED(tmp_path):
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
+
+    assert plan.held_without_row == ["MSFT"]
+    # and the checks that USED to be the only ones stay empty -- which is the point:
+    # neither of them can see this case, so neither is a substitute for it.
+    assert plan.promotions == []
+    assert plan.not_in_universe == []
+    assert plan.blocked_reason is None
+
+
+def test_it_appears_in_the_SUMMARY_not_only_in_the_cli(tmp_path):
+    """`summary_lines` is what the dry run prints and what any other consumer of a
+    plan reads. A finding visible on only one of the two paths is half-reported."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers={"AAPL", "MSFT"})
+    text = " | ".join(plan.summary_lines())
+    assert "HELD, NO ROW" in text and "MSFT" in text
+
+
+def test_a_name_outside_the_universe_is_still_not_in_universe_not_this(tmp_path):
+    """The two findings must stay distinct: one says CM does not cover the name, the
+    other says CM covers it and has no row. Different remedies."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "ZZZZ"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers={"AAPL"})
+    assert plan.not_in_universe == ["ZZZZ"]
+    assert plan.held_without_row == []
+
+
+def test_no_universe_passed_means_no_claim(tmp_path):
+    """Without `universe_tickers` we cannot tell the two cases apart, so we assert
+    neither -- the same discipline `not_in_universe` already follows."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed)
+    assert plan.held_without_row == []
+    assert plan.not_in_universe == []
+
+
+def test_an_existing_row_is_never_reported_as_missing(tmp_path):
+    """The ordinary case must stay silent, or the finding becomes wallpaper."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "MSFT": ("Researching", "")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
+    assert plan.held_without_row == []
+    assert plan.promotions == ["MSFT"]          # the normal promotion path still works

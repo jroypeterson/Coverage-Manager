@@ -305,6 +305,20 @@ class SyncPlan:
     demotions: list[str] = field(default_factory=list)      # held -> not held
     refreshed: list[str] = field(default_factory=list)      # still held, figures updated
     not_in_universe: list[str] = field(default_factory=list)
+    #: ⛑ Feed holdings that ARE in the coverage universe but have NO row in
+    #: `positions_and_researching.csv`, so `plan_sync`'s loop — which iterates existing
+    #: ENTRIES — can never see them. Board #347: a stock JP bought was dropped from
+    #: `Held` with `promotions=[]`, `not_in_universe=[]`, `blocked_reason=None` and a
+    #: green run, because `not_in_universe` compares against the UNIVERSE and the name
+    #: was in it. The two existing checks look past each other and the gap between them
+    #: is exactly a new purchase.
+    #:
+    #: Reported, not acted on. The row says the remedy — create the row, or block the
+    #: sync until JP adds it — is his call, and it is: blocking stalls every export
+    #: behind a purchase, auto-creating makes CM assert coverage of something nobody
+    #: triaged. Naming them needs no decision and closes the half of the defect that is
+    #: in the title: it is no longer SILENT.
+    held_without_row: list[str] = field(default_factory=list)
     #: Demotions held back because the join could not be trusted this run. They are
     #: NOT applied and NOT a block -- see the withhold rule in `plan_sync`.
     withheld_demotions: list[str] = field(default_factory=list)
@@ -335,6 +349,15 @@ class SyncPlan:
             + (f"  {', '.join(self.demotions)}" if self.demotions else ""),
             f"refreshed       : {len(self.refreshed)}",
         ]
+        if self.held_without_row:
+            # In the SUMMARY, not only in the CLI's warning block: `summary_lines` is
+            # what the dry run prints and what any other consumer of a plan reads, and
+            # a finding visible on only one of the two paths is half-reported.
+            out.append(
+                f"HELD, NO ROW    : {len(self.held_without_row)}"
+                f"  {', '.join(self.held_without_row)}"
+                " - owned, covered, and absent from the positions file (board #347)"
+            )
         if self.withheld_demotions or self.withheld_refreshes:
             out.append(
                 f"WITHHELD         : {len(self.withheld_demotions)} demotion(s)"
@@ -574,6 +597,14 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
     if universe_tickers is not None:
         known = {t.strip().upper() for t in universe_tickers}
         plan.not_in_universe = sorted(t for t in feed.rows if t not in known)
+        # ⛑ The gap between the two checks (board #347). `not_in_universe` asks "is the
+        # broker holding a name CM does not cover?"; the loop below asks "did any
+        # EXISTING row change?". A freshly bought name that IS covered answers no to
+        # both, so it was dropped from `Held` on a green run with every counter empty.
+        # The module's own docstring claimed a held ticker was "reported every run and
+        # never silently dropped"; this is the case that claim missed.
+        plan.held_without_row = sorted(
+            t for t in feed.rows if t in known and t not in by_ticker)
 
     for ticker, entry in sorted(by_ticker.items()):
         was_held = (entry.get("Held") or "").strip().upper() == "Y"
