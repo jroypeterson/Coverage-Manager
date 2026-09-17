@@ -106,8 +106,28 @@ that makes history exist later is snapshotting now.
    `build_universe` shape — `{ticker: {name, gics_sector, idx: [...]}}`, with
    `as_of`, `source` and license metadata per index, and a 400–600 count gate.
 3. Failure behaviour: last-good + visibly stale, never an empty list.
-4. Migrate the four consumers through one schema-pinned adapter. Retire
-   `sigma-alert/sources/sp500.txt` after one compatibility cycle.
+4. Migrate the four consumers through one schema-pinned adapter. ~~Retire
+   `sigma-alert/sources/sp500.txt` after one compatibility cycle.~~
+   ⛑ **WITHDRAWN 2026-09-16 — that half is NOT EXECUTABLE, and the reason is a
+   constraint this brief itself established.** Consumer migration is done (five
+   repos, 2026-09-10/15). Retiring the text file is not, and never will be:
+   **`sigma-alert` has no local runtime** — all seven of its jobs run in GitHub
+   Actions, which clones only that repo — while **our snapshots are gitignored on
+   purpose** (`.gitignore:37`) under the licensing decision settled above. The
+   committed text file is the only way a CI-hosted screener can know the S&P 500,
+   and publishing our snapshot to give it another way is exactly what the
+   licensing call forbids. Deleting it takes sigma-alert offline.
+
+   **What shipped instead: `universe/index_mirrors.py`, weekly step `[4f3/6]`.**
+   The duplication worth ending was never the FILE, it was *silent divergence* —
+   two lists, two collectors, two cadences, nothing watching. (Two collectors of a
+   free public Wikipedia page is cheap redundancy, and a CI job is *more* reliable
+   for a CI-hosted repo than a weekly local one.) So: detect, do not unify. It
+   compares the **committed** blob, not the working tree, because that is what CI
+   clones. **It found a real defect on its first run** — `sp500_names.json` stale
+   by 10 names since 2026-04-13, because `refresh-sp500.yml` staged only
+   `sp500.txt` and discarded the name-map rewrite every month; those 10 S&P names
+   rendered in Slack as bare tickers. Fixed in `sigma-alert` `79bf6b6`.
 5. Add a reconciliation line to the Friday report: "N universe rows in S&P 500 /
    R1000 / R2000; entered/left since last week."
 

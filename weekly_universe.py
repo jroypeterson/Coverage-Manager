@@ -919,6 +919,30 @@ def _step_index_membership():
     return {"results": results}
 
 
+def _step_index_mirrors():
+    """Verify the fleet's OTHER copies of an index list against ours (board #354).
+
+    The brief's step 4 said "retire `sigma-alert/sources/sp500.txt`". It cannot be
+    retired: sigma-alert runs only in GitHub Actions and our snapshots are gitignored
+    on purpose, so the committed text file is the only way a CI-hosted screener can
+    know the S&P 500. `universe/index_mirrors.py` carries the full reasoning.
+
+    What the mirror DOES cost is silent divergence -- two lists, two collectors, two
+    cadences, and nothing watching. This step is the watcher, and it runs HERE because
+    this is the only place in the fleet where both copies are on disk at once.
+
+    Non-gating for the same reason `index_membership` is: it writes nothing, no export
+    depends on it, and a sibling repo that is merely not checked out must not be able
+    to fail the build that publishes the universe. A drift is a WARNING in the report.
+    """
+    from universe import index_mirrors as mir
+
+    results = mir.check_all()
+    return {"results": [r.as_dict() for r in results],
+            "problems": [r.as_dict() for r in results if r.is_problem],
+            "summary": mir.summarise(results)}
+
+
 def _step_form10_watch():
     """Form 10-12B registrations -- spin-offs and uplistings, before they list.
 
@@ -1591,6 +1615,18 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                 for r in im_result["results"])
         else:
             steps["index_membership"] = status
+
+        # Immediately after, while the snapshots it compares against are the ones just
+        # written. Reported as a WARNING line, never a failure -- see _step_index_mirrors.
+        logger.info("[4f3/6] Index mirrors (fleet copies of the same lists)...")
+        mir_status, mir_result = run_step("index_mirrors", _step_index_mirrors)
+        if mir_result and mir_result.get("results"):
+            steps["index_mirrors"] = mir_result["summary"]
+            for p in mir_result.get("problems") or []:
+                logger.warning("  index mirror %s: %s -- %s",
+                               p["name"], p["status"], p["detail"])
+        else:
+            steps["index_mirrors"] = mir_status
 
     # Step 4g: Form 10-12B watch -- spin-offs and OTC uplistings, 1-3 months
     # BEFORE they list. A spin-off has no offering, so the Finnhub IPO calendar

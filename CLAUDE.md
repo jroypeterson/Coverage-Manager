@@ -716,9 +716,61 @@ measured 2026-09-10, all three Russell snapshots were as-of 2026-07-31, i.e. **4
 completely healthy week**, four days short of a 45-day gate. Putting the threshold ON the
 artifact means one authority and no copy to drift; a consumer reads the JSON, not this module.
 
-**What is still open:** `post_earnings_movers`, `forensic_triage` and
-`screens_equity/surprise_screens` read their own caches, and `sigma-alert/sources/sp500.txt`
-still exists.
+**What is still open:** nothing, as of 2026-09-16. `post_earnings_movers`,
+`forensic_triage`, `screens_equity/surprise_screens` and `transcripts` all migrated on
+2026-09-15. `sigma-alert/sources/sp500.txt` still exists **and is meant to** — see below.
+
+### Fleet mirrors of an index list — `universe/index_mirrors.py` (2026-09-16)
+
+`python -m universe.index_mirrors`, and weekly step **`[4f3/6]`**. The last piece of #354,
+and it is NOT what the brief asked for.
+
+⛑ **The brief's "retire `sigma-alert/sources/sp500.txt`" is WITHDRAWN as not executable,
+and the reason is a constraint the same brief established.** Measured 2026-09-16:
+`sigma-alert` has no local runtime — all seven of its jobs run in **GitHub Actions**,
+which clones only that repo — while `data/index_membership/` is **gitignored on purpose**
+(`.gitignore:37`) under the licensing rule *"kept on disk, never pushed"*. So the committed
+text file is the only way a CI-hosted screener can know the S&P 500, and publishing our
+snapshot to give it another way is precisely what the licensing call forbids. Retiring the
+mirror would take the screener offline.
+
+**The duplication worth ending was never the file — it was silent divergence.** Two lists,
+two collectors (our `wikipedia_provider.py`, its `refresh_sp500.py`), two cadences (weekly
+vs monthly), and nothing watching. Redundant collection of a free public page is cheap, and
+a CI job is *more* reliable for a CI-hosted repo than a weekly local one: if this machine is
+off for a month, a CM-written mirror goes stale and nothing over there can refresh it. So
+this module **detects and reports; it never writes, fixes or normalises** the mirror. Which
+side is wrong is a judgement it cannot make.
+
+⛑ **It compares the COMMITTED blob, not the working tree** (`git show HEAD:<path>`), and
+separately reports uncommitted or unpushed changes as a `publish_lag`. CI clones the pushed
+branch, so the worktree is not the artifact — a local regeneration that was never committed
+would otherwise certify agreement while CI keeps serving the stale copy. That is not
+hypothetical: it was the live state at the moment this check first ran, and Codex caught the
+first version reading the wrong bytes. A non-git checkout falls back to the worktree and
+**says so**; it never passes silently.
+
+⛑ **The reference must clear the index's own credibility floor** (`SOURCES[key]["floor"]`),
+not merely be non-empty. `MIN_MIRROR_FRACTION` is a fraction *of the reference*, so a
+truncated snapshot silently rescales the plausibility test with it — two equally broken
+420-name files would have certified `ok` against a 503-name index. Also Codex.
+
+**Every non-comparison outcome is its own status and none of them is `ok`**:
+`reference_unusable` / `mirror_absent` / `mirror_unreadable` / `mirror_implausible`. A
+half-written mirror reports as a **broken file**, deliberately NOT as 300 index departures —
+only the first is true, and the second sends a reader hunting a corporate action that does
+not exist. `is_problem` covers a publish lag too, even when the lists agree.
+
+**It found a real defect on its first run.** `sigma-alert/sources/sp500_names.json` was
+stale by 10 names since **2026-04-13** against a 2026-09-01 ticker refresh: `refresh_sp500.py`
+rewrites the name map on every run by design, but `refresh-sp500.yml` staged only
+`sp500.txt`, so CI discarded that write every month. `load_sp500_names()` fills company
+names for the ~390 S&P names we hold no metadata for, so MRVL, RDDT, VEEV, FERG, FLEX, BNY,
+ECHO, FDXF, HONA and VMRK each rendered in Slack as a bare ticker. Fixed in `sigma-alert`
+`79bf6b6`; both mirrors now verify 503/503.
+
+Non-gating, no network, no writes (all three pinned by tests). Module
+`universe/index_mirrors.py`; tests `tests/test_index_mirrors.py` (29, mutation-checked).
 
 ### Coverage-vs-index reconciliation — `universe/index_reconciliation.py` (2026-09-10)
 
