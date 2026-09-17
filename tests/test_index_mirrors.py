@@ -28,6 +28,7 @@ from universe import index_mirrors as mir
 
 SNAP_TICKERS = [f"T{i:03d}" for i in range(503)]
 TODAY = date(2026, 9, 16)
+LINES_BODY = "\n".join(SNAP_TICKERS) + "\n"
 
 
 def _snapshot(tickers=None, *, as_of="2026-09-08", stale_days=45, holdings=None):
@@ -45,16 +46,25 @@ def _git(repo, *args):
 
 @pytest.fixture
 def root(tmp_path):
-    """A fleet root whose sibling repo is a real git checkout.
+    """A fleet root whose sibling repo is a real checkout WITH AN UPSTREAM.
 
-    Production compares the COMMITTED blob. A bare directory would exercise only the
-    worktree fallback and prove nothing about the path that actually runs.
+    Production compares the blob at the remote-tracking ref, because that is what the
+    consumer's CI clones. A checkout with no upstream is a legitimate state and gets its
+    own test -- but the ordinary fixture must have one, or every test here would exercise
+    the unverifiable branch and prove nothing about the path that actually runs.
     """
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(bare)],
+                   check=True, capture_output=True)
     repo = tmp_path / "sigma-alert"
     (repo / "sources").mkdir(parents=True)
-    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+    subprocess.run(["git", "init", "-q", "-b", "master", str(repo)],
+                   check=True, capture_output=True)
     _git(repo, "config", "user.email", "t@t.t")
     _git(repo, "config", "user.name", "t")
+    _git(repo, "remote", "add", "origin", str(bare))
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "root")
+    _git(repo, "push", "-q", "-u", "origin", "master")
     return tmp_path
 
 
@@ -72,18 +82,22 @@ def names_mirror():
                       index_key="sp500", fmt="names_json", why="test")
 
 
-def _commit(root):
+def _commit(root, *, push=True):
+    """Commit, and by default PUSH -- the pushed ref is what production compares."""
     repo = root / "sigma-alert"
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "x", "--allow-empty")
+    if push:
+        _git(repo, "push", "-q", "origin", "master")
 
 
-def _write_lines(root, tickers, *, name="sp500.txt", commit=True, body=None):
+def _write_lines(root, tickers, *, name="sp500.txt", commit=True, body=None,
+                 push=True):
     p = root / "sigma-alert" / "sources" / name
     p.write_text(body if body is not None
                  else "# a comment\n\n" + "\n".join(tickers) + "\n", encoding="utf-8")
     if commit:
-        _commit(root)
+        _commit(root, push=push)
     return p
 
 
@@ -99,7 +113,7 @@ def test_identical_lists_report_ok(root, mirror, monkeypatch):
     r = mir.check(mirror, today=TODAY, fleet_root=root)
     assert r.status == "ok"
     assert not r.is_problem
-    assert r.compared == "committed"
+    assert r.compared == "pushed"
     assert r.mirror_count == 503 and r.snapshot_count == 503
 
 
@@ -113,22 +127,59 @@ def test_comments_blank_lines_and_case_do_not_count_as_drift(root, mirror, monke
 # --- it must compare the bytes CI reads, not the working tree --------------------------
 
 def test_an_uncommitted_fix_does_not_certify_agreement(root, mirror, monkeypatch):
-    """Codex's P1, reproduced: the exact live state when this module first ran.
+    """Codex round 1, reproduced: the exact live state when this module first ran.
 
-    The committed copy is stale and the worktree has been repaired but not committed.
+    The pushed copy is stale and the worktree has been repaired but not committed.
     A worktree comparison says `ok` while CI is still serving the stale list.
     """
     _patch_snapshot(monkeypatch, _snapshot())
-    _write_lines(root, SNAP_TICKERS[:-10] + [f"OLD{i}" for i in range(10)])  # committed
+    _write_lines(root, SNAP_TICKERS[:-10] + [f"OLD{i}" for i in range(10)])  # pushed
     _write_lines(root, SNAP_TICKERS, commit=False)                           # repaired
     r = mir.check(mirror, today=TODAY, fleet_root=root)
-    assert r.compared == "committed"
-    assert r.status == "drifted", "the committed copy is what CI reads"
+    assert r.status == "drifted", "the pushed copy is what CI reads"
     assert r.is_problem
 
 
-def test_a_committed_but_unstaged_edit_is_flagged_even_when_the_lists_agree(
-        root, mirror, monkeypatch):
+def test_a_committed_but_unpushed_fix_does_not_certify_agreement(root, mirror, monkeypatch):
+    """Codex round 2: the same class one step out, and it was INSIDE round 1's fix.
+
+    Comparing local HEAD instead of the pushed ref certifies a repair CI has never seen.
+    sigma-alert's own monthly Action also advances that remote with no local action at
+    all, so this clone goes stale by itself.
+    """
+    _patch_snapshot(monkeypatch, _snapshot())
+    _write_lines(root, SNAP_TICKERS[:-10] + [f"OLD{i}" for i in range(10)])   # pushed
+    _write_lines(root, SNAP_TICKERS, push=False)                              # local only
+    r = mir.check(mirror, today=TODAY, fleet_root=root)
+    assert r.status == "drifted", "an unpushed commit is not what CI reads"
+    assert "not pushed" in r.publish_lag
+    assert r.is_problem
+
+
+def test_no_upstream_is_unverifiable_not_ok(root, mirror, monkeypatch, tmp_path):
+    """A checkout with no upstream cannot say what CI has, so it must not say `ok`.
+
+    Round 2 caught this too: `@{u}` failed, the failure was ignored, and an unpushed
+    HEAD was certified indefinitely.
+    """
+    plain = tmp_path / "noupstream"
+    repo = plain / "sigma-alert"
+    (repo / "sources").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", "-b", "master", str(repo)],
+                   check=True, capture_output=True)
+    _git(repo, "config", "user.email", "t@t.t")
+    _git(repo, "config", "user.name", "t")
+    (repo / "sources" / "sp500.txt").write_text(LINES_BODY, encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "x")
+    _patch_snapshot(monkeypatch, _snapshot())
+    r = mir.check(mirror, today=TODAY, fleet_root=plain)
+    assert r.status == "mirror_unverifiable"
+    assert r.is_problem
+
+
+def test_an_unstaged_edit_is_flagged_even_when_the_lists_agree(root, mirror,
+                                                              monkeypatch):
     """Agreement plus a publish lag is still a problem: CI does not have the bytes."""
     _patch_snapshot(monkeypatch, _snapshot())
     _write_lines(root, SNAP_TICKERS)
@@ -140,16 +191,15 @@ def test_a_committed_but_unstaged_edit_is_flagged_even_when_the_lists_agree(
     assert r.is_problem, "a publish lag must not read as verified"
 
 
-def test_a_non_git_checkout_falls_back_and_says_so(root, mirror, monkeypatch, tmp_path):
-    """Falling back to the worktree is allowed; doing it SILENTLY is not."""
+def test_a_non_git_directory_is_unverifiable_not_ok(root, mirror, monkeypatch, tmp_path):
+    """There is deliberately NO worktree fallback: both fallbacks certified stale bytes."""
     plain = tmp_path / "plain"
     (plain / "sigma-alert" / "sources").mkdir(parents=True)
-    (plain / "sigma-alert" / "sources" / "sp500.txt").write_text(
-        "\n".join(SNAP_TICKERS) + "\n", encoding="utf-8")
+    (plain / "sigma-alert" / "sources" / "sp500.txt").write_text(LINES_BODY,
+                                                                 encoding="utf-8")
     _patch_snapshot(monkeypatch, _snapshot())
     r = mir.check(mirror, today=TODAY, fleet_root=plain)
-    assert r.compared == "worktree"
-    assert r.publish_lag
+    assert r.status == "mirror_unverifiable"
     assert r.is_problem
 
 
@@ -350,7 +400,23 @@ def test_check_makes_no_network_call(root, mirror, monkeypatch):
     monkeypatch.setattr(mir.im, "refresh", _forbidden)
     _patch_snapshot(monkeypatch, _snapshot())
     _write_lines(root, SNAP_TICKERS)
+    # fetch defaults to False -- the ONE network call this module can make is opt-in.
     assert mir.check(mirror, today=TODAY, fleet_root=root).status == "ok"
+
+
+def test_fetch_is_opt_in_and_off_by_default(root, mirror, monkeypatch):
+    calls = []
+    real = mir.subprocess.run
+
+    def _spy(cmd, **kw):
+        calls.append(list(cmd))
+        return real(cmd, **kw)
+
+    _write_lines(root, SNAP_TICKERS)          # same ordering rule as the test above
+    _patch_snapshot(monkeypatch, _snapshot())
+    monkeypatch.setattr(mir.subprocess, "run", _spy)
+    mir.check(mirror, today=TODAY, fleet_root=root)
+    assert not any("fetch" in c for c in calls), "default must make no network call"
 
 
 def test_check_writes_nothing(root, mirror, monkeypatch):
@@ -365,15 +431,40 @@ def test_check_writes_nothing(root, mirror, monkeypatch):
 
 def test_a_git_failure_never_escapes(root, mirror, monkeypatch):
     """A diagnostic that crashes is an outage. The weekly step calls this."""
-    _write_lines(root, SNAP_TICKERS)              # commit BEFORE git is broken
+    _write_lines(root, SNAP_TICKERS)              # commit+push BEFORE git is broken
 
     def _boom(*a, **k):
         raise OSError("git is not on PATH")
     monkeypatch.setattr(mir.subprocess, "run", _boom)
     _patch_snapshot(monkeypatch, _snapshot())
     r = mir.check(mirror, today=TODAY, fleet_root=root)
-    assert r.compared == "worktree"
-    assert r.status == "ok" and r.is_problem      # fell back, and said so
+    assert r.status == "mirror_unverifiable"      # could not ask, so did not claim
+    assert r.is_problem
+
+
+def test_git_is_invoked_non_interactively(root, mirror, monkeypatch):
+    """Unattended under Task Scheduler, a git credential prompt blocks for ever.
+
+    The weekly build must not be hangable by a diagnostic it does not gate on.
+    """
+    seen = {}
+    real = mir.subprocess.run
+
+    def _spy(cmd, **kw):
+        seen.setdefault("env", kw.get("env") or {})
+        seen.setdefault("stdin", kw.get("stdin"))
+        seen.setdefault("timeout", kw.get("timeout"))
+        seen.setdefault("cmd", cmd)
+        return real(cmd, **kw)
+
+    _write_lines(root, SNAP_TICKERS)          # fixture git runs BEFORE the spy, or it
+    _patch_snapshot(monkeypatch, _snapshot())  # captures the test helper, not the module
+    monkeypatch.setattr(mir.subprocess, "run", _spy)
+    mir.check(mirror, today=TODAY, fleet_root=root)
+    assert seen["env"].get("GIT_TERMINAL_PROMPT") == "0"
+    assert seen["stdin"] is mir.subprocess.DEVNULL
+    assert seen["timeout"] and seen["timeout"] > 0
+    assert "credential.helper=" in seen["cmd"]
 
 
 def test_every_registered_mirror_names_an_index_we_actually_collect():
@@ -402,3 +493,31 @@ def test_summarise_covers_every_result(root, mirror, monkeypatch):
     _write_lines(root, SNAP_TICKERS)
     results = [mir.check(mirror, today=TODAY, fleet_root=root)]
     assert mirror.name in mir.summarise(results)
+
+
+def test_both_production_callers_fetch_before_comparing(monkeypatch):
+    """`is_problem` ignores `ref_caveat` ONLY because production refreshes the ref.
+
+    That reasoning is written into `MirrorResult.is_problem`'s docstring as "pinned by a
+    test", and until this existed it was not: a mutation making the CLI stop fetching
+    left all 33 tests green. A comment claiming a guard exists, with no guard, is the
+    `a-green-test-can-name-a-thing-that-is-missing` shape.
+
+    ⛑ The FIRST version of this test asserted `"check_all(fetch=" in source`, which the
+    mutant `check_all(fetch=False)` also satisfies -- it survived a second time. Assert
+    the VALUE that reaches the callee, never the shape of the call.
+    """
+    from pathlib import Path as _P
+
+    seen = []
+    monkeypatch.setattr(mir, "check_all", lambda **kw: seen.append(kw.get("fetch")) or [])
+    mir.main([])
+    mir.main(["--no-fetch"])
+    assert seen == [True, False], (
+        f"CLI must fetch by default and opt out with --no-fetch; got {seen}")
+
+    weekly = (_P(mir.__file__).resolve().parent.parent / "weekly_universe.py").read_text(
+        encoding="utf-8")
+    step = weekly.split("def _step_index_mirrors")[1].split("\ndef ")[0]
+    assert "check_all(fetch=True)" in step, (
+        "the weekly step must refresh the remote-tracking ref before comparing")

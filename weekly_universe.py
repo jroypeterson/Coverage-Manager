@@ -937,7 +937,11 @@ def _step_index_mirrors():
     """
     from universe import index_mirrors as mir
 
-    results = mir.check_all()
+    # fetch=True: the ref this compares against is what sigma-alert's CI clones, and
+    # ITS OWN monthly Action advances that remote with no local action at all -- so an
+    # unfetched remote-tracking ref goes stale here exactly the way the fleet's other
+    # checkouts do. This step is already inside a networked build; one fetch is cheap.
+    results = mir.check_all(fetch=True)
     return {"results": [r.as_dict() for r in results],
             "problems": [r.as_dict() for r in results if r.is_problem],
             "summary": mir.summarise(results)}

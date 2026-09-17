@@ -36,9 +36,14 @@ shelf life, and nothing was watching it. So: detect, do not unify.
 
 ## What this module does NOT do
 
-It does not write, fix or normalise the mirror, and it makes no network call. It reports.
-A mirror that has drifted is a fact for a human -- the correct repair depends on which side
-is wrong, and this module cannot know that.
+It does not write, fix or normalise the mirror -- it reports. A mirror that has drifted is
+a fact for a human; the correct repair depends on which side is wrong, and this module cannot
+know that.
+
+It makes **no network call by default**. `fetch=True` is the one exception and it does exactly
+one thing: refresh the remote-tracking ref so the comparison is against what the consumer's CI
+would clone *now* rather than whenever this machine last fetched. The weekly step passes it
+because that step is already networked; everything else keeps the cheap property.
 
 ## The failure it is built to avoid in itself
 
@@ -112,15 +117,17 @@ class MirrorResult:
     path: str
     index_key: str
     status: str                      # ok | drifted | mirror_absent | mirror_unreadable
-                                     # | mirror_implausible | reference_unusable
+                                     # | mirror_implausible | mirror_unverifiable
+                                     # | reference_unusable
     detail: str = ""
     mirror_count: int | None = None
     snapshot_count: int | None = None
     only_in_mirror: list[str] = field(default_factory=list)
     only_in_snapshot: list[str] = field(default_factory=list)
     # Which bytes were actually compared, and whether CI is reading them yet.
-    compared: str = "worktree"       # "committed" | "worktree"
-    publish_lag: str = ""            # non-empty => the compared copy is not what CI has
+    compared: str = "pushed"         # "pushed" -- the ref CI clones
+    publish_lag: str = ""            # non-empty => a local fix CI does not have
+    ref_caveat: str = ""             # non-empty => how current the compared ref itself is
 
     @property
     def is_problem(self) -> bool:
@@ -133,6 +140,12 @@ class MirrorResult:
         A publish lag is a problem too, even when the lists agree: the point of this
         module is whether the bytes the CI-hosted screener READS still match, and an
         uncommitted or unpushed fix is one CI does not have.
+
+        ⛑ `ref_caveat` is deliberately NOT a problem. It records how current the compared
+        ref is, and on the `fetch=False` library default it is set on EVERY result -- so
+        counting it would make `is_problem` permanently true, which is the fleet's own
+        `a-flag-that-is-always-true`. Both production callers fetch (pinned by a test), so
+        the caveat is empty where it would matter.
         """
         return self.status != "ok" or bool(self.publish_lag)
 
@@ -144,50 +157,92 @@ class MirrorResult:
             "only_in_mirror": self.only_in_mirror,
             "only_in_snapshot": self.only_in_snapshot,
             "compared": self.compared, "publish_lag": self.publish_lag,
+            "ref_caveat": self.ref_caveat,
         }
 
 
-def _git(repo_root: Path, *args: str) -> tuple[int, str]:
-    """Run one git command in `repo_root`. Never raises; returns (code, stdout)."""
+def _git(repo_root: Path, *args: str, timeout: int = 30) -> tuple[int, str]:
+    """Run one git command in `repo_root`. Never raises; returns (code, stdout).
+
+    ⛑ `GIT_TERMINAL_PROMPT=0` and an empty credential helper are not optional. This runs
+    unattended under Windows Task Scheduler, where a git command that decides to ask for
+    a username blocks for ever on a console nobody is watching -- a diagnostic that hangs
+    the weekly build it is specified not to gate. The timeout is the second backstop.
+    """
+    import os
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
     try:
-        p = subprocess.run(["git", "-C", str(repo_root), *args],
-                           capture_output=True, text=True, timeout=30,
-                           encoding="utf-8", errors="replace")
+        p = subprocess.run(
+            ["git", "-C", str(repo_root), "-c", "credential.helper=", "--no-pager", *args],
+            capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace", env=env, stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return 1, ""
     return p.returncode, p.stdout
 
 
-def _published_text(repo_root: Path, path_in_repo: str) -> tuple[str | None, str]:
-    """The mirror's COMMITTED content, plus a note when CI does not have it yet.
+def _upstream_ref(repo_root: Path) -> str:
+    """The remote-tracking ref whose content CI actually clones, or ''."""
+    code, out = _git(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    if code == 0 and out.strip():
+        return out.strip()
+    # A checkout with no configured upstream can still have an unambiguous origin default.
+    code, out = _git(repo_root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    return out.strip() if code == 0 and out.strip() else ""
 
-    ⛑ **The worktree file is NOT what the consumer reads.** `sigma-alert` runs only in
-    GitHub Actions, which clones the pushed branch -- so the bytes that matter are the
-    committed (and pushed) ones. Comparing the working tree lets a local regeneration
-    that was never committed certify agreement while CI keeps using the stale copy.
-    That is not hypothetical: it was the live state of `sources/sp500_names.json` at the
-    moment this check first ran, and Codex caught the module reading the wrong bytes.
 
-    Returns `(None, reason)` when git cannot answer, so the caller can fall back to the
-    worktree and SAY that is what it compared.
+def _published_text(repo_root: Path, path_in_repo: str,
+                    *, fetch: bool = False) -> tuple[str | None, str, str]:
+    """The mirror's PUSHED content, plus a note for anything CI does not have yet.
+
+    ⛑ **Neither the worktree nor local `HEAD` is what the consumer reads.** `sigma-alert`
+    runs only in GitHub Actions, which clones the **pushed branch**. Two rounds of review
+    walked this in:
+
+      * Round 1 caught it comparing the **working tree** -- a local regeneration never
+        committed would certify agreement while CI served the stale copy. That was the
+        live state of `sources/sp500_names.json` when this check first ran.
+      * Round 2 caught the fix itself comparing local **HEAD**, which is the same class one
+        step out: `sigma-alert`'s own monthly Action pushes to the remote, so this clone's
+        HEAD and its remote-tracking ref both go stale with **no local action at all**, and
+        the check would certify old bytes. A detached HEAD or a checkout with no upstream
+        made it worse -- `@{u}` failed, the failure was ignored, and an unpushed HEAD was
+        certified indefinitely.
+
+    So the comparison is against the **remote-tracking ref**, and a checkout where that
+    cannot be resolved is reported `mirror_unverifiable` rather than passing.
+
+    `fetch=True` refreshes that ref first; the weekly caller does, because it is already a
+    networked step. The default is False so `check()` keeps its no-network property, and
+    the returned note then says the ref was not refreshed this run.
     """
-    code, out = _git(repo_root, "show", f"HEAD:{path_in_repo}")
+    ref = _upstream_ref(repo_root)
+    if not ref:
+        return None, "", ("no upstream branch resolvable -- cannot tell which bytes CI "
+                          "has (detached HEAD, no remote, or not a git checkout)")
+
+    caveat = ""
+    if fetch:
+        remote = ref.split("/", 1)[0]
+        code, _ = _git(repo_root, "fetch", "--quiet", remote, timeout=90)
+        if code != 0:
+            caveat = f"could not fetch {remote}, so {ref} may be behind the real remote"
+    else:
+        caveat = f"{ref} was not refreshed this run and may be behind the real remote"
+
+    code, out = _git(repo_root, "show", f"{ref}:{path_in_repo}")
     if code != 0:
-        return None, "not committed at HEAD (or not a git checkout)"
+        return None, "", f"not present at {ref} (never pushed, or deleted upstream)"
 
     lag = []
     code, dirty = _git(repo_root, "status", "--porcelain", "--", path_in_repo)
     if code == 0 and dirty.strip():
         lag.append("uncommitted local changes CI will not see")
 
-    code, upstream = _git(repo_root, "rev-parse", "--abbrev-ref",
-                          "--symbolic-full-name", "@{u}")
-    if code == 0 and upstream.strip():
-        code, diff = _git(repo_root, "diff", "--name-only",
-                          f"{upstream.strip()}..HEAD", "--", path_in_repo)
-        if code == 0 and diff.strip():
-            lag.append(f"committed but not pushed to {upstream.strip()}")
-    return out, "; ".join(lag)
+    code, diff = _git(repo_root, "diff", "--name-only", f"{ref}..HEAD", "--", path_in_repo)
+    if code == 0 and diff.strip():
+        lag.append(f"committed locally but not pushed to {ref}")
+    return out, "; ".join(lag), caveat
 
 
 def _parse_mirror(text: str, fmt: str) -> set[str]:
@@ -248,8 +303,13 @@ def _snapshot_tickers(key: str, today: date | None = None) -> tuple[set[str] | N
 
 
 def check(mirror: Mirror, *, today: date | None = None,
-          fleet_root: Path | None = None) -> MirrorResult:
-    """Compare one mirror against this repo's snapshot. No network, no writes."""
+          fleet_root: Path | None = None, fetch: bool = False) -> MirrorResult:
+    """Compare one mirror against this repo's snapshot. No writes, ever.
+
+    No network either unless `fetch=True`, which only refreshes the remote-tracking
+    ref. The weekly caller passes it; the default keeps the cheap property that makes
+    this runnable anywhere.
+    """
     root = fleet_root or FLEET_ROOT
     path = root / mirror.repo_relative
     res = MirrorResult(name=mirror.name, path=str(path), index_key=mirror.index_key,
@@ -262,25 +322,19 @@ def check(mirror: Mirror, *, today: date | None = None,
         return res
     res.snapshot_count = len(ref)
 
-    # Prefer the COMMITTED bytes -- they are what the CI-hosted consumer clones. Fall
-    # back to the worktree only when git cannot answer, and record which was compared.
-    text, lag = _published_text(root / mirror.repo, mirror.path_in_repo)
-    if text is not None:
-        res.compared, res.publish_lag = "committed", lag
-    else:
-        if not path.exists():
-            res.status = "mirror_absent"
-            res.detail = f"{mirror.repo_relative} is not on disk (not checked out?)"
-            return res
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as exc:
-            res.status = "mirror_unreadable"
-            res.detail = (f"{mirror.repo_relative} unreadable "
-                          f"({type(exc).__name__}: {exc})")
-            return res
-        res.compared = "worktree"
-        res.publish_lag = f"compared the working tree: {lag}"
+    # ⛑ Compare the PUSHED bytes -- the ref the CI-hosted consumer clones. There is
+    # deliberately NO fallback to the working tree or to local HEAD: both were tried and
+    # both certified stale bytes as agreement (see `_published_text`). A checkout where
+    # the pushed state cannot be established reports that it cannot be established.
+    text, lag, caveat = _published_text(root / mirror.repo, mirror.path_in_repo,
+                                        fetch=fetch)
+    if text is None:
+        res.status = "mirror_unverifiable" if path.exists() else "mirror_absent"
+        res.detail = (f"{mirror.repo_relative}: {caveat}"
+                      if res.status == "mirror_unverifiable"
+                      else f"{mirror.repo_relative} is not on disk and {caveat}")
+        return res
+    res.publish_lag, res.ref_caveat = lag, caveat
 
     try:
         got = _parse_mirror(text, mirror.fmt)
@@ -306,14 +360,16 @@ def check(mirror: Mirror, *, today: date | None = None,
                       f"{len(res.only_in_snapshot)} only in the snapshot")
     else:
         res.detail = f"{len(got)}/{len(ref)} identical ({res.compared})"
-    if res.publish_lag:
-        res.detail = f"{res.detail} - {res.publish_lag}"
+    for note in (res.publish_lag, res.ref_caveat):
+        if note:
+            res.detail = f"{res.detail} - {note}"
     return res
 
 
-def check_all(*, today: date | None = None,
-              fleet_root: Path | None = None) -> list[MirrorResult]:
-    return [check(m, today=today, fleet_root=fleet_root) for m in MIRRORS]
+def check_all(*, today: date | None = None, fleet_root: Path | None = None,
+              fetch: bool = False) -> list[MirrorResult]:
+    return [check(m, today=today, fleet_root=fleet_root, fetch=fetch)
+            for m in MIRRORS]
 
 
 def summarise(results: list[MirrorResult]) -> str:
@@ -324,12 +380,17 @@ def summarise(results: list[MirrorResult]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Manual entry point: `python -m universe.index_mirrors`.
+    """Manual entry point: `python -m universe.index_mirrors [--no-fetch]`.
 
     Exits 1 when any mirror is not a verified match, so it is usable as a check. The
     WEEKLY step deliberately does not gate on it -- see `_step_index_mirrors`.
     """
-    results = check_all()
+    # ⛑ The CLI FETCHES BY DEFAULT, and `--no-fetch` opts out. The other way round made
+    # every ordinary manual run report "the ref was not refreshed, this may be stale" and
+    # exit 1 -- true, useless, and `a-flag-that-is-always-true`: a warning on the common
+    # path is one the reader stops seeing. The library default stays False so importing
+    # this module still costs no network.
+    results = check_all(fetch="--no-fetch" not in (argv or []))
     for r in results:
         mark = "OK  " if r.status == "ok" else "WARN"
         print(f"[{mark}] {r.name}")
@@ -349,4 +410,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import sys
+    raise SystemExit(main(sys.argv[1:]))

@@ -742,13 +742,38 @@ off for a month, a CM-written mirror goes stale and nothing over there can refre
 this module **detects and reports; it never writes, fixes or normalises** the mirror. Which
 side is wrong is a judgement it cannot make.
 
-⛑ **It compares the COMMITTED blob, not the working tree** (`git show HEAD:<path>`), and
-separately reports uncommitted or unpushed changes as a `publish_lag`. CI clones the pushed
-branch, so the worktree is not the artifact — a local regeneration that was never committed
-would otherwise certify agreement while CI keeps serving the stale copy. That is not
-hypothetical: it was the live state at the moment this check first ran, and Codex caught the
-first version reading the wrong bytes. A non-git checkout falls back to the worktree and
-**says so**; it never passes silently.
+⛑ **It compares the blob at the REMOTE-TRACKING REF** (`git show origin/master:<path>`),
+because CI clones the *pushed* branch. Two review rounds walked this in, and the second
+finding was a defect inside the first fix:
+
+  * **Round 1** caught it comparing the **working tree**. A local regeneration never
+    committed would certify agreement while CI served the stale copy — the live state at
+    the moment this check first ran.
+  * **Round 2** caught the fix comparing local **HEAD**, which is the same class one step
+    out. `sigma-alert`'s own monthly Action advances that remote, so this clone's HEAD and
+    its remote-tracking ref both go stale **with no local action at all**. A detached HEAD
+    or a checkout with no upstream made it worse: `@{u}` failed, the failure was ignored,
+    and an unpushed HEAD was certified indefinitely.
+
+There is deliberately **no fallback** to the worktree or to HEAD — both were tried and both
+certified stale bytes. A checkout whose pushed state cannot be established reports
+`mirror_unverifiable`. `fetch=True` (the CLI default, `--no-fetch` to opt out; and the weekly
+step) refreshes the ref first, since a ref this machine last fetched a month ago answers a
+different question.
+
+⛑ **`ref_caveat` is separate from `publish_lag`, and only the latter counts as a problem.**
+`publish_lag` is a local fix CI does not have (uncommitted, or committed-but-unpushed).
+`ref_caveat` says how current the compared ref itself is, and on the `fetch=False` library
+default it is set on **every** result — counting it would make `is_problem` permanently true,
+which is `a-flag-that-is-always-true`. Both production callers fetch, and
+`test_both_production_callers_fetch_before_comparing` pins that. ⛑ **That test's first version
+asserted `"check_all(fetch=" in source`, which the mutant `check_all(fetch=False)` also
+satisfies — it let the mutation survive twice.** Assert the value that reaches the callee,
+never the shape of the call.
+
+⛑ **git is invoked non-interactively** (`GIT_TERMINAL_PROMPT=0`, empty credential helper,
+`stdin=DEVNULL`, timeouts). This runs unattended under Task Scheduler, where a credential
+prompt would block for ever — a diagnostic hanging the build it is specified not to gate.
 
 ⛑ **The reference must clear the index's own credibility floor** (`SOURCES[key]["floor"]`),
 not merely be non-empty. `MIN_MIRROR_FRACTION` is a fraction *of the reference*, so a
