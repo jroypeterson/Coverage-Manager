@@ -609,3 +609,53 @@ def test_both_production_callers_fetch_before_comparing(monkeypatch):
     step = weekly.split("def _step_index_mirrors")[1].split("\ndef ")[0]
     assert "check_all(fetch=True)" in step, (
         "the weekly step must refresh the remote-tracking ref before comparing")
+
+
+# --- the step must be NON-GATING but AUDIBLE ------------------------------------------
+
+def _step_status(problems, total=2):
+    import weekly_universe as wu
+    return wu._index_mirrors_step_status({
+        "results": [{"n": i} for i in range(total)],
+        "problems": problems,
+        "summary": "s",
+    })
+
+
+def test_a_drifted_mirror_makes_the_step_report_failed():
+    """Codex round 4: non-gating is not the same as inaudible.
+
+    The first version returned a free-form summary whether the mirrors agreed or not, so
+    `collect_non_successes` read every outcome as a success -- the heartbeat stayed `ok`
+    and the weekly card said "All steps completed successfully" while the check had found
+    a drift. A check nobody is told about is not a check.
+    """
+    st = _step_status([{"name": "m", "status": "drifted", "detail": "d"}])
+    assert st.startswith("failed:"), st
+    assert "drifted" in st
+
+
+def test_an_unverifiable_mirror_also_reports_failed():
+    """'I could not check' must not read as 'I checked and it is fine'."""
+    st = _step_status([{"name": "m", "status": "mirror_unverifiable", "detail": "d"}])
+    assert st.startswith("failed:")
+    assert "mirror_unverifiable" in st
+
+
+def test_all_clean_does_not_report_failed():
+    """The guard must not become the outage: a healthy week stays green."""
+    st = _step_status([])
+    assert not st.startswith("failed:")
+    assert "2/2 verified identical" in st
+
+
+def test_no_mirrors_checked_is_a_failure_not_a_clean_sweep():
+    import weekly_universe as wu
+    st = wu._index_mirrors_step_status({"results": [], "problems": [], "summary": ""})
+    assert st.startswith("failed:")
+
+
+def test_the_step_status_is_ascii_only():
+    """A cp1252 console has twice killed a run mid-report in this repo."""
+    for problems in ([], [{"name": "m", "status": "drifted", "detail": "d"}]):
+        _step_status(problems).encode("ascii")

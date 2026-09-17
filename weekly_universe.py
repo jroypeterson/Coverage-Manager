@@ -947,6 +947,37 @@ def _step_index_mirrors():
             "summary": mir.summarise(results)}
 
 
+def _index_mirrors_step_status(mir_result) -> str:
+    """Render the mirror step's status, and make a problem AUDIBLE.
+
+    ⛑ Non-gating is not the same as inaudible, and the first version conflated them.
+    The step returned a free-form summary whether the mirrors agreed or not, so
+    `collect_non_successes` saw a success either way: the health heartbeat stayed `ok`
+    and the weekly card ended "All steps completed successfully" while the check had
+    detected a drift. A check nobody is told about is not a check -- Codex round 4.
+
+    The `failed:` prefix is exactly the convention `_crosscheck_step_status` already uses
+    for the same reason: the build and the exports are untouched, but the run reports
+    `partial` and the card says why.
+
+    ASCII-only by construction (counts and fixed labels, plus mirror names which are
+    ASCII by declaration) -- a cp1252 console has twice killed a run mid-report here.
+    """
+    results = mir_result.get("results") or []
+    problems = mir_result.get("problems") or []
+    summary = mir_result.get("summary") or f"{len(results)} mirror(s)"
+    if not results:
+        return "failed: no mirrors checked"
+    if problems:
+        kinds = {}
+        for pr in problems:
+            kinds[pr["status"]] = kinds.get(pr["status"], 0) + 1
+        counts = ", ".join(f"{n} {k}" for k, n in sorted(kinds.items()))
+        return (f"failed: {len(problems)} of {len(results)} mirror(s) not verified "
+                f"({counts}); {summary}")
+    return f"{len(results)}/{len(results)} verified identical; {summary}"
+
+
 def _step_form10_watch():
     """Form 10-12B registrations -- spin-offs and uplistings, before they list.
 
@@ -1625,7 +1656,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
         logger.info("[4f3/6] Index mirrors (fleet copies of the same lists)...")
         mir_status, mir_result = run_step("index_mirrors", _step_index_mirrors)
         if mir_result and mir_result.get("results"):
-            steps["index_mirrors"] = mir_result["summary"]
+            steps["index_mirrors"] = _index_mirrors_step_status(mir_result)
             for p in mir_result.get("problems") or []:
                 logger.warning("  index mirror %s: %s -- %s",
                                p["name"], p["status"], p["detail"])
