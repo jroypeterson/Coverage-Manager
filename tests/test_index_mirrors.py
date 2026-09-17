@@ -405,18 +405,31 @@ def test_check_makes_no_network_call(root, mirror, monkeypatch):
 
 
 def test_fetch_is_opt_in_and_off_by_default(root, mirror, monkeypatch):
+    """The library default must make no network call.
+
+    ⛑ This test was VACUOUS for one commit. It spied on `subprocess.run`, and when
+    `_git` switched to `subprocess.Popen` for the process-tree kill, the spy stopped
+    observing anything -- `calls` was always empty, so the assertion passed however the
+    default behaved. `a-check-that-silently-matches-nothing`, caught by Codex, and the
+    third time tonight one of my own tests went stale inside my own fix. It now spies on
+    `_git`, which is the seam the behaviour actually crosses and does not move when the
+    subprocess API underneath it does.
+    """
     calls = []
-    real = mir.subprocess.run
+    real = mir._git
 
-    def _spy(cmd, **kw):
-        calls.append(list(cmd))
-        return real(cmd, **kw)
+    def _spy(repo_root, *args, **kw):
+        calls.append(args)
+        return real(repo_root, *args, **kw)
 
-    _write_lines(root, SNAP_TICKERS)          # same ordering rule as the test above
+    _write_lines(root, SNAP_TICKERS)
     _patch_snapshot(monkeypatch, _snapshot())
-    monkeypatch.setattr(mir.subprocess, "run", _spy)
+    monkeypatch.setattr(mir, "_git", _spy)
     mir.check(mirror, today=TODAY, fleet_root=root)
-    assert not any("fetch" in c for c in calls), "default must make no network call"
+    assert calls, "the spy must actually observe _git, or this test proves nothing"
+    assert not any(a and a[0] == "fetch" for a in calls), (
+        f"the library default must make no network call; saw {calls}")
+
 
 
 def test_check_writes_nothing(root, mirror, monkeypatch):
