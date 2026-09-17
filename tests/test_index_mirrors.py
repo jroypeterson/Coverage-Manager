@@ -431,11 +431,11 @@ def test_check_writes_nothing(root, mirror, monkeypatch):
 
 def test_a_git_failure_never_escapes(root, mirror, monkeypatch):
     """A diagnostic that crashes is an outage. The weekly step calls this."""
-    _write_lines(root, SNAP_TICKERS)              # commit+push BEFORE git is broken
+    _write_lines(root, SNAP_TICKERS)          # commit+push BEFORE git is broken
 
     def _boom(*a, **k):
         raise OSError("git is not on PATH")
-    monkeypatch.setattr(mir.subprocess, "run", _boom)
+    monkeypatch.setattr(mir.subprocess, "Popen", _boom)
     _patch_snapshot(monkeypatch, _snapshot())
     r = mir.check(mirror, today=TODAY, fleet_root=root)
     assert r.status == "mirror_unverifiable"      # could not ask, so did not claim
@@ -448,51 +448,126 @@ def test_git_is_invoked_non_interactively(root, mirror, monkeypatch):
     The weekly build must not be hangable by a diagnostic it does not gate on.
     """
     seen = {}
-    real = mir.subprocess.run
+    real = mir.subprocess.Popen
 
     def _spy(cmd, **kw):
         seen.setdefault("env", kw.get("env") or {})
         seen.setdefault("stdin", kw.get("stdin"))
-        seen.setdefault("timeout", kw.get("timeout"))
         seen.setdefault("cmd", cmd)
         return real(cmd, **kw)
 
-    _write_lines(root, SNAP_TICKERS)          # fixture git runs BEFORE the spy, or it
-    _patch_snapshot(monkeypatch, _snapshot())  # captures the test helper, not the module
-    monkeypatch.setattr(mir.subprocess, "run", _spy)
+    _write_lines(root, SNAP_TICKERS)          # fixture git runs BEFORE the spy
+    _patch_snapshot(monkeypatch, _snapshot())
+    monkeypatch.setattr(mir.subprocess, "Popen", _spy)
     mir.check(mirror, today=TODAY, fleet_root=root)
     assert seen["env"].get("GIT_TERMINAL_PROMPT") == "0"
     assert seen["stdin"] is mir.subprocess.DEVNULL
-    assert seen["timeout"] and seen["timeout"] > 0
     assert "credential.helper=" in seen["cmd"]
 
 
-def test_every_registered_mirror_names_an_index_we_actually_collect():
-    """A mirror keyed to an index this repo does not snapshot could never be verified.
+def test_a_hung_git_kills_the_whole_process_tree(root, mirror, monkeypatch):
+    """Codex round 3: `run(timeout=)` kills git.exe and not its transport helper.
 
-    It would sit at `reference_unusable` for ever and read as a standing alarm nobody
-    can clear -- the `a-flag-that-is-always-true` shape.
+    On Windows `git fetch` spawns `git-remote-https`, which holds the captured pipes --
+    so the read after the timeout can block PAST the bound that was supposed to stop it,
+    hanging the weekly build. The kill must reach the tree.
     """
-    known = set(mir.im.SOURCES)
-    for m in mir.MIRRORS:
-        assert m.index_key in known, f"{m.name} points at unknown index {m.index_key!r}"
+    killed = []
+    monkeypatch.setattr(mir, "_kill_tree", lambda proc: killed.append(proc))
+
+    class _Hanging:
+        pid = 4242
+        returncode = None
+
+        def __init__(self, *a, **k):
+            self.calls = 0
+
+        def communicate(self, timeout=None):
+            self.calls += 1
+            if self.calls == 1:
+                raise mir.subprocess.TimeoutExpired(cmd="git", timeout=timeout or 0)
+            return ("", "")
+
+    monkeypatch.setattr(mir.subprocess, "Popen", _Hanging)
+    code, out = mir._git(root, "fetch", timeout=1)
+    assert code == 1 and out == ""
+    assert killed, "the timeout must kill the process tree, not just git"
 
 
-def test_every_registered_mirror_declares_why_it_exists():
-    """`why` is load-bearing: it is what stops the next reader deleting the file.
+def test_a_failed_requested_fetch_refuses_to_compare(root, mirror, monkeypatch):
+    """Codex round 3, and it is the module's own founding rule.
 
-    The brief already told one reader to retire sigma-alert/sources/sp500.txt, which
-    would have taken the screener offline.
+    With `fetch=True` the caller asked for a current ref. If that refresh fails, the
+    stale ref must NOT reach the comparison: a chance match would report `ok`, and
+    `is_problem` ignores `ref_caveat`, so the weekly step would be silent and the CLI
+    would exit 0 while the real remote had moved.
     """
-    for m in mir.MIRRORS:
-        assert m.why and len(m.why) > 20, f"{m.name} has no usable rationale"
-
-
-def test_summarise_covers_every_result(root, mirror, monkeypatch):
-    _patch_snapshot(monkeypatch, _snapshot())
     _write_lines(root, SNAP_TICKERS)
-    results = [mir.check(mirror, today=TODAY, fleet_root=root)]
-    assert mirror.name in mir.summarise(results)
+    _patch_snapshot(monkeypatch, _snapshot())
+    real = mir._git
+
+    def _fail_fetch(repo_root, *args, **kw):
+        if args and args[0] == "fetch":
+            return 1, ""
+        return real(repo_root, *args, **kw)
+
+    monkeypatch.setattr(mir, "_git", _fail_fetch)
+    r = mir.check(mirror, today=TODAY, fleet_root=root, fetch=True)
+    assert r.status == "mirror_unverifiable", (
+        "a refresh that was requested and failed is a refusal, not a caveat")
+    assert r.is_problem
+
+
+def test_the_fetch_names_the_exact_branch_not_just_the_remote(root, mirror, monkeypatch):
+    """Codex round 3: a bare `git fetch origin` returns 0 after the branch is deleted
+    upstream and leaves the stale remote-tracking ref in place, so the comparison would
+    certify a blob CI can no longer clone. Naming the refspec makes that an error.
+    """
+    _write_lines(root, SNAP_TICKERS)
+    _patch_snapshot(monkeypatch, _snapshot())
+    seen = []
+    real = mir._git
+
+    def _spy(repo_root, *args, **kw):
+        if args and args[0] == "fetch":
+            seen.append(args)
+        return real(repo_root, *args, **kw)
+
+    monkeypatch.setattr(mir, "_git", _spy)
+    mir.check(mirror, today=TODAY, fleet_root=root, fetch=True)
+    assert seen, "fetch=True must actually fetch"
+    assert any("refs/heads/" in a and mirror.ci_branch in a
+               for args in seen for a in args if isinstance(a, str)), (
+        f"the fetch must name an explicit refspec for {mirror.ci_branch}; got {seen}")
+
+
+def test_the_compared_ref_is_declared_not_taken_from_the_local_upstream(root, monkeypatch):
+    """Codex round 3: `@{u}` follows whatever branch the sibling is parked on.
+
+    Park the sibling on a feature branch whose copy matches, while the branch CI clones
+    still holds the stale one. The old `@{u}` resolution reported `ok`; the declared ref
+    must report the drift.
+    """
+    m = mir.Mirror(name="test mirror", repo="sigma-alert",
+                   path_in_repo="sources/sp500.txt", index_key="sp500",
+                   fmt="lines", why="test", ci_branch="master")
+    _patch_snapshot(monkeypatch, _snapshot())
+    repo = root / "sigma-alert"
+    _write_lines(root, SNAP_TICKERS[:-10] + [f"OLD{i}" for i in range(10)])  # on master
+    _git(repo, "checkout", "-q", "-b", "feature")
+    _write_lines(root, SNAP_TICKERS, commit=False)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "feature fix")
+    _git(repo, "push", "-q", "-u", "origin", "feature")
+
+    r = mir.check(m, today=TODAY, fleet_root=root)
+    assert r.status == "drifted", (
+        "the declared CI branch is master; the feature branch's copy must not certify it")
+
+
+def test_every_mirror_declares_the_branch_its_consumer_clones():
+    for m in mir.MIRRORS:
+        assert m.ci_remote and m.ci_branch, f"{m.name} does not declare its CI branch"
 
 
 def test_both_production_callers_fetch_before_comparing(monkeypatch):

@@ -77,6 +77,10 @@ class Mirror:
     index_key: str       # the key in this repo's index_membership snapshots
     fmt: str             # "lines" (one ticker per line, # comments) or "names_json"
     why: str             # why this copy exists and may not simply be deleted
+    # The branch the consumer's CI actually clones. DECLARED, never inferred from the
+    # local checkout's current upstream -- see `_remote_ref`.
+    ci_remote: str = "origin"
+    ci_branch: str = "master"
 
     @property
     def repo_relative(self) -> str:
@@ -161,37 +165,88 @@ class MirrorResult:
         }
 
 
+def _kill_tree(proc: "subprocess.Popen") -> None:
+    """Kill git AND the transport helpers it spawned.
+
+    ⛑ `subprocess.run(timeout=...)` kills only the immediate `git.exe`. On Windows a
+    `git fetch` launches `git-remote-https` (or `ssh`), which keeps the captured pipe
+    handles open, so the subsequent blocking read can hang **past** the timeout that was
+    supposed to bound it -- the weekly build stalled by the diagnostic it does not gate
+    on. An interrupted fetch can also leave `.git` lock files that break Coverage
+    Manager's own `sigma_export` fetch+rebase later in the same build. (Codex round 3.)
+    """
+    import os
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                           capture_output=True, timeout=15)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    else:                                     # pragma: no cover - POSIX path
+        try:
+            os.killpg(os.getpgid(proc.pid), 9)
+        except (OSError, AttributeError):
+            pass
+
+
 def _git(repo_root: Path, *args: str, timeout: int = 30) -> tuple[int, str]:
     """Run one git command in `repo_root`. Never raises; returns (code, stdout).
 
     ⛑ `GIT_TERMINAL_PROMPT=0` and an empty credential helper are not optional. This runs
     unattended under Windows Task Scheduler, where a git command that decides to ask for
     a username blocks for ever on a console nobody is watching -- a diagnostic that hangs
-    the weekly build it is specified not to gate. The timeout is the second backstop.
+    the weekly build it is specified not to gate.
+
+    ⛑ The timeout kills the whole PROCESS TREE, not just git. See `_kill_tree`.
     """
     import os
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="",
+               GCM_INTERACTIVE="never", GIT_LFS_SKIP_SMUDGE="1")
+    flags = {}
+    if os.name == "nt":
+        flags["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:                                     # pragma: no cover - POSIX path
+        flags["start_new_session"] = True
     try:
-        p = subprocess.run(
+        proc = subprocess.Popen(
             ["git", "-C", str(repo_root), "-c", "credential.helper=", "--no-pager", *args],
-            capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace", env=env, stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.SubprocessError):
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+            text=True, encoding="utf-8", errors="replace", env=env, **flags)
+    except (OSError, ValueError):
         return 1, ""
-    return p.returncode, p.stdout
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        try:
+            out, _ = proc.communicate(timeout=10)
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            out = ""
+        return 1, out or ""
+    except (OSError, ValueError):
+        _kill_tree(proc)
+        return 1, ""
+    return proc.returncode, out or ""
 
 
-def _upstream_ref(repo_root: Path) -> str:
-    """The remote-tracking ref whose content CI actually clones, or ''."""
-    code, out = _git(repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    if code == 0 and out.strip():
-        return out.strip()
-    # A checkout with no configured upstream can still have an unambiguous origin default.
-    code, out = _git(repo_root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
-    return out.strip() if code == 0 and out.strip() else ""
+def _remote_ref(mirror: "Mirror") -> str:
+    """The fully qualified remote-tracking ref whose content CI clones.
+
+    ⛑ Built from the mirror's DECLARED `ci_remote`/`ci_branch`, never from `@{u}`.
+    `@{u}` follows whatever branch the sibling checkout happens to be on: leave
+    `sigma-alert` parked on a feature branch and the check would compare that branch's
+    copy and report `ok` while CI kept reading a divergent `master`. `--abbrev-ref` also
+    drops the namespace, so a local tag named like the branch can make the name
+    ambiguous. (Codex round 3.)
+    """
+    return f"refs/remotes/{mirror.ci_remote}/{mirror.ci_branch}"
 
 
-def _published_text(repo_root: Path, path_in_repo: str,
+def _published_text(repo_root: Path, mirror: "Mirror", path_in_repo: str,
                     *, fetch: bool = False) -> tuple[str | None, str, str]:
     """The mirror's PUSHED content, plus a note for anything CI does not have yet.
 
@@ -209,24 +264,45 @@ def _published_text(repo_root: Path, path_in_repo: str,
         made it worse -- `@{u}` failed, the failure was ignored, and an unpushed HEAD was
         certified indefinitely.
 
-    So the comparison is against the **remote-tracking ref**, and a checkout where that
-    cannot be resolved is reported `mirror_unverifiable` rather than passing.
+      * Round 3 caught four more in round 2's own surface: `@{u}` follows whatever
+        branch the sibling is parked on rather than the branch CI clones; a bare
+        `git fetch origin` returns 0 after the branch is deleted upstream and leaves the
+        stale ref in place; a **failed** requested fetch still let that stale ref reach
+        the comparison, where a chance match reported `ok`; and the subprocess timeout
+        killed only `git.exe`, not the transport helper holding its pipes.
+
+    So the comparison is against a **declared, fully qualified remote-tracking ref**,
+    refreshed by an **exact refspec**, and any checkout or fetch that cannot establish it
+    is reported `mirror_unverifiable` rather than passing.
 
     `fetch=True` refreshes that ref first; the weekly caller does, because it is already a
     networked step. The default is False so `check()` keeps its no-network property, and
     the returned note then says the ref was not refreshed this run.
     """
-    ref = _upstream_ref(repo_root)
-    if not ref:
-        return None, "", ("no upstream branch resolvable -- cannot tell which bytes CI "
-                          "has (detached HEAD, no remote, or not a git checkout)")
+    ref = _remote_ref(mirror)
+    code, _ = _git(repo_root, "rev-parse", "--verify", "--quiet", ref)
+    if code != 0:
+        return None, "", (f"{ref} does not exist in this checkout -- cannot tell which "
+                          f"bytes CI has (no remote, wrong branch, or not a git checkout)")
 
     caveat = ""
     if fetch:
-        remote = ref.split("/", 1)[0]
-        code, _ = _git(repo_root, "fetch", "--quiet", remote, timeout=90)
+        # ⛑ Fetch the EXACT branch, not the whole remote. A bare `git fetch origin`
+        # returns 0 after the branch is renamed or deleted upstream, leaving the stale
+        # remote-tracking ref in place -- and the comparison would then certify a blob
+        # CI can no longer clone. Naming the refspec makes a deleted branch an error.
+        refspec = f"+refs/heads/{mirror.ci_branch}:{ref}"
+        code, _ = _git(repo_root, "fetch", "--quiet", mirror.ci_remote, refspec,
+                       timeout=90)
         if code != 0:
-            caveat = f"could not fetch {remote}, so {ref} may be behind the real remote"
+            # ⛑ A REQUESTED refresh that failed is not a caveat, it is a refusal. The
+            # stale ref must not reach the comparison: if it happens to match while the
+            # real remote has moved, `status` would be `ok`, `is_problem` False (it
+            # ignores `ref_caveat`), the weekly step silent and the CLI exit 0.
+            return None, "", (
+                f"could not fetch {mirror.ci_remote}/{mirror.ci_branch} -- refusing to "
+                f"compare against a ref that is known to be unrefreshed (branch renamed "
+                f"or deleted upstream, network, or auth)")
     else:
         caveat = f"{ref} was not refreshed this run and may be behind the real remote"
 
@@ -241,7 +317,8 @@ def _published_text(repo_root: Path, path_in_repo: str,
 
     code, diff = _git(repo_root, "diff", "--name-only", f"{ref}..HEAD", "--", path_in_repo)
     if code == 0 and diff.strip():
-        lag.append(f"committed locally but not pushed to {ref}")
+        lag.append(f"committed locally but not pushed to {mirror.ci_remote}/"
+                   f"{mirror.ci_branch}")
     return out, "; ".join(lag), caveat
 
 
@@ -326,8 +403,8 @@ def check(mirror: Mirror, *, today: date | None = None,
     # deliberately NO fallback to the working tree or to local HEAD: both were tried and
     # both certified stale bytes as agreement (see `_published_text`). A checkout where
     # the pushed state cannot be established reports that it cannot be established.
-    text, lag, caveat = _published_text(root / mirror.repo, mirror.path_in_repo,
-                                        fetch=fetch)
+    text, lag, caveat = _published_text(root / mirror.repo, mirror,
+                                        mirror.path_in_repo, fetch=fetch)
     if text is None:
         res.status = "mirror_unverifiable" if path.exists() else "mirror_absent"
         res.detail = (f"{mirror.repo_relative}: {caveat}"
