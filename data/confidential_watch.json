@@ -25,5 +25,14 @@
   "source_kind": "announcement",
   "source_url": "https://www.prnewswire.com/news-releases/brooks-automation-holdings-inc-announces-confidential-submission-of-draft-registration-statement-for-proposed-initial-public-offering-302874604.html",
   "status": "open"
+ },
+ {
+  "company": "Altera Corporation",
+  "first_seen": "2026-09-18",
+  "flipped_to": "",
+  "note": "Announced 2026-09-15 in Altera's own words ('Altera Corporation announced that its parent company has confidentially submitted a draft registration statement on Form S-1') - carried by wire pickup; no company-hosted release page located. FPGA / programmable logic for AI, industrial automation and robotics; Silver Lake took 51% from Intel in 2025 at a $8.75B valuation, MGX co-invested, Intel retains 49%. Reuters: preparing a >$2B IPO as soon as this year. Core adjacency (semis) - Bucket 1 adjacency on pricing, Bucket 2 only if >= $25B",
+  "source_kind": "announcement",
+  "source_url": "https://www.investing.com/news/stock-market-news/altera-files-confidential-ipo-registration-with-the-sec-432SI-4901828",
+  "status": "open"
  }
 ]

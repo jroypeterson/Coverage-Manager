@@ -22516,8 +22516,8 @@
     ],
     "next_expected": {
       "fiscal_year": 2027,
-      "fiscal_quarter": 1,
-      "report_date": "2026-09-16",
+      "fiscal_quarter": 2,
+      "report_date": "2026-12-16",
       "source": "finnhub",
       "gating_eligible": true
     }
@@ -36444,6 +36444,7 @@
       3,
       5,
       6,
+      7,
       8,
       9,
       12
@@ -36453,19 +36454,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-14",
-        "n_rows": 8,
+        "fetched_at": "2026-09-18",
+        "n_rows": 9,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "n_events": 2,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "covered": false,
         "error": null
       }
@@ -36474,7 +36475,7 @@
     "recent_quarters": [
       {
         "fiscal_year": 2026,
-        "fiscal_quarter": 3,
+        "fiscal_quarter": 2,
         "report_date": "2026-08-06",
         "period_end": null,
         "eps_actual": 0.822,
@@ -36488,6 +36489,19 @@
       {
         "fiscal_year": 2026,
         "fiscal_quarter": 1,
+        "report_date": "2026-07-30",
+        "period_end": null,
+        "eps_actual": 0.822,
+        "label_sources": [
+          "finnhub"
+        ],
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
+      },
+      {
+        "fiscal_year": 2025,
+        "fiscal_quarter": 4,
         "report_date": "2026-05-07",
         "period_end": null,
         "eps_actual": null,
@@ -36500,7 +36514,7 @@
       },
       {
         "fiscal_year": 2025,
-        "fiscal_quarter": 4,
+        "fiscal_quarter": 3,
         "report_date": "2026-02-12",
         "period_end": null,
         "eps_actual": 0.094,
@@ -36513,7 +36527,7 @@
       },
       {
         "fiscal_year": 2025,
-        "fiscal_quarter": 3,
+        "fiscal_quarter": 2,
         "report_date": "2025-09-30",
         "period_end": null,
         "eps_actual": -0.1542,
@@ -36526,7 +36540,7 @@
       },
       {
         "fiscal_year": 2025,
-        "fiscal_quarter": 2,
+        "fiscal_quarter": 1,
         "report_date": "2025-06-29",
         "period_end": null,
         "eps_actual": 0.873,
@@ -36538,8 +36552,8 @@
         "gating_eligible": false
       },
       {
-        "fiscal_year": 2025,
-        "fiscal_quarter": 1,
+        "fiscal_year": 2024,
+        "fiscal_quarter": 4,
         "report_date": "2025-03-31",
         "period_end": null,
         "eps_actual": 0.4064,
@@ -36552,7 +36566,7 @@
       },
       {
         "fiscal_year": 2024,
-        "fiscal_quarter": 4,
+        "fiscal_quarter": 3,
         "report_date": "2024-12-30",
         "period_end": null,
         "eps_actual": 0.2147,
@@ -56330,19 +56344,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "n_rows": 50,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "n_events": 3,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "covered": false,
         "error": null
       }
@@ -57160,19 +57174,19 @@
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "n_rows": 38,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-14",
-        "n_events": 3,
+        "fetched_at": "2026-09-18",
+        "n_events": 2,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-14",
+        "fetched_at": "2026-09-18",
         "covered": true,
         "error": null
       }

@@ -238,9 +238,9 @@
   "verdict": "not-relevant"
  },
  "2128626": {
-  "accession": "0001193125-26-352605",
+  "accession": "0001193125-26-391356",
   "doc": "ck0002128626-ex99_1.htm",
-  "filed": "2026-08-14",
+  "filed": "2026-09-15",
   "first_seen": "2026-08-06",
   "listing_kind": "new registration",
   "parent": "",
@@ -251,10 +251,24 @@
   "ticker": "",
   "verdict": "not-relevant"
  },
+ "2130999": {
+  "accession": "0001193125-26-391224",
+  "doc": "d42824dex991.htm",
+  "filed": "2026-09-15",
+  "first_seen": "2026-09-18",
+  "listing_kind": "spin-off",
+  "parent": "FLEXIBLE SOLUTIONS INTERNATIONAL INC",
+  "reason": "Adjacent sector (Tech, SIC 3672); Bucket 3 if it separates above $10B \u2014 size unknown until it trades",
+  "registrant": "Archer SpinCo, Inc.",
+  "sector": "Tech",
+  "sic": "3672",
+  "ticker": "",
+  "verdict": "relevant"
+ },
  "2132873": {
-  "accession": "0001193125-26-381915",
+  "accession": "0001193125-26-392242",
   "doc": "d127770dex991.htm",
-  "filed": "2026-09-03",
+  "filed": "2026-09-16",
   "first_seen": "2026-08-17",
   "listing_kind": "spin-off",
   "parent": "Madison Square Garden Sports Corp.",
@@ -262,7 +276,7 @@
   "registrant": "MSGS Spinco, Inc.",
   "sector": "",
   "sic": "7990",
-  "ticker": "",
+  "ticker": "MSGR",
   "verdict": "not-relevant"
  },
  "96664": {
