@@ -509,21 +509,23 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
         _, rc = _git(target_dir, "fetch", "origin", branch)
         if rc != 0:
             return {"status": "failed", "reason": f"git fetch origin {branch} failed in sigma-alert clone"}
-        _, rc = _git(target_dir, "rebase", f"origin/{branch}")
-        if rc != 0:
-            _git(target_dir, "rebase", "--abort")
-            return {"status": "failed", "reason": "pre-export rebase failed (sigma-alert working tree dirty or conflict)"}
-
-        # ⛑ CHECKED BEFORE A SINGLE FILE IS WRITTEN. A push publishes the whole branch,
-        # so a foreign local commit contaminates the CHANGED-bytes path exactly as it
-        # does the catch-up path; refusing here leaves the clone byte-identical instead
-        # of stranding freshly written files in a dirty tree for the next rebase to
-        # choke on.
+        # ⛑ CLASSIFY BEFORE ANY HISTORY-MUTATING COMMAND, AND BEFORE A SINGLE FILE IS
+        # WRITTEN. The fetch above only moves a remote-tracking ref; the REBASE rewrites
+        # local history, so running this check after it meant a scheduled job replayed
+        # someone's WIP commit onto the new remote tip — new SHA, signature dropped,
+        # merge topology flattened — and then reported that it had left the clone
+        # untouched. A push also publishes the whole branch, so a foreign commit
+        # contaminates the changed-bytes path exactly as it does the catch-up path.
         _, foreign, err = classify_unpushed(target_dir, branch)
         if err:
             return {"status": "failed", "reason": err}
         if foreign:
             return {"status": "failed", "reason": _foreign_commit_reason(foreign, branch)}
+
+        _, rc = _git(target_dir, "rebase", f"origin/{branch}")
+        if rc != 0:
+            _git(target_dir, "rebase", "--abort")
+            return {"status": "failed", "reason": "pre-export rebase failed (sigma-alert working tree dirty or conflict)"}
 
     # Surface any tickers sigma-alert flagged as missing metadata. We log the
     # warning whether or not the export below ends up changing the file —

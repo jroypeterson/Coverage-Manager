@@ -847,3 +847,76 @@ def test_a_row_longer_than_the_header_raises_too(monkeypatch, tmp_path):
 def test_blank_lines_are_still_ignored(monkeypatch, tmp_path):
     rows = _ivv(monkeypatch, tmp_path, text=_ivv_text() + "\n\n")[2]
     assert len(rows) == 503
+
+
+# --- Codex round 6 -------------------------------------------------------------
+
+def test_a_body_cut_inside_the_last_record_raises(monkeypatch, tmp_path):
+    """A cut inside the final QUOTED field yields full-width records for everything
+    before it, so the field-count guard never fires: 496 constituents would clear the
+    495-510 band with seven names silently missing. Measured on the live files
+    2026-09-22 (IVV 83,277 bytes, EFA 115,972): both end with a newline after the last
+    record, so a body that does not is a body that was cut."""
+    with pytest.raises(im.IndexMembershipError, match="truncat"):
+        im.parse_holdings(_ivv_text()[:-30])
+
+
+def test_a_body_with_no_terminating_newline_raises_for_every_fund(monkeypatch):
+    with pytest.raises(im.IndexMembershipError, match="truncat"):
+        im.parse_holdings(_csv(3).rstrip("\n"))
+
+
+def test_a_complete_body_is_accepted_with_or_without_a_trailing_blank_line():
+    """The live files end `...\n\n`; one newline is equally complete."""
+    assert im.parse_holdings(_csv(3))[1]
+    assert im.parse_holdings(_csv(3) + "\n")[1]
+
+
+def test_an_incomplete_chunked_read_is_reported_not_crashed(monkeypatch):
+    """http.client.IncompleteRead is NOT an OSError, so a truncated chunked response
+    escaped the fetch's own except clause as an unhandled exception mid-build. Both
+    endpoints answer `Transfer-Encoding: chunked` with no Content-Length (measured
+    2026-09-22), so this is the transport's only truncation signal."""
+    import http.client
+    import urllib.request as _u
+
+    def _boom(*a, **k):
+        raise http.client.IncompleteRead(b"partial")
+
+    monkeypatch.setattr(_u, "urlopen", _boom)
+    with pytest.raises(im.IndexMembershipError, match="truncat"):
+        im._fetch_csv("239726")
+
+
+def test_a_vanguard_as_of_that_is_not_a_calendar_date_raises(monkeypatch):
+    """Dates were compared as STRINGS and Vanguard's value was only sliced, so
+    `2026-09-00T00:00:00-04:00` passed the future check, passed the older-than check,
+    and archived `r1000_2026-09-00.json` as latest with age_days None."""
+    import time
+    import urllib.request as _u
+
+    def _fake(req, timeout=60):
+        return _JsonResp(_vanguard_page(600, 1, 600, as_of="2026-09-00"))
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    with pytest.raises(im.IndexMembershipError, match="2026-09-00"):
+        im._fetch_vanguard("VONE")
+
+
+def test_a_cm_cache_stamp_that_is_not_a_calendar_date_raises(monkeypatch, tmp_path):
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({"_cached_at": "2026-09-00T19:01:55+00:00",
+                                 "data": {"tickers": ["A"], "info": {}}}),
+                     encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    with pytest.raises(im.IndexMembershipError, match="2026-09-00"):
+        im._load_cm_sp500()
+
+
+def test_the_future_and_older_checks_compare_PARSED_dates(out_dir, monkeypatch, tmp_path):
+    """A string comparison reads `2026-9-21` as older than `2026-09-08`."""
+    assert im.is_future_as_of("2026-09-30", date(2026, 9, 22)) is True
+    assert im.is_future_as_of("2026-09-23", date(2026, 9, 22)) is False
+    with pytest.raises(im.IndexMembershipError, match="2026-09-31"):
+        im.parse_as_of("2026-09-31", "test")

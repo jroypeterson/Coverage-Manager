@@ -374,3 +374,33 @@ def test_a_commit_touching_a_foreign_path_alongside_ours_is_refused(
     assert "secrets.env" in res["reason"]
     assert subprocess.run(["git", "-C", str(bare), "show", "master:secrets.env"],
                           capture_output=True).returncode != 0
+
+
+def test_a_foreign_commit_is_refused_BEFORE_the_rebase_rewrites_it(
+        monkeypatch, tmp_path, fixture_csv):
+    """The check ran after the rebase, so a scheduled run replayed someone's WIP
+    commit onto the new remote tip -- new SHA, signature dropped, topology gone --
+    and then reported that it had left the clone untouched."""
+    _positions_stub(monkeypatch, tmp_path)
+    repo, bare = _real_clone(tmp_path)
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
+
+    # someone else advances origin, so a rebase would certainly rewrite local history
+    other = tmp_path / "other"
+    subprocess.run(["git", "clone", "-q", str(bare), str(other)], check=True,
+                   capture_output=True)
+    (other / "upstream.txt").write_text("from CI\n", encoding="utf-8")
+    for args in (["config", "user.email", "t@t.t"], ["config", "user.name", "t"],
+                 ["add", "upstream.txt"], ["commit", "-q", "-m", "CI cache update"],
+                 ["push", "-q", "origin", "master"]):
+        subprocess.run(["git", "-C", str(other), *args], check=True, capture_output=True)
+
+    (repo / "notes.txt").write_text("half-written\n", encoding="utf-8")
+    for args in (["add", "notes.txt"], ["commit", "-q", "-m", "WIP: do not ship"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    before, _ = sigma_export._git(repo, "rev-parse", "HEAD")
+
+    res = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert res["status"] == "failed" and "WIP: do not ship" in res["reason"]
+    after, _ = sigma_export._git(repo, "rev-parse", "HEAD")
+    assert after.strip() == before.strip(), "the foreign commit was rewritten anyway"

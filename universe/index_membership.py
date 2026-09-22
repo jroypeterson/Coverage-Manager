@@ -264,11 +264,38 @@ def is_future_as_of(as_of: str | None, today: date) -> bool:
     A future date is not a fresh snapshot and not a usable fallback; it is a corrupt
     one, whichever path produced it.
     """
-    return bool(as_of) and as_of > (today + timedelta(days=FUTURE_TOLERANCE_DAYS)).isoformat()
+    d = _as_date(as_of)
+    return d is not None and d > today + timedelta(days=FUTURE_TOLERANCE_DAYS)
 
 
 class IndexMembershipError(RuntimeError):
     """Fetch or parse failed in a way that must not resolve to an empty index."""
+
+
+def _as_date(value: str | None) -> date | None:
+    """A real calendar date from an ISO string, or None. Never a substring."""
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_as_of(raw: str | None, source: str) -> str:
+    """An ISO date from a source's own stamp, or raise. Used by EVERY source kind.
+
+    ⛑ A DATE-SHAPED STRING IS NOT A DATE, AND THESE WERE COMPARED LEXICALLY. Vanguard's
+    `asOfDate` was merely SLICED to ten characters, so `2026-09-00T00:00:00-04:00`
+    passed the future check, passed the older-than check, and archived
+    `r1000_2026-09-00.json` as latest with `age_days` None — a snapshot that no
+    staleness rule can ever measure and that blocks nothing behind it. Parse where the
+    value is read, refuse what does not parse, and compare dates rather than strings.
+    """
+    d = _as_date(raw)
+    if d is None:
+        raise IndexMembershipError(
+            f"{source}: as-of {raw!r} is not a calendar date — refusing to stamp a "
+            f"snapshot with a value no staleness or ordering check can read")
+    return d.isoformat()
 
 
 def _num(v) -> float | None:
@@ -295,10 +322,19 @@ def _fetch_csv(pid: str, timeout: int = 60) -> str:
     req = urllib.request.Request(HOLDINGS_URL.format(pid=pid),
                                  headers={"User-Agent": BROWSER_UA,
                                           "Accept": "text/csv,*/*"})
+    import http.client
+
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read().decode("utf-8-sig", "replace")
-    except (urllib.error.URLError, OSError, TimeoutError) as e:
+    except http.client.IncompleteRead as e:
+        # ⛑ NOT an OSError, so this escaped the clause below as an unhandled exception
+        # mid-build. It is also the transport's ONLY truncation signal here: both
+        # endpoints answer `Transfer-Encoding: chunked` with no Content-Length.
+        raise IndexMembershipError(
+            f"truncated response for product {pid}: the chunked body ended early "
+            f"({len(e.partial)} bytes read)") from e
+    except (urllib.error.URLError, OSError, TimeoutError, http.client.HTTPException) as e:
         raise IndexMembershipError(f"fetch failed for product {pid}: {e}") from e
 
 
@@ -314,6 +350,22 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
         raise IndexMembershipError(
             "response is an HTML page, not a CSV — the endpoint served the app shell "
             "(this returns HTTP 200, so the status code proves nothing)")
+
+    # ⛑ A CUT INSIDE THE FINAL QUOTED FIELD LEAVES EVERY EARLIER RECORD FULL-WIDTH, so
+    # the per-row field-count guard never fires and 496 constituents clear the 495-510
+    # band with seven names silently missing. Measured on the live files 2026-09-22
+    # (IVV 83,277 bytes, EFA 115,972): both end `...\n\n`, i.e. a newline after the
+    # last record — and neither endpoint sends a Content-Length (both answer
+    # `Transfer-Encoding: chunked`), so this is the only in-file evidence there is.
+    #
+    # 🔻 RESIDUAL, STATED: a cut landing exactly on a record boundary is invisible here
+    # — the file carries no holdings count to reconcile against. The count band and the
+    # weekly IVV-vs-Wikipedia line in `index_mirrors` are what cover that.
+    if not text.endswith("\n"):
+        raise IndexMembershipError(
+            "the response does not end with a newline — it was truncated mid-record "
+            "(a cut inside a quoted field leaves the rows before it well-formed, so "
+            "nothing else in this parser can see it)")
 
     lines = text.splitlines()
     header_idx = next((i for i, l in enumerate(lines)
@@ -533,7 +585,8 @@ def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
         if not isinstance(d, dict):
             raise IndexMembershipError(f"{etf}: page at start={start} is not a JSON object")
         size = d.get("size") if size is None else size
-        as_of = as_of or (d.get("asOfDate") or "")[:10]
+        if not as_of and d.get("asOfDate"):
+            as_of = parse_as_of(d.get("asOfDate"), etf)
         ents = ((d.get("fund") or {}).get("entity")) or []
         if not ents:
             break
@@ -589,6 +642,7 @@ def _load_cm_sp500() -> tuple[str, list[dict]]:
         raise IndexMembershipError(
             "S&P 500 cache has no usable `_cached_at` — refusing to stamp a snapshot "
             "with today's date instead")
+    stamp = parse_as_of(stamp, "S&P 500 cache `_cached_at`")
 
     rows = []
     for t in tickers:
@@ -721,7 +775,8 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # and nothing is written: the run reports what it saw and the next fetch fixes it.
     previous = load_latest(key)
     prev_as_of = (previous or {}).get("as_of")
-    if prev_as_of and as_of < prev_as_of:
+    prev_date, this_date = _as_date(prev_as_of), _as_date(as_of)
+    if prev_date and this_date and this_date < prev_date:
         msg = (f"{key}: fetched as_of {as_of} is OLDER than the snapshot on disk "
                f"({prev_as_of}) — refusing to move latest backward")
         log.warning("index_membership[%s]: %s", key, msg)
