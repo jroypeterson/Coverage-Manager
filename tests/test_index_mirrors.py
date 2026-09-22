@@ -659,3 +659,84 @@ def test_the_step_status_is_ascii_only():
     """A cp1252 console has twice killed a run mid-report in this repo."""
     for problems in ([], [{"name": "m", "status": "drifted", "detail": "d"}]):
         _step_status(problems).encode("ascii")
+
+
+# --- IVV vs Wikipedia: a permanent, NON-GATING second-source line (2026-09-22) -------
+#
+# sp500 now comes from iShares IVV holdings. The Wikipedia cache CM still refreshes for
+# its own use is an independent second source, so their difference is worth one line
+# every week -- and must never fail the step: on a reconstitution week the two SHOULD
+# differ until Wikipedia (and CM's 7-day cache of it) catch up.
+
+SEPT_IN, SEPT_OUT = ["BE", "ILMN", "P"], ["BLDR", "TAP", "TTD"]
+
+
+def test_compare_sources_reports_both_directions():
+    base = set(SNAP_TICKERS)
+    xc = mir.compare_sources(base | set(SEPT_IN), base | set(SEPT_OUT),
+                             ivv_as_of="2026-09-21", wiki_as_of="2026-09-18")
+    assert xc["status"] == "differs"
+    assert xc["only_in_ivv"] == SEPT_IN
+    assert xc["only_in_wikipedia"] == SEPT_OUT
+    assert "3 only in IVV (BE, ILMN, P)" in xc["line"]
+    assert "3 only in Wikipedia (BLDR, TAP, TTD)" in xc["line"]
+    xc["line"].encode("ascii")
+
+
+def test_compare_sources_agreement():
+    xc = mir.compare_sources(set(SNAP_TICKERS), set(SNAP_TICKERS),
+                             ivv_as_of="2026-09-21", wiki_as_of="2026-09-18")
+    assert xc["status"] == "agree"
+    assert "503/503 identical" in xc["line"]
+
+
+def test_source_crosscheck_never_raises_and_says_when_it_cannot_compare(monkeypatch):
+    monkeypatch.setattr(mir.im, "load_latest", lambda key: None)
+    xc = mir.source_crosscheck()
+    assert xc["status"] == "unavailable"
+    assert xc["line"].startswith("IVV vs Wikipedia: unavailable")
+
+
+def test_source_crosscheck_skips_a_snapshot_that_is_not_from_ivv(monkeypatch):
+    """Comparing a Wikipedia-derived snapshot against Wikipedia is vacuous agreement."""
+    monkeypatch.setattr(mir.im, "load_latest", lambda key: _snapshot())
+    xc = mir.source_crosscheck()
+    assert xc["status"] == "unavailable"
+    assert "not IVV" in xc["line"]
+
+
+def test_source_crosscheck_compares_an_ivv_snapshot_against_the_cache(monkeypatch):
+    doc = _snapshot(SNAP_TICKERS[:-1] + ["BE"], as_of="2026-09-21")
+    doc["kind"] = "ishares"
+    monkeypatch.setattr(mir.im, "load_latest", lambda key: doc)
+    monkeypatch.setattr(mir.im, "_load_cm_sp500",
+                        lambda: ("2026-09-18", [{"ticker": t} for t in SNAP_TICKERS]))
+    xc = mir.source_crosscheck()
+    assert xc["status"] == "differs"
+    assert xc["only_in_ivv"] == ["BE"] and xc["only_in_wikipedia"] == [SNAP_TICKERS[-1]]
+
+
+def test_a_source_difference_does_not_fail_the_weekly_step(monkeypatch):
+    """Non-gating AND not a `problem`: a reconstitution week must stay green."""
+    import weekly_universe as wu
+
+    monkeypatch.setattr(mir, "check_all", lambda **kw: [])
+    monkeypatch.setattr(mir, "source_crosscheck", lambda: mir.compare_sources(
+        set(SNAP_TICKERS) | set(SEPT_IN), set(SNAP_TICKERS) | set(SEPT_OUT),
+        ivv_as_of="2026-09-21", wiki_as_of="2026-09-18"))
+    out = wu._step_index_mirrors()
+    assert out["problems"] == []
+    assert out["source_crosscheck"]["status"] == "differs"
+    assert "IVV vs Wikipedia: differs" in out["summary"]
+    st = wu._index_mirrors_step_status(
+        {"results": [{"n": 0}, {"n": 1}], "problems": [], "summary": out["summary"]})
+    assert not st.startswith("failed:")
+    st.encode("ascii")
+
+
+def test_the_cli_exit_code_ignores_the_source_crosscheck(monkeypatch):
+    monkeypatch.setattr(mir, "check_all", lambda **kw: [])
+    monkeypatch.setattr(mir, "source_crosscheck", lambda: {
+        "status": "differs", "line": "IVV vs Wikipedia: differs",
+        "only_in_ivv": ["BE"], "only_in_wikipedia": []})
+    assert mir.main(["--no-fetch"]) == 0

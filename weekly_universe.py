@@ -958,9 +958,13 @@ def _step_index_mirrors():
     # unfetched remote-tracking ref goes stale here exactly the way the fleet's other
     # checkouts do. This step is already inside a networked build; one fetch is cheap.
     results = mir.check_all(fetch=True)
+    # IVV vs Wikipedia (2026-09-22): a second-source line appended to the summary and
+    # deliberately kept OUT of `problems` -- a reconstitution week must not read failed.
+    xc = mir.source_crosscheck()
     return {"results": [r.as_dict() for r in results],
             "problems": [r.as_dict() for r in results if r.is_problem],
-            "summary": mir.summarise(results)}
+            "source_crosscheck": xc,
+            "summary": f"{mir.summarise(results)}; {xc['line']}"}
 
 
 def _index_mirrors_step_status(mir_result) -> str:

@@ -254,7 +254,12 @@ def test_stale_days_is_per_source_because_the_cadences_differ():
 
 def test_sp500_comes_from_cm_cache_as_an_OBSERVATION_not_a_source_date(out_dir, monkeypatch, tmp_path):
     """A scraped list states no effective date. Stamping it as though the index provider
-    said so would let today's scrape claim to be a membership record for today."""
+    said so would let today's scrape claim to be a membership record for today.
+
+    Since 2026-09-22 sp500's source is IVV; the `cm_cache` kind is kept as the rollback
+    path (and its reader is IVV's name/sector enrichment), so it is pinned here by
+    pointing the sp500 key back at it."""
+    monkeypatch.setitem(im.SOURCES, "sp500", dict(im.SOURCES["sp500"], kind="cm_cache"))
     cache = tmp_path / "sp500.json"
     cache.write_text(json.dumps({
         "_cached_at": "2026-09-08T19:01:55.529799+00:00",
@@ -417,3 +422,152 @@ def test_a_vanguard_page_that_never_decodes_raises_rather_than_shrinking_the_ind
     with pytest.raises(im.IndexMembershipError, match="undecodable"):
         im._fetch_vanguard("VTWO")
     assert calls["n"] == 1 + im.VANGUARD_RETRIES     # it retried before giving up
+
+
+# --- S&P 500 from iShares IVV holdings (JP 2026-09-22, Fable-gated) -----------
+#
+# The fixture is a TRIMMED copy of the live IVV file fetched 2026-09-22 (product
+# 239726, "Fund Holdings as of Sep 21, 2026"): the real preamble and header, every
+# share-class line the S&P 500 has, the September reconstitution's three entrants,
+# the four non-equity lines, and HOLX -- a post-deal residual the fund still carries
+# at $0.01 on "NO MARKET (E.G. UNLISTED)" although the index dropped it.
+
+from pathlib import Path as _Path
+
+IVV_FIXTURE = _Path(__file__).parent / "fixtures" / "ivv_holdings_2026-09-21_trimmed.csv"
+
+
+def _ivv_text():
+    return IVV_FIXTURE.read_text(encoding="utf-8")
+
+
+def _wiki_cache(tmp_path, monkeypatch, tickers=None, info=None):
+    """A Wikipedia-shaped CM cache: pre-reconstitution, so no BE/ILMN/P."""
+    tickers = tickers if tickers is not None else [
+        "NVDA", "AAPL", "MMM", "GOOGL", "GOOG", "BRK.B", "BF.B", "FOXA", "FOX",
+        "NWSA", "NWS", "CBOE", "BLDR", "TAP", "TTD"]
+    info = info if info is not None else {
+        "MMM": {"Company Name": "3M", "GICS Sector": "Industrials",
+                "GICS Sub-Industry": "Industrial Conglomerates"},
+        "BRK.B": {"Company Name": "Berkshire Hathaway", "GICS Sector": "Financials",
+                  "GICS Sub-Industry": "Multi-Sector Holdings"},
+        "GOOGL": {"Company Name": "Alphabet Inc. (Class A)",
+                  "GICS Sector": "Communication Services",
+                  "GICS Sub-Industry": "Interactive Media & Services"},
+    }
+    cache = tmp_path / "sp500_wiki.json"
+    cache.write_text(json.dumps({"_cached_at": "2026-09-18T14:09:24+00:00",
+                                 "data": {"tickers": tickers, "info": info}}),
+                     encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    return cache
+
+
+def _ivv(monkeypatch, tmp_path, text=None):
+    _serve(monkeypatch, text if text is not None else _ivv_text())
+    _wiki_cache(tmp_path, monkeypatch)
+    return im.collect("sp500")
+
+
+def test_sp500_source_is_ivv_via_the_ishares_path():
+    src = im.SOURCES["sp500"]
+    assert src["kind"] == "ishares"
+    assert src["pid"] == "239726"
+    assert src["floor"] == 450
+    assert im.stale_days_for("sp500") == im.STALE_DAYS == 45
+
+
+def test_ivv_share_classes_normalise_to_the_cm_cache_dash_form(monkeypatch, tmp_path):
+    """IVV writes `BRK B` / `BF B` with a SPACE. The cm_cache snapshots say `BRK-B`, and
+    any other spelling makes the switch week's diff show phantom departures."""
+    _, _, rows = _ivv(monkeypatch, tmp_path)
+    got = {r["ticker"] for r in rows}
+    assert {"BRK-B", "BF-B", "GOOG", "GOOGL", "FOX", "FOXA", "NWS", "NWSA"} <= got
+    assert not [t for t in got if " " in t or "." in t]
+    assert {"BE", "ILMN", "P"} <= got          # proves these rows came from IVV
+
+
+def test_ivv_non_equity_and_unlisted_residual_lines_are_dropped(monkeypatch, tmp_path):
+    _, _, rows = _ivv(monkeypatch, tmp_path)
+    got = {r["ticker"] for r in rows}
+    assert not got & {"XTSLA", "USD", "SGAFT", "ESZ6"}      # money market, cash, futures
+    assert "HOLX" not in got                                # $0.01 post-deal residual
+    assert {"BE", "ILMN", "P"} <= got and not got & {"BLDR", "TAP", "TTD"}
+    assert len(rows) == 15
+
+
+def test_ivv_as_of_is_the_funds_own_date_recorded_as_source(monkeypatch, tmp_path):
+    as_of, kind, _ = _ivv(monkeypatch, tmp_path)
+    assert (as_of, kind) == ("2026-09-21", "source")
+
+
+def test_ivv_names_and_sectors_come_from_the_wikipedia_cache(monkeypatch, tmp_path):
+    """Otherwise sp500_names.json flips to 'BERKSHIRE HATHAWAY INC CLASS B' style names,
+    and IVV's 'Communication' is not the GICS 'Communication Services'."""
+    _, _, rows = _ivv(monkeypatch, tmp_path)
+    by = {r["ticker"]: r for r in rows}
+    assert by["BRK-B"]["name"] == "Berkshire Hathaway"
+    assert by["BRK-B"]["sub_industry"] == "Multi-Sector Holdings"
+    assert by["GOOGL"]["sector"] == "Communication Services"
+    assert by["MMM"]["name"] == "3M"
+    assert by["MMM"]["name_source"] == "wikipedia"
+    # the fund's weights and values stay on the (gitignored) snapshot
+    assert by["MMM"]["weight_pct"] == 0.13
+    assert by["MMM"]["exchange"] == "NYSE"
+
+
+def test_ivv_name_is_only_the_fallback_for_a_name_wikipedia_lacks(monkeypatch, tmp_path):
+    _, _, rows = _ivv(monkeypatch, tmp_path)
+    be = {r["ticker"]: r for r in rows}["BE"]
+    assert be["name"] == "BLOOM ENERGY CLASS A"
+    assert be["name_source"] == "ivv"
+    assert be["sector"] == "Industrials"
+    assert be["sub_industry"] == ""
+    fox = {r["ticker"]: r for r in rows}["FOX"]
+    # in the Wikipedia ticker list but with no info row: IVV's sector, mapped to GICS
+    assert fox["sector"] == "Communication Services"
+    assert (fox["name"], fox["name_source"]) == ("FOX CLASS B", "ivv")
+
+
+def test_ivv_with_an_unreadable_wikipedia_cache_raises(monkeypatch, tmp_path):
+    """Falling back to IVV names for all 503 would rewrite every sigma-alert name."""
+    _serve(monkeypatch, _ivv_text())
+    monkeypatch.setattr(im, "SP500_CACHE", tmp_path / "missing.json")
+    with pytest.raises(im.IndexMembershipError, match="S&P 500 cache"):
+        im.collect("sp500")
+
+
+def test_ivv_html_shell_still_raises(monkeypatch, tmp_path):
+    with pytest.raises(im.IndexMembershipError, match="HTML"):
+        _ivv(monkeypatch, tmp_path, text="<!DOCTYPE html><html>app shell</html>")
+
+
+def test_two_ivv_lines_normalising_to_one_ticker_raise(monkeypatch, tmp_path):
+    text = _ivv_text()
+    dup = next(l for l in text.splitlines() if l.startswith('"BRK B"'))
+    with pytest.raises(im.IndexMembershipError, match="BRK-B"):
+        _ivv(monkeypatch, tmp_path, text=text + dup.replace('"BRK B"', '"BRK.B"') + "\n")
+
+
+def test_eafe_local_tickers_stay_raw(monkeypatch):
+    """The normalisation is S&P 500 only: EFA's `NOVO B` is a Copenhagen local ticker."""
+    extras = ('"NOVO B","NOVO NORDISK CLASS B","Health Care","Equity","1,000.00","1.0",'
+              '"1,000.00","10.00","100.00","Denmark","Omx Nordic Exchange Copenhagen A/S",'
+              '"DKK","1.0","DKK","-"\n')
+    _serve(monkeypatch, _csv(2, extras))
+    _, _, rows = im.collect("eafe")
+    assert "NOVO B" in {r["ticker"] for r in rows}
+
+
+def test_ivv_snapshot_caveats_describe_ivv_not_efa(out_dir, monkeypatch, tmp_path):
+    pad = "".join(
+        f'"Z{i:03d}","PAD {i}","Industrials","Equity","1.00","0.01","1.00","1.00",'
+        f'"1.00","United States","NYSE","USD","1.00","USD","-"\n' for i in range(450))
+    _serve(monkeypatch, _ivv_text() + pad)
+    _wiki_cache(tmp_path, monkeypatch)
+    r = im.refresh("sp500")
+    assert r["status"] == "ok" and r["as_of"] == "2026-09-21" and r["count"] == 465
+    doc = json.loads((out_dir / "sp500_2026-09-21.json").read_text(encoding="utf-8"))
+    assert doc["as_of_kind"] == "source" and doc["kind"] == "ishares"
+    blob = " ".join(doc["caveats"]).lower()
+    assert "ivv" in blob and "sampled" not in blob and "exports" in blob

@@ -462,6 +462,68 @@ def check_all(*, today: date | None = None, fleet_root: Path | None = None,
             for m in MIRRORS]
 
 
+# --- IVV vs Wikipedia: a second-SOURCE line, NON-GATING (2026-09-22) -----------------
+#
+# Since 2026-09-22 the sp500 snapshot comes from iShares IVV holdings. CM still refreshes
+# its Wikipedia cache (`cache/constituents/sp500.json`) for its own use, so every week there
+# are two independent sources for one list. Their difference is a fact worth one line, and
+# ONLY a line: on a reconstitution week they SHOULD differ until Wikipedia and CM's 7-day
+# cache of it catch up, so this is never a `problem`, never flips the step to `failed:`, and
+# never touches the CLI's exit code.
+
+_XC_SHOW = 10
+
+
+def compare_sources(ivv: set[str], wiki: set[str], *, ivv_as_of: str | None,
+                    wiki_as_of: str | None) -> dict:
+    """Symmetric difference of two ticker sets, plus one ASCII report line."""
+    only_ivv, only_wiki = sorted(ivv - wiki), sorted(wiki - ivv)
+
+    def _names(xs):
+        more = f", +{len(xs) - _XC_SHOW} more" if len(xs) > _XC_SHOW else ""
+        return ", ".join(xs[:_XC_SHOW]) + more
+
+    dates = f"IVV as_of {ivv_as_of}, Wikipedia cache {wiki_as_of}"
+    if only_ivv or only_wiki:
+        status = "differs"
+        body = (f"{len(only_ivv)} only in IVV ({_names(only_ivv)}); "
+                f"{len(only_wiki)} only in Wikipedia ({_names(only_wiki)})")
+    else:
+        status = "agree"
+        body = f"{len(ivv)}/{len(wiki)} identical"
+    line = f"IVV vs Wikipedia: {status} - {body} [{dates}; non-gating]"
+    return {"status": status, "only_in_ivv": only_ivv, "only_in_wikipedia": only_wiki,
+            "line": line.encode("ascii", "replace").decode("ascii")}
+
+
+def source_crosscheck() -> dict:
+    """Compare the IVV-derived sp500 snapshot with CM's Wikipedia cache. Never raises.
+
+    Reads two local files; no network, no writes. A snapshot that is not IVV-derived
+    (e.g. after a rollback to `cm_cache`) is reported `unavailable`, because comparing a
+    Wikipedia-derived list against Wikipedia would be agreement by construction.
+    """
+    def unavailable(why):
+        return {"status": "unavailable", "only_in_ivv": [], "only_in_wikipedia": [],
+                "line": f"IVV vs Wikipedia: unavailable - {why} [non-gating]"}
+
+    try:
+        doc = im.load_latest("sp500")
+        if not isinstance(doc, dict):
+            return unavailable("no sp500 snapshot on disk")
+        if doc.get("kind") != "ishares":
+            return unavailable(f"sp500 snapshot kind is {doc.get('kind')!r}, not IVV")
+        ivv = {str(h.get("ticker")).upper() for h in doc.get("holdings") or []
+               if isinstance(h, dict) and h.get("ticker")}
+        if not ivv:
+            return unavailable("sp500 snapshot carries no tickers")
+        stamp, rows = im._load_cm_sp500()
+        wiki = {str(r["ticker"]).upper() for r in rows if r.get("ticker")}
+    except Exception as exc:                          # noqa: BLE001 - a line, not a crash
+        return unavailable(f"{type(exc).__name__}: {exc}")
+    return compare_sources(ivv, wiki, ivv_as_of=doc.get("as_of"), wiki_as_of=stamp)
+
+
 def summarise(results: list[MirrorResult]) -> str:
     """One line per mirror, for the weekly step's report string."""
     if not results:
@@ -496,6 +558,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"{' ...' if len(r.only_in_snapshot) > 20 else ''}")
     bad = [r for r in results if r.is_problem]
     print(f"\n{len(results) - len(bad)}/{len(results)} mirrors verified identical")
+    # Informational only -- deliberately NOT part of the exit code (see compare_sources).
+    print(source_crosscheck()["line"])
     return 1 if bad else 0
 
 

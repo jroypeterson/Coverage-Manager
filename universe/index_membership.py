@@ -14,7 +14,7 @@ reference data published on its own path, never rows in
 | Index | The issue | Fixed here? |
 |---|---|---|
 | Russell 1000/2000/3000 | `sector_chart_pack/russell.py` has fetched them weekly for months into a cache that is **overwritten**. The lists work; no history exists. | **Yes** — dated snapshots |
-| S&P 500 | Two writers (CM's `wikipedia_provider` and `sigma-alert/sources/sp500.txt`), neither accumulating history | **Half** — history yes; retiring the second copy is consumer migration |
+| S&P 500 | Two writers (CM's `wikipedia_provider` and `sigma-alert/sources/sp500.txt`), neither accumulating history | **Half** — history yes; retiring the second copy is consumer migration (done 2026-09-22, `sigma_export.build_sp500_mirror`) |
 | All | Four consumers read a per-project cache as if it were a contract | **No** — deliberately out of scope, see below |
 
 ⛑ **THE CONSUMER MIGRATION IS DELIBERATELY NOT DONE HERE, AND THE ORDER IS THE POINT.**
@@ -50,7 +50,48 @@ and not redistributing solves it.
 |---|---|---|
 | `ishares` | MSCI EAFE | `latest-holdings.csv` for EFA — the route `foreign_identifiers.py` already uses |
 | `vanguard` | Russell 1000 / 2000 / 3000 | VONE / VTWO / VTHR holdings JSON, paginated at 500 |
-| `cm_cache` | S&P 500 | CM's own `cache/constituents/sp500.json` (Wikipedia via `providers/wikipedia_provider.py`) |
+| `ishares` | S&P 500 | `latest-holdings.csv` for **IVV** (product 239726) — since 2026-09-22 |
+| `cm_cache` | (none; rollback only) | CM's own `cache/constituents/sp500.json` (Wikipedia via `providers/wikipedia_provider.py`) |
+
+## S&P 500 comes from IVV holdings, not the Wikipedia scrape (JP 2026-09-22, Fable-gated)
+
+The scrape had three defects: no weights; no effective date (`as_of_kind` could only be
+`observed`); and the weekly build snapshotted CM's cache BEFORE the weekly performance run
+refreshed it (18 Sep 2026: snapshot 09:36, cache 10:09), so the list lagged a week and
+missed the September reconstitution (BE, ILMN, P in; BLDR, TAP, TTD out). IVV is a full
+replication fund that states its own as-of date daily.
+
+Measured on the live file, 2026-09-22 (`Fund Holdings as of Sep 21, 2026`), and pinned by
+`tests/fixtures/ivv_holdings_2026-09-21_trimmed.csv`:
+
+* 508 lines: 504 `Equity`, plus `Money Market` (XTSLA), `Cash` (USD), `Cash Collateral
+  and Margins` (SGAFT) and `Futures` (ESZ6). Only `Asset Class == Equity` is kept.
+* ⛑ **One equity line is not a constituent**: HOLX, $28k at $0.01 on exchange
+  `NO MARKET (E.G. UNLISTED)` — a post-deal residual the index had already dropped. Lines
+  on that exchange are dropped (S&P 500 only), which leaves 503 = the index's count.
+* ⛑ **Share classes are written with a SPACE**: `BRK B`, `BF B`. GOOG/GOOGL, FOX/FOXA and
+  NWS/NWSA are distinct plain tickers. `normalise_us_ticker` maps space and dot to the
+  dash every cm_cache snapshot used (`BRK-B`), so the switch week's reconciliation shows
+  no phantom departures. **S&P 500 only**: EFA's `NOVO B` is a Copenhagen local ticker
+  and must stay raw.
+* ⛑ **IVV's sector strings are NOT the GICS set** (`Communication`, not `Communication
+  Services`) and its names are `BERKSHIRE HATHAWAY INC CLASS B` style. So `name`,
+  `sector` and `sub_industry` are JOINED from the Wikipedia cache by normalised ticker,
+  and IVV's are only the fallback for a name the cache does not have yet (a new entrant,
+  in the week before Wikipedia catches up); `name_source` says which. An unreadable
+  cache RAISES rather than falling back for all 503 — that would rewrite every name in
+  sigma-alert's public `sp500_names.json` in one week.
+* Weight, market value and exchange stay on the snapshot, which is gitignored. The public
+  sigma-alert mirror writes tickers and names ONLY (pinned by a test in
+  `tests/test_sigma_sp500_mirror.py`).
+
+`universe/index_mirrors.source_crosscheck` compares IVV against the Wikipedia cache every
+week as a NON-GATING line: they should differ on a reconstitution week and agree after.
+
+**Documented fallback source (not built):** SSGA's daily SPY holdings xlsx
+(`https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx`),
+(URL recalled, NOT fetched or verified) -- another full-replication S&P 500 fund with
+its own as-of date. If IVV's endpoint goes for good, that is the swap — the `cm_cache` kind is the immediate rollback meanwhile.
 
 ⛑ **`as_of_kind` DISTINGUISHES A SOURCE DATE FROM AN OBSERVATION DATE, AND THEY ARE NOT
 THE SAME FACT.** A fund states the date its holdings are as of (`source`). A scraped
@@ -136,9 +177,10 @@ SOURCES: dict[str, dict] = {
               "index": "Russell 2000", "fund": "Vanguard Russell 2000 ETF (VTWO)"},
     "r3000": {"kind": "vanguard", "etf": "VTHR", "floor": 2400,
               "index": "Russell 3000", "fund": "Vanguard Russell 3000 ETF (VTHR)"},
-    "sp500": {"kind": "cm_cache", "floor": 450,
-              "index": "S&P 500",
-              "fund": "Wikipedia constituent list (CM providers/wikipedia_provider.py)"},
+    # `post` names an S&P-500-only row transform (see `_POST`). Rollback: kind
+    # "cm_cache" with no pid/post restores the Wikipedia-scrape source exactly.
+    "sp500": {"kind": "ishares", "pid": "239726", "floor": 450, "post": "sp500_ivv",
+              "index": "S&P 500", "fund": "iShares Core S&P 500 ETF (IVV)"},
 }
 
 # Per-source caveats, written into every snapshot rather than left in this docstring —
@@ -159,6 +201,19 @@ CAVEATS: dict[str, list[str]] = {
     "cm_cache": [
         "Scraped from Wikipedia by CM's own provider - `as_of_kind` is `observed`, "
         "the date we looked, NOT a date the index provider stated.",
+    ],
+}
+# Per-KEY caveats override the per-kind ones: sp500 uses the ishares kind, and the EFA
+# caveats ("sampled", "local exchange ticker") are false for IVV.
+CAVEATS_BY_KEY: dict[str, list[str]] = {
+    "sp500": [
+        "iShares Core S&P 500 ETF (IVV) holdings - a full-replication fund, not S&P's own "
+        "constituent file. `as_of` is the fund's stated holdings date (`source`).",
+        "Non-equity lines (cash, money market, collateral, futures) and residual lines "
+        "on 'NO MARKET (E.G. UNLISTED)' are dropped.",
+        "Share classes normalised to the dash form (IVV `BRK B` -> BRK-B).",
+        "`name`/`sector`/`sub_industry` are joined from CM's Wikipedia cache; "
+        "`name_source: ivv` marks a row where IVV's own name/sector was the fallback.",
     ],
 }
 _LICENCE = ("Licensed for internal use only - never publish into exports/ or push.")
@@ -287,6 +342,58 @@ def normalise_share_class(ticker: str) -> str:
     return (ticker or "").strip().upper().replace(".", "-")
 
 
+def normalise_us_ticker(ticker: str) -> str:
+    """A US share-class ticker in the fleet's dash form, from IVV's SPACE form.
+
+    IVV writes `BRK B` / `BF B` (measured 2026-09-22); Vanguard and Wikipedia a dot.
+    Every run of whitespace and dots becomes one dash. S&P 500 only -- an EFA ticker
+    like `NOVO B` is a local exchange code and is never passed through this.
+    """
+    import re
+
+    return re.sub(r"[\s.]+", "-", (ticker or "").strip().upper())
+
+
+UNLISTED_EXCHANGE = "NO MARKET (E.G. UNLISTED)"
+
+# IVV's sector labels differ from GICS in exactly this one (measured: the other ten of
+# IVV's eleven equity sector strings equal the Wikipedia cache's GICS set).
+IVV_SECTOR_TO_GICS = {"Communication": "Communication Services"}
+
+
+def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
+    """IVV equity rows -> S&P 500 membership rows. See the docstring's IVV section.
+
+    Drops unlisted residuals, normalises share classes, and joins name/sector/
+    sub_industry from the Wikipedia cache (IVV's only as the fallback).
+    """
+    _, info = _read_cm_sp500()
+    out, seen = [], {}
+    for r in rows:
+        if (r.get("exchange") or "").strip().upper() == UNLISTED_EXCHANGE:
+            continue
+        t = normalise_us_ticker(r["ticker"])
+        if t in seen:
+            raise IndexMembershipError(
+                f"IVV lines {seen[t]!r} and {r['ticker']!r} both normalise to {t} - "
+                f"refusing to guess which is the constituent")
+        seen[t] = r["ticker"]
+        w = info.get(t) or {}
+        wname = (w.get("Company Name") or "").strip()
+        wsector = (w.get("GICS Sector") or "").strip()
+        ivv_sector = IVV_SECTOR_TO_GICS.get(r.get("sector") or "", r.get("sector") or "")
+        out.append({**r,
+                    "ticker": t,
+                    "name": wname or r.get("name") or t,
+                    "sector": wsector or ivv_sector,
+                    "sub_industry": (w.get("GICS Sub-Industry") or "").strip(),
+                    "name_source": "wikipedia" if wname else "ivv"})
+    return out
+
+
+_POST = {"sp500_ivv": _sp500_ivv_rows}
+
+
 def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
                     retries: int = VANGUARD_RETRIES) -> tuple[str, list[dict]]:
     """Paginate one Vanguard ETF's equity holdings.
@@ -351,6 +458,25 @@ def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
     return as_of, out
 
 
+def _read_cm_sp500_doc() -> tuple[str, list[str], dict]:
+    """`(cached_at_date, raw_tickers, raw_info)` from CM's Wikipedia cache. Raises."""
+    try:
+        doc = json.loads(SP500_CACHE.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as e:
+        raise IndexMembershipError(f"S&P 500 cache unreadable at {SP500_CACHE}: {e}") from e
+    data = doc.get("data") or {}
+    tickers = data.get("tickers") or []
+    if not tickers:
+        raise IndexMembershipError("S&P 500 cache holds no tickers")
+    return str(doc.get("_cached_at") or "")[:10], tickers, data.get("info") or {}
+
+
+def _read_cm_sp500() -> tuple[str, dict]:
+    """`(cached_at_date, {dash_ticker: info})` -- the join table for IVV enrichment."""
+    stamp, tickers, info = _read_cm_sp500_doc()
+    return stamp, {normalise_us_ticker(t): (info.get(t) or {}) for t in tickers}
+
+
 def _load_cm_sp500() -> tuple[str, list[dict]]:
     """CM's own S&P 500 constituent cache, read-only.
 
@@ -358,17 +484,7 @@ def _load_cm_sp500() -> tuple[str, list[dict]]:
     date, so the only honest stamp is `_cached_at` — when we looked. The caller records
     `as_of_kind='observed'` so a consumer cannot mistake it for the index provider's own.
     """
-    try:
-        doc = json.loads(SP500_CACHE.read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError) as e:
-        raise IndexMembershipError(f"S&P 500 cache unreadable at {SP500_CACHE}: {e}") from e
-
-    data = doc.get("data") or {}
-    tickers = data.get("tickers") or []
-    info = data.get("info") or {}
-    stamp = str(doc.get("_cached_at") or "")[:10]
-    if not tickers:
-        raise IndexMembershipError("S&P 500 cache holds no tickers")
+    stamp, tickers, info = _read_cm_sp500_doc()
     if len(stamp) != 10:
         raise IndexMembershipError(
             "S&P 500 cache has no usable `_cached_at` — refusing to stamp a snapshot "
@@ -395,6 +511,8 @@ def collect(key: str) -> tuple[str, str, list[dict]]:
     kind = src["kind"]
     if kind == "ishares":
         as_of, rows = parse_holdings(_fetch_csv(src["pid"]))
+        if src.get("post"):
+            rows = _POST[src["post"]](rows)
         return as_of, "source", rows
     if kind == "vanguard":
         as_of, rows = _fetch_vanguard(src["etf"])
@@ -496,7 +614,7 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         "fetched_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "source": _source_label(key),
         # Stated on every snapshot so a consumer cannot mistake the proxy for the index.
-        "caveats": CAVEATS[src["kind"]] + [_LICENCE],
+        "caveats": CAVEATS_BY_KEY.get(key, CAVEATS[src["kind"]]) + [_LICENCE],
         "count": len(rows),
         # None, not 0.0, where the source publishes no weights: a zero would read as an
         # index whose constituents carry no weight, which is a claim rather than a gap.

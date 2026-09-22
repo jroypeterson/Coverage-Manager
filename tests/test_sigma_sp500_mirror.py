@@ -223,3 +223,37 @@ def test_weekly_status_success_is_not_failed(state):
     st = wu._sp500_mirror_status("pushed (5 tickers)",
                                  {"status": state, "count": 503, "as_of": "2026-09-25"})
     assert not st.startswith("failed") and f"sp500 {state}" in st
+
+
+# --- the PUBLIC mirror carries tickers + names ONLY (IVV switch, Fable condition 4) ---
+
+def test_mirror_payload_is_exactly_tickers_and_names(tmp_path):
+    """sigma-alert is a public repo. An IVV-derived snapshot carries the fund's weight,
+    market value, exchange and the iShares URL; none of it may cross the boundary."""
+    tickers = _tickers()
+    doc = _doc(tickers)
+    doc["source"] = "https://www.ishares.com/us/products/239726/x/latest-holdings.csv"
+    doc["kind"] = "ishares"
+    doc["equity_weight_pct"] = 99.87
+    for i, h in enumerate(doc["holdings"]):
+        h.update({"weight_pct": 0.1234 + i, "market_value_usd": 7654321.5 + i,
+                  "exchange": "NYSE", "location": "United States",
+                  "market_currency": "USD", "sector": "Industrials",
+                  "sub_industry": "Widgets", "name_source": "wikipedia"})
+    _seed(tmp_path, tickers[:-1] + ["OLDCO"])
+    res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=doc)
+    assert res["status"] == "changed"
+    assert set(res["files"]) == {se.SP500_RELPATH, se.SP500_NAMES_RELPATH}
+
+    txt = res["files"][se.SP500_RELPATH]
+    body = [ln for ln in txt.splitlines() if not ln.startswith("#")]
+    assert body == sorted(tickers)
+
+    names = json.loads(res["files"][se.SP500_NAMES_RELPATH])
+    assert names == {t: f"{t} Corp" for t in tickers}
+    assert all(isinstance(v, str) for v in names.values())
+
+    everything = (txt + res["files"][se.SP500_NAMES_RELPATH]).lower()
+    for leak in ("ishares", "239726", "0.1234", "7654321", "99.87", "nyse",
+                 "industrials", "widgets", "wikipedia\"", "weight", "market"):
+        assert leak not in everything, leak
