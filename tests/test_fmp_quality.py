@@ -146,3 +146,18 @@ def test_the_report_column_names_match_the_calcs_constant():
     the reverse becomes a column of None. Neither raises."""
     from reporting.calcs import QUALITY_COLS
     assert set(q.quality_columns_from_payload(None)) == set(QUALITY_COLS)
+
+
+def test_the_published_HEADERS_are_what_screens_equity_reads():
+    """⛑ A CROSS-REPO CONTRACT, and it is not the internal names.
+
+    This module emits `FCF Yield`; the xlsx header says `FCF Yield (TTM)`, via
+    `FUND_DISPLAY_NAMES`. `screens_equity/quantitative_screens/coverage_data.py` parses the
+    xlsx, so it keys on the DISPLAY name — and a rename here would leave that screen reading
+    an absent column, which degrades to "0 names carry this metric" with no error anywhere.
+    Caught exactly that way on 2026-09-22, in a harness that used the internal names.
+    """
+    from reporting.calcs import FUND_DISPLAY_NAMES, QUALITY_COLS
+    published = [FUND_DISPLAY_NAMES.get(c, c) for c in QUALITY_COLS]
+    assert published == ["FCF Yield (TTM)", "ROIC (TTM)", "CFO Margin (TTM)",
+                         "Cash Flow Status"]
