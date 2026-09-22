@@ -44,6 +44,15 @@ pushed and never published into `exports/`**. `data/index_membership/` is gitign
 Fund holdings are the fund's own SEC-mandated disclosure; redistribution is the concern,
 and not redistributing solves it.
 
+⛑ **ONE BREACH OF THAT RULE IS IN THIS PUBLIC REPO'S HISTORY, AND JP RULED IT STAYS.**
+Commit `b46885f` (2026-09-22) carried `tests/fixtures/ivv_holdings_2026-09-21_trimmed.csv`
+with REAL IVV market values, weights and quantities for ~20 names. It was meant to be
+squashed before pushing; another session pushed `master` first and carried it along. The
+next commit replaced those figures with synthetic ones, so only the history holds them.
+JP, asked: *"i don't care if people see publicly data that is available publicly"* — the
+file is a public iShares download, 20 of 503 rows, one day old. **Do NOT rewrite history
+or force-push this repo to remove it.** The rule above still governs new commits.
+
 ## Three sources, and none of them is the index vendor
 
 | Kind | Indices | Source |
