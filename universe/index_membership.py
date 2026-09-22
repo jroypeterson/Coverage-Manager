@@ -461,9 +461,19 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
                 f"the response is truncated or the shape changed; refusing to parse "
                 f"fields that would silently read as empty")
         r = dict(zip(header, raw))
-        if (r.get("Asset Class") or "").strip() != "Equity":
+        asset_class = cell(r, "Asset Class")
+        t = cell(r, "Ticker")
+        if not asset_class:
+            # ⛑ AN UNCLASSIFIABLE ROW IS NOT A NON-EQUITY ROW. `!= "Equity"` sent a
+            # blank straight to `continue`, which is a silent deletion of whatever the
+            # row was; only an EMPTY row may be skipped.
+            if t or cell(r, "Name"):
+                raise IndexMembershipError(
+                    f"holding {t or cell(r, 'Name')!r} has no Asset Class — refusing "
+                    f"to classify it as non-equity and drop it")
+            continue
+        if asset_class != "Equity":
             continue                      # cash, futures and collateral carry `-`
-        t = (r.get("Ticker") or "").strip()
         # ⛑ AN EQUITY ROW WITH NO SYMBOL IS NOT A ROW TO DROP. Dropping it removed the
         # holding before any downstream guard could see it: an otherwise complete file
         # with AAPL's ticker blank yields a 502-member basket that clears the count
@@ -482,19 +492,19 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
         # join floor. Measured 2026-09-22: 0 of 504 IVV and 0 of 658 EFA equity rows
         # carry a blank exchange, so "every constituent names its venue" is the rule,
         # not a rate heuristic that would itself need calibrating.
-        if not (r.get("Exchange") or "").strip():
+        if not cell(r, "Exchange"):
             raise IndexMembershipError(
                 f"equity holding {t} has a blank Exchange — the unlisted-residual "
                 f"filter would match nothing and silently keep non-constituents")
         rows.append({
             "ticker": t,
-            "name": (r.get("Name") or "").strip(),
-            "sector": (r.get("Sector") or "").strip(),
-            "weight_pct": _num(r.get("Weight (%)")),
-            "location": (r.get("Location") or "").strip(),
-            "exchange": (r.get("Exchange") or "").strip(),
-            "market_currency": (r.get("Market Currency") or "").strip(),
-            "market_value_usd": _num(r.get("Market Value")),
+            "name": cell(r, "Name"),
+            "sector": cell(r, "Sector"),
+            "weight_pct": _num(cell(r, "Weight (%)")),
+            "location": cell(r, "Location"),
+            "exchange": cell(r, "Exchange"),
+            "market_currency": cell(r, "Market Currency"),
+            "market_value_usd": _num(cell(r, "Market Value")),
         })
     return as_of, rows
 
@@ -522,6 +532,20 @@ def normalise_us_ticker(ticker: str) -> str:
 
 
 UNLISTED_EXCHANGE = "NO MARKET (E.G. UNLISTED)"
+
+# ⛑ THE VENDOR WRITES "MISSING" SEVERAL WAYS, AND EACH READER GUESSED SEPARATELY. A
+# blank `Asset Class` read as "not Equity" and the row was DROPPED (blank MMM's cell
+# and 3M silently leaves the S&P 500 while every count still looks right); an
+# `Exchange` of `-` read as a populated venue, so the unlisted-residual filter never
+# fired for it. Together: 503 rows, ~100% of weight, passing joins, HOLX in and MMM
+# out. One sentinel set, read through one helper, at every site.
+MISSING_CELLS = frozenset({"", "-", "--", "N/A", "NA", "NULL", "NONE"})
+
+
+def cell(row: dict, name: str) -> str:
+    """A holdings cell, with every vendor sentinel normalised to the empty string."""
+    v = str(row.get(name) or "").strip()
+    return "" if v.upper() in MISSING_CELLS else v
 
 # ⛑ THE S&P 500 COUNT BAND IS THE PUBLIC MIRROR'S BAND, CHECKED AT COLLECT TIME.
 # The generic `floor` (450) is a half-parse test, not a membership test: a CSV
@@ -562,7 +586,7 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
     _, info = _read_cm_sp500()
     out, seen = [], {}
     for r in rows:
-        if (r.get("exchange") or "").strip().upper() == UNLISTED_EXCHANGE:
+        if (r.get("exchange") or "").strip().upper() in (UNLISTED_EXCHANGE, ""):
             continue
         t = normalise_us_ticker(r["ticker"])
         if t in seen:
@@ -836,6 +860,15 @@ def snapshot_problem(key: str, doc: dict) -> str:
              if not isinstance(h, dict) or not str(h.get("ticker") or "").strip()]
     if blank:
         return f"{len(blank)} holding(s) carry no ticker"
+    # ⛑ THE FLOOR IS A FACT ABOUT THE INDEX, SO IT BINDS EVERY COPY OF IT. It lived on
+    # the fresh-fetch path alone, so a recent cached EAFE doc holding ONE ticker at 100%
+    # served as a fallback and the weekly step stayed green, and a truncated dated file
+    # counted as an immutable record. (A test written in round 11 asserted exactly that
+    # wrong result; it was fixed with this change, not worked around.)
+    floor = (SOURCES.get(key) or {}).get("floor")
+    if isinstance(floor, int) and len(holdings) < floor:
+        return (f"{len(holdings)} holdings is below the {key} credibility floor "
+                f"of {floor}")
     kind = doc.get("kind") or (SOURCES.get(key) or {}).get("kind") or ""
     try:
         check_sp500_count(key, holdings)
@@ -863,6 +896,22 @@ def _snapshot_is_usable(path: Path, key: str, count: int | None = None) -> bool:
     if snapshot_problem(key, doc):
         return False
     return count is None or doc["count"] == count
+
+
+def _dated_is_usable(path: Path, key: str, as_of: str) -> bool:
+    """A dated artifact is valid only if it IS the snapshot that date's name claims.
+
+    ⛑ NOTHING BOUND THE DOCUMENT TO THE DATE IN ITS FILENAME, so a complete Sep 14 doc
+    stored as `sp500_2026-09-21.json` passed every check: the good Sep 21 fetch
+    reported `ok` with `written=None` and the Sep 21 archive held Sep 14 membership
+    permanently — the one file in this system that cannot be re-fetched.
+    """
+    if not _snapshot_is_usable(path, key):
+        return False
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("as_of") == as_of
+    except (OSError, ValueError):          # pragma: no cover - re-read of a good file
+        return False
 
 
 def write_snapshot(path: Path, doc: dict) -> None:
@@ -904,10 +953,18 @@ def write_snapshot(path: Path, doc: dict) -> None:
         tmp.unlink(missing_ok=True)
     except OSError:                       # pragma: no cover - a locked temp is junk
         pass
-    if not _snapshot_is_usable(path, doc.get("key"), doc.get("count")):
+    # ⛑ THE VERIFICATION COMPARES THE BYTES, NOT A SHAPE. `key` and `count` are
+    # satisfied by any document of the same shape — including the one ALREADY on disk,
+    # which is exactly the case a failed rename leaves behind.
+    try:
+        landed = path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise IndexMembershipError(f"{path.name} could not be read back: {e}") from e
+    if landed != text:
         raise IndexMembershipError(
-            f"{path.name} could not be read back as the snapshot just written — "
-            f"refusing to report a half-written file as an archived date")
+            f"{path.name} could not be read back as the snapshot just written "
+            f"({len(landed)} bytes on disk against {len(text)} written) — refusing to "
+            f"report a half-written or stale file as an archived date")
 
 
 def _snapshot_path(key: str, as_of: str) -> Path:
@@ -1060,7 +1117,7 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # skipping it on `exists()` alone left the only snapshot for that date corrupt for
     # ever. So: rewrite exactly when the file cannot be read back as this snapshot.
     written = None
-    if not _snapshot_is_usable(dated, key):
+    if not _dated_is_usable(dated, key, as_of):
         write_snapshot(dated, doc)
         written = str(dated)
     write_snapshot(_latest_path(key), doc)

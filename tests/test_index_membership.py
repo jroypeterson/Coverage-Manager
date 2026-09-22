@@ -781,10 +781,7 @@ def test_a_future_dated_CACHED_snapshot_is_not_a_usable_fallback(out_dir, monkey
 def test_a_cached_snapshot_inside_the_tolerance_is_still_a_fallback(out_dir, monkeypatch):
     """The guard must not become the outage: one day ahead is the tolerated case."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "eafe_latest.json").write_text(json.dumps(
-        {"key": "eafe", "kind": "ishares", "as_of": "2026-09-23", "count": 1,
-         "stale_days": 45,
-         "holdings": [{"ticker": "T0", "weight_pct": 100.0}]}), encoding="utf-8")
+    _cached(out_dir, key="eafe", as_of="2026-09-23")      # 500 holdings, weighted
     _fail(monkeypatch)
     assert im.refresh("eafe", today=date(2026, 9, 22))["status"] == "stale"
 
@@ -1314,3 +1311,85 @@ def test_a_weightless_DATED_file_is_rewritten_when_a_good_fetch_arrives(
     assert r["status"] == "ok" and r["written"] == str(dated)
     doc = json.loads(dated.read_text(encoding="utf-8"))
     assert sum(1 for h in doc["holdings"] if h["weight_pct"] is not None) == 503
+
+
+# --- Codex round 12 (A): floors on every path, sentinels, a dated file's own date ---
+
+def test_a_cached_doc_UNDER_ITS_INDEX_FLOOR_is_not_a_usable_fallback(out_dir, monkeypatch):
+    """`snapshot_problem` carried only the S&P 500 band, so the EAFE and Russell floors
+    existed on the fresh-fetch path alone: a recent cached EAFE doc holding ONE ticker
+    at 100% returned `stale` and the weekly step stayed green."""
+    _cached(out_dir, key="eafe", n=1)
+    _fail(monkeypatch)
+    r = im.refresh("eafe", today=date(2026, 9, 22))
+    assert r["status"] == "cache_unusable"
+    assert "floor" in r["error"]
+
+
+def test_a_truncated_dated_file_under_the_floor_is_rewritten(out_dir, monkeypatch):
+    """Same rule, other path: an under-floor dated file is not an immutable record."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dated = out_dir / "eafe_2026-09-04.json"
+    dated.write_text(json.dumps(
+        {"key": "eafe", "kind": "ishares", "as_of": "2026-09-04", "count": 2,
+         "holdings": [{"ticker": "T0", "weight_pct": 50.0},
+                      {"ticker": "T1", "weight_pct": 50.0}]}), encoding="utf-8")
+    _serve(monkeypatch, _csv(500))
+    r = im.refresh("eafe", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["written"] == str(dated)
+    assert json.loads(dated.read_text(encoding="utf-8"))["count"] == 500
+
+
+def test_a_sentinel_exchange_is_MISSING_not_a_venue(monkeypatch, tmp_path):
+    """`Exchange="-"` counted as a populated venue, so the unlisted filter never fired
+    for it: pair it with a blanked Asset Class elsewhere and you get 503 rows, ~100%
+    weights and passing joins -- with HOLX in and MMM out."""
+    line = next(l for l in _ivv_text().splitlines() if l.startswith('"HOLX"'))
+    text = _ivv_text().replace(line, line.replace(
+        '"NO MARKET (E.G. UNLISTED)"', '"-"'))
+    with pytest.raises(im.IndexMembershipError, match="[Ee]xchange"):
+        _ivv(monkeypatch, tmp_path, text=text)
+
+
+@pytest.mark.parametrize("cell", ["", "-", "N/A"])
+def test_a_missing_asset_class_on_a_real_row_refuses(monkeypatch, tmp_path, cell):
+    """A blank read as `not Equity`, so the row was DROPPED: blank MMM's asset class
+    and 3M silently leaves the S&P 500 while every count still looks right."""
+    line = next(l for l in _ivv_text().splitlines() if l.startswith('"MMM"'))
+    text = _ivv_text().replace(line, line.replace('"Equity"', f'"{cell}"'))
+    with pytest.raises(im.IndexMembershipError, match="[Aa]sset [Cc]lass"):
+        _ivv(monkeypatch, tmp_path, text=text)
+
+
+def test_a_dated_file_holding_ANOTHER_DATE_is_not_a_valid_snapshot(
+        out_dir, monkeypatch, tmp_path):
+    """Nothing bound the document to the date in its filename, so a complete Sep 14 doc
+    stored as `sp500_2026-09-21.json` counted as usable: the good Sep 21 fetch returned
+    ok with written=None and the Sep 21 archive held Sep 14 membership for ever."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dated = out_dir / "sp500_2026-09-21.json"
+    _cached(out_dir, key="sp500", n=503, as_of="2026-09-14")
+    dated.write_text((out_dir / "sp500_latest.json").read_text(encoding="utf-8"),
+                     encoding="utf-8")
+    (out_dir / "sp500_latest.json").unlink()
+
+    _serve_ivv(monkeypatch, tmp_path)
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["written"] == str(dated)
+    assert json.loads(dated.read_text(encoding="utf-8"))["as_of"] == "2026-09-21"
+
+
+def test_the_write_back_check_proves_the_BYTES_just_written(out_dir, monkeypatch, tmp_path):
+    """Key and count are satisfied by any document of the same shape -- including the
+    one already on disk. The verification compares what is there with what was sent."""
+    _serve_ivv(monkeypatch, tmp_path)
+    real_write = im._write_snapshot_bytes
+
+    def _writes_something_else(path, text):
+        doc = json.loads(text)
+        doc["holdings"][0]["ticker"] = "SWAPPED"
+        real_write(path, json.dumps(doc, indent=1))
+
+    monkeypatch.setattr(im, "_write_snapshot_bytes", _writes_something_else)
+    with pytest.raises(im.IndexMembershipError, match="read back"):
+        im.refresh("sp500", today=date(2026, 9, 22))
