@@ -39,6 +39,13 @@ from reporting.sigma_export import (
 from universe.artifacts import build_universe_metadata
 
 
+@pytest.fixture(autouse=True)
+def _no_real_sp500_snapshot(monkeypatch):
+    """Hermetic: export_and_push must not read CM's real sp500 snapshot here.
+    The S&P 500 path is covered by tests/test_sigma_sp500_mirror.py."""
+    monkeypatch.setattr(sigma_export, "_load_sp500_snapshot", lambda: None)
+
+
 @pytest.fixture
 def fixture_csv(tmp_path):
     csv_path = tmp_path / "coverage_universe_tickers.csv"

@@ -725,6 +725,20 @@ artifact means one authority and no copy to drift; a consumer reads the JSON, no
 `python -m universe.index_mirrors`, and weekly step **`[4f3/6]`**. The last piece of #354,
 and it is NOT what the brief asked for.
 
+**UPDATE 2026-09-22 -- superseded: CM now WRITES the S&P 500 mirror.** JP approved *"retire
+sigma-alert/sources/sp500.txt"*. `reporting/sigma_export.build_sp500_mirror` writes
+`sources/sp500.txt` + `sources/sp500_names.json` from the sp500 snapshot in the same push as
+`ticker_metadata.json` (tickers and names only -- exactly what sigma-alert already published
+from its own scrape; GICS stays in the gitignored snapshot). sigma-alert's `refresh-sp500.yml`
+is now manual-only. It **refuses** (step reads `failed:`, both files untouched) on a missing
+snapshot, a count outside 495-510, a snapshot past its own `stale_days`, a duplicate/blank
+ticker, or -- the one that fires in practice -- **a differing list from a snapshot not strictly
+newer than the file's `Last updated`**: measured 2026-09-22, the snapshot is taken before the
+performance run refreshes the 7-day Wikipedia cache, so a same-date snapshot still lacked the
+September reconstitution and would have reverted it. Preview: `python -m reporting.sigma_export`
+(read-only). Tests `tests/test_sigma_sp500_mirror.py` (26, mutation-checked). This module stays
+as the post-write check. The reasoning below is history.
+
 ⛑ **The brief's "retire `sigma-alert/sources/sp500.txt`" is WITHDRAWN as not executable,
 and the reason is a constraint the same brief established.** Measured 2026-09-16:
 `sigma-alert` has no local runtime — all seven of its jobs run in **GitHub Actions**,

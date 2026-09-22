@@ -843,6 +843,21 @@ def _step_sigma_export():
     return export_and_push(CSV_PATH)
 
 
+def _sp500_mirror_status(detail, sp500):
+    """Fold the S&P 500 list outcome into the sigma_export status (CM-owned, 2026-09-22).
+
+    A refusal is `failed:` so the heartbeat reads `partial`: the metadata still shipped,
+    but sigma-alert's S&P 500 list did not move, and nothing else would say so. A missing
+    summary is reported, never assumed fine. ASCII-only by construction.
+    """
+    if not isinstance(sp500, dict):
+        return f"failed: S&P 500 list outcome not reported; {detail}"
+    st = sp500.get("status")
+    if st == "refused":
+        return f"failed: S&P 500 list NOT written ({sp500.get('reason', '')}); {detail}"
+    return f"{detail} | sp500 {st} ({sp500.get('count')} as_of {sp500.get('as_of')})"
+
+
 def _step_delisted_check():
     """Probe yfinance identity for each universe ticker and flag mismatches.
 
@@ -922,10 +937,11 @@ def _step_index_membership():
 def _step_index_mirrors():
     """Verify the fleet's OTHER copies of an index list against ours (board #354).
 
-    The brief's step 4 said "retire `sigma-alert/sources/sp500.txt`". It cannot be
-    retired: sigma-alert runs only in GitHub Actions and our snapshots are gitignored
-    on purpose, so the committed text file is the only way a CI-hosted screener can
-    know the S&P 500. `universe/index_mirrors.py` carries the full reasoning.
+    Since 2026-09-22 `sigma_export` WRITES `sigma-alert/sources/sp500.txt` from our
+    snapshot (JP: "retire sigma-alert/sources/sp500.txt"); the committed file is still
+    the transport because sigma-alert runs only in GitHub Actions. This step runs BEFORE
+    that write, so a drift here on a reconstitution week is expected and the same run's
+    sigma_export fixes it -- unless the writer refused, which it reports itself.
 
     What the mirror DOES cost is silent divergence -- two lists, two collectors, two
     cadences, and nothing watching. This step is the watcher, and it runs HERE because
@@ -1859,7 +1875,7 @@ def main(skip_discovery=False, dry_run=False, force=False, log_audit=True):
                     detail = f"{detail} — {reason}"
                 if missing:
                     detail = f"{detail} | sigma-alert flagged {len(missing)} missing: {sorted(missing)}"
-                steps["sigma_export"] = detail
+                steps["sigma_export"] = _sp500_mirror_status(detail, result.get("sp500"))
             elif outcome == "committed_not_pushed":
                 steps["sigma_export"] = f"failed: {reason} (commit is local in sigma-alert clone)"
             elif outcome == "failed":

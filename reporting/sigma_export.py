@@ -6,7 +6,9 @@ filter on Healthcare Services / MedTech / PA tickers.
 
 The Coverage Manager CSV is the canonical source for that data, so this module
 generates the metadata file directly into the sibling sigma-alert clone, then
-commits and pushes only that single file. sigma-alert's CI does not (and
+commits and pushes only the files it owns (the JSON payloads below, plus
+`sources/sp500.txt` + `sources/sp500_names.json` since 2026-09-22 -- see
+`build_sp500_mirror`). sigma-alert's CI does not (and
 should not) try to regenerate the file — it has no access to the CSV.
 """
 
@@ -236,7 +238,154 @@ def _git(cwd, *args):
     return result.stdout.strip(), result.returncode
 
 
-def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
+# --- S&P 500 membership (board #354; JP 2026-09-22: "retire sigma-alert/sources/sp500.txt")
+#
+# sigma-alert's S&P 500 list used to be collected by its own monthly Wikipedia scrape
+# (`scripts/refresh_sp500.py`), in parallel with CM's `wikipedia_provider`. CM now owns it:
+# this step writes both files from CM's `index_membership` sp500 snapshot, in the same
+# commit as ticker_metadata.json. sigma-alert's CI still cannot read the gitignored
+# snapshot, so the committed text file remains the transport -- it is simply CM-written.
+#
+# ONLY tickers and names cross the boundary (the same two fields sigma-alert already
+# published from its own scrape). GICS fields stay in the gitignored snapshot.
+#
+# ⛑ NEVER OVERWRITE A GOOD LIST WITH A BAD ONE. Every refusal leaves both files untouched,
+# lets the rest of the export proceed, and is reported as `failed:` in the weekly step.
+SP500_RELPATH = "sources/sp500.txt"
+SP500_NAMES_RELPATH = "sources/sp500_names.json"
+SP500_MIN_COUNT = 495
+SP500_MAX_COUNT = 510
+SP500_SOURCE_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+_SP500_UPDATED_PREFIX = "# Last updated:"
+
+
+def _load_sp500_snapshot():
+    """CM's latest S&P 500 snapshot doc, or None. Seam for tests."""
+    from universe import index_membership as im
+
+    return im.load_latest("sp500")
+
+
+def _mirror_tickers(text):
+    return {ln.strip().upper() for ln in text.splitlines()
+            if ln.strip() and not ln.lstrip().startswith("#")}
+
+
+def _mirror_updated(text):
+    for ln in text.splitlines():
+        if ln.startswith(_SP500_UPDATED_PREFIX):
+            return ln[len(_SP500_UPDATED_PREFIX):].strip()[:10]
+    return None
+
+
+def render_sp500_txt(tickers, as_of):
+    """Byte format of sigma-alert's `refresh_sp500.write_sp500`, exactly (LF; git
+    normalises the worktree's line endings)."""
+    header = [
+        "# S&P 500 Constituents",
+        f"# Last updated: {as_of}",
+        "# Check for reconstitution updates quarterly (March, June, September, December)",
+        f"# Source: {SP500_SOURCE_URL}",
+    ]
+    return "\n".join(header + sorted(set(tickers))) + "\n"
+
+
+def render_sp500_names(mapping):
+    """Byte format of sigma-alert's `refresh_sp500.write_sp500_names`, exactly."""
+    return json.dumps(dict(sorted(mapping.items())), indent=2) + "\n"
+
+
+def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
+    """Decide what, if anything, to write to sigma-alert's two S&P 500 files. No writes.
+
+    Returns {"status": "changed"|"unchanged"|"refused", "reason", "as_of", "count",
+    "files": {relpath: content}} -- `files` holds only the files whose CONTENT changed.
+    A header-date-only difference is not a change, so an unchanged list never churns.
+
+    The snapshot is loaded once and the same object is validated and rendered.
+    """
+    from universe import index_membership as im
+
+    def refused(reason, **kw):
+        return {"status": "refused", "reason": reason, "files": {}, **kw}
+
+    if doc is None:
+        try:
+            doc = _load_sp500_snapshot()
+        except Exception as e:  # a diagnostic seam must not crash the export
+            return refused(f"snapshot unreadable ({type(e).__name__}: {e})")
+    if not isinstance(doc, dict):
+        return refused("no S&P 500 snapshot on disk")
+
+    holdings = doc.get("holdings")
+    if not isinstance(holdings, list) or not holdings:
+        return refused("snapshot carries no holdings")
+    pairs = {}
+    for h in holdings:
+        t = str((h or {}).get("ticker") or "").strip().upper() if isinstance(h, dict) else ""
+        if not t:
+            return refused("snapshot has a holding with no ticker")
+        if t in pairs:
+            return refused(f"snapshot lists {t} twice")
+        pairs[t] = str(h.get("name") or "").strip()
+
+    as_of = doc.get("as_of")
+    count = len(pairs)
+    if not SP500_MIN_COUNT <= count <= SP500_MAX_COUNT:
+        return refused(f"implausible count {count} (outside {SP500_MIN_COUNT}-{SP500_MAX_COUNT})",
+                       as_of=as_of, count=count)
+
+    # Staleness: the SAME rule index_membership/index_mirrors apply -- the limit travels
+    # on the snapshot (`stale_days`), falling back to the module's per-kind table.
+    age = im.snapshot_age_days(doc, today=today)
+    limit = doc.get("stale_days")
+    if not isinstance(limit, int) or limit <= 0:
+        limit = im.stale_days_for("sp500")
+    if age is None:
+        return refused("snapshot carries no usable as_of date", count=count)
+    if age < 0:
+        return refused(f"snapshot as_of {as_of} is in the future", as_of=as_of, count=count)
+    if age > limit:
+        return refused(f"snapshot as_of {as_of} is {age}d old (limit {limit}d)",
+                       as_of=as_of, count=count)
+
+    txt_path = Path(target_dir) / SP500_RELPATH
+    names_path = Path(target_dir) / SP500_NAMES_RELPATH
+    try:
+        cur_txt = txt_path.read_text(encoding="utf-8") if txt_path.exists() else None
+        cur_names = (json.loads(names_path.read_text(encoding="utf-8"))
+                     if names_path.exists() else None)
+    except (OSError, ValueError) as e:
+        return refused(f"current sigma-alert S&P 500 files unreadable ({e})",
+                       as_of=as_of, count=count)
+
+    # Blank names are skipped, as refresh_sp500 did. A name EQUAL to its ticker is kept:
+    # IBM, MSCI and Uber really are named that (measured 2026-09-22).
+    names = {t: n for t, n in pairs.items() if n}
+
+    files = {}
+    if cur_txt is None or _mirror_tickers(cur_txt) != set(pairs):
+        files[SP500_RELPATH] = render_sp500_txt(pairs, as_of)
+    if cur_names != names:
+        files[SP500_NAMES_RELPATH] = render_sp500_names(names)
+
+    # ⛑ ONLY A STRICTLY NEWER OBSERVATION MAY CHANGE THE LIST. CM's snapshot is taken
+    # before the weekly performance run refreshes its 7-day Wikipedia cache, so it lags;
+    # measured 2026-09-22, a snapshot observed on the SAME date as sigma-alert's list
+    # (2026-09-18) still lacked that week's reconstitution (BE/ILMN/P in, BLDR/TAP/TTD
+    # out). Writing it would have silently reverted the index change. So: a difference
+    # from a same-day or older observation is refused, and the list waits for CM to
+    # catch up. Agreement is never refused -- that is simply `unchanged`.
+    cur_updated = _mirror_updated(cur_txt) if cur_txt else None
+    if files and cur_updated and as_of and as_of <= cur_updated:
+        return refused(f"CM snapshot as_of {as_of} is not newer than the sigma-alert list "
+                       f"dated {cur_updated} but disagrees with it - refusing to overwrite",
+                       as_of=as_of, count=count)
+    return {"status": "changed" if files else "unchanged", "reason": "",
+            "as_of": as_of, "count": count, "names": len(names), "files": files}
+
+
+def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None):
     """Build metadata, write it into target_dir, and commit/push only that file.
 
     Returns a dict describing what happened. Raises only on unrecoverable errors;
@@ -297,6 +446,14 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
         READY_TO_SHORT_FILENAME: json.dumps(ready_to_short_payload, indent=2) + "\n",
     }
 
+    # S&P 500 membership (CM-owned since 2026-09-22). Only CHANGED content is added, and
+    # a refusal adds nothing -- the existing files stay exactly as they are.
+    sp500 = build_sp500_mirror(target_dir, today=today)
+    files.update(sp500["files"])
+    sp500_summary = {k: v for k, v in sp500.items() if k != "files"}
+    if sp500["status"] == "refused":
+        logger.warning("S&P 500 list NOT written to sigma-alert: %s", sp500["reason"])
+
     def _result(**fields):
         out = {
             "tickers": len(metadata),
@@ -306,6 +463,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
             "following_for_interest_entries": len(following_payload),
             "ready_to_buy_entries": len(ready_to_buy_payload),
             "ready_to_short_entries": len(ready_to_short_payload),
+            "sp500": sp500_summary,
         }
         if flagged_tickers:
             out["missing_metadata"] = flagged_tickers
@@ -337,10 +495,10 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
     if rc == 0:
         return _result(status="unchanged")
 
-    _, rc = _git(
-        target_dir, "commit", "-m",
-        "Sync ticker metadata + position lists from Coverage Manager",
-    )
+    message = "Sync ticker metadata + position lists from Coverage Manager"
+    if sp500["files"]:
+        message += " (+ S&P 500 list)"
+    _, rc = _git(target_dir, "commit", "-m", message)
     if rc != 0:
         return _result(status="failed", reason="git commit failed")
 
@@ -355,3 +513,12 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True):
         )
 
     return _result(status="pushed")
+
+
+if __name__ == "__main__":
+    # Read-only preview: `python -m reporting.sigma_export` shows what the S&P 500 step
+    # WOULD write into the sibling sigma-alert clone. Writes nothing, runs no git.
+    res = build_sp500_mirror()
+    print({k: v for k, v in res.items() if k != "files"})
+    for rel in res["files"]:
+        print(f"  would write {rel}")

@@ -2,6 +2,18 @@
 
 Board #354, and specifically the one residual its brief could not close.
 
+## UPDATE 2026-09-22 -- the S&P 500 mirror is now WRITTEN by this repo
+
+JP approved retiring sigma-alert's own collector ("retire sigma-alert/sources/sp500.txt").
+`reporting/sigma_export.build_sp500_mirror` now writes `sources/sp500.txt` and
+`sources/sp500_names.json` from the sp500 snapshot, in the same push as
+`ticker_metadata.json`, and sigma-alert's monthly `refresh-sp500.yml` is manual-only.
+The committed files remain the transport (CI still cannot read the gitignored snapshot);
+only tickers and names cross, exactly what sigma-alert already published from its own
+scrape. This module keeps running as the post-write check: a `drifted` result now means
+the writer REFUSED (see its guards) or has not pushed yet. The history below is kept
+because its constraints still bind the writer.
+
 ## Why this exists instead of the thing the brief asked for
 
 `plans/index_membership_brief.md` step 4 ends: *"Retire `sigma-alert/sources/sp500.txt`
@@ -94,8 +106,9 @@ MIRRORS: tuple[Mirror, ...] = (
         path_in_repo="sources/sp500.txt",
         index_key="sp500",
         fmt="lines",
-        why=("sigma-alert runs only in GitHub Actions and cannot read this repo's "
-             "gitignored snapshot; sync_watchlist.py builds watchlist.txt from it"),
+        why=("CM-written since 2026-09-22 (sigma_export.build_sp500_mirror); sigma-alert "
+             "runs only in GitHub Actions and cannot read the gitignored snapshot, and "
+             "sync_watchlist.py builds watchlist.txt from it"),
     ),
     Mirror(
         name="sigma-alert S&P 500 name fallback",
