@@ -285,6 +285,16 @@ def _status_cell(p):
         return CHECK_UNRECONCILED
     if p.get("check") == CHECK_OK:
         return "ok (corroborated)"
+    # ⛑ "WE COULD NOT CHECK" IS NOT "WE CHECKED". A candidate whose statements were
+    # unavailable, or whose corroboration call failed, used to collapse into a plain `ok`
+    # cell — and screens_equity's mid-teens screen rejects only `unreconciled`, so an
+    # unverified figure published under a section promising corroboration (Codex r7).
+    fcf = p.get("fcf_yield")
+    candidate = fcf is not None and abs(fcf) >= CHECK_TRIGGER
+    if candidate and p.get("check") == CHECK_NO_STATEMENTS:
+        return "ok (not corroborated: no statements)"
+    if candidate and p.get("check") == CHECK_NOT_CHECKED:
+        return "ok (not corroborated)"
     if p.get("ic_nonpositive"):
         return "ok (ROIC withheld: invested capital <= 0)"
     return STATUS_OK

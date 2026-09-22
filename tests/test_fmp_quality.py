@@ -161,3 +161,20 @@ def test_the_published_HEADERS_are_what_screens_equity_reads():
     published = [FUND_DISPLAY_NAMES.get(c, c) for c in QUALITY_COLS]
     assert published == ["FCF Yield (TTM)", "ROIC (TTM)", "CFO Margin (TTM)",
                          "Cash Flow Status"]
+
+
+def test_a_candidate_that_could_not_be_checked_says_so(monkeypatch):
+    """⛑ "WE COULD NOT CHECK" IS NOT "WE CHECKED" (Codex r7). A candidate whose statements
+    were unavailable used to collapse into a plain `ok` cell, and the downstream screen
+    rejected only `unreconciled` — so an unverified figure published under a section
+    promising corroboration. Names far from the bar still read a plain `ok`: nothing claims
+    to have checked them."""
+    row = {**MRK_ROW, "freeCashFlowYieldTTM": 0.20, "marketCap": 1000.0}
+    _patch(monkeypatch, row, fcf_sum=None)          # statements unavailable
+    p = q.fetch_quality("X", "key")
+    cell = q.quality_columns_from_payload(p)["Cash Flow Status"]
+    assert cell.startswith("ok (not corroborated")
+    assert not cell.startswith("ok (corroborated)")
+
+    _patch(monkeypatch, MRK_ROW)                    # 4.3%, nowhere near the bar
+    assert q.quality_columns_from_payload(q.fetch_quality("MRK", "key"))["Cash Flow Status"] == "ok"
