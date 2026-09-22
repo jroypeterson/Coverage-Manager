@@ -27,9 +27,13 @@ HEADER = ("Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value
 
 
 def _rows(n=3):
+    """⛑ The weights SUM TO ~100, as a real fund's do. They used to be `{i}.5`, so a
+    500-row fixture summed to 125,500% -- harmless while nothing read the total, and
+    misleading the moment a guard did (the weight-total rule, Codex round 10)."""
+    each = round(100.0 / n, 4)
     out = []
     for i in range(n):
-        out.append(f'"T{i}","COMPANY {i}","Health Care","Equity","1,000.00","{i + 1}.5",'
+        out.append(f'"T{i}","COMPANY {i}","Health Care","Equity","1,000.00","{each}",'
                    f'"1,000.00","10.00","100.00","Japan","Tokyo","USD","1.0","JPY","-"\n')
     return "".join(out)
 
@@ -44,7 +48,7 @@ def test_parses_as_of_and_equity_rows():
     as_of, rows = im.parse_holdings(_csv(3))
     assert as_of == "2026-09-04"
     assert [r["ticker"] for r in rows] == ["T0", "T1", "T2"]
-    assert rows[0]["weight_pct"] == 1.5
+    assert rows[0]["weight_pct"] == round(100 / 3, 4)
     assert rows[0]["location"] == "Japan"
     assert rows[0]["market_currency"] == "JPY"
 
@@ -297,7 +301,7 @@ def test_one_index_failing_does_not_skip_the_others(out_dir, monkeypatch):
         if key.startswith("r"):
             raise im.IndexMembershipError("vanguard down")
         return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
-                                         "weight_pct": 0.1, "location": "", "exchange": "",
+                                         "weight_pct": 0.2, "location": "", "exchange": "",
                                          "market_currency": "", "market_value_usd": None}
                                         for i in range(500)]
     monkeypatch.setattr(im, "collect", _collect)
@@ -345,7 +349,8 @@ def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypat
     """Not one number on every file: the Russell lane's 120 is the whole point."""
     def _collect(key):
         return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
-                                         "weight_pct": 0.1, "location": "", "exchange": "",
+                                         "weight_pct": round(100 / 3000, 4),
+                                         "location": "", "exchange": "",
                                          "market_currency": "", "market_value_usd": None}
                                         for i in range(3000)]
     monkeypatch.setattr(im, "collect", _collect)
@@ -366,7 +371,8 @@ def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypat
 def _vanguard_page(n, start, size, as_of="2026-07-31"):
     return {"size": size, "asOfDate": as_of + "T00:00:00-04:00",
             "fund": {"entity": [{"ticker": f"T{i}", "longName": f"Name {i}",
-                                 "percentWeight": "0.1"} for i in range(start, start + n)]}}
+                                 "percentWeight": f"{round(100.0 / max(size, 1), 4)}"}
+                                for i in range(start, start + n)]}}
 
 
 class _JsonResp:
@@ -461,9 +467,15 @@ def _pad_tickers(n=PAD_N):
     return [f"Z{i:03d}" for i in range(n)]
 
 
+# The trimmed fixture's own equity rows carry ~0.9% between them; the pad rows take
+# the rest, so a padded basket sums to ~100% exactly as the live file does.
+FIXTURE_WEIGHT_PCT = 0.9
+
+
 def _pad_rows(n=PAD_N):
+    each = round((100.0 - FIXTURE_WEIGHT_PCT) / n, 4)
     return "".join(
-        f'"{t}","PAD {t}","Industrials","Equity","1.00","0.01","1.00","1.00",'
+        f'"{t}","PAD {t}","Industrials","Equity","1.00","{each}","1.00","1.00",'
         f'"1.00","United States","NYSE","USD","1.00","USD","-"\n'
         for t in _pad_tickers(n))
 
@@ -1043,3 +1055,168 @@ def test_the_rollback_still_works_at_a_plausible_count(out_dir, monkeypatch, tmp
                          "fund": "Wikipedia constituent list"})
     r = im.refresh("sp500", today=date(2026, 9, 22))
     assert r["status"] == "ok" and r["count"] == 503
+
+
+# --- Codex round 10: what a real weekly run hits --------------------------------
+
+def test_a_blank_exchange_on_an_equity_row_refuses(monkeypatch, tmp_path):
+    """If iShares keeps the Exchange column but BLANKS it, the
+    "NO MARKET (E.G. UNLISTED)" test matches nothing -- the fleet's
+    a-flag-that-is-always-FALSE shape -- so HOLX rides through and 504 rows clear the
+    band and the join. Measured 2026-09-22: 0 of 504 IVV and 0 of 658 EFA equity rows
+    carry a blank exchange, so every constituent having one is the real rule."""
+    line = next(l for l in _ivv_text().splitlines() if l.startswith('"MMM"'))
+    with pytest.raises(im.IndexMembershipError, match="[Ee]xchange"):
+        _ivv(monkeypatch, tmp_path, text=_ivv_text().replace(
+            line, line.replace('"NYSE"', '""')))
+
+
+def test_a_weightless_but_structurally_valid_response_fails_the_lane(
+        out_dir, monkeypatch, tmp_path):
+    """Weights are half the reason this archive exists and cannot be backfilled. A
+    503-row file whose `Weight (%)` cells are all `-` passed every gate: _num returned
+    None for each, equity_weight_pct was None, and that date was archived WITHOUT
+    weights -- permanently, since a dated file is written once."""
+    import csv as _csvmod
+    import io as _io
+
+    lines = (_ivv_text() + _pad_rows()).splitlines()
+    h = next(i for i, l in enumerate(lines) if l.startswith("Ticker,"))
+    buf = _io.StringIO()
+    w = _csvmod.writer(buf, quoting=_csvmod.QUOTE_ALL, lineterminator="\n")
+    for raw in _csvmod.reader(_io.StringIO("\n".join(lines[h + 1:]))):
+        if not raw:
+            continue
+        raw[5] = "-"                       # every Weight (%) cell unusable
+        w.writerow(raw)
+    text = "\n".join(lines[:h + 1]) + "\n" + buf.getvalue()
+    _serve_ivv(monkeypatch, tmp_path)          # wires the Wikipedia cache
+    _serve(monkeypatch, text)                  # ... then the weightless body
+    with pytest.raises(im.IndexMembershipError, match="weight"):
+        im.refresh("sp500", today=date(2026, 9, 22))
+    assert not (out_dir / "sp500_latest.json").exists()
+
+
+def test_a_weight_total_far_from_100_refuses(out_dir, monkeypatch, tmp_path):
+    """Live totals 2026-09-22: IVV 99.92, EFA 99.48, Russell 97.44-99.80. A basket
+    summing to a third of the fund is a different fact, not a rounding difference."""
+    _serve_ivv(monkeypatch, tmp_path)
+    real = im.parse_holdings
+
+    def third(text):
+        as_of, rows = real(text)
+        for r in rows:
+            if r["weight_pct"] is not None:
+                r["weight_pct"] = r["weight_pct"] / 3
+        return as_of, rows
+
+    monkeypatch.setattr(im, "parse_holdings", third)
+    with pytest.raises(im.IndexMembershipError, match="weight"):
+        im.refresh("sp500", today=date(2026, 9, 22))
+
+
+def test_the_weight_rule_exempts_a_source_that_publishes_none(out_dir, monkeypatch, tmp_path):
+    """⛑ The cm_cache rollback carries NO weights BY DESIGN (a constituent list is not
+    a weighted index). The guard must not become the outage for it."""
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({
+        "_cached_at": "2026-09-18T14:09:24+00:00",
+        "data": {"tickers": [f"T{i}" for i in range(503)],
+                 "info": {f"T{i}": {"Company Name": f"Co {i}", "GICS Sector": "Industrials",
+                                    "GICS Sub-Industry": "Widgets"} for i in range(503)}}}),
+        encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    monkeypatch.setitem(im.SOURCES, "sp500",
+                        {"kind": "cm_cache", "floor": 450, "index": "S&P 500",
+                         "fund": "Wikipedia constituent list"})
+    assert im.refresh("sp500", today=date(2026, 9, 22))["status"] == "ok"
+
+
+def test_a_corrupt_dated_snapshot_is_REWRITTEN_not_treated_as_written(
+        out_dir, monkeypatch, tmp_path):
+    """An interrupted first write leaves a truncated file; the next valid run saw only
+    that the PATH EXISTS, skipped it, wrote latest and returned ok -- so the sole
+    historical snapshot for that date stayed corrupt for ever. Immutability protects a
+    GOOD file, not a byte count."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dated = out_dir / "sp500_2026-09-21.json"
+    dated.write_text('{"key": "sp500", "count": 503, "holdi', encoding="utf-8")
+
+    _serve_ivv(monkeypatch, tmp_path)
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["written"] == str(dated)
+    doc = json.loads(dated.read_text(encoding="utf-8"))
+    assert doc["key"] == "sp500" and doc["count"] == 503 and len(doc["holdings"]) == 503
+
+
+def test_a_GOOD_dated_snapshot_is_still_never_rewritten(out_dir, monkeypatch, tmp_path):
+    """The archive's whole value is that a past file says what it said at the time."""
+    _serve_ivv(monkeypatch, tmp_path)
+    im.refresh("sp500", today=date(2026, 9, 22))
+    dated = out_dir / "sp500_2026-09-21.json"
+    before = dated.read_bytes()
+    dated.write_bytes(before.replace(b'"count": 503', b'"count": 503 '))  # same doc, new bytes
+    marker = dated.read_bytes()
+
+    _serve_ivv(monkeypatch, tmp_path)
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["written"] is None
+    assert dated.read_bytes() == marker
+
+
+def test_a_dropbox_locked_rename_still_lands_the_file(out_dir, monkeypatch, tmp_path):
+    """⛑ `os.replace` needs DELETE on the target and Dropbox denies it (WinError 5),
+    while an in-place write still succeeds -- measured on this machine 2026-08-21. The
+    fallback must leave no half-written file that a later run would trust."""
+    import os as _os
+
+    def _denied(src, dst):
+        raise PermissionError(5, "Access is denied")
+
+    monkeypatch.setattr(_os, "replace", _denied)
+    _serve_ivv(monkeypatch, tmp_path)
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok"
+    doc = json.loads((out_dir / "sp500_latest.json").read_text(encoding="utf-8"))
+    assert doc["count"] == 503 and len(doc["holdings"]) == 503
+    assert not list(out_dir.glob("*.new"))          # no orphan temp left behind
+
+
+def test_a_write_that_cannot_be_read_back_raises(out_dir, monkeypatch, tmp_path):
+    """Validate by RE-READING: a write that reports success and produces an unreadable
+    file must not be reported as an archived snapshot."""
+    _serve_ivv(monkeypatch, tmp_path)
+    real_write = im._write_snapshot_bytes
+
+    def _truncating(path, text):
+        real_write(path, text[: len(text) // 2])
+
+    monkeypatch.setattr(im, "_write_snapshot_bytes", _truncating)
+    with pytest.raises(im.IndexMembershipError, match="read back"):
+        im.refresh("sp500", today=date(2026, 9, 22))
+
+
+def test_a_basket_where_a_FIFTH_of_the_rows_carry_no_weight_refuses(
+        out_dir, monkeypatch, tmp_path):
+    """The total rule alone cannot see this: rescale the rows that DO carry a weight
+    and the fund still sums to ~100 while a fifth of the archive's rows are weightless
+    -- and those rows are exactly the ones a later analysis would silently drop."""
+    import csv as _csvmod
+    import io as _io
+
+    lines = (_ivv_text() + _pad_rows()).splitlines()
+    h = next(i for i, l in enumerate(lines) if l.startswith("Ticker,"))
+    rows = [r for r in _csvmod.reader(_io.StringIO("\n".join(lines[h + 1:]))) if r]
+    blank = [i for i, r in enumerate(rows) if i % 5 == 0]
+    each = round(100.0 / (len(rows) - len(blank)), 4)
+    buf = _io.StringIO()
+    w = _csvmod.writer(buf, quoting=_csvmod.QUOTE_ALL, lineterminator="\n")
+    for i, r in enumerate(rows):
+        r[5] = "-" if i in blank else str(each)
+        w.writerow(r)
+    text = "\n".join(lines[:h + 1]) + "\n" + buf.getvalue()
+
+    _serve_ivv(monkeypatch, tmp_path)          # wires the Wikipedia cache
+    _serve(monkeypatch, text)
+    with pytest.raises(im.IndexMembershipError, match="carry a usable weight"):
+        im.refresh("sp500", today=date(2026, 9, 22))

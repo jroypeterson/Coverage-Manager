@@ -475,6 +475,17 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             raise IndexMembershipError(
                 f"an Equity holding has no ticker (name {r.get('Name', '')!r}) — "
                 f"dropping it would silently shrink the index by one real constituent")
+        # ⛑ AN EXCLUSION PREDICATE NEEDS A POPULATED COLUMN. Keep the `Exchange`
+        # header and blank its values and the "NO MARKET (E.G. UNLISTED)" test matches
+        # NOTHING — the fleet's a-flag-that-is-always-FALSE shape — so the HOLX-style
+        # residual rides through and a 504-row basket clears the count band and the
+        # join floor. Measured 2026-09-22: 0 of 504 IVV and 0 of 658 EFA equity rows
+        # carry a blank exchange, so "every constituent names its venue" is the rule,
+        # not a rate heuristic that would itself need calibrating.
+        if not (r.get("Exchange") or "").strip():
+            raise IndexMembershipError(
+                f"equity holding {t} has a blank Exchange — the unlisted-residual "
+                f"filter would match nothing and silently keep non-constituents")
         rows.append({
             "ticker": t,
             "name": (r.get("Name") or "").strip(),
@@ -709,6 +720,40 @@ def _load_cm_sp500() -> tuple[str, list[dict]]:
     return stamp, rows
 
 
+# Kinds whose whole point is that they carry weights. `cm_cache` is deliberately not
+# here: a scraped constituent list is not a weighted index and publishes None.
+WEIGHTED_KINDS = frozenset({"ishares", "vanguard"})
+MIN_WEIGHTED_ROW_RATE = 0.90
+# Live totals 2026-09-22: IVV 99.92, EFA 99.48, VONE 99.80, VTWO 97.44, VTHR 97.97.
+WEIGHT_TOTAL_RANGE = (90.0, 105.0)
+
+
+def check_weights(key: str, kind: str, rows: list[dict]) -> None:
+    """Refuse a weighted source that came back without usable weights.
+
+    ⛑ WEIGHTS ARE HALF THE REASON THIS ARCHIVE EXISTS AND CANNOT BE BACKFILLED. A
+    structurally perfect 503-row response whose `Weight (%)` cells are all `-` passed
+    every gate: `_num` returned None for each, `equity_weight_pct` was None, `refresh`
+    reported `ok`, and that date was archived weightless — permanently, because a dated
+    file is written once. A snapshot that cannot answer the question it was taken for
+    is a failure, so this raises and the weekly step reports the lane degraded.
+    """
+    if kind not in WEIGHTED_KINDS or not rows:
+        return
+    weighted = [r["weight_pct"] for r in rows if r.get("weight_pct") is not None]
+    if len(weighted) < MIN_WEIGHTED_ROW_RATE * len(rows):
+        raise IndexMembershipError(
+            f"{key}: only {len(weighted)} of {len(rows)} holdings carry a usable "
+            f"weight (floor {MIN_WEIGHTED_ROW_RATE:.0%}) — refusing to archive a "
+            f"weightless snapshot of a weighted fund; this date cannot be re-fetched")
+    total = round(sum(weighted), 4)
+    low, high = WEIGHT_TOTAL_RANGE
+    if not low <= total <= high:
+        raise IndexMembershipError(
+            f"{key}: the weights sum to {total}% of the fund, outside {low}-{high}% — "
+            f"refusing to archive a basket that does not describe the whole fund")
+
+
 def check_sp500_count(key: str, rows: list[dict]) -> list[dict]:
     """The S&P 500 count band, applied to the KEY rather than to one source kind.
 
@@ -752,6 +797,82 @@ def _source_label(key: str) -> str:
     if src["kind"] == "vanguard":
         return VANGUARD_API.format(etf=src["etf"], start=1, count=VANGUARD_PAGE)
     return str(SP500_CACHE)
+
+
+def _write_snapshot_bytes(path: Path, text: str) -> None:
+    """Write and flush to disk. The seam a test replaces to simulate a partial write."""
+    import os
+
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def _snapshot_is_usable(path: Path, key: str, count: int | None = None) -> bool:
+    """Does this file hold a COMPLETE snapshot of `key`?
+
+    ⛑ Completeness is INTERNAL consistency — it parses, it is this index, and it holds
+    as many rows as it claims. It is deliberately NOT agreement with what today's fetch
+    returned: a dated file records what that day said, and the fund legitimately
+    republishes the same as-of with a slightly different basket. `count` is passed only
+    where the caller is verifying a write it has just made.
+    """
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not (isinstance(doc, dict) and doc.get("key") == key
+            and isinstance(doc.get("holdings"), list)
+            and isinstance(doc.get("count"), int)
+            and len(doc["holdings"]) == doc["count"]):
+        return False
+    return count is None or doc["count"] == count
+
+
+def write_snapshot(path: Path, doc: dict) -> None:
+    """Write a snapshot durably, then prove it by READING IT BACK.
+
+    ⛑ `os.replace` NEEDS DELETE RIGHTS ON THE TARGET AND DROPBOX DENIES THEM
+    (`WinError 5`, measured on this machine 2026-08-21) while permitting an in-place
+    write — so the rename fails *after* the temp is written and the stale file survives
+    beside a `.new` nothing will ever read. Hence: temp → fsync → try `replace` with a
+    short backoff → fall back to writing THROUGH the target, keeping the temp until
+    that returns so a crash on the non-atomic path is still recoverable.
+
+    ⛑ AND THE WRITE IS NOT "DONE" UNTIL IT PARSES BACK. An interrupted first write left
+    a truncated dated file; the next valid run saw only that the PATH EXISTED, skipped
+    it, and returned `ok` — so the sole historical snapshot for that date stayed corrupt
+    for ever. Existence is not evidence.
+    """
+    import os
+    import time
+
+    text = json.dumps(doc, indent=1)
+    tmp = path.with_name(path.name + ".new")
+    _write_snapshot_bytes(tmp, text)
+    for attempt in range(4):
+        try:
+            os.replace(tmp, path)
+            break
+        except PermissionError:
+            if attempt == 3:
+                # Dropbox holds the target open; writing through still works.
+                log.warning("index_membership: rename refused for %s (Dropbox lock) — "
+                            "writing in place", path.name)
+                _write_snapshot_bytes(path, text)
+                break
+            time.sleep(0.25 * (attempt + 1))
+        except OSError as e:
+            raise IndexMembershipError(f"could not write {path}: {e}") from e
+    try:
+        tmp.unlink(missing_ok=True)
+    except OSError:                       # pragma: no cover - a locked temp is junk
+        pass
+    if not _snapshot_is_usable(path, doc.get("key"), doc.get("count")):
+        raise IndexMembershipError(
+            f"{path.name} could not be read back as the snapshot just written — "
+            f"refusing to report a half-written file as an archived date")
 
 
 def _snapshot_path(key: str, as_of: str) -> Path:
@@ -852,6 +973,8 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
                 "age_days": snapshot_age_days({"as_of": as_of}, today), "error": msg,
                 "written": None}
 
+    check_weights(key, src["kind"], rows)
+
     if len(rows) < floor:
         raise IndexMembershipError(
             f"{key}: {len(rows)} holdings is below the credibility floor of {floor} — "
@@ -887,14 +1010,17 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     }
 
     dated = _snapshot_path(key, as_of)
-    # ⛑ A DATED SNAPSHOT IS WRITTEN ONCE. The fund republishes the same as-of for days;
-    # rewriting it would silently change a file the archive treats as immutable, and the
-    # whole value of the archive is that a past file says what it said at the time.
+    # ⛑ A DATED SNAPSHOT IS WRITTEN ONCE — BUT IMMUTABILITY PROTECTS A GOOD FILE, NOT A
+    # PATH. The fund republishes the same as-of for days, so rewriting a complete file
+    # would silently change what the archive says a past day said. An UNUSABLE one
+    # (interrupted write, truncated, wrong key) is not a record of anything, and
+    # skipping it on `exists()` alone left the only snapshot for that date corrupt for
+    # ever. So: rewrite exactly when the file cannot be read back as this snapshot.
     written = None
-    if not dated.exists():
-        dated.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    if not _snapshot_is_usable(dated, key):
+        write_snapshot(dated, doc)
         written = str(dated)
-    _latest_path(key).write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    write_snapshot(_latest_path(key), doc)
 
     return {"key": key, "status": "ok", "as_of": as_of, "count": len(rows),
             "age_days": snapshot_age_days(doc, today), "error": None,
