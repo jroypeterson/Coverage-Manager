@@ -150,6 +150,9 @@ OUT_DIR = config.DATA_DIR / "index_membership"
 
 HOLDINGS_URL = "https://www.ishares.com/us/products/{pid}/x/latest-holdings.csv"
 
+# Columns whose ABSENCE would make a filter or a field silently vanish rather than fail.
+REQUIRED_COLUMNS = ("Ticker", "Name", "Sector", "Asset Class", "Weight (%)", "Exchange")
+
 # iShares 403s a non-browser agent — the same CDN behaviour `foreign_identifiers.py`
 # and the comments tracker both hit.
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -292,6 +295,18 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
     if header_idx is None:
         raise IndexMembershipError("no 'Ticker,' header row — file shape changed")
 
+    # ⛑ REQUIRE THE COLUMNS THE FILTERS READ, because `row.get(col, "")` makes a
+    # renamed or dropped column fail OPEN: with `Exchange` gone, the
+    # NO MARKET (E.G. UNLISTED) test never matches and the HOLX-style residual
+    # publishes as a constituent; with `Asset Class` gone, cash and futures lines do.
+    # A guard that silently stops applying is worse than no guard.
+    header = [h.strip() for h in next(csv.reader([lines[header_idx]]))]
+    missing = [c for c in REQUIRED_COLUMNS if c not in header]
+    if missing:
+        raise IndexMembershipError(
+            f"holdings file is missing required column(s) {', '.join(missing)} — "
+            f"the filters that read them would fail open (header: {', '.join(header)})")
+
     as_of = ""
     for l in lines[:header_idx]:
         if l.startswith("Fund Holdings as of"):
@@ -356,6 +371,31 @@ def normalise_us_ticker(ticker: str) -> str:
 
 UNLISTED_EXCHANGE = "NO MARKET (E.G. UNLISTED)"
 
+# ⛑ THE S&P 500 COUNT BAND IS THE PUBLIC MIRROR'S BAND, CHECKED AT COLLECT TIME.
+# The generic `floor` (450) is a half-parse test, not a membership test: a CSV
+# truncated at 495 equities, or a transitional basket of 506 (503 current plus three
+# outgoing names the fund has not sold yet), both cleared it and replaced the snapshot
+# every consumer reads. Only `sigma_export.build_sp500_mirror` applied a real band, and
+# it sits one repo downstream and guards one file. One authority, imported there.
+#
+# 🔻 RESIDUAL, STATED RATHER THAN GUARDED: 504-510 is still accepted, so a fund caught
+# mid-reconstitution can publish a handful of non-members for one run and self-corrects
+# on the next. Narrowing it to exactly 503 would refuse a real index change (the S&P 500
+# has carried 503 lines for years only because of the dual-class names), and the obvious
+# discriminator -- absent from the Wikipedia list AND tiny weight -- fails on exactly the
+# week it is needed, because a NEW entrant is also absent from a week-old Wikipedia list.
+# `index_mirrors.source_crosscheck` names every such difference instead.
+SP500_MIN_COUNT = 495
+SP500_MAX_COUNT = 510
+
+# A Wikipedia join below this share means the cache is present but not usable for names
+# (empty `info`, or a renamed schema), and every row would fall back to IVV's own
+# "BERKSHIRE HATHAWAY INC CLASS B" style -- rewriting the public sp500_names.json
+# wholesale. Measured 2026-09-22: 500 of 503 joined, the 3 misses being that week's
+# entrants. 0.90 leaves room for a full reconstitution (~25 names) and still refuses a
+# schema break, which lands near zero.
+SP500_MIN_JOIN_RATE = 0.90
+
 # IVV's sector labels differ from GICS in exactly this one (measured: the other ten of
 # IVV's eleven equity sector strings equal the Wikipedia cache's GICS set).
 IVV_SECTOR_TO_GICS = {"Communication": "Communication Services"}
@@ -388,6 +428,19 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
                     "sector": wsector or ivv_sector,
                     "sub_industry": (w.get("GICS Sub-Industry") or "").strip(),
                     "name_source": "wikipedia" if wname else "ivv"})
+
+    if not SP500_MIN_COUNT <= len(out) <= SP500_MAX_COUNT:
+        raise IndexMembershipError(
+            f"sp500: {len(out)} constituents is outside {SP500_MIN_COUNT}-"
+            f"{SP500_MAX_COUNT} — refusing to replace the list with a truncated file "
+            f"or a transitional basket")
+
+    joined = sum(1 for r in out if r["name_source"] == "wikipedia")
+    if joined < SP500_MIN_JOIN_RATE * len(out):
+        raise IndexMembershipError(
+            f"sp500: the Wikipedia cache named only {joined} of {len(out)} holdings "
+            f"(floor {SP500_MIN_JOIN_RATE:.0%}) — refusing to fall back to IVV names "
+            f"for the rest, which would rewrite every published company name")
     return out
 
 
@@ -587,6 +640,21 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         return {"key": key, "status": "stale_unfit" if unfit else "stale",
                 "as_of": cached.get("as_of"), "count": cached.get("count"),
                 "age_days": age, "error": str(e), "written": None}
+
+    # ⛑ A VALID BUT OLDER RESPONSE MUST NOT MOVE `<key>_latest.json` BACKWARD.
+    # iShares can serve a previous day's file (CDN edge, or a republish), and every
+    # snapshot consumer reads `latest` — only the public mirror had a strictly-newer
+    # rule, and it guards one file in one repo. Dated files stay immutable either way,
+    # and nothing is written: the run reports what it saw and the next fetch fixes it.
+    previous = load_latest(key)
+    prev_as_of = (previous or {}).get("as_of")
+    if prev_as_of and as_of < prev_as_of:
+        msg = (f"{key}: fetched as_of {as_of} is OLDER than the snapshot on disk "
+               f"({prev_as_of}) — refusing to move latest backward")
+        log.warning("index_membership[%s]: %s", key, msg)
+        return {"key": key, "status": "source_older", "as_of": as_of, "count": len(rows),
+                "age_days": snapshot_age_days({"as_of": as_of}, today), "error": msg,
+                "written": None}
 
     if len(rows) < floor:
         raise IndexMembershipError(

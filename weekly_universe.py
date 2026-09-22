@@ -924,7 +924,9 @@ def _step_index_membership():
     from universe import index_membership as im
 
     results = im.refresh_all()
-    bad = [r for r in results if r["status"] in ("stale_unfit", "failed")]
+    # `source_older` joins the two: the fetch worked and the answer was unusable, which
+    # is the same operator signal -- this lane did not learn what it was asked to learn.
+    bad = [r for r in results if r["status"] in ("stale_unfit", "failed", "source_older")]
     if bad:
         raise RuntimeError(
             "index membership degraded: "

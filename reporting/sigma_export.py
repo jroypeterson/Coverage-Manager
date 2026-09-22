@@ -17,6 +17,7 @@ import subprocess
 from pathlib import Path
 
 from logging_utils import get_logger
+from universe import index_membership as _im
 from universe.artifacts import build_universe_metadata
 
 logger = get_logger("reporting.sigma_export")
@@ -253,8 +254,12 @@ def _git(cwd, *args):
 # lets the rest of the export proceed, and is reported as `failed:` in the weekly step.
 SP500_RELPATH = "sources/sp500.txt"
 SP500_NAMES_RELPATH = "sources/sp500_names.json"
-SP500_MIN_COUNT = 495
-SP500_MAX_COUNT = 510
+# ⛑ ONE AUTHORITY FOR THE BAND. These used to be a second copy of the numbers the
+# collector applies; the collector had a LOOSER rule (the generic 450 floor), so a
+# truncated or transitional list was written to the snapshot and only refused here --
+# after every other consumer of `sp500_latest.json` had already read it.
+SP500_MIN_COUNT = _im.SP500_MIN_COUNT
+SP500_MAX_COUNT = _im.SP500_MAX_COUNT
 # Named WITHOUT a URL (2026-09-22): the list now comes from IVV fund holdings via CM's
 # index_membership, and the iShares URL must never reach this public repo.
 SP500_SOURCE_LABEL = "Coverage Manager index membership (S&P 500; fund holdings disclosure)"

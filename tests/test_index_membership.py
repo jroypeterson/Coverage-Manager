@@ -441,20 +441,37 @@ def _ivv_text():
     return IVV_FIXTURE.read_text(encoding="utf-8")
 
 
+WIKI_TICKERS = ["NVDA", "AAPL", "MMM", "GOOGL", "GOOG", "BRK.B", "BF.B", "FOXA",
+                "FOX", "NWSA", "NWS", "CBOE", "BLDR", "TAP", "TTD"]
+WIKI_INFO = {
+    "MMM": {"Company Name": "3M", "GICS Sector": "Industrials",
+            "GICS Sub-Industry": "Industrial Conglomerates"},
+    "BRK.B": {"Company Name": "Berkshire Hathaway", "GICS Sector": "Financials",
+              "GICS Sub-Industry": "Multi-Sector Holdings"},
+    "GOOGL": {"Company Name": "Alphabet Inc. (Class A)",
+              "GICS Sector": "Communication Services",
+              "GICS Sub-Industry": "Interactive Media & Services"},
+}
+# The fixture carries 15 members; the S&P 500 must land inside 495-510, so every
+# collect-level test pads to a plausible index rather than exercising a 15-name one.
+PAD_N = 488
+
+
+def _pad_tickers(n=PAD_N):
+    return [f"Z{i:03d}" for i in range(n)]
+
+
+def _pad_rows(n=PAD_N):
+    return "".join(
+        f'"{t}","PAD {t}","Industrials","Equity","1.00","0.01","1.00","1.00",'
+        f'"1.00","United States","NYSE","USD","1.00","USD","-"\n'
+        for t in _pad_tickers(n))
+
+
 def _wiki_cache(tmp_path, monkeypatch, tickers=None, info=None):
     """A Wikipedia-shaped CM cache: pre-reconstitution, so no BE/ILMN/P."""
-    tickers = tickers if tickers is not None else [
-        "NVDA", "AAPL", "MMM", "GOOGL", "GOOG", "BRK.B", "BF.B", "FOXA", "FOX",
-        "NWSA", "NWS", "CBOE", "BLDR", "TAP", "TTD"]
-    info = info if info is not None else {
-        "MMM": {"Company Name": "3M", "GICS Sector": "Industrials",
-                "GICS Sub-Industry": "Industrial Conglomerates"},
-        "BRK.B": {"Company Name": "Berkshire Hathaway", "GICS Sector": "Financials",
-                  "GICS Sub-Industry": "Multi-Sector Holdings"},
-        "GOOGL": {"Company Name": "Alphabet Inc. (Class A)",
-                  "GICS Sector": "Communication Services",
-                  "GICS Sub-Industry": "Interactive Media & Services"},
-    }
+    tickers = WIKI_TICKERS if tickers is None else tickers
+    info = dict(WIKI_INFO) if info is None else info
     cache = tmp_path / "sp500_wiki.json"
     cache.write_text(json.dumps({"_cached_at": "2026-09-18T14:09:24+00:00",
                                  "data": {"tickers": tickers, "info": info}}),
@@ -463,10 +480,27 @@ def _wiki_cache(tmp_path, monkeypatch, tickers=None, info=None):
     return cache
 
 
-def _ivv(monkeypatch, tmp_path, text=None):
-    _serve(monkeypatch, text if text is not None else _ivv_text())
-    _wiki_cache(tmp_path, monkeypatch)
+def _serve_ivv(monkeypatch, tmp_path, text=None, pad=PAD_N, info_covered=None):
+    """Serve the fixture padded to a plausible index, with a matching Wikipedia cache."""
+    pads = _pad_tickers(pad)
+    covered = pads if info_covered is None else pads[:info_covered]
+    info = dict(WIKI_INFO)
+    info.update({t: {"Company Name": f"Pad {t} Inc", "GICS Sector": "Industrials",
+                     "GICS Sub-Industry": "Widgets"} for t in covered})
+    _wiki_cache(tmp_path, monkeypatch, tickers=WIKI_TICKERS + pads, info=info)
+    _serve(monkeypatch, (text if text is not None else _ivv_text()) + _pad_rows(pad))
+
+
+def _ivv(monkeypatch, tmp_path, text=None, pad=PAD_N, info_covered=None):
+    _serve_ivv(monkeypatch, tmp_path, text=text, pad=pad, info_covered=info_covered)
     return im.collect("sp500")
+
+
+def _rename_header(column, replacement):
+    lines = _ivv_text().splitlines(keepends=True)
+    i = next(i for i, l in enumerate(lines) if l.startswith("Ticker,"))
+    lines[i] = lines[i].replace(column, replacement)
+    return "".join(lines)
 
 
 def test_sp500_source_is_ivv_via_the_ishares_path():
@@ -493,7 +527,7 @@ def test_ivv_non_equity_and_unlisted_residual_lines_are_dropped(monkeypatch, tmp
     assert not got & {"XTSLA", "USD", "SGAFT", "ESZ6"}      # money market, cash, futures
     assert "HOLX" not in got                                # $0.01 post-deal residual
     assert {"BE", "ILMN", "P"} <= got and not got & {"BLDR", "TAP", "TTD"}
-    assert len(rows) == 15
+    assert len(rows) == 503
 
 
 def test_ivv_as_of_is_the_funds_own_date_recorded_as_source(monkeypatch, tmp_path):
@@ -560,14 +594,107 @@ def test_eafe_local_tickers_stay_raw(monkeypatch):
 
 
 def test_ivv_snapshot_caveats_describe_ivv_not_efa(out_dir, monkeypatch, tmp_path):
-    pad = "".join(
-        f'"Z{i:03d}","PAD {i}","Industrials","Equity","1.00","0.01","1.00","1.00",'
-        f'"1.00","United States","NYSE","USD","1.00","USD","-"\n' for i in range(450))
-    _serve(monkeypatch, _ivv_text() + pad)
-    _wiki_cache(tmp_path, monkeypatch)
+    _serve_ivv(monkeypatch, tmp_path)
     r = im.refresh("sp500")
-    assert r["status"] == "ok" and r["as_of"] == "2026-09-21" and r["count"] == 465
+    assert r["status"] == "ok" and r["as_of"] == "2026-09-21" and r["count"] == 503
     doc = json.loads((out_dir / "sp500_2026-09-21.json").read_text(encoding="utf-8"))
     assert doc["as_of_kind"] == "source" and doc["kind"] == "ishares"
     blob = " ".join(doc["caveats"]).lower()
     assert "ivv" in blob and "sampled" not in blob and "exports" in blob
+
+
+# --- Codex round 1: four guards on the IVV path -------------------------------
+
+def test_the_sp500_collect_band_is_the_PUBLIC_MIRRORS_band():
+    """One band, not two. The 450 floor let a 495-truncated file replace a
+    503-member list, and a transitional 506 publish non-members; the mirror's
+    495-510 was the only real gate and it sits one repo downstream."""
+    from reporting import sigma_export as se
+
+    assert (im.SP500_MIN_COUNT, im.SP500_MAX_COUNT) == (495, 510)
+    assert (se.SP500_MIN_COUNT, se.SP500_MAX_COUNT) == (495, 510)
+
+
+def test_a_truncated_ivv_file_is_refused_at_collect(monkeypatch, tmp_path):
+    with pytest.raises(im.IndexMembershipError, match="494.*495-510"):
+        _ivv(monkeypatch, tmp_path, pad=479)            # 15 + 479 = 494
+
+
+def test_an_over_long_ivv_file_is_refused_at_collect(monkeypatch, tmp_path):
+    with pytest.raises(im.IndexMembershipError, match="511.*495-510"):
+        _ivv(monkeypatch, tmp_path, pad=496)            # 15 + 496 = 511
+
+
+def test_a_transitional_basket_inside_the_band_is_still_accepted(monkeypatch, tmp_path):
+    """The stated residual exposure: a fund still holding an outgoing name reads
+    504-510 and passes, then self-corrects on the next run."""
+    _, _, rows = _ivv(monkeypatch, tmp_path, pad=491)   # 506
+    assert len(rows) == 506
+
+
+def test_a_renamed_exchange_column_raises_rather_than_failing_the_filter_open(
+        monkeypatch, tmp_path):
+    """`.get("Exchange", "")` made the NO MARKET filter fail OPEN: rename the
+    column and HOLX publishes as a member with nothing reported."""
+    with pytest.raises(im.IndexMembershipError, match="Exchange"):
+        _ivv(monkeypatch, tmp_path, text=_rename_header("Exchange,", "Venue,"))
+
+
+def test_a_renamed_asset_class_column_raises(monkeypatch, tmp_path):
+    with pytest.raises(im.IndexMembershipError, match="Asset Class"):
+        _ivv(monkeypatch, tmp_path, text=_rename_header("Asset Class,", "AssetClass,"))
+
+
+def test_an_empty_wikipedia_info_map_is_refused_not_used_as_a_fallback(
+        monkeypatch, tmp_path):
+    """Tickers but no `info` (or a renamed schema) would give IVV-style names to all
+    503 and rewrite the public sp500_names.json wholesale."""
+    with pytest.raises(im.IndexMembershipError, match=r"3 of 503"):
+        _ivv(monkeypatch, tmp_path, info_covered=0)
+
+
+def test_a_join_rate_below_the_floor_is_refused_and_one_above_it_passes(
+        monkeypatch, tmp_path):
+    # 452 pads + the 3 real info rows = 455 of 503 = 90.5%
+    _, _, rows = _ivv(monkeypatch, tmp_path, info_covered=452)
+    assert sum(1 for r in rows if r["name_source"] == "wikipedia") == 455
+    # 449 pads + 3 = 452 of 503 = 89.9%
+    with pytest.raises(im.IndexMembershipError, match=r"452 of 503"):
+        _ivv(monkeypatch, tmp_path, info_covered=449)
+
+
+def test_an_older_as_of_never_moves_latest_backward(out_dir, monkeypatch, tmp_path):
+    """Only the public mirror refused an older list; every snapshot consumer reads
+    `sp500_latest.json` and would have been moved back a week."""
+    _serve_ivv(monkeypatch, tmp_path)
+    assert im.refresh("sp500")["status"] == "ok"
+    latest = out_dir / "sp500_latest.json"
+    before = latest.read_bytes()
+
+    _serve_ivv(monkeypatch, tmp_path,
+               text=_ivv_text().replace("Sep 21, 2026", "Sep 14, 2026"))
+    r = im.refresh("sp500")
+    assert r["status"] == "source_older"
+    assert r["as_of"] == "2026-09-14" and r["written"] is None
+    assert "2026-09-21" in r["error"]
+    assert latest.read_bytes() == before
+    assert not (out_dir / "sp500_2026-09-14.json").exists()
+
+
+def test_the_same_as_of_is_not_a_regression(out_dir, monkeypatch, tmp_path):
+    """A fund republishes one as-of for days; refusing that would be an outage."""
+    _serve_ivv(monkeypatch, tmp_path)
+    im.refresh("sp500")
+    _serve_ivv(monkeypatch, tmp_path)
+    assert im.refresh("sp500")["status"] == "ok"
+
+
+def test_the_weekly_step_fails_when_a_source_went_backwards(out_dir, monkeypatch):
+    import weekly_universe
+
+    monkeypatch.setattr(im, "refresh_all",
+                        lambda: [{"key": "sp500", "status": "source_older",
+                                  "as_of": "2026-09-14", "count": 503, "age_days": 8,
+                                  "error": "older than 2026-09-21", "written": None}])
+    with pytest.raises(RuntimeError, match="degraded"):
+        weekly_universe._step_index_membership()
