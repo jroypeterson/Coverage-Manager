@@ -298,8 +298,14 @@ def _mirror_tickers(text):
 def mirror_update_values(text):
     """Every `# Last updated:` value in the file, raw, in order. Used to say WHY a
     mirror is undatable -- the refusal has to name the values a human will look for."""
-    return [ln[len(_SP500_UPDATED_PREFIX):].strip()
-            for ln in text.splitlines() if ln.startswith(_SP500_UPDATED_PREFIX)]
+    # ⛑ THE SAME LEADING-WHITESPACE NORMALISATION `_mirror_tickers` USES. It skips a
+    # comment after `lstrip`, so an INDENTED second header was a comment to the ticker
+    # reader and invisible to the date reader: the file looked singly-dated at
+    # 2026-09-01 while carrying a corrective 2026-09-30, and an older snapshot
+    # overwrote the newer basket. Two readers of one file must see one set of lines.
+    return [ln.lstrip()[len(_SP500_UPDATED_PREFIX):].strip()
+            for ln in text.splitlines()
+            if ln.lstrip().startswith(_SP500_UPDATED_PREFIX)]
 
 
 def _mirror_updated(text):
@@ -320,19 +326,15 @@ def _mirror_updated(text):
     found = mirror_update_values(text)
     if len(found) != 1:
         return None
-    for ln in text.splitlines():
-        if ln.startswith(_SP500_UPDATED_PREFIX):
-            # ⛑ THE WHOLE VALUE, NOT ITS FIRST TEN CHARACTERS. Slicing first made an
-            # annotated header parse as its PREFIX -- `2026-09-01 (corrected
-            # 2026-09-30)` read as 2026-09-01, so a snapshot from 2026-09-08 counted
-            # as strictly newer and overwrote the public mirror with the OLDER basket.
-            # Trailing content means we do not know what the file is dated.
-            raw = ln[len(_SP500_UPDATED_PREFIX):].strip()
-            try:
-                return _dt.strptime(raw, "%Y-%m-%d").date().isoformat()
-            except ValueError:
-                return None
-    return None
+    # ⛑ THE WHOLE VALUE, NOT ITS FIRST TEN CHARACTERS. Slicing first made an annotated
+    # header parse as its PREFIX -- `2026-09-01 (corrected 2026-09-30)` read as
+    # 2026-09-01, so a snapshot from 2026-09-08 counted as strictly newer and overwrote
+    # the public mirror with the OLDER basket. Trailing content means we do not know
+    # what the file is dated.
+    try:
+        return _dt.strptime(found[0], "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
 
 
 def render_sp500_txt(tickers, as_of):

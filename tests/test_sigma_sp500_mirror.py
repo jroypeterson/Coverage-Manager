@@ -397,3 +397,35 @@ def test_two_last_updated_headers_make_the_file_undatable(tmp_path):
     assert res["status"] == "refused"
     assert "2026-09-01" in res["reason"] and "2026-09-30" in res["reason"]
     assert res["files"] == {}
+
+
+def test_an_INDENTED_duplicate_update_header_is_seen_by_the_ambiguity_guard(tmp_path):
+    """`_mirror_tickers` skips a comment after lstrip, so an indented second header is
+    a comment to the ticker reader and INVISIBLE to the date reader: the file looks
+    singly-dated at 2026-09-01 while carrying a corrective 2026-09-30, and a
+    2026-09-08 snapshot overwrites the newer basket. Both readers must see the same
+    set of lines."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-01")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    lines = txt_path.read_text(encoding="utf-8").splitlines()
+    i = next(i for i, ln in enumerate(lines) if ln.startswith("# Last updated:"))
+    lines.insert(i + 1, "  # Last updated: 2026-09-30")
+    txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-08"))
+    assert res["status"] == "refused"
+    assert "2026-09-01" in res["reason"] and "2026-09-30" in res["reason"]
+    assert res["files"] == {}
+
+
+def test_an_indented_single_header_is_still_a_usable_date(tmp_path):
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-18")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    txt_path.write_text(txt_path.read_text(encoding="utf-8").replace(
+        "# Last updated: 2026-09-18", "   # Last updated: 2026-09-18"), encoding="utf-8")
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-25"))
+    assert res["status"] == "changed", res

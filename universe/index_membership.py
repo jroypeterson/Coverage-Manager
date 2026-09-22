@@ -412,9 +412,22 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             f"holdings file is missing required column(s) {', '.join(missing)} — "
             f"the filters that read them would fail open (header: {', '.join(header)})")
 
+    # ⛑ TWO AS-OF HEADERS IS NOT AN ANSWER. The parser took the FIRST and never looked
+    # further, so a response carrying `Sep 25, 2026` followed by a corrective
+    # `Sep 18, 2026` -- with the OLDER basket beneath it -- was stamped Sep 25, sailed
+    # past the strictly-newer guard, and published older membership as current. Same
+    # rule the sigma-alert mirror applies to its own `# Last updated:` line.
+    stamps = [l.split(",", 1)[1].strip().strip('"') if "," in l else ""
+              for l in lines[:header_idx] if l.strip().startswith("Fund Holdings as of")]
+    if len(stamps) > 1:
+        raise IndexMembershipError(
+            "the file carries more than one 'Fund Holdings as of' header "
+            f"({', '.join(repr(s) for s in stamps)}) — it cannot be dated, and the "
+            f"first one is not evidence of which basket is below it")
+
     as_of = ""
     for l in lines[:header_idx]:
-        if l.startswith("Fund Holdings as of"):
+        if l.strip().startswith("Fund Holdings as of"):
             raw = l.split(",", 1)[1].strip().strip('"') if "," in l else ""
             for fmt in ("%b %d, %Y", "%d-%b-%Y", "%Y-%m-%d"):
                 try:
@@ -559,11 +572,6 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
                     # transport for the per-field join check below; popped before return
                     "_sector_source": "wikipedia" if wsector else "ivv"})
 
-    if not SP500_MIN_COUNT <= len(out) <= SP500_MAX_COUNT:
-        raise IndexMembershipError(
-            f"sp500: {len(out)} constituents is outside {SP500_MIN_COUNT}-"
-            f"{SP500_MAX_COUNT} — refusing to replace the list with a truncated file "
-            f"or a transitional basket")
 
     # ⛑ THE THRESHOLD COVERS EVERY FIELD THE JOIN PROMISES, not just the one that
     # motivated it. Counting company NAMES alone meant a cache that renamed
@@ -701,6 +709,24 @@ def _load_cm_sp500() -> tuple[str, list[dict]]:
     return stamp, rows
 
 
+def check_sp500_count(key: str, rows: list[dict]) -> list[dict]:
+    """The S&P 500 count band, applied to the KEY rather than to one source kind.
+
+    ⛑ IT USED TO LIVE INSIDE THE IVV TRANSFORM, which the documented `cm_cache`
+    ROLLBACK returns before — so the rollback, the one moment the band is most needed,
+    wrote a 450-member `sp500_latest.json` as `ok` under the generic floor. A rule
+    about what the S&P 500 IS cannot be attached to where today's copy comes from.
+    """
+    if key != "sp500":
+        return rows
+    if not SP500_MIN_COUNT <= len(rows) <= SP500_MAX_COUNT:
+        raise IndexMembershipError(
+            f"sp500: {len(rows)} constituents is outside {SP500_MIN_COUNT}-"
+            f"{SP500_MAX_COUNT} — refusing to replace the list with a truncated file "
+            f"or a transitional basket")
+    return rows
+
+
 def collect(key: str) -> tuple[str, str, list[dict]]:
     """`(as_of, as_of_kind, rows)` for one index. Dispatches on the source kind."""
     src = SOURCES[key]
@@ -709,13 +735,13 @@ def collect(key: str) -> tuple[str, str, list[dict]]:
         as_of, rows = parse_holdings(_fetch_csv(src["pid"]))
         if src.get("post"):
             rows = _POST[src["post"]](rows)
-        return as_of, "source", rows
+        return as_of, "source", check_sp500_count(key, rows)
     if kind == "vanguard":
         as_of, rows = _fetch_vanguard(src["etf"])
         return as_of, "source", rows
     if kind == "cm_cache":
         as_of, rows = _load_cm_sp500()
-        return as_of, "observed", rows
+        return as_of, "observed", check_sp500_count(key, rows)
     raise IndexMembershipError(f"unknown source kind {kind!r} for {key!r}")
 
 

@@ -988,3 +988,58 @@ def test_a_missing_sector_field_is_named_too(monkeypatch, tmp_path):
     _wiki_missing_field(tmp_path, monkeypatch, "GICS Sector")
     with pytest.raises(im.IndexMembershipError, match="sector"):
         im.collect("sp500")
+
+
+# --- Codex round 9 -------------------------------------------------------------
+
+def test_two_fund_holdings_as_of_headers_refuse_and_name_both(monkeypatch, tmp_path):
+    """The parser took the FIRST as-of line and never looked further, so a response
+    carrying `Sep 25, 2026` followed by a corrective `Sep 18, 2026` -- with the OLDER
+    basket beneath it -- was stamped Sep 25, sailed past the strictly-newer guard, and
+    published older membership as current. Same rule as the mirror's header."""
+    text = _ivv_text().replace(
+        'Fund Holdings as of,"Sep 21, 2026"',
+        'Fund Holdings as of,"Sep 25, 2026"\nFund Holdings as of,"Sep 18, 2026"')
+    with pytest.raises(im.IndexMembershipError, match="Sep 25, 2026"):
+        _ivv(monkeypatch, tmp_path, text=text)
+
+
+def test_the_count_BAND_applies_to_the_sp500_key_under_ANY_source_kind(
+        out_dir, monkeypatch, tmp_path):
+    """The band lived inside the IVV transform, which the documented cm_cache rollback
+    returns before -- so the rollback, the moment the band is most needed, wrote a
+    450-member sp500_latest.json as `ok` under the generic 450 floor."""
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({
+        "_cached_at": "2026-09-18T14:09:24+00:00",
+        "data": {"tickers": [f"T{i}" for i in range(450)],
+                 "info": {f"T{i}": {"Company Name": f"Co {i}",
+                                    "GICS Sector": "Industrials",
+                                    "GICS Sub-Industry": "Widgets"} for i in range(450)}}}),
+        encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    monkeypatch.setitem(im.SOURCES, "sp500",
+                        {"kind": "cm_cache", "floor": 450, "index": "S&P 500",
+                         "fund": "Wikipedia constituent list"})
+
+    with pytest.raises(im.IndexMembershipError, match="450.*495-510"):
+        im.collect("sp500")
+    assert not (out_dir / "sp500_latest.json").exists()
+
+
+def test_the_rollback_still_works_at_a_plausible_count(out_dir, monkeypatch, tmp_path):
+    """The band must not become the outage: a real Wikipedia list still publishes."""
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({
+        "_cached_at": "2026-09-18T14:09:24+00:00",
+        "data": {"tickers": [f"T{i}" for i in range(503)],
+                 "info": {f"T{i}": {"Company Name": f"Co {i}",
+                                    "GICS Sector": "Industrials",
+                                    "GICS Sub-Industry": "Widgets"} for i in range(503)}}}),
+        encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    monkeypatch.setitem(im.SOURCES, "sp500",
+                        {"kind": "cm_cache", "floor": 450, "index": "S&P 500",
+                         "fund": "Wikipedia constituent list"})
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["count"] == 503
