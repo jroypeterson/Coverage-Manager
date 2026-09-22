@@ -1,6 +1,6 @@
 # Project Brief — read this first (for reviewers, human or AI)
 
-> **Last reconciled against the repo: 2026-09-10** (board #319). Check drift with
+> **Last reconciled against the repo: 2026-09-21** (board #319; previous 2026-09-10). Check drift with
 > `python ../scripts/audit_project_briefs.py --repo "Coverage Manager"` — it counts
 > commits landed since this file was last touched that actually changed behaviour,
 > excluding CI/artifact writes. Reconcile when that number gets large; every figure
@@ -96,7 +96,8 @@ what changed in the universe week-to-week.
 | 17 | A published artifact is verified after writing, not only before | ✅ Done | Step `check_published_exports` (`universe/export_acceptance.py`) re-opens every published CSV **with the encoding the least careful consumer uses**, asserts the join key is present and populated, and cross-checks counts against the status file claiming to describe them. Built after a BOM silently blanked the `Ticker` column in every export while `validation_passed` said `true` — validation ran on the *source* and nothing read the *artifact* back |
 | 18 | Money is single-currency by construction — no mixed-unit figure is ever published | ✅ Done | Shipped after this brief was last written. Minor-unit currencies are a `MINOR_UNITS` table, not a GBp special case (ZAc mapped after two JSE rows published ~100x low: Aspen Pharmacare USD 43M → 4,217M). EV and its multiples are computed from **single-currency primitives**; the vendor's mixed-unit `enterpriseValue` is no longer published (TAK 5.1tn → 91bn). `derive_valuation` lives in `providers/valuation.py` so the report lane and the export lane cannot diverge. `num()` rejects infinity at the boundary, not just NaN |
 | 19 | A derived `Commercial Biopharma` category, published and consumed | ✅ Done | `exports/commercial_biopharma.json` (`schema_version 1`, rule stated *in the artifact*), plus a `commercial` field in `universe_metadata.json`; wired into `weekly-universe` step 4i and `cli.py backfill-commercial-revenue`. Consumed by `sigma-alert` (digest subcategory) and `sector_chart_pack` (valuation scatter). The export names its own `unknown` bucket rather than silently folding it below the line |
-| 20 | Index membership tracked with **history**, without infecting the universe | 🟡 Partial | `universe/index_membership.py` + `index_reconciliation.py` (board #354): MSCI EAFE, Russell 1000/2000/3000, S&P 500, dated weekly snapshots so history accumulates. Found and fixed a silent Vanguard outage that had served a frozen membership list for 12 days behind a working fallback. **Deliberately not in `exports/` and not rows in the universe** — see §4. Remaining: four consumers still read per-project caches as if they were a contract (the migration is filed, not done) |
+| 20 | Index membership tracked with **history**, without infecting the universe | 🟡 Partial | `universe/index_membership.py` + `index_reconciliation.py` (board #354): MSCI EAFE, Russell 1000/2000/3000, S&P 500, dated weekly snapshots so history accumulates. Found and fixed a silent Vanguard outage that had served a frozen membership list for 12 days behind a working fallback. **Deliberately not in `exports/` and not rows in the universe** — see §4. **Consumer migration is 4 of 5, not 0 of 4** (verified by grep 2026-09-21): `sector_chart_pack` (2026-09-10), `forensic_triage`, `screens_equity/surprise_screens` and `transcripts` read `data/index_membership/`. `post_earnings_movers` does **not** — `pem/config.py` still reads CM's Wikipedia cache `cache/constituents/sp500.json`, although `CLAUDE.md` lists it as migrated 2026-09-15. `sigma-alert/sources/sp500.txt` is **kept on purpose** (CI-only repo, snapshots gitignored under the licensing rule) and is instead **verified weekly** by `universe/index_mirrors.py`, step `[4f3/6]` (`b3e45ca` → `c6f02ce`); a drift makes the run `partial`. Its first run found sigma-alert's name map stale since 2026-04-13 (fixed there, `79bf6b6`) |
+| 21 | A broker holding with no CM row is reported, never silently dropped from `Held` | ✅ Done (reporting half) | `acd22e3` (#347): `sync-held` names `held_without_row` in the plan summary and the CLI warning block, and exits non-zero. Before it, a newly bought name was neither promoted nor flagged on a green run. Whether to auto-create the row or block the sync is left open — see §5 |
 
 **Overall: the core hub goal is met and live.** The universe, the published
 contract, the weekly Slack feeds, the published web page, and the unattended
@@ -113,7 +114,9 @@ substantive commits).** The whole identity-verification surface (§11b) and the
 published page (§16) did not exist; the universe grew by 254 names; the export
 contract went v3 → v4.
 
-**What changed in this one (2026-08-15 → 2026-09-10, 56 substantive commits).**
+**What changed 2026-09-10 → 2026-09-21 (8 substantive commits).** No change of shape: the fleet's other copies of an index list are now verified weekly rather than retired (§20, §3.16), the index-consumer migration is done except `post_earnings_movers`, and a newly bought name missing from the positions CSV is now reported (§21). `cli.py` also gained the `sys` import its warning paths needed (`d773894`, pinned by `tests/test_cli_names_are_bound.py`).
+
+**What changed in the reconciliation before (2026-08-15 → 2026-09-10, 56 substantive commits).**
 Four things, and the first two change the *shape* of the project rather than a
 number: CM now publishes a **derived classification** it computes itself
 (Commercial Biopharma, §19) and drives a **second coverage book** from the same
@@ -207,6 +210,14 @@ under any bucket (§3.13).
     replaced gets noticed; 33bn gets used. Hence EV is computed from primitives
     that each carry one known currency, and a missing input **blanks the field,
     never the row**.
+16. **Detect a duplicated list; do not unify it** (2026-09-16, `universe/index_mirrors.py`).
+    `sigma-alert/sources/sp500.txt` cannot be retired: sigma-alert runs only in GitHub
+    Actions and CM's snapshots are gitignored under the licensing rule, so the committed
+    mirror is the only way it can know the S&P 500. Two collectors of a free public page
+    is cheap redundancy; the defect was that nothing noticed them disagreeing. The check
+    compares the **pushed** blob (what CI clones), treats a reference below the index's
+    own credibility floor as "cannot verify", and is **non-gating but audible** — any
+    unverified mirror is a `failed:` step and a `partial` heartbeat, never a log line.
 
 ## 4. Non-goals / accepted tradeoffs
 
@@ -235,11 +246,14 @@ under any bucket (§3.13).
   licensing posture as `data/crsp/`) — never rows in
   `data/coverage_universe_tickers.csv`, never a published export. A consumer that
   wants membership reads the snapshots directly.
-- **The four remaining index-membership consumers are deliberately unmigrated.**
-  `post_earnings_movers`, `forensic_triage` and `screens_equity/surprise_screens`
-  still read their own caches. Starting the dated archive is the half that cannot
-  be bought back later; repointing consumers can be done any week and risks
-  breaking working lanes. Ordering, not neglect — do not file it as a gap.
+- ~~**The four remaining index-membership consumers are deliberately unmigrated.**~~
+  **Overtaken by the code (2026-09-21):** the ordering rationale held — the archive
+  was started first — and the migration then ran (§20). Four consumers are moved;
+  `post_earnings_movers` is the one that still reads a CM cache, and that *is* now a
+  gap (§5), since the reason for waiting has lapsed.
+- **`sigma-alert/sources/sp500.txt` is a permanent mirror, not a migration
+  leftover.** Plan step 4's "retire it" was withdrawn 2026-09-16 as not executable
+  (§3.16). Do not file its existence as a gap.
 - **Public-repo privacy exposure is out of scope here.** The full book is
   committed to public repos; that is a known, separately-tracked workspace
   decision, not something this project re-litigates.
@@ -281,6 +295,17 @@ under any bucket (§3.13).
   / `Ready to Short` rows don't appear there; new consumers must use the 5
   state-specific JSONs.
 - **Email re-enable decision** is pending the 2026-06-29 revisit.
+- **`post_earnings_movers` still reads `cache/constituents/sp500.json`** — a CM
+  provider cache consumed as if it were a contract, the last index consumer off the
+  snapshot adapter (found 2026-09-21; CM's `CLAUDE.md` records it as migrated).
+- **Two Codex Highs on `index_mirrors` are recorded, not fixed** (`c6f02ce`): a
+  timed-out fetch can leave a lock that wedges the sibling clone for `sigma_export`
+  and later runs, and the compared commit is not pinned across the build, so
+  `sigma_export` can advance `origin/master` after the check certified the previous
+  one. Both need a change to `sigma_export`'s fetch + rebase.
+- **A held name with no positions row is reported, not resolved** (§21). Creating
+  the row automatically asserts coverage nobody triaged; blocking the sync stalls
+  every export behind a purchase. The choice is JP's and is open.
 
 Most useful feedback: (a) whether the `exports/` contract is genuinely sufficient
 and stable for the consumers `DEPENDENCIES.md` registers, or whether something
@@ -356,7 +381,8 @@ JSON/CSV contract in `exports/`, gitignored Excel/HTML/PNG in `reports/`, snapsh
   + `foreign_identifiers.py` (iShares ⋈ SEC N-PORT), `symbol_directory.py` (Nasdaq Trader
   diff), `form10_watch.py` (spin-off registrations), `instrument_type.py` (receipt vs
   ordinary share), `export_acceptance.py` (read the artifact back), `crsp_snapshot.py`,
-  `cik_backfill.py`. **Added since 2026-08-15:** `commercial_biopharma.py` (the derived
+  `cik_backfill.py`. **Added since 2026-09-10:** `index_mirrors.py` (verify the
+  fleet's copies of an index list, §3.16). **Added since 2026-08-15:** `commercial_biopharma.py` (the derived
   category, §19), `index_membership.py` + `index_reconciliation.py` (§20, on their own
   path — nothing here writes the universe), `aliases.py` (one issuer, several live ticker
   strings), `s1_watch.py` / `confidential_watch.py` (the IPO pipeline before a listing
@@ -432,9 +458,18 @@ notable files in §6.
   `cache/prices/*` → screens_equity/quantitative_screens, portfolio_daily, sector_chart_pack; `cache/perf/perf_df_*.pkl`
   → sector_chart_pack.
 
-**Consumes (reverse channel):** notion_watchlist WRITES `data/positions_and_researching.csv` (only
-downstream that writes CM data; runs as a non-gating pre-step of `WeeklyCoverageBuilder`);
-sigma-alert's `missing_metadata.json` feedback; `_shared/api_rate_ledger` (AV) + `_shared/email_alert`.
+**Consumes (reverse channel):** ⛑ corrected 2026-09-21 — this line used to say notion_watchlist is
+the only downstream that writes CM data, which has been false since 2026-09-08.
+- `portfolio_workbook` (`build_workbook.sync_with_coverage_manager`, Mon + Fri) **writes
+  `data/positions_and_researching.csv`** through `universe/positions.py`: a ticker JP types on the
+  sheet is added, a CM name missing from the sheet gets a blank row there. It only ever creates a
+  missing row, never edits one.
+- `portfolio_daily/exports/held.json` → `universe/held.py` (`sync-held`) derives the `Held` column —
+  ownership is a broker FACT CM consumes, not state it owns (since 2026-08-23).
+- `notion_watchlist` still runs as a non-gating pre-step of `WeeklyCoverageBuilder`, but its
+  Notion → CM write is **gated off** (`cm_csv.save`, notion_watchlist `feb6c1c`); it now only
+  projects CM → Notion.
+- sigma-alert's `missing_metadata.json` feedback; `_shared/api_rate_ledger` (AV) + `_shared/email_alert`.
 
 ✅ **The "known drift" this section used to warn about is RESOLVED — verified 2026-08-15.**
 It read: *"sa-monitor `build_universe.py:27` still asserts `schema_version == 2` — needs a
