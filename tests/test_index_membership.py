@@ -1524,3 +1524,45 @@ def test_a_vanguard_sentinel_ticker_is_missing_not_a_constituent(monkeypatch, ce
     _paged(monkeypatch, [page])
     with pytest.raises(im.IndexMembershipError, match="ticker"):
         im._fetch_vanguard("VONE")
+
+
+# --- Codex round 13 (B): a guard that became the outage, and the wrong index ------
+
+def test_a_FUTURE_DATED_latest_does_not_block_every_valid_fetch(
+        out_dir, monkeypatch, tmp_path):
+    """⛑ THE GUARD BECOMING THE OUTAGE, for the third time in this module. The future
+    check ran only on the exception path, so on a SUCCESSFUL fetch a corrupt
+    `latest.as_of = 2026-12-31` made a valid 2026-09-21 snapshot `source_older` and
+    nothing was written -- every good fetch blocked until December or a manual delete.
+    A future-dated latest is not a baseline; it is the thing to correct."""
+    _cached(out_dir, key="sp500", n=503, as_of="2026-12-31")
+    _serve_ivv(monkeypatch, tmp_path)
+
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["as_of"] == "2026-09-21"
+    assert json.loads((out_dir / "sp500_latest.json").read_text(
+        encoding="utf-8"))["as_of"] == "2026-09-21"
+
+
+def test_a_genuinely_older_fetch_is_still_refused(out_dir, monkeypatch, tmp_path):
+    """The ordering rule itself must survive the fix: a USABLE newer baseline still
+    blocks an older response."""
+    _cached(out_dir, key="sp500", n=503, as_of="2026-09-25")
+    _serve_ivv(monkeypatch, tmp_path)
+    assert im.refresh("sp500", today=date(2026, 9, 26))["status"] == "source_older"
+
+
+def test_a_document_for_ANOTHER_INDEX_is_not_a_usable_snapshot(out_dir, monkeypatch):
+    """`snapshot_problem` never looked at `doc["key"]`, so a current, weighted, 503-row
+    EAFE document stored as `sp500_latest.json` served as a stale S&P 500 fallback --
+    and the mirror would have rendered it into the public sources/sp500.txt. The wrong
+    index, published."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _cached(out_dir, key="eafe", n=503, as_of="2026-09-20")
+    (out_dir / "sp500_latest.json").write_text(
+        (out_dir / "eafe_latest.json").read_text(encoding="utf-8"), encoding="utf-8")
+    _fail(monkeypatch)
+
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "cache_unusable"
+    assert "eafe" in r["error"]

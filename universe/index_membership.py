@@ -923,6 +923,15 @@ def snapshot_problem(key: str, doc: dict) -> str:
     restated here; what a stored snapshot can still be checked for is its shape, its
     tickers, the S&P 500 count band and the weights a weighted kind must carry.
     """
+    # ⛑ WHICH INDEX IS THIS? Nothing asked, so a current, weighted, 503-row EAFE
+    # document stored as `sp500_latest.json` served as a stale S&P 500 fallback — and
+    # `build_sp500_mirror` would have rendered it into the PUBLIC sources/sp500.txt and
+    # sp500_names.json. Every other property was impeccable; it was simply another
+    # index. The filename is not evidence, the document must say so itself.
+    stored_key = doc.get("key")
+    if stored_key != key:
+        return (f"the document describes {stored_key!r}, not {key!r} — a snapshot of "
+                f"another index is not a fallback for this one")
     holdings = doc.get("holdings")
     if not isinstance(holdings, list) or not holdings:
         return "snapshot carries no holdings"
@@ -1135,7 +1144,18 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # snapshot consumer reads `latest` — only the public mirror had a strictly-newer
     # rule, and it guards one file in one repo. Dated files stay immutable either way,
     # and nothing is written: the run reports what it saw and the next fetch fixes it.
+    # ⛑ THE GUARD BECOMING THE OUTAGE. The future check ran on the EXCEPTION path only,
+    # so after a SUCCESSFUL fetch a corrupt `latest.as_of = 2026-12-31` made a valid
+    # 2026-09-21 snapshot `source_older` and nothing was written — every good fetch
+    # blocked until December or a manual delete, by the guard that exists to keep the
+    # archive correct. A baseline is only a baseline while it is itself usable: a
+    # future-dated or otherwise broken `latest` is the thing this fetch should FIX.
     previous = load_latest(key)
+    if previous is not None and (is_future_as_of(previous.get("as_of"), today)
+                                 or snapshot_problem(key, previous)):
+        log.warning("index_membership[%s]: the stored latest (as_of %s) is not a usable "
+                    "baseline — this fetch replaces it", key, previous.get("as_of"))
+        previous = None
     prev_as_of = (previous or {}).get("as_of")
     prev_date, this_date = _as_date(prev_as_of), _as_date(as_of)
     if prev_date and this_date and this_date < prev_date:

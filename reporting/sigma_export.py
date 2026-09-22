@@ -376,6 +376,14 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
     if not isinstance(doc, dict):
         return refused("no S&P 500 snapshot on disk")
 
+    # ⛑ WHICH INDEX IS THIS? An EAFE document sitting at `sp500_latest.json` carried a
+    # perfectly good 503 holdings, and this would have rendered it into the PUBLIC
+    # sources/sp500.txt and sp500_names.json. A snapshot that does not say it is the
+    # S&P 500 is not the S&P 500. (`key` is absent on schema-2 files, which predate
+    # this mirror and are not published from.)
+    if doc.get("key") != "sp500":
+        return refused(f"the snapshot describes {doc.get('key')!r}, not 'sp500' - "
+                       f"refusing to publish another index as the S&P 500 list")
     holdings = doc.get("holdings")
     if not isinstance(holdings, list) or not holdings:
         return refused("snapshot carries no holdings")

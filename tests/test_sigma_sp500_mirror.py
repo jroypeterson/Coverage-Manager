@@ -24,7 +24,8 @@ def _tickers(n=503):
 def _doc(tickers=None, as_of="2026-09-25", stale_days=45, names=None):
     tickers = _tickers() if tickers is None else tickers
     names = names or {}
-    return {"as_of": as_of, "stale_days": stale_days,
+    # every real snapshot names its index; the mirror refuses one that does not
+    return {"key": "sp500", "as_of": as_of, "stale_days": stale_days,
             "holdings": [{"ticker": t, "name": names.get(t, f"{t} Corp")} for t in tickers]}
 
 
@@ -96,7 +97,7 @@ def test_absent_files_are_written(tmp_path):
 
 @pytest.mark.parametrize("doc, why", [
     (None, "no S&P 500 snapshot"),
-    ({"as_of": "2026-09-25", "holdings": []}, "no holdings"),
+    ({"key": "sp500", "as_of": "2026-09-25", "holdings": []}, "no holdings"),
     (_doc(_tickers(494)), "implausible count 494"),
     (_doc(_tickers(511)), "implausible count 511"),
     (_doc(as_of="2026-08-10"), "46d old (limit 45d)"),
@@ -429,3 +430,24 @@ def test_an_indented_single_header_is_still_a_usable_date(tmp_path):
     res = se.build_sp500_mirror(tmp_path, today=TODAY,
                                 doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-25"))
     assert res["status"] == "changed", res
+
+
+def test_the_mirror_refuses_a_snapshot_of_ANOTHER_INDEX(tmp_path):
+    """Nothing checked which index the document described, so an EAFE snapshot sitting
+    at sp500_latest.json would be rendered into the PUBLIC sources/sp500.txt and
+    sp500_names.json."""
+    doc = _doc()
+    doc["key"] = "eafe"
+    doc["index"] = "MSCI EAFE"
+    _seed(tmp_path, _tickers())
+    res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=doc)
+    assert res["status"] == "refused"
+    assert "eafe" in res["reason"]
+    assert res["files"] == {}
+
+
+def test_the_mirror_accepts_a_snapshot_that_names_its_index(tmp_path):
+    doc = _doc(_tickers()[:-1] + ["NEWCO"])
+    doc["key"] = "sp500"
+    _seed(tmp_path, _tickers())
+    assert se.build_sp500_mirror(tmp_path, today=TODAY, doc=doc)["status"] == "changed"
