@@ -92,6 +92,12 @@ def _empty(status):
         "ic_nonpositive": False,
         "check": CHECK_NOT_CHECKED,
         "own_fcf_yield": None,
+        # The newest quarterly statement behind the corroboration, so a consumer can refuse
+        # a figure computed off an obsolete fiscal period. Only populated where we actually
+        # read statements: `key-metrics-ttm` carries NO period date at all (probed live
+        # 2026-09-22 -- 43 fields, not one of them a date), so for a row we never
+        # corroborated there is nothing honest to publish here.
+        "stmt_as_of": None,
     }
 
 
@@ -125,7 +131,7 @@ def _fetch_key_metrics_ttm(ticker, api_key):
 
 
 def _fetch_quarterly_fcf(ticker, api_key, limit=4):
-    """(sum of the last `limit` quarterly free cash flows, errored). None when unavailable.
+    """(sum of the last `limit` quarterly free cash flows, newest statement date, errored).
 
     The sum is in the STATEMENT's currency, which is the same currency as the `marketCap`
     in the key-metrics payload it is compared against — measured on SNY, both EUR. The
@@ -136,21 +142,23 @@ def _fetch_quarterly_fcf(ticker, api_key, limit=4):
                f"?symbol={ticker}&period=quarter&limit={limit}&apikey={api_key}")
         data, code = _fmp_request(url, want_status=True)
         if not isinstance(data, list) or not data:
-            return None, (data is None and code != FMP_GATED_STATUS)
+            return None, None, (data is None and code != FMP_GATED_STATUS)
         vals = [_safe_float(r.get("freeCashFlow")) for r in data]
         if any(v is None for v in vals) or len(vals) < limit:
             # A partial year is not a TTM. Corroborating against one would manufacture a
             # disagreement out of the missing quarters.
-            return None, False
-        return sum(vals), False
+            return None, None, False
+        dates = sorted(str(r.get("date") or "")[:10] for r in data)
+        return sum(vals), (dates[-1] or None), False
     except Exception as e:
         log_exception(logger, f"FMP quarterly cash-flow failed for {ticker}", e)
-        return None, True
+        return None, None, True
 
 
 def _corroborate(ticker, api_key, payload, market_cap):
     """Set `check`/`own_fcf_yield` on a candidate row. Mutates and returns `payload`."""
-    own_fcf, errored = _fetch_quarterly_fcf(ticker, api_key)
+    own_fcf, stmt_as_of, errored = _fetch_quarterly_fcf(ticker, api_key)
+    payload["stmt_as_of"] = stmt_as_of
     if own_fcf is None or not market_cap:
         payload["check"] = CHECK_NO_STATEMENTS if not errored else CHECK_NOT_CHECKED
         return payload
@@ -269,6 +277,7 @@ def quality_columns_from_payload(payload):
         "ROIC": _pct(p.get("roic")),
         "CFO Margin": _pct(p.get("cfo_margin")),
         "Cash Flow Status": _status_cell(p),
+        "Cash Flow As Of": p.get("stmt_as_of"),
     }
 
 

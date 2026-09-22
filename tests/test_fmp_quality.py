@@ -25,7 +25,8 @@ def _patch(monkeypatch, row, fcf_sum=None, calls=None):
     monkeypatch.setattr(q, "cache_get", lambda *a, **k: None)
     monkeypatch.setattr(q, "cache_set", lambda *a, **k: (calls or {}).setdefault("set", []).append(a))
     monkeypatch.setattr(q, "_fetch_key_metrics_ttm", lambda t, k: (row, False, False))
-    monkeypatch.setattr(q, "_fetch_quarterly_fcf", lambda t, k, limit=4: (fcf_sum, False))
+    monkeypatch.setattr(q, "_fetch_quarterly_fcf",
+                        lambda t, k, limit=4: (fcf_sum, "2026-06-30", False))
 
 
 def test_the_three_numbers_come_off_one_payload(monkeypatch):
@@ -84,7 +85,7 @@ def test_a_name_far_from_the_bar_is_not_checked_and_does_not_CLAIM_to_be(monkeyp
     called = []
     _patch(monkeypatch, MRK_ROW)
     monkeypatch.setattr(q, "_fetch_quarterly_fcf",
-                        lambda *a, **k: (called.append(1), (1.0, False))[1])
+                        lambda *a, **k: (called.append(1), (1.0, "2026-06-30", False))[1])
     p = q.fetch_quality("MRK", "key")
     assert called == [] and p["check"] == q.CHECK_NOT_CHECKED
     assert q.quality_columns_from_payload(p)["Cash Flow Status"] == "ok"
@@ -94,8 +95,8 @@ def test_a_partial_year_of_statements_cannot_corroborate(monkeypatch):
     """Three quarters summed against a TTM headline manufactures a disagreement."""
     monkeypatch.setattr(q, "_fmp_request", lambda url, want_status=False: (
         [{"freeCashFlow": 1.0}, {"freeCashFlow": 2.0}], 200))
-    total, errored = q._fetch_quarterly_fcf("X", "key")
-    assert total is None and errored is False
+    total, as_of, errored = q._fetch_quarterly_fcf("X", "key")
+    assert total is None and as_of is None and errored is False
 
 
 def test_an_error_is_NEVER_cached_but_no_data_is(monkeypatch):
@@ -160,7 +161,7 @@ def test_the_published_HEADERS_are_what_screens_equity_reads():
     from reporting.calcs import FUND_DISPLAY_NAMES, QUALITY_COLS
     published = [FUND_DISPLAY_NAMES.get(c, c) for c in QUALITY_COLS]
     assert published == ["FCF Yield (TTM)", "ROIC (TTM)", "CFO Margin (TTM)",
-                         "Cash Flow Status"]
+                         "Cash Flow Status", "Cash Flow As Of"]
 
 
 def test_a_candidate_that_could_not_be_checked_says_so(monkeypatch):
@@ -178,3 +179,20 @@ def test_a_candidate_that_could_not_be_checked_says_so(monkeypatch):
 
     _patch(monkeypatch, MRK_ROW)                    # 4.3%, nowhere near the bar
     assert q.quality_columns_from_payload(q.fetch_quality("MRK", "key"))["Cash Flow Status"] == "ok"
+
+
+def test_the_statement_date_behind_a_corroboration_is_published(monkeypatch):
+    """⛑ `key-metrics-ttm` carries NO period date (probed live: 43 fields, none a date), so a
+    consumer cannot tell a current TTM from one computed off an obsolete fiscal year. Where
+    we DO read statements to corroborate, their newest date is published so a screen can
+    refuse a stale figure (Codex r12; the plan required this gate)."""
+    row = {**MRK_ROW, "freeCashFlowYieldTTM": 0.20, "marketCap": 1000.0}
+    _patch(monkeypatch, row, fcf_sum=0.20 * 1000.0)
+    cols = q.quality_columns_from_payload(q.fetch_quality("X", "key"))
+    assert cols["Cash Flow As Of"] == "2026-06-30"
+
+
+def test_a_row_we_never_corroborated_publishes_NO_statement_date(monkeypatch):
+    """Absent is honest; inventing a date from the fetch time is not."""
+    _patch(monkeypatch, MRK_ROW)                       # 4.3%, never a candidate
+    assert q.quality_columns_from_payload(q.fetch_quality("MRK", "key"))["Cash Flow As Of"] is None

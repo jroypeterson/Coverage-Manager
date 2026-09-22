@@ -70,7 +70,7 @@ HIST_COLS = (
 # and invested capital in the listing's own currency (Takeda 150x CM's USD figure, in yen),
 # so an absolute here would be a local-currency number sitting beside USD money columns.
 # `Mkt Cap (USD $B)` stays the only market cap anything may threshold on.
-QUALITY_COLS = ["FCF Yield", "ROIC", "CFO Margin", "Cash Flow Status"]
+QUALITY_COLS = ["FCF Yield", "ROIC", "CFO Margin", "Cash Flow Status", "Cash Flow As Of"]
 QUALITY_PCT_COLS = {"FCF Yield", "ROIC", "CFO Margin"}
 QUALITY_STATUS_COL = "Cash Flow Status"
 HIST_RATIO_COLS = {
