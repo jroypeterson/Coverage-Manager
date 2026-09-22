@@ -8,6 +8,7 @@ sigma-alert watchlist needs but the coverage universe does not contain.
 
 import csv
 import json
+import subprocess
 
 import pytest
 
@@ -256,3 +257,65 @@ def test_export_and_push_writes_all_seven_files(monkeypatch, tmp_path, fixture_c
     assert result["following_for_interest_entries"] == 0
     assert result["ready_to_buy_entries"] == 1
     assert result["ready_to_short_entries"] == 0
+
+
+def _real_clone(tmp_path):
+    """A sigma-alert clone with a real bare origin, so push/rebase actually run."""
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(bare)],
+                   check=True, capture_output=True)
+    repo = tmp_path / "sigma-alert"
+    repo.mkdir()
+    for args in (["init", "-q", "-b", "master"], ["config", "user.email", "t@t.t"],
+                 ["config", "user.name", "t"], ["remote", "add", "origin", str(bare)],
+                 ["commit", "-q", "--allow-empty", "-m", "root"],
+                 ["push", "-q", "-u", "origin", "master"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    return repo, bare
+
+
+def test_a_failed_push_is_retried_on_the_NEXT_run_even_when_nothing_changed(
+        monkeypatch, tmp_path, fixture_csv):
+    """A transient push failure left the commit local. The next run rebased, found the
+    worktree already carrying the new bytes, reported `unchanged` and never pushed --
+    so origin, and every sigma-alert CI job cloning it, served the old list for ever."""
+    from universe import positions as pos
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+
+    repo, bare = _real_clone(tmp_path)
+    real_git = sigma_export._git
+
+    def no_push(cwd, *args):
+        if args and args[0] == "push":
+            return "", 1
+        return real_git(cwd, *args)
+
+    monkeypatch.setattr(sigma_export, "_git", no_push)
+    first = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert first["status"] == "committed_not_pushed"
+    assert subprocess.run(["git", "-C", str(bare), "show", "master:ticker_metadata.json"],
+                          capture_output=True).returncode != 0
+
+    monkeypatch.setattr(sigma_export, "_git", real_git)
+    second = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert second["status"] == "pushed", second
+    assert subprocess.run(["git", "-C", str(bare), "show", "master:ticker_metadata.json"],
+                          capture_output=True).returncode == 0
+
+
+def test_an_up_to_date_clone_still_reports_unchanged(monkeypatch, tmp_path, fixture_csv):
+    """The catch-up push must not fire on an ordinary quiet week."""
+    from universe import positions as pos
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    from universe import watchlist as wl
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+
+    repo, _ = _real_clone(tmp_path)
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "unchanged"

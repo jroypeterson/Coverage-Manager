@@ -796,3 +796,26 @@ def test_a_rollback_to_the_wikipedia_cache_restores_ITS_caveats(
     blob = " ".join(doc["caveats"]).lower()
     assert "wikipedia" in blob and "observed" in blob
     assert "ivv" not in blob and "no market" not in blob
+
+
+# --- Codex round 4 -------------------------------------------------------------
+
+def test_a_header_with_stray_whitespace_still_filters(monkeypatch, tmp_path):
+    """The required-column check STRIPPED the header names while DictReader did not,
+    so `Exchange ` passed validation and then every parsed exchange was blank: the
+    NO MARKET filter matched nothing, HOLX rode through, and 504 rows still sat inside
+    the 495-510 band. Validation and parsing must read the SAME normalised header."""
+    got = {r["ticker"] for r in _ivv(
+        monkeypatch, tmp_path,
+        text=_rename_header("Location,Exchange,", "Location , Exchange ,"))[2]}
+    assert "HOLX" not in got
+    assert {"BE", "ILMN", "P"} <= got
+
+
+def test_stray_whitespace_around_asset_class_still_drops_cash_and_futures(
+        monkeypatch, tmp_path):
+    rows = _ivv(monkeypatch, tmp_path,
+                text=_rename_header("Asset Class,", " Asset Class ,"))[2]
+    got = {r["ticker"] for r in rows}
+    assert not got & {"XTSLA", "USD", "SGAFT", "ESZ6"}
+    assert len(rows) == 503

@@ -392,12 +392,40 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
     # from a same-day or older observation is refused, and the list waits for CM to
     # catch up. Agreement is never refused -- that is simply `unchanged`.
     cur_updated = _mirror_updated(cur_txt) if cur_txt else None
+    # ⛑ AN UNKNOWN DATE IS NOT A DATE OLDER THAN OURS. With no parsable
+    # `# Last updated:` line the comparison below was simply skipped, so the guard
+    # failed OPEN and an older snapshot rolled the public list backward -- the exact
+    # revert (BLDR/TAP/TTD returning) it exists to prevent. A list we cannot date is a
+    # list we must not overwrite; agreement is still `unchanged`, so a quiet week is
+    # unaffected and only a CHANGE is blocked.
+    if files and cur_txt is not None and not cur_updated:
+        return refused("the sigma-alert list carries no parsable `# Last updated:` line, "
+                       "so it cannot be dated - refusing to overwrite it with a snapshot "
+                       "that may be older", as_of=as_of, count=count)
     if files and cur_updated and as_of and as_of <= cur_updated:
         return refused(f"CM snapshot as_of {as_of} is not newer than the sigma-alert list "
                        f"dated {cur_updated} but disagrees with it - refusing to overwrite",
                        as_of=as_of, count=count)
     return {"status": "changed" if files else "unchanged", "reason": "",
             "as_of": as_of, "count": count, "names": len(names), "files": files}
+
+
+def _commits_ahead_of_origin(target_dir, branch):
+    """How many local commits `origin/<branch>` does not have, or None if unknowable.
+
+    ⛑ THIS IS ASKED ON EVERY RUN, NOT ONLY WHEN BYTES CHANGED. A transient push
+    failure left the commit local; the next run rebased, found the worktree already
+    carrying the new bytes, reported `unchanged` and never pushed again -- so origin,
+    which is the only thing sigma-alert's GitHub Actions ever clone, served the old
+    list indefinitely while every local surface looked correct.
+    """
+    out, rc = _git(target_dir, "rev-list", "--count", f"origin/{branch}..HEAD")
+    if rc != 0:
+        return None
+    try:
+        return int(out.strip() or "0")
+    except ValueError:
+        return None
 
 
 def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None):
@@ -417,6 +445,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
     # so without rebasing first, our push is rejected as non-fast-forward and
     # the export silently stalls — the original cause of the 2026-04-07 →
     # 2026-04-29 core_watchlist drift.
+    branch = None
     if push:
         branch, rc = _git(target_dir, "rev-parse", "--abbrev-ref", "HEAD")
         if rc != 0:
@@ -485,6 +514,26 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
         out.update(fields)
         return out
 
+    def _nothing_changed_this_run():
+        """`unchanged` -- unless an EARLIER run left a commit origin never received."""
+        if not push or not branch:
+            return _result(status="unchanged")
+        ahead = _commits_ahead_of_origin(target_dir, branch)
+        if ahead is None:
+            return _result(status="failed",
+                           reason=f"could not compare HEAD with origin/{branch} in the "
+                                  f"sigma-alert clone")
+        if not ahead:
+            return _result(status="unchanged")
+        _, rc = _git(target_dir, "push", "origin", "HEAD")
+        if rc != 0:
+            return _result(status="committed_not_pushed",
+                           reason=f"{ahead} commit(s) from an earlier run are still "
+                                  f"local and git push failed again")
+        logger.info("Pushed %d commit(s) left local by an earlier run", ahead)
+        return _result(status="pushed",
+                       reason=f"pushed {ahead} commit(s) left local by an earlier run")
+
     # Write files that actually changed; stage all tracked files so we pick up
     # anything the previous run left in an inconsistent state.
     changed_any = False
@@ -497,7 +546,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
         changed_any = True
 
     if not changed_any:
-        return _result(status="unchanged")
+        return _nothing_changed_this_run()
 
     for name in files:
         _, rc = _git(target_dir, "add", name)
@@ -508,7 +557,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
     # changed but git normalizes line endings to match HEAD)
     _, rc = _git(target_dir, "diff", "--cached", "--quiet", "--", *files.keys())
     if rc == 0:
-        return _result(status="unchanged")
+        return _nothing_changed_this_run()
 
     message = "Sync ticker metadata + position lists from Coverage Manager"
     if sp500["files"]:

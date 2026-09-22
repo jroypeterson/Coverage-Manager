@@ -303,3 +303,35 @@ def test_the_mirror_accepts_EXACTLY_the_dates_the_collector_accepts(tmp_path):
         assert (res["status"] != "refused") is collector_accepts, (ahead, res)
         if not collector_accepts:
             assert "future" in res["reason"], res
+
+
+def test_a_mirror_with_no_usable_date_header_is_refused_not_overwritten(tmp_path):
+    """The strictly-newer guard failed OPEN when `# Last updated:` was missing or
+    unparseable: the comparison was skipped and an OLDER snapshot rolled the public
+    list backward -- the exact revert (BLDR/TAP/TTD returning) the guard exists to
+    stop. An unknown date is not a date older than ours."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-18")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    stripped = "\n".join(ln for ln in txt_path.read_text(encoding="utf-8").splitlines()
+                         if not ln.startswith("# Last updated:")) + "\n"
+    txt_path.write_text(stripped, encoding="utf-8")
+
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-25"))
+    assert res["status"] == "refused"
+    assert "Last updated" in res["reason"]
+    assert res["files"] == {}
+
+
+def test_an_agreeing_list_with_no_date_header_is_not_refused(tmp_path):
+    """The guard must not become the outage: with nothing to change there is nothing
+    to roll back."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-18")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    txt_path.write_text("\n".join(
+        ln for ln in txt_path.read_text(encoding="utf-8").splitlines()
+        if not ln.startswith("# Last updated:")) + "\n", encoding="utf-8")
+    res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=_doc(tickers))
+    assert res["status"] == "unchanged" and res["files"] == {}

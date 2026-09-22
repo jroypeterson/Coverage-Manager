@@ -326,7 +326,14 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
     # NO MARKET (E.G. UNLISTED) test never matches and the HOLX-style residual
     # publishes as a constituent; with `Asset Class` gone, cash and futures lines do.
     # A guard that silently stops applying is worse than no guard.
-    header = [h.strip() for h in next(csv.reader([lines[header_idx]]))]
+    # ⛑ THE CHECK AND THE PARSE READ THE SAME NORMALISED HEADER. The first version
+    # stripped the names for the check and then handed the RAW line to DictReader, so a
+    # header of `Exchange ` passed validation while every parsed exchange came back
+    # blank -- the NO MARKET filter matched nothing, HOLX rode through, and 504 rows
+    # still sat inside the 495-510 band. A validator that inspects a different value
+    # from the one the code uses is not a validator.
+    rows_iter = csv.reader(io.StringIO("\n".join(lines[header_idx:])))
+    header = [h.strip() for h in next(rows_iter)]
     missing = [c for c in REQUIRED_COLUMNS if c not in header]
     if missing:
         raise IndexMembershipError(
@@ -354,7 +361,8 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             "today's date instead")
 
     rows = []
-    for r in csv.DictReader(io.StringIO("\n".join(lines[header_idx:]))):
+    for raw in rows_iter:
+        r = dict(zip(header, raw))
         if (r.get("Asset Class") or "").strip() != "Equity":
             continue
         t = (r.get("Ticker") or "").strip()
