@@ -362,6 +362,19 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
 
     rows = []
     for raw in rows_iter:
+        if not any(f.strip() for f in raw):
+            continue                      # a blank line is not a truncated record
+        # ⛑ VALIDATING THE HEADER IS NOT VALIDATING THE ROWS. `zip` stops at the
+        # shorter side, so a response truncated mid-record left HOLX carrying a Ticker
+        # and `Asset Class=Equity` with NO Exchange -- the unlisted filter saw "" and
+        # kept it, and 504 rows still cleared the count band and the join floor. A
+        # truncated CSV must not parse as a valid basket.
+        if len(raw) != len(header):
+            raise IndexMembershipError(
+                f"holdings row {len(rows) + 1} has {len(raw)} field(s) against a "
+                f"{len(header)}-column header (first cell {raw[0] if raw else ''!r}) — "
+                f"the response is truncated or the shape changed; refusing to parse "
+                f"fields that would silently read as empty")
         r = dict(zip(header, raw))
         if (r.get("Asset Class") or "").strip() != "Equity":
             continue

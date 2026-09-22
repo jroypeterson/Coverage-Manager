@@ -319,3 +319,58 @@ def test_an_up_to_date_clone_still_reports_unchanged(monkeypatch, tmp_path, fixt
     repo, _ = _real_clone(tmp_path)
     assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
     assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "unchanged"
+
+
+def _positions_stub(monkeypatch, tmp_path):
+    from universe import positions as pos
+    from universe import watchlist as wl
+
+    pos_csv = tmp_path / "positions_and_researching.csv"
+    monkeypatch.setattr(pos, "POSITIONS_PATH", pos_csv)
+    monkeypatch.setattr(wl, "WATCHLIST_PATH", pos_csv)
+
+
+def test_a_FOREIGN_local_commit_is_never_pushed_by_the_exporter(
+        monkeypatch, tmp_path, fixture_csv):
+    """The round-4 recovery treated every commit in origin/<branch>..HEAD as its own,
+    so an unrelated WIP commit sitting in the sibling clone would be rebased and pushed
+    to origin/master by a SCHEDULED job. This exporter publishes its own files; it must
+    refuse and name the foreign commit rather than ship someone's unfinished work."""
+    _positions_stub(monkeypatch, tmp_path)
+    repo, bare = _real_clone(tmp_path)
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
+
+    (repo / "notes.txt").write_text("half-written thought\n", encoding="utf-8")
+    for args in (["add", "notes.txt"], ["commit", "-q", "-m", "WIP: do not ship"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    res = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert res["status"] == "failed", res
+    assert "WIP: do not ship" in res["reason"]
+    assert subprocess.run(["git", "-C", str(bare), "show", "master:notes.txt"],
+                          capture_output=True).returncode != 0
+    head, _ = sigma_export._git(repo, "rev-parse", "HEAD")
+    remote, _ = sigma_export._git(repo, "rev-parse", "origin/master")
+    assert head.strip() != remote.strip()      # the clone is left exactly as it was
+
+
+def test_a_commit_touching_a_foreign_path_alongside_ours_is_refused(
+        monkeypatch, tmp_path, fixture_csv):
+    """Both tests must hold: OUR message marker AND only our files. A commit wearing
+    the right subject while carrying someone else's file is not ours."""
+    _positions_stub(monkeypatch, tmp_path)
+    repo, bare = _real_clone(tmp_path)
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
+
+    (repo / "secrets.env").write_text("TOKEN=x\n", encoding="utf-8")
+    (repo / "portfolio.json").write_text("{}\n", encoding="utf-8")
+    for args in (["add", "secrets.env", "portfolio.json"],
+                 ["commit", "-q", "-m", sigma_export.EXPORT_COMMIT_MESSAGE
+                  + "\n\n" + sigma_export.EXPORT_COMMIT_MARKER]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    res = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert res["status"] == "failed", res
+    assert "secrets.env" in res["reason"]
+    assert subprocess.run(["git", "-C", str(bare), "show", "master:secrets.env"],
+                          capture_output=True).returncode != 0

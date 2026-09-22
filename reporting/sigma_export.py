@@ -254,6 +254,15 @@ def _git(cwd, *args):
 # lets the rest of the export proceed, and is reported as `failed:` in the weekly step.
 SP500_RELPATH = "sources/sp500.txt"
 SP500_NAMES_RELPATH = "sources/sp500_names.json"
+
+# ⛑ THE ONLY PATHS THIS EXPORTER OWNS, and the marker it stamps on its own commits.
+# The round-4 catch-up push treated EVERY commit in `origin/<branch>..HEAD` as a
+# stranded export, so one unrelated WIP commit sitting in the sibling clone would be
+# rebased and pushed to origin/master by a SCHEDULED job -- publishing someone's
+# unfinished work, from a lane nobody is watching at the time. Ownership is now two
+# tests, both required: OUR message, and ONLY our files.
+EXPORT_COMMIT_MESSAGE = "Sync ticker metadata + position lists from Coverage Manager"
+EXPORT_COMMIT_MARKER = "CM-Sigma-Export: v1"
 # ⛑ ONE AUTHORITY FOR THE BAND. These used to be a second copy of the numbers the
 # collector applies; the collector had a LOOSER rule (the generic 450 floor), so a
 # truncated or transitional list was written to the snapshot and only refused here --
@@ -279,9 +288,23 @@ def _mirror_tickers(text):
 
 
 def _mirror_updated(text):
+    """The mirror's own `# Last updated:` date as ISO, or None if it is not a date.
+
+    ⛑ IT MUST PARSE, NOT MERELY BE NON-EMPTY. This returned the first 10 characters of
+    whatever followed the label, and the caller then COMPARED THEM LEXICALLY: a file
+    stamped `0000-00-00` sorts below every real ISO date, so a fresh-but-older snapshot
+    counted as strictly newer and rolled the public list backward -- the exact revert
+    the guard exists to stop, surviving the round that was supposed to close it.
+    """
+    from datetime import datetime as _dt
+
     for ln in text.splitlines():
         if ln.startswith(_SP500_UPDATED_PREFIX):
-            return ln[len(_SP500_UPDATED_PREFIX):].strip()[:10]
+            raw = ln[len(_SP500_UPDATED_PREFIX):].strip()[:10]
+            try:
+                return _dt.strptime(raw, "%Y-%m-%d").date().isoformat()
+            except ValueError:
+                return None
     return None
 
 
@@ -399,7 +422,7 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
     # list we must not overwrite; agreement is still `unchanged`, so a quiet week is
     # unaffected and only a CHANGE is blocked.
     if files and cur_txt is not None and not cur_updated:
-        return refused("the sigma-alert list carries no parsable `# Last updated:` line, "
+        return refused("the sigma-alert list carries no parsable `# Last updated:` date, "
                        "so it cannot be dated - refusing to overwrite it with a snapshot "
                        "that may be older", as_of=as_of, count=count)
     if files and cur_updated and as_of and as_of <= cur_updated:
@@ -410,22 +433,55 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
             "as_of": as_of, "count": count, "names": len(names), "files": files}
 
 
-def _commits_ahead_of_origin(target_dir, branch):
-    """How many local commits `origin/<branch>` does not have, or None if unknowable.
+def _owned_paths():
+    return {METADATA_FILENAME, CORE_WATCHLIST_FILENAME, PORTFOLIO_FILENAME,
+            RESEARCHING_FILENAME, FOLLOWING_FOR_INTEREST_FILENAME,
+            READY_TO_BUY_FILENAME, READY_TO_SHORT_FILENAME,
+            SP500_RELPATH, SP500_NAMES_RELPATH}
 
-    ⛑ THIS IS ASKED ON EVERY RUN, NOT ONLY WHEN BYTES CHANGED. A transient push
-    failure left the commit local; the next run rebased, found the worktree already
-    carrying the new bytes, reported `unchanged` and never pushed again -- so origin,
-    which is the only thing sigma-alert's GitHub Actions ever clone, served the old
-    list indefinitely while every local surface looked correct.
+
+def classify_unpushed(target_dir, branch):
+    """`(ours, foreign, error)` for the commits `origin/<branch>` does not have.
+
+    ⛑ ASKED ON EVERY RUN, NOT ONLY WHEN BYTES CHANGED. A transient push failure left
+    the commit local; the next run rebased, found the worktree already carrying the new
+    bytes, reported `unchanged` and never pushed again -- so origin, the only thing
+    sigma-alert's GitHub Actions ever clone, served the old list indefinitely.
+
+    ⛑ AND A COMMIT IS OURS ONLY IF BOTH TESTS PASS: our message (the marker, or the
+    subject we have always written, for commits predating the marker) AND a changed-path
+    set inside `_owned_paths()`. A subject can be copied and a path set can be
+    coincidental; together they are what "this exporter wrote it" means. `git push`
+    cannot publish a subset of a linear history, so a foreign commit means the whole
+    push is refused and the clone is left exactly as it was.
     """
-    out, rc = _git(target_dir, "rev-list", "--count", f"origin/{branch}..HEAD")
+    out, rc = _git(target_dir, "rev-list", f"origin/{branch}..HEAD")
     if rc != 0:
-        return None
-    try:
-        return int(out.strip() or "0")
-    except ValueError:
-        return None
+        return [], [], f"could not list commits ahead of origin/{branch}"
+    shas = [ln.strip() for ln in out.splitlines() if ln.strip()]
+    owned, ours, foreign = _owned_paths(), [], []
+    for sha in reversed(shas):
+        msg, rc_msg = _git(target_dir, "show", "-s", "--format=%s%n%b", sha)
+        paths, rc_paths = _git(target_dir, "show", "--name-only", "--format=", sha)
+        if rc_msg != 0 or rc_paths != 0:
+            return [], [], f"could not read local commit {sha[:8]}"
+        subject = (msg.splitlines() or [""])[0].strip()
+        changed = [p.strip() for p in paths.splitlines() if p.strip()]
+        outside = sorted(p for p in changed if p not in owned)
+        if (EXPORT_COMMIT_MARKER in msg or subject.startswith(EXPORT_COMMIT_MESSAGE)) \
+                and not outside:
+            ours.append(sha)
+        else:
+            foreign.append((sha[:8], subject, outside))
+    return ours, foreign, ""
+
+
+def _foreign_commit_reason(foreign, branch):
+    sha, subject, outside = foreign[0]
+    extra = f" touching {', '.join(outside)}" if outside else ""
+    return (f"{len(foreign)} local commit(s) in the sigma-alert clone are not this "
+            f"exporter's - refusing to push them to origin/{branch} and leaving the "
+            f"clone untouched (first: {sha} \"{subject}\"{extra})")
 
 
 def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None):
@@ -457,6 +513,17 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
         if rc != 0:
             _git(target_dir, "rebase", "--abort")
             return {"status": "failed", "reason": "pre-export rebase failed (sigma-alert working tree dirty or conflict)"}
+
+        # ⛑ CHECKED BEFORE A SINGLE FILE IS WRITTEN. A push publishes the whole branch,
+        # so a foreign local commit contaminates the CHANGED-bytes path exactly as it
+        # does the catch-up path; refusing here leaves the clone byte-identical instead
+        # of stranding freshly written files in a dirty tree for the next rebase to
+        # choke on.
+        _, foreign, err = classify_unpushed(target_dir, branch)
+        if err:
+            return {"status": "failed", "reason": err}
+        if foreign:
+            return {"status": "failed", "reason": _foreign_commit_reason(foreign, branch)}
 
     # Surface any tickers sigma-alert flagged as missing metadata. We log the
     # warning whether or not the export below ends up changing the file —
@@ -518,21 +585,22 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
         """`unchanged` -- unless an EARLIER run left a commit origin never received."""
         if not push or not branch:
             return _result(status="unchanged")
-        ahead = _commits_ahead_of_origin(target_dir, branch)
-        if ahead is None:
+        ours, foreign, err = classify_unpushed(target_dir, branch)
+        if err:
+            return _result(status="failed", reason=err)
+        if foreign:
             return _result(status="failed",
-                           reason=f"could not compare HEAD with origin/{branch} in the "
-                                  f"sigma-alert clone")
-        if not ahead:
+                           reason=_foreign_commit_reason(foreign, branch))
+        if not ours:
             return _result(status="unchanged")
         _, rc = _git(target_dir, "push", "origin", "HEAD")
         if rc != 0:
             return _result(status="committed_not_pushed",
-                           reason=f"{ahead} commit(s) from an earlier run are still "
+                           reason=f"{len(ours)} commit(s) from an earlier run are still "
                                   f"local and git push failed again")
-        logger.info("Pushed %d commit(s) left local by an earlier run", ahead)
+        logger.info("Pushed %d commit(s) left local by an earlier run", len(ours))
         return _result(status="pushed",
-                       reason=f"pushed {ahead} commit(s) left local by an earlier run")
+                       reason=f"pushed {len(ours)} commit(s) left local by an earlier run")
 
     # Write files that actually changed; stage all tracked files so we pick up
     # anything the previous run left in an inconsistent state.
@@ -559,9 +627,11 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
     if rc == 0:
         return _nothing_changed_this_run()
 
-    message = "Sync ticker metadata + position lists from Coverage Manager"
+    message = EXPORT_COMMIT_MESSAGE
     if sp500["files"]:
         message += " (+ S&P 500 list)"
+    # The marker is what a later run reads to know this commit is its own.
+    message += "\n\n" + EXPORT_COMMIT_MARKER
     _, rc = _git(target_dir, "commit", "-m", message)
     if rc != 0:
         return _result(status="failed", reason="git commit failed")

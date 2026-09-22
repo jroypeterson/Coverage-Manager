@@ -819,3 +819,31 @@ def test_stray_whitespace_around_asset_class_still_drops_cash_and_futures(
     got = {r["ticker"] for r in rows}
     assert not got & {"XTSLA", "USD", "SGAFT", "ESZ6"}
     assert len(rows) == 503
+
+
+# --- Codex round 5 -------------------------------------------------------------
+
+def test_a_row_shorter_than_the_header_raises_rather_than_blanking_fields(
+        monkeypatch, tmp_path):
+    """Validating the HEADER is not validating the ROWS. A response truncated
+    mid-record left HOLX with a Ticker and `Asset Class=Equity` but no Exchange, so
+    the unlisted filter saw "" and kept it -- and 504 rows still cleared the count
+    band and the join floor, publishing a non-member."""
+    text = _ivv_text()
+    short = '"HOLX","HOLOGIC INC","Health Care","Equity","1.00"\n'
+    text = text.replace(
+        next(l + "\n" for l in text.splitlines() if l.startswith('"HOLX"')), short)
+    with pytest.raises(im.IndexMembershipError, match="5 field"):
+        _ivv(monkeypatch, tmp_path, text=text)
+
+
+def test_a_row_longer_than_the_header_raises_too(monkeypatch, tmp_path):
+    text = _ivv_text()
+    line = next(l for l in text.splitlines() if l.startswith('"MMM"'))
+    with pytest.raises(im.IndexMembershipError, match="field"):
+        _ivv(monkeypatch, tmp_path, text=text.replace(line, line + ',"EXTRA"'))
+
+
+def test_blank_lines_are_still_ignored(monkeypatch, tmp_path):
+    rows = _ivv(monkeypatch, tmp_path, text=_ivv_text() + "\n\n")[2]
+    assert len(rows) == 503

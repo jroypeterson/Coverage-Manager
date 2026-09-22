@@ -335,3 +335,22 @@ def test_an_agreeing_list_with_no_date_header_is_not_refused(tmp_path):
         if not ln.startswith("# Last updated:")) + "\n", encoding="utf-8")
     res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=_doc(tickers))
     assert res["status"] == "unchanged" and res["files"] == {}
+
+
+@pytest.mark.parametrize("stamp", ["0000-00-00", "not-a-date", "2026-13-45", "unknown"])
+def test_a_malformed_last_updated_value_is_refused_like_a_missing_one(tmp_path, stamp):
+    """`_mirror_updated` returned the first 10 characters of whatever followed the
+    label, never a date. `0000-00-00` compares lexically BELOW every real ISO date, so
+    a fresh-but-older snapshot sailed past the strictly-newer guard and rolled the
+    public list backward -- the failure round 4 thought it had closed."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-18")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    txt_path.write_text(txt_path.read_text(encoding="utf-8").replace(
+        "# Last updated: 2026-09-18", f"# Last updated: {stamp}"), encoding="utf-8")
+
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-08"))
+    assert res["status"] == "refused"
+    assert "Last updated" in res["reason"]
+    assert res["files"] == {}
