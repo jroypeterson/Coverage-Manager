@@ -348,11 +348,13 @@ def test_a_snapshot_states_its_own_staleness_threshold(out_dir, monkeypatch):
 def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypatch):
     """Not one number on every file: the Russell lane's 120 is the whole point."""
     def _collect(key):
+        # sp500 gets a plausible S&P 500 count: the band binds every path now.
+        n = 503 if key == "sp500" else 3000
         return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
-                                         "weight_pct": round(100 / 3000, 4),
+                                         "weight_pct": round(100 / n, 4),
                                          "location": "", "exchange": "",
                                          "market_currency": "", "market_value_usd": None}
-                                        for i in range(3000)]
+                                        for i in range(n)]
     monkeypatch.setattr(im, "collect", _collect)
     im.refresh_all()
     got = {k: json.loads((out_dir / f"{k}_latest.json").read_text(encoding="utf-8"))["stale_days"]
@@ -780,8 +782,9 @@ def test_a_cached_snapshot_inside_the_tolerance_is_still_a_fallback(out_dir, mon
     """The guard must not become the outage: one day ahead is the tolerated case."""
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "eafe_latest.json").write_text(json.dumps(
-        {"key": "eafe", "as_of": "2026-09-23", "count": 500, "stale_days": 45,
-         "holdings": [{"ticker": "T0"}]}), encoding="utf-8")
+        {"key": "eafe", "kind": "ishares", "as_of": "2026-09-23", "count": 1,
+         "stale_days": 45,
+         "holdings": [{"ticker": "T0", "weight_pct": 100.0}]}), encoding="utf-8")
     _fail(monkeypatch)
     assert im.refresh("eafe", today=date(2026, 9, 22))["status"] == "stale"
 
@@ -1220,3 +1223,94 @@ def test_a_basket_where_a_FIFTH_of_the_rows_carry_no_weight_refuses(
     _serve(monkeypatch, text)
     with pytest.raises(im.IndexMembershipError, match="carry a usable weight"):
         im.refresh("sp500", today=date(2026, 9, 22))
+
+
+# --- Codex round 11: an invariant applied on ONE path is applied nowhere --------
+
+def _cached(out_dir, key="eafe", *, weights=True, kind="ishares", n=500,
+            as_of="2026-09-20", ticker_blank=False):
+    out_dir.mkdir(parents=True, exist_ok=True)
+    holdings = [{"ticker": f"T{i}", "name": f"Co {i}", "sector": "Health Care",
+                 "sub_industry": "Widgets", "name_source": "wikipedia",
+                 "weight_pct": round(100.0 / n, 4) if weights else None}
+                for i in range(n)]
+    if ticker_blank:
+        holdings[0]["ticker"] = ""
+    (out_dir / f"{key}_latest.json").write_text(json.dumps(
+        {"key": key, "kind": kind, "as_of": as_of, "count": n, "stale_days": 45,
+         "holdings": holdings}), encoding="utf-8")
+
+
+def test_a_WEIGHTLESS_cached_snapshot_is_not_a_usable_fallback(out_dir, monkeypatch):
+    """Round 10's weight rule ran only on a fresh fetch. A one-day-old ishares snapshot
+    with 503 valid tickers and every weight null, plus IVV answering HTML-with-200,
+    reported `stale`, kept the weekly step green, and left the WEIGHTED archive
+    unusable -- the same one-path shape as the round-3 future-date gap."""
+    _cached(out_dir, weights=False)
+    _fail(monkeypatch)
+    r = im.refresh("eafe", today=date(2026, 9, 22))
+    assert r["status"] == "cache_unusable"
+    assert "weight" in r["error"]
+
+
+def test_a_weighted_cached_snapshot_is_still_a_fallback(out_dir, monkeypatch):
+    """The guard must not become the outage: a real cached snapshot still serves."""
+    _cached(out_dir, weights=True)
+    _fail(monkeypatch)
+    assert im.refresh("eafe", today=date(2026, 9, 22))["status"] == "stale"
+
+
+def test_the_cache_rule_exempts_cm_cache_which_publishes_no_weights(
+        out_dir, monkeypatch, tmp_path):
+    """A scraped constituent list is not a weighted index -- exempt on EVERY path."""
+    monkeypatch.setitem(im.SOURCES, "sp500",
+                        {"kind": "cm_cache", "floor": 450, "index": "S&P 500",
+                         "fund": "Wikipedia constituent list"})
+    _cached(out_dir, key="sp500", weights=False, kind="cm_cache", n=503)
+    monkeypatch.setattr(im, "SP500_CACHE", tmp_path / "missing.json")
+    assert im.refresh("sp500", today=date(2026, 9, 22))["status"] == "stale"
+
+
+def test_a_cached_snapshot_with_a_blank_ticker_is_not_usable(out_dir, monkeypatch):
+    _cached(out_dir, ticker_blank=True)
+    _fail(monkeypatch)
+    assert im.refresh("eafe", today=date(2026, 9, 22))["status"] == "cache_unusable"
+
+
+def test_a_cached_sp500_outside_the_count_band_is_not_usable(out_dir, monkeypatch):
+    """The band is a fact about the index, so it binds a cached copy too."""
+    _cached(out_dir, key="sp500", n=450, kind="ishares")
+    _fail(monkeypatch)
+    assert im.refresh("sp500", today=date(2026, 9, 22))["status"] == "cache_unusable"
+
+
+def test_the_weekly_step_fails_on_an_unusable_cache(out_dir, monkeypatch):
+    import weekly_universe
+
+    monkeypatch.setattr(im, "refresh_all",
+                        lambda: [{"key": "eafe", "status": "cache_unusable",
+                                  "as_of": "2026-09-20", "count": 500, "age_days": 2,
+                                  "error": "no usable weights", "written": None}])
+    with pytest.raises(RuntimeError, match="degraded"):
+        weekly_universe._step_index_membership()
+
+
+def test_a_weightless_DATED_file_is_rewritten_when_a_good_fetch_arrives(
+        out_dir, monkeypatch, tmp_path):
+    """`_snapshot_is_usable` checked only key and row count, so the weightless dated
+    file for that as_of counted as a valid immutable record: `latest` was repaired and
+    the ARCHIVE -- the thing that cannot be re-fetched -- never was."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dated = out_dir / "sp500_2026-09-21.json"
+    dated.write_text(json.dumps(
+        {"key": "sp500", "kind": "ishares", "as_of": "2026-09-21", "count": 503,
+         "stale_days": 45,
+         "holdings": [{"ticker": f"T{i}", "name": f"Co {i}", "sector": "Health Care",
+                       "sub_industry": "Widgets", "name_source": "wikipedia",
+                       "weight_pct": None} for i in range(503)]}), encoding="utf-8")
+
+    _serve_ivv(monkeypatch, tmp_path)
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok" and r["written"] == str(dated)
+    doc = json.loads(dated.read_text(encoding="utf-8"))
+    assert sum(1 for h in doc["holdings"] if h["weight_pct"] is not None) == 503

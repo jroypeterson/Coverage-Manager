@@ -809,6 +809,42 @@ def _write_snapshot_bytes(path: Path, text: str) -> None:
         os.fsync(fh.fileno())
 
 
+def snapshot_problem(key: str, doc: dict) -> str:
+    """Why this snapshot is not a usable record of `key`, or "" if it is.
+
+    ⛑ AN INVARIANT APPLIED ON ONE PATH IS APPLIED NOWHERE. Round 10 refused a
+    weightless response at FETCH time; the cached-fallback path and the dated-file
+    check knew nothing about it, so a weightless ishares snapshot plus an HTML-with-200
+    fetch reported `stale`, kept the weekly step green, and left the weighted archive
+    unusable — and the weightless DATED file still counted as a valid immutable record,
+    so a later good fetch for the same as_of repaired `latest` and never the archive.
+    Same shape as the round-3 future-date gap, so the rules live in ONE function that
+    every acceptance path calls.
+
+    Applied to a doc, not to a fetch: the parse-time rules (HTML shell, truncation,
+    duplicate or missing columns, duplicate as-of headers) describe a CSV and cannot be
+    restated here; what a stored snapshot can still be checked for is its shape, its
+    tickers, the S&P 500 count band and the weights a weighted kind must carry.
+    """
+    holdings = doc.get("holdings")
+    if not isinstance(holdings, list) or not holdings:
+        return "snapshot carries no holdings"
+    if not isinstance(doc.get("count"), int) or doc["count"] != len(holdings):
+        return (f"count {doc.get('count')!r} does not match the "
+                f"{len(holdings)} holdings stored")
+    blank = [h for h in holdings
+             if not isinstance(h, dict) or not str(h.get("ticker") or "").strip()]
+    if blank:
+        return f"{len(blank)} holding(s) carry no ticker"
+    kind = doc.get("kind") or (SOURCES.get(key) or {}).get("kind") or ""
+    try:
+        check_sp500_count(key, holdings)
+        check_weights(key, kind, holdings)
+    except IndexMembershipError as e:
+        return str(e)
+    return ""
+
+
 def _snapshot_is_usable(path: Path, key: str, count: int | None = None) -> bool:
     """Does this file hold a COMPLETE snapshot of `key`?
 
@@ -822,10 +858,9 @@ def _snapshot_is_usable(path: Path, key: str, count: int | None = None) -> bool:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    if not (isinstance(doc, dict) and doc.get("key") == key
-            and isinstance(doc.get("holdings"), list)
-            and isinstance(doc.get("count"), int)
-            and len(doc["holdings"]) == doc["count"]):
+    if not isinstance(doc, dict) or doc.get("key") != key:
+        return False
+    if snapshot_problem(key, doc):
         return False
     return count is None or doc["count"] == count
 
@@ -928,6 +963,14 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
                    f"— a future-dated snapshot is a corrupt file, not a fallback")
             log.warning("index_membership[%s]: %s", key, msg)
             return {"key": key, "status": "source_future", "as_of": cached.get("as_of"),
+                    "count": cached.get("count"), "age_days": age, "error": msg,
+                    "written": None}
+        problem = snapshot_problem(key, cached)
+        if problem:
+            msg = (f"{key}: refresh failed ({e}) and the cached snapshot as_of "
+                   f"{cached.get('as_of')} is not a usable record — {problem}")
+            log.warning("index_membership[%s]: %s", key, msg)
+            return {"key": key, "status": "cache_unusable", "as_of": cached.get("as_of"),
                     "count": cached.get("count"), "age_days": age, "error": msg,
                     "written": None}
         unfit = age is None or age > stale_days_for(key)
