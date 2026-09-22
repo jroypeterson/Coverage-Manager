@@ -1393,3 +1393,88 @@ def test_the_write_back_check_proves_the_BYTES_just_written(out_dir, monkeypatch
     monkeypatch.setattr(im, "_write_snapshot_bytes", _writes_something_else)
     with pytest.raises(im.IndexMembershipError, match="read back"):
         im.refresh("sp500", today=date(2026, 9, 22))
+
+
+# --- Codex round 12 (B): pagination across a rebalance, and per-index isolation ---
+
+def _paged(monkeypatch, pages):
+    """Serve `pages` in order to `_fetch_vanguard`, one per request."""
+    import time
+    import urllib.request as _u
+
+    seen = iter(pages)
+
+    def _fake(req, timeout=60):
+        return _JsonResp(next(seen))
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+
+
+def test_pages_dated_DIFFERENTLY_are_not_one_snapshot(monkeypatch):
+    """`asOfDate` was read from the FIRST page only, so a fetch straddling a monthly
+    republish combined an Aug 31 page with a Sep 30 page into one snapshot stamped
+    Aug 31 -- half its membership from September, and no way to tell later."""
+    _paged(monkeypatch, [_vanguard_page(500, 1, 1000, as_of="2026-08-31"),
+                         _vanguard_page(500, 501, 1000, as_of="2026-09-30")])
+    with pytest.raises(im.IndexMembershipError, match="2026-09-30"):
+        im._fetch_vanguard("VONE")
+
+
+def test_pages_reporting_a_DIFFERENT_SIZE_are_not_one_snapshot(monkeypatch):
+    """The same republish shows up as a changed `size`; one fund cannot have two."""
+    _paged(monkeypatch, [_vanguard_page(500, 1, 1000, as_of="2026-08-31"),
+                         _vanguard_page(500, 501, 1200, as_of="2026-08-31")])
+    with pytest.raises(im.IndexMembershipError, match="size"):
+        im._fetch_vanguard("VONE")
+
+
+def test_consistent_pages_still_paginate(monkeypatch):
+    _paged(monkeypatch, [_vanguard_page(500, 1, 1000, as_of="2026-08-31"),
+                         _vanguard_page(500, 501, 1000, as_of="2026-08-31"),
+                         _vanguard_page(0, 1001, 1000, as_of="2026-08-31")])
+    as_of, rows = im._fetch_vanguard("VONE")
+    assert as_of == "2026-08-31" and len(rows) == 1000
+
+
+@pytest.mark.parametrize("payload", [
+    {"fund": ["maintenance"]},
+    {"fund": {"entity": "maintenance"}},
+    {"fund": {"entity": [["VONE", 1]]}},
+    {"fund": None, "size": 1000},
+])
+def test_an_unexpected_json_SHAPE_is_an_IndexMembershipError(monkeypatch, payload):
+    """A valid HTTP-200 body of the wrong shape raised a raw AttributeError/TypeError,
+    which `refresh_all` does not catch."""
+    _paged(monkeypatch, [payload])
+    with pytest.raises(im.IndexMembershipError):
+        im._fetch_vanguard("VONE")
+
+
+def test_refresh_all_isolates_ANY_exception_not_just_ours(out_dir, monkeypatch):
+    """⛑ The loop caught IndexMembershipError only, so one raw exception at r1000 took
+    r2000, r3000, eafe and sp500 down with it -- the module's stated per-index
+    independence, undone by an error type. A week not captured cannot be recaptured."""
+    def _collect(key):
+        if key == "r1000":
+            raise AttributeError("'list' object has no attribute 'get'")
+        n = 503 if key == "sp500" else im.SOURCES[key]["floor"] + 50
+        return "2026-09-08", "source", [
+            {"ticker": f"T{i}", "name": "x", "sector": "", "weight_pct": round(100 / n, 4),
+             "location": "", "exchange": "NYSE", "market_currency": "",
+             "market_value_usd": None} for i in range(n)]
+
+    monkeypatch.setattr(im, "collect", _collect)
+    results = {r["key"]: r["status"] for r in im.refresh_all(today=date(2026, 9, 22))}
+    assert results["r1000"] == "failed"
+    assert results["eafe"] == results["sp500"] == results["r2000"] == "ok"
+
+
+def test_an_isolated_failure_still_names_its_error(out_dir, monkeypatch):
+    def _collect(key):
+        raise ZeroDivisionError("boom")
+
+    monkeypatch.setattr(im, "collect", _collect)
+    rows = im.refresh_all(today=date(2026, 9, 22))
+    assert all(r["status"] == "failed" for r in rows)
+    assert all("ZeroDivisionError" in (r["error"] or "") for r in rows)

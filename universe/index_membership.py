@@ -669,13 +669,48 @@ def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
                 time.sleep(2.0 * (attempt + 1))
         if not isinstance(d, dict):
             raise IndexMembershipError(f"{etf}: page at start={start} is not a JSON object")
-        size = d.get("size") if size is None else size
-        if not as_of and d.get("asOfDate"):
-            as_of = parse_as_of(d.get("asOfDate"), etf)
-        ents = ((d.get("fund") or {}).get("entity")) or []
+        # ⛑ EVERY PAGE MUST DESCRIBE THE SAME SNAPSHOT. `size` and `asOfDate` were read
+        # from the FIRST page only, so a fetch straddling Vanguard's monthly republish
+        # combined an Aug 31 page with a Sep 30 page into one snapshot stamped Aug 31 —
+        # half its membership from September, and nothing on the artifact to tell a
+        # later reader. Pagination is only safe while the thing being paginated stands
+        # still, so a page that disagrees is refused rather than merged.
+        page_as_of = parse_as_of(d["asOfDate"], etf) if d.get("asOfDate") else None
+        if as_of is None:
+            as_of = page_as_of
+        elif page_as_of and page_as_of != as_of:
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} is as of {page_as_of} but the first page "
+                f"was {as_of} — the fund republished mid-fetch; refusing to merge two "
+                f"snapshots into one")
+        page_size = d.get("size")
+        if size is None:
+            size = page_size
+        elif page_size is not None and page_size != size:
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} reports size {page_size} against {size} "
+                f"on the first page — one fund cannot have two sizes mid-fetch")
+
+        # ⛑ A VALID HTTP-200 BODY OF THE WRONG SHAPE IS OUR ERROR, NOT PYTHON'S.
+        # `{"fund": ["maintenance"]}` raised a raw AttributeError, which `refresh_all`
+        # did not catch — so a maintenance page at r1000 aborted the whole lane.
+        fund = d.get("fund")
+        if fund is not None and not isinstance(fund, dict):
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} has `fund` as {type(fund).__name__}, "
+                f"not an object — the endpoint served something that is not holdings")
+        ents = ((fund or {}).get("entity")) or []
+        if not isinstance(ents, list):
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} has `fund.entity` as "
+                f"{type(ents).__name__}, not a list")
         if not ents:
             break
         for e in ents:
+            if not isinstance(e, dict):
+                raise IndexMembershipError(
+                    f"{etf}: a holding on the page at start={start} is "
+                    f"{type(e).__name__}, not an object")
             t = normalise_share_class(e.get("ticker") or "")
             if t:
                 out.append({"ticker": t, "name": e.get("longName") or t,
@@ -1130,19 +1165,28 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
 def refresh_all(*, today: date | None = None) -> list[dict]:
     """Every index, independently.
 
-    ⛑ ONE INDEX FAILING MUST NOT SKIP THE REST. The first version raised out of the
-    loop, so a Vanguard outage took the EAFE and S&P snapshots with it — and the whole
-    point of this lane is that a week not captured cannot be recaptured. A failure with
-    no cached fallback becomes a `failed` row, not an exception.
+    ⛑ ONE INDEX FAILING MUST NOT SKIP THE REST, AND "FAILING" MEANS ANY EXCEPTION. The
+    first version raised out of the loop, so a Vanguard outage took the EAFE and S&P
+    snapshots with it — and the whole point of this lane is that a week not captured
+    cannot be recaptured. The second version caught only `IndexMembershipError`, which
+    is the same outage one step in: a malformed page raised `AttributeError` at r1000
+    and everything after it was skipped. A failure with no cached fallback becomes a
+    `failed` row carrying the exception's class name, never an exception.
     """
     out = []
     for k in SOURCES:
         try:
             out.append(refresh(k, today=today))
-        except IndexMembershipError as e:
-            log.error("index_membership[%s]: %s", k, e)
+        except Exception as e:                       # noqa: BLE001 - see the docstring
+            # ⛑ ANY exception, not only ours. The loop caught `IndexMembershipError`
+            # alone, so one raw `AttributeError` from a malformed Vanguard page took
+            # r2000, r3000, eafe and sp500 down with it — the per-index independence
+            # this function exists for, undone by an error TYPE. The class name travels
+            # in the message so an unexpected failure is still diagnosable.
+            log.error("index_membership[%s]: %s: %s", k, type(e).__name__, e)
             out.append({"key": k, "status": "failed", "as_of": None, "count": None,
-                        "age_days": None, "error": str(e), "written": None})
+                        "age_days": None, "error": f"{type(e).__name__}: {e}",
+                        "written": None})
     return out
 
 
