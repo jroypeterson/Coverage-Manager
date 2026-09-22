@@ -59,6 +59,20 @@ HIST_COLS = (
     + HIST_PE_10Y_COLS + HIST_EVS_10Y_COLS
     + [HIST_STATUS_COL]
 )
+
+# ── Cash-return columns (added 2026-09-22; providers/fmp_quality.py) ──────
+# APPENDED LAST, after the history block, for the reason stated above: consumers read this
+# export by column NAME, and appending is the only direction that cannot break one. They are
+# their own group rather than members of FUND_COLS because that would insert them mid-file
+# between "EPS Grw" and the P/E history block.
+#
+# ⛑ ALL THREE ARE RATIOS, AND NONE OF THEM MAY BECOME AN ABSOLUTE. FMP reports market cap
+# and invested capital in the listing's own currency (Takeda 150x CM's USD figure, in yen),
+# so an absolute here would be a local-currency number sitting beside USD money columns.
+# `Mkt Cap (USD $B)` stays the only market cap anything may threshold on.
+QUALITY_COLS = ["FCF Yield", "ROIC", "CFO Margin", "Cash Flow Status"]
+QUALITY_PCT_COLS = {"FCF Yield", "ROIC", "CFO Margin"}
+QUALITY_STATUS_COL = "Cash Flow Status"
 HIST_RATIO_COLS = {
     "P/E (TTM)", "P/E 5Y Avg", "P/E 5Y +1σ", "P/E 5Y -1σ", "P/E 5Y Min", "P/E 5Y Max",
     "EV/S 5Y Avg", "EV/S 5Y +1σ", "EV/S 5Y -1σ", "EV/S 5Y Min", "EV/S 5Y Max",
@@ -86,6 +100,9 @@ FUND_DISPLAY_NAMES = {
     "Rev Grw": "Rev Grw (TTM YoY)",
     "EPS Grw": "EPS Grw (TTM YoY)",
     "Core": "Core Coverage",
+    "FCF Yield": "FCF Yield (TTM)",
+    "ROIC": "ROIC (TTM)",
+    "CFO Margin": "CFO Margin (TTM)",
 }
 
 # ── Forward EPS growth (for the P/E vs growth scatter) ─────────────────────

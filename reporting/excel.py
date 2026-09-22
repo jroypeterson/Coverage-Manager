@@ -25,6 +25,7 @@ from reporting.calcs import (
     RETURN_COLS, PERIOD_COLS, ANNUAL_COLS, FUND_COLS, VAL_COLS,
     FUND_PCT_COLS, FUND_MONEY_COLS, FUND_DISPLAY_NAMES,
     HIST_COLS, HIST_RATIO_COLS, HIST_VS_AVG_COLS,
+    QUALITY_COLS, QUALITY_PCT_COLS,
     get_color, format_mkt_cap, format_price,
 )
 
@@ -54,7 +55,7 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
         bottom=Side(style="thin", color="D0D0D0"),
     )
 
-    all_cols = info_cols + RETURN_COLS + FUND_COLS + HIST_COLS
+    all_cols = info_cols + RETURN_COLS + FUND_COLS + HIST_COLS + QUALITY_COLS
 
     # Write headers
     for col_idx, col_name in enumerate(all_cols, 1):
@@ -111,6 +112,31 @@ def write_excel_sheet(wb, sheet_name, df, info_cols):
                         cell.number_format = '0.0'
                     except (TypeError, ValueError):
                         cell = ws.cell(row=row_idx, column=col_idx, value=str(val))
+                    cell.font = Font(size=9)
+            elif col_name in QUALITY_COLS:
+                # Cash-return columns. The three numerics render as percentages with the same
+                # red/green sense as ROE; `Cash Flow Status` is prose and must stay text.
+                if col_name in QUALITY_PCT_COLS:
+                    if val is None or (hasattr(val, "__float__") and pd.isna(val)):
+                        cell = ws.cell(row=row_idx, column=col_idx, value="N/A")
+                        cell.font = Font(color="999999", size=9)
+                    else:
+                        try:
+                            num_val = float(val)
+                            cell = ws.cell(row=row_idx, column=col_idx, value=round(num_val, 1))
+                            cell.number_format = '0.0"%"'
+                            if num_val < 0:
+                                cell.font = Font(color="8B0000", size=9)
+                            elif num_val > 0:
+                                cell.font = Font(color="006400", size=9)
+                            else:
+                                cell.font = Font(size=9)
+                        except (TypeError, ValueError):
+                            cell = ws.cell(row=row_idx, column=col_idx, value=str(val))
+                            cell.font = Font(size=9)
+                else:
+                    cell = ws.cell(row=row_idx, column=col_idx,
+                                   value=("" if val is None else str(val)))
                     cell.font = Font(size=9)
             elif col_name in RETURN_COLS:
                 if val is not None and not pd.isna(val):

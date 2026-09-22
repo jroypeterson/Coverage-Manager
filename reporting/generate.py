@@ -31,6 +31,7 @@ from reporting.history_stats import stats_from_series
 from providers.wikipedia_provider import fetch_sp500_tickers
 from providers.fmp_provider import fetch_historical_prices as try_fmp_historical
 from providers.fmp_history import fetch_history_parallel, STATUS_NOT_ATTEMPTED
+from providers.fmp_quality import fetch_quality_parallel, quality_columns_from_payload
 from providers.fmp_estimates import fetch_estimates_parallel
 from providers.finnhub_provider import fetch_parallel as fetch_finnhub_parallel
 from providers.yfinance_provider import batch_download_prices
@@ -620,6 +621,32 @@ def main(sample_mode=False, refresh=False, skip_email=False):
     else:
         logger.warning("Skipping history enrichment — FMP_API_KEY not set")
 
+    # Cash-return columns (FCF yield / ROIC / CFO margin) for the WHOLE universe.
+    #
+    # ⛑ Full-universe and LIVE, unlike the history block above, and that is a deliberate
+    # difference rather than an oversight. History is annual data behind a 30-day TTL, so a
+    # separate resumable backfill earns its keep. These three ride on a TTM market cap that
+    # moves every day, and their own TTL is 144h — shorter than this report's weekly cadence
+    # — so a cache-only read would render a column that is always one run stale while the
+    # report's own date claims otherwise. One pass costs ~1,350 calls, about 5 minutes inside
+    # the 300/min limiter, and re-runs in the same week are cache hits.
+    quality_data = {}
+    if fmp_key_for_history:
+        t0 = time.monotonic()
+        quality_tickers = sorted(set(df_unique["Ticker"].dropna().astype(str).str.strip()) - {""})
+        logger.info("Fetching cash-return metrics for %s tickers...", len(quality_tickers))
+        quality_data = fetch_quality_parallel(quality_tickers, fmp_key_for_history, max_workers=10)
+        q_ok = sum(1 for q in quality_data.values() if q.get("status") == "ok")
+        q_unrec = sum(1 for q in quality_data.values() if q.get("check") == "unreconciled")
+        step_timings.append((
+            "quality", time.monotonic() - t0,
+            f"{q_ok}/{len(quality_data)} tickers ({q_unrec} unreconciled)",
+        ))
+        logger.info("Cash-return metrics: %s/%s populated, %s unreconciled against the "
+                    "vendor's own statements", q_ok, len(quality_data), q_unrec)
+    else:
+        logger.warning("Skipping cash-return metrics — FMP_API_KEY not set")
+
     # Forward annual EPS estimates for the same Phase 1 universe — drives the
     # P/E vs forward-2yr-growth scatter. FMP-only, 30-day cached (same scope +
     # cadence rationale as the 5Y history above).
@@ -682,6 +709,11 @@ def main(sample_mode=False, refresh=False, skip_email=False):
             # leaving an ambiguous blank.
             result_row.update({col: None for col in HIST_COLS})
             result_row[HIST_STATUS_COL] = STATUS_NOT_ATTEMPTED
+
+        # Cash-return columns. A ticker with no payload gets the explicit
+        # `not_attempted` cell rather than a blank, for the reason HIST_STATUS_COL exists:
+        # "we never asked" and "we asked and FMP has nothing" are different facts.
+        result_row.update(quality_columns_from_payload(quality_data.get(orig_ticker)))
 
         results.append(result_row)
 
