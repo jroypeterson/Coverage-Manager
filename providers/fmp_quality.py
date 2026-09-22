@@ -60,7 +60,12 @@ QUALITY_CACHE_NAMESPACE = "quality_metrics"
 # so a long TTL would quietly widen the as-of gap the report's own date claims.
 QUALITY_CACHE_TTL_HOURS = 144.0
 QUALITY_NO_DATA_TTL_HOURS = 168.0
-QUALITY_SCHEMA_VERSION = 1
+# ⛑ BUMPED TO 2 WHEN `stmt_as_of` LANDED. A v1 entry was corroborated but carries NO
+# statement date, and the consumer's staleness gate passes anything it cannot date — so 130
+# cached rows would have published as corroborated-and-undatable, which is exactly the
+# `a-check-that-silently-matches-nothing` shape (Codex r13). An old-schema entry is a cache
+# MISS and is refetched, the same rule `fmp_history` uses for its own v1 payloads.
+QUALITY_SCHEMA_VERSION = 2
 
 STATUS_OK = "ok"
 STATUS_NO_DATA = "no_data"
