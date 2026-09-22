@@ -1478,3 +1478,49 @@ def test_an_isolated_failure_still_names_its_error(out_dir, monkeypatch):
     rows = im.refresh_all(today=date(2026, 9, 22))
     assert all(r["status"] == "failed" for r in rows)
     assert all("ZeroDivisionError" in (r["error"] or "") for r in rows)
+
+
+# --- Codex round 13 (A): the Vanguard path --------------------------------------
+
+def test_an_early_empty_page_does_not_end_a_short_fetch(monkeypatch):
+    """Pagination stopped on an empty page without asking whether it had REACHED the
+    advertised size: five 500-row VTHR pages then an empty one returned 2,500
+    holdings, cleared the 2,400 floor at ~95% of weight, and archived a snapshot
+    missing 500 constituents as `ok`."""
+    pages = [_vanguard_page(500, 1 + 500 * i, 3000, as_of="2026-08-31") for i in range(5)]
+    pages.append(_vanguard_page(0, 2501, 3000, as_of="2026-08-31"))
+    _paged(monkeypatch, pages)
+    with pytest.raises(im.IndexMembershipError, match="2500.*3000|3000.*2500"):
+        im._fetch_vanguard("VTHR")
+
+
+@pytest.mark.parametrize("drop", ["asOfDate", "size"])
+def test_a_page_that_states_no_metadata_cannot_be_matched_to_the_others(monkeypatch, drop):
+    """The agreement rule only compared when a later page PROVIDED the field, so a
+    second page carrying neither was accepted into an August snapshot even when it came
+    from the September republish. Absent is not agreement."""
+    second = _vanguard_page(500, 501, 1000, as_of="2026-08-31")
+    second.pop(drop)
+    _paged(monkeypatch, [_vanguard_page(500, 1, 1000, as_of="2026-08-31"), second])
+    with pytest.raises(im.IndexMembershipError, match=drop):
+        im._fetch_vanguard("VONE")
+
+
+def test_a_vanguard_holding_with_no_ticker_raises_instead_of_vanishing(monkeypatch):
+    """The Vanguard reader silently dropped a row with no ticker -- 899 of 900
+    archived at ~99.9% of weight, over the floor, with nothing reported."""
+    page = _vanguard_page(900, 1, 900, as_of="2026-08-31")
+    page["fund"]["entity"][7]["ticker"] = ""
+    _paged(monkeypatch, [page])
+    with pytest.raises(im.IndexMembershipError, match="ticker"):
+        im._fetch_vanguard("VONE")
+
+
+@pytest.mark.parametrize("cell", ["-", "N/A"])
+def test_a_vanguard_sentinel_ticker_is_missing_not_a_constituent(monkeypatch, cell):
+    """`-` became a literal ticker that every later check read as populated."""
+    page = _vanguard_page(900, 1, 900, as_of="2026-08-31")
+    page["fund"]["entity"][3]["ticker"] = cell
+    _paged(monkeypatch, [page])
+    with pytest.raises(im.IndexMembershipError, match="ticker"):
+        im._fetch_vanguard("VONE")

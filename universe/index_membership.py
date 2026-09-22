@@ -675,18 +675,30 @@ def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
         # half its membership from September, and nothing on the artifact to tell a
         # later reader. Pagination is only safe while the thing being paginated stands
         # still, so a page that disagrees is refused rather than merged.
-        page_as_of = parse_as_of(d["asOfDate"], etf) if d.get("asOfDate") else None
+        # ⛑ ABSENT IS NOT AGREEMENT. The rule compared only when a later page PROVIDED
+        # the field, so a second page carrying neither `asOfDate` nor `size` joined an
+        # August snapshot even when it came from the September republish — the exact
+        # merge the rule exists to stop, walking through the hole in the rule.
+        if not d.get("asOfDate"):
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} states no asOfDate — a page that cannot "
+                f"be matched to the others must not be merged into their snapshot")
+        if d.get("size") is None:
+            raise IndexMembershipError(
+                f"{etf}: page at start={start} states no size — a page that cannot be "
+                f"matched to the others must not be merged into their snapshot")
+        page_as_of = parse_as_of(d["asOfDate"], etf)
         if as_of is None:
             as_of = page_as_of
-        elif page_as_of and page_as_of != as_of:
+        elif page_as_of != as_of:
             raise IndexMembershipError(
                 f"{etf}: page at start={start} is as of {page_as_of} but the first page "
                 f"was {as_of} — the fund republished mid-fetch; refusing to merge two "
                 f"snapshots into one")
-        page_size = d.get("size")
+        page_size = d["size"]
         if size is None:
             size = page_size
-        elif page_size is not None and page_size != size:
+        elif page_size != size:
             raise IndexMembershipError(
                 f"{etf}: page at start={start} reports size {page_size} against {size} "
                 f"on the first page — one fund cannot have two sizes mid-fetch")
@@ -711,17 +723,43 @@ def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
                 raise IndexMembershipError(
                     f"{etf}: a holding on the page at start={start} is "
                     f"{type(e).__name__}, not an object")
-            t = normalise_share_class(e.get("ticker") or "")
-            if t:
-                out.append({"ticker": t, "name": e.get("longName") or t,
-                            "sector": (e.get("sector") or "").strip(),
-                            "weight_pct": _num(e.get("percentWeight")),
-                            "location": "", "exchange": "", "market_currency": "",
-                            "market_value_usd": None})
+            # ⛑ THE SAME SENTINEL READER THE iSHARES PATH USES. A blank ticker was
+            # silently DROPPED here (899 of 900 archived at ~99.9% of weight, over the
+            # floor, nothing reported) and `-` or `N/A` became a literal constituent
+            # that every later check read as populated.
+            raw_ticker = cell(e, "ticker")
+            if not raw_ticker:
+                raise IndexMembershipError(
+                    f"{etf}: a holding on the page at start={start} has no ticker "
+                    f"(name {cell(e, 'longName') or '?'}) — dropping it would shrink "
+                    f"the index by a real constituent")
+            t = normalise_share_class(raw_ticker)
+            out.append({"ticker": t, "name": cell(e, "longName") or t,
+                        "sector": cell(e, "sector"),
+                        "weight_pct": _num(cell(e, "percentWeight")),
+                        "location": "", "exchange": "", "market_currency": "",
+                        "market_value_usd": None})
         start += len(ents)
         if size and start > size:
             break
         time.sleep(VANGUARD_PAUSE)
+    # ⛑ AN EMPTY PAGE IS NOT EVIDENCE THAT THE FETCH IS COMPLETE. The loop broke on
+    # one without asking whether it had reached the advertised `size`: five 500-row
+    # VTHR pages then an empty one returned 2,500 holdings, cleared the 2,400 floor at
+    # ~95% of weight, and archived an index missing 500 constituents as `ok`.
+    #
+    # 🔻 ONE-SIDED BY CHOICE: this refuses a SHORT fetch. Whether `size` can legitimately
+    # exceed the rows served (a non-stock line, a same-day correction) could not be
+    # measured — on 2026-09-22 the endpoint served non-JSON for VONE and VTHR through
+    # four retries each — so a strict equality could take the lane down over a vendor
+    # convention nobody has verified. A surplus is logged instead.
+    if size is not None and len(out) < size:
+        raise IndexMembershipError(
+            f"{etf}: collected {len(out)} holdings against an advertised size of "
+            f"{size} — the fetch stopped short; refusing to archive a partial index")
+    if size is not None and len(out) > size:
+        log.warning("index_membership[%s]: %d holdings against an advertised size of "
+                    "%d — serving the larger list", etf, len(out), size)
     if not out:
         raise IndexMembershipError(f"{etf}: no holdings returned")
     if not as_of:
