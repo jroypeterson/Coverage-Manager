@@ -350,8 +350,16 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
         limit = im.stale_days_for("sp500")
     if age is None:
         return refused("snapshot carries no usable as_of date", count=count)
-    if age < 0:
-        return refused(f"snapshot as_of {as_of} is in the future", as_of=as_of, count=count)
+    # ⛑ THE SAME TOLERANCE THE COLLECTOR APPLIES, not a second rule with a different
+    # sign convention. `age` is today - as_of, so a snapshot one day ahead is -1 --
+    # which `index_membership.refresh` accepts (a fund stamps its own trade date). This
+    # refused it, so a snapshot the archive had already accepted could never reach
+    # sigma-alert and the public list simply stopped updating, with no path back but
+    # waiting for the date to catch up.
+    if age < -_im.FUTURE_TOLERANCE_DAYS:
+        return refused(f"snapshot as_of {as_of} is in the future "
+                       f"(beyond the {_im.FUTURE_TOLERANCE_DAYS}d tolerance)",
+                       as_of=as_of, count=count)
     if age > limit:
         return refused(f"snapshot as_of {as_of} is {age}d old (limit {limit}d)",
                        as_of=as_of, count=count)

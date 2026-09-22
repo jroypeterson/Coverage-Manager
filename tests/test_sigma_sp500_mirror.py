@@ -100,7 +100,8 @@ def test_absent_files_are_written(tmp_path):
     (_doc(_tickers(494)), "implausible count 494"),
     (_doc(_tickers(511)), "implausible count 511"),
     (_doc(as_of="2026-08-10"), "46d old (limit 45d)"),
-    (_doc(as_of="2026-09-26"), "in the future"),
+    # 2 days ahead: 1 day is the collector tolerance and is deliberately accepted.
+    (_doc(as_of="2026-09-27"), "in the future"),
     (_doc(as_of=None), "no usable as_of"),
     (_doc(_tickers(502) + ["T000"]), "T000 twice"),
     (_doc(_tickers(502) + [""]), "no ticker"),
@@ -281,3 +282,24 @@ def test_a_header_only_difference_is_not_a_list_change(tmp_path):
     assert res["status"] == "refused"
     # and nothing that names the fund's URL can appear
     assert "http" not in se.render_sp500_txt(tickers, "2026-09-25")
+
+
+def test_the_mirror_accepts_EXACTLY_the_dates_the_collector_accepts(tmp_path):
+    """The collector tolerates a snapshot up to FUTURE_TOLERANCE_DAYS ahead (a fund
+    stamps its own trade date); the mirror refused anything with a negative age, so a
+    snapshot the archive had accepted left sigma-alert stale with no way to recover but
+    waiting. One constant, one sign convention, pinned across the seam."""
+    from datetime import timedelta
+
+    from universe import index_membership as im
+
+    tol = im.FUTURE_TOLERANCE_DAYS
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-01")
+    for ahead in range(0, tol + 3):
+        as_of = (TODAY + timedelta(days=ahead)).isoformat()
+        res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=_doc(tickers, as_of=as_of))
+        collector_accepts = ahead <= tol
+        assert (res["status"] != "refused") is collector_accepts, (ahead, res)
+        if not collector_accepts:
+            assert "future" in res["reason"], res

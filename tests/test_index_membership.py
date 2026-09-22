@@ -743,3 +743,56 @@ def test_the_weekly_step_fails_on_a_future_dated_source(out_dir, monkeypatch):
                                   "error": "dated in the future", "written": None}])
     with pytest.raises(RuntimeError, match="degraded"):
         weekly_universe._step_index_membership()
+
+
+# --- Codex round 3 -------------------------------------------------------------
+
+def test_a_future_dated_CACHED_snapshot_is_not_a_usable_fallback(out_dir, monkeypatch):
+    """The round-2 guard sat on the SUCCESS path only. A snapshot already on disk with
+    a future as_of plus a failing fetch computes a NEGATIVE age, which is never greater
+    than STALE_DAYS, so it classified as an ordinary `stale` fallback and the weekly
+    step read it as consumable — the wedge, serving the corrupt file indefinitely."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "eafe_latest.json").write_text(json.dumps(
+        {"key": "eafe", "as_of": "2027-12-04", "count": 500, "stale_days": 45,
+         "holdings": [{"ticker": "T0"}]}), encoding="utf-8")
+    _fail(monkeypatch)
+
+    r = im.refresh("eafe", today=date(2026, 9, 22))
+    assert r["status"] == "source_future"
+    assert r["as_of"] == "2027-12-04" and r["written"] is None
+    assert "fallback" in r["error"] or "future" in r["error"]
+
+
+def test_a_cached_snapshot_inside_the_tolerance_is_still_a_fallback(out_dir, monkeypatch):
+    """The guard must not become the outage: one day ahead is the tolerated case."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "eafe_latest.json").write_text(json.dumps(
+        {"key": "eafe", "as_of": "2026-09-23", "count": 500, "stale_days": 45,
+         "holdings": [{"ticker": "T0"}]}), encoding="utf-8")
+    _fail(monkeypatch)
+    assert im.refresh("eafe", today=date(2026, 9, 22))["status"] == "stale"
+
+
+def test_a_rollback_to_the_wikipedia_cache_restores_ITS_caveats(
+        out_dir, monkeypatch, tmp_path):
+    """The caveats describe the SOURCE, so they follow the kind actually used. Keyed on
+    `sp500` alone, the documented rollback to `cm_cache` would keep telling every
+    consumer the file was full-replication IVV holdings with a fund-stated date."""
+    cache = tmp_path / "sp500.json"
+    cache.write_text(json.dumps({
+        "_cached_at": "2026-09-18T14:09:24+00:00",
+        "data": {"tickers": [f"T{i}" for i in range(500)],
+                 "info": {"T0": {"Company Name": "Zero Inc"}}}}), encoding="utf-8")
+    monkeypatch.setattr(im, "SP500_CACHE", cache)
+    monkeypatch.setitem(im.SOURCES, "sp500",
+                        {"kind": "cm_cache", "floor": 450, "index": "S&P 500",
+                         "fund": "Wikipedia constituent list"})
+
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "ok"
+    doc = json.loads((out_dir / "sp500_latest.json").read_text(encoding="utf-8"))
+    assert doc["as_of_kind"] == "observed" and doc["kind"] == "cm_cache"
+    blob = " ".join(doc["caveats"]).lower()
+    assert "wikipedia" in blob and "observed" in blob
+    assert "ivv" not in blob and "no market" not in blob

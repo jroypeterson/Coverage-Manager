@@ -206,10 +206,14 @@ CAVEATS: dict[str, list[str]] = {
         "the date we looked, NOT a date the index provider stated.",
     ],
 }
-# Per-KEY caveats override the per-kind ones: sp500 uses the ishares kind, and the EFA
-# caveats ("sampled", "local exchange ticker") are false for IVV.
-CAVEATS_BY_KEY: dict[str, list[str]] = {
-    "sp500": [
+# ⛑ AN OVERRIDE IS KEYED ON (key, KIND), NEVER ON THE KEY ALONE. These sentences
+# describe the SOURCE, so they must follow the source actually used for the run: keyed
+# on "sp500" alone, the documented rollback to `cm_cache` (change the SOURCES entry,
+# nothing else) would keep stamping every snapshot "full-replication IVV holdings,
+# fund-stated date" onto a Wikipedia scrape, and the archive would be permanently
+# mislabelled with no error anywhere. The per-kind table below is the fallback.
+CAVEATS_BY_KEY: dict[tuple[str, str], list[str]] = {
+    ("sp500", "ishares"): [
         "iShares Core S&P 500 ETF (IVV) holdings - a full-replication fund, not S&P's own "
         "constituent file. `as_of` is the fund's stated holdings date (`source`).",
         "Non-equity lines (cash, money market, collateral, futures) and residual lines "
@@ -219,6 +223,11 @@ CAVEATS_BY_KEY: dict[str, list[str]] = {
         "`name_source: ivv` marks a row where IVV's own name/sector was the fallback.",
     ],
 }
+
+
+def caveats_for(key: str, kind: str) -> list[str]:
+    """The caveats for the source this run actually used. See `CAVEATS_BY_KEY`."""
+    return CAVEATS_BY_KEY.get((key, kind)) or CAVEATS[kind]
 _LICENCE = ("Licensed for internal use only - never publish into exports/ or push.")
 
 # Back-compat: the first version of this module exposed `FUNDS`. Nothing outside it read
@@ -242,6 +251,20 @@ STALE_DAYS_BY_KIND = {"vanguard": 120}           # month-end publishing + annual
 
 def stale_days_for(key: str) -> int:
     return STALE_DAYS_BY_KIND.get(SOURCES[key]["kind"], STALE_DAYS)
+
+
+def is_future_as_of(as_of: str | None, today: date) -> bool:
+    """Is this as-of date further ahead than the timezone tolerance allows?
+
+    ⛑ ONE TEST, USED ON BOTH PATHS. The first version guarded only a FRESHLY FETCHED
+    date, so a future-dated snapshot already on disk sailed through the fetch-FAILURE
+    path: its age is NEGATIVE, a negative is never greater than `STALE_DAYS`, and it
+    was therefore served as an ordinary `stale` fallback and read as consumable —
+    indefinitely, because the same file then blocks every correct fetch behind it.
+    A future date is not a fresh snapshot and not a usable fallback; it is a corrupt
+    one, whichever path produced it.
+    """
+    return bool(as_of) and as_of > (today + timedelta(days=FUTURE_TOLERANCE_DAYS)).isoformat()
 
 
 class IndexMembershipError(RuntimeError):
@@ -635,6 +658,14 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         age = snapshot_age_days(cached, today)
         if cached is None:
             raise
+        if is_future_as_of(cached.get("as_of"), today):
+            msg = (f"{key}: refresh failed ({e}) and the cached snapshot as_of "
+                   f"{cached.get('as_of')} is in the FUTURE against {today.isoformat()} "
+                   f"— a future-dated snapshot is a corrupt file, not a fallback")
+            log.warning("index_membership[%s]: %s", key, msg)
+            return {"key": key, "status": "source_future", "as_of": cached.get("as_of"),
+                    "count": cached.get("count"), "age_days": age, "error": msg,
+                    "written": None}
         unfit = age is None or age > stale_days_for(key)
         log.warning("index_membership[%s]: refresh failed (%s); serving cached "
                     "snapshot as_of=%s age=%sd%s",
@@ -653,7 +684,7 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # iShares) and a run either side of midnight local is not a corrupt file. Applies
     # to EVERY index -- EAFE and the Russell lanes had the same hole with no mirror
     # behind them to catch it.
-    if as_of > (today + timedelta(days=FUTURE_TOLERANCE_DAYS)).isoformat():
+    if is_future_as_of(as_of, today):
         msg = (f"{key}: fetched as_of {as_of} is in the FUTURE against {today.isoformat()} "
                f"(tolerance {FUTURE_TOLERANCE_DAYS}d) — refusing to write a snapshot "
                f"that would become an unbeatable floor for every later fetch")
@@ -703,7 +734,7 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         "fetched_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "source": _source_label(key),
         # Stated on every snapshot so a consumer cannot mistake the proxy for the index.
-        "caveats": CAVEATS_BY_KEY.get(key, CAVEATS[src["kind"]]) + [_LICENCE],
+        "caveats": caveats_for(key, src["kind"]) + [_LICENCE],
         "count": len(rows),
         # None, not 0.0, where the source publishes no weights: a zero would read as an
         # index whose constituents carry no weight, which is a claim rather than a gap.
