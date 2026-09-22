@@ -377,3 +377,23 @@ def test_a_last_updated_value_with_TRAILING_CONTENT_is_undatable(tmp_path, stamp
     assert res["status"] == "refused"
     assert "Last updated" in res["reason"]
     assert res["files"] == {}
+
+
+def test_two_last_updated_headers_make_the_file_undatable(tmp_path):
+    """`_mirror_updated` returned the FIRST value and never looked further, so a file
+    carrying both `2026-09-01` and a corrective `2026-09-30` let a 2026-09-08 snapshot
+    count as newer and overwrite the public list with an older basket. Two answers is
+    not an answer."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-01")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    lines = txt_path.read_text(encoding="utf-8").splitlines()
+    i = next(i for i, ln in enumerate(lines) if ln.startswith("# Last updated:"))
+    lines.insert(i + 1, "# Last updated: 2026-09-30")
+    txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-08"))
+    assert res["status"] == "refused"
+    assert "2026-09-01" in res["reason"] and "2026-09-30" in res["reason"]
+    assert res["files"] == {}

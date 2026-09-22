@@ -295,6 +295,13 @@ def _mirror_tickers(text):
             if ln.strip() and not ln.lstrip().startswith("#")}
 
 
+def mirror_update_values(text):
+    """Every `# Last updated:` value in the file, raw, in order. Used to say WHY a
+    mirror is undatable -- the refusal has to name the values a human will look for."""
+    return [ln[len(_SP500_UPDATED_PREFIX):].strip()
+            for ln in text.splitlines() if ln.startswith(_SP500_UPDATED_PREFIX)]
+
+
 def _mirror_updated(text):
     """The mirror's own `# Last updated:` date as ISO, or None if it is not a date.
 
@@ -306,6 +313,13 @@ def _mirror_updated(text):
     """
     from datetime import datetime as _dt
 
+    # ⛑ A SECOND HEADER IS NOT AN ANNOTATION, IT IS AN AMBIGUITY. This returned the
+    # FIRST value and never looked further, so a file carrying both `2026-09-01` and a
+    # corrective `2026-09-30` let a 2026-09-08 snapshot count as strictly newer and
+    # overwrite the public list with the OLDER basket.
+    found = mirror_update_values(text)
+    if len(found) != 1:
+        return None
     for ln in text.splitlines():
         if ln.startswith(_SP500_UPDATED_PREFIX):
             # ⛑ THE WHOLE VALUE, NOT ITS FIRST TEN CHARACTERS. Slicing first made an
@@ -435,9 +449,13 @@ def build_sp500_mirror(target_dir=SIGMA_ALERT_DIR, today=None, doc=None):
     # list we must not overwrite; agreement is still `unchanged`, so a quiet week is
     # unaffected and only a CHANGE is blocked.
     if files and cur_txt is not None and not cur_updated:
-        return refused("the sigma-alert list carries no parsable `# Last updated:` date, "
-                       "so it cannot be dated - refusing to overwrite it with a snapshot "
-                       "that may be older", as_of=as_of, count=count)
+        found = mirror_update_values(cur_txt)
+        detail = (f"found {len(found)}: {', '.join(repr(v) for v in found)}"
+                  if found else "no `# Last updated:` line at all")
+        return refused("the sigma-alert list carries no single parsable "
+                       f"`# Last updated:` date ({detail}), so it cannot be dated - "
+                       "refusing to overwrite it with a snapshot that may be older",
+                       as_of=as_of, count=count)
     if files and cur_updated and as_of and as_of <= cur_updated:
         return refused(f"CM snapshot as_of {as_of} is not newer than the sigma-alert list "
                        f"dated {cur_updated} but disagrees with it - refusing to overwrite",

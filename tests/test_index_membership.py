@@ -937,3 +937,54 @@ def test_a_duplicate_column_name_is_refused(monkeypatch, tmp_path):
 def test_the_duplicate_check_names_every_repeat(monkeypatch, tmp_path):
     with pytest.raises(im.IndexMembershipError, match="duplicate"):
         _ivv(monkeypatch, tmp_path, text=_rename_header("Name,", "Ticker,"))
+
+
+# --- Codex round 8 -------------------------------------------------------------
+
+@pytest.mark.parametrize("cell", ["", "-"])
+def test_an_equity_row_with_no_ticker_raises_instead_of_being_dropped(
+        monkeypatch, tmp_path, cell):
+    """The row was silently DISCARDED, so the mirror's no-blank-ticker guard never saw
+    it: an otherwise complete file with AAPL's ticker blank yields a 502-member basket
+    that clears the band and the join, reports success, and publishes without Apple.
+    Measured 2026-09-22: neither IVV nor EFA has a single Equity row with a blank or
+    `-` ticker, so this is never a normal shape."""
+    line = next(l for l in _ivv_text().splitlines() if l.startswith('"AAPL"'))
+    text = _ivv_text().replace(line, line.replace('"AAPL"', f'"{cell}"', 1))
+    with pytest.raises(im.IndexMembershipError, match="ticker"):
+        _ivv(monkeypatch, tmp_path, text=text)
+
+
+def test_a_non_equity_row_with_no_ticker_is_still_just_skipped(monkeypatch, tmp_path):
+    """The cash and futures lines legitimately carry `-`; only a CONSTITUENT must
+    have a symbol, or the guard becomes the outage."""
+    rows = _ivv(monkeypatch, tmp_path)[2]
+    assert len(rows) == 503
+
+
+def _wiki_missing_field(tmp_path, monkeypatch, drop):
+    """A cache whose entries omit one GICS field for every padded name."""
+    pads = _pad_tickers()
+    info = {}
+    for t in pads:
+        entry = {"Company Name": f"Pad {t} Inc", "GICS Sector": "Industrials",
+                 "GICS Sub-Industry": "Widgets"}
+        entry.pop(drop)
+        info[t] = entry
+    _wiki_cache(tmp_path, monkeypatch, tickers=WIKI_TICKERS + pads, info=info)
+    _serve(monkeypatch, _ivv_text() + _pad_rows())
+
+
+def test_the_join_threshold_covers_every_field_the_join_PROMISES(monkeypatch, tmp_path):
+    """It counted company NAMES only, so renaming `GICS Sub-Industry` to
+    `GICS Sub Industry` in the cache reported 503/503 joined and wrote a snapshot with
+    every sub_industry blank. Each field the join claims to provide is checked."""
+    _wiki_missing_field(tmp_path, monkeypatch, "GICS Sub-Industry")
+    with pytest.raises(im.IndexMembershipError, match="sub_industry"):
+        im.collect("sp500")
+
+
+def test_a_missing_sector_field_is_named_too(monkeypatch, tmp_path):
+    _wiki_missing_field(tmp_path, monkeypatch, "GICS Sector")
+    with pytest.raises(im.IndexMembershipError, match="sector"):
+        im.collect("sp500")

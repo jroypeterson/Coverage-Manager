@@ -449,10 +449,19 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
                 f"fields that would silently read as empty")
         r = dict(zip(header, raw))
         if (r.get("Asset Class") or "").strip() != "Equity":
-            continue
+            continue                      # cash, futures and collateral carry `-`
         t = (r.get("Ticker") or "").strip()
+        # ⛑ AN EQUITY ROW WITH NO SYMBOL IS NOT A ROW TO DROP. Dropping it removed the
+        # holding before any downstream guard could see it: an otherwise complete file
+        # with AAPL's ticker blank yields a 502-member basket that clears the count
+        # band and the join floor, reports success, and publishes the S&P 500 without
+        # Apple -- and the mirror's own no-blank-ticker check never sees a row that is
+        # already gone. Measured 2026-09-22: neither IVV nor EFA carries a single
+        # Equity row with a blank or `-` ticker, so this shape is always a defect.
         if not t or t == "-":
-            continue
+            raise IndexMembershipError(
+                f"an Equity holding has no ticker (name {r.get('Name', '')!r}) — "
+                f"dropping it would silently shrink the index by one real constituent")
         rows.append({
             "ticker": t,
             "name": (r.get("Name") or "").strip(),
@@ -546,7 +555,9 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
                     "name": wname or r.get("name") or t,
                     "sector": wsector or ivv_sector,
                     "sub_industry": (w.get("GICS Sub-Industry") or "").strip(),
-                    "name_source": "wikipedia" if wname else "ivv"})
+                    "name_source": "wikipedia" if wname else "ivv",
+                    # transport for the per-field join check below; popped before return
+                    "_sector_source": "wikipedia" if wsector else "ivv"})
 
     if not SP500_MIN_COUNT <= len(out) <= SP500_MAX_COUNT:
         raise IndexMembershipError(
@@ -554,12 +565,23 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
             f"{SP500_MAX_COUNT} — refusing to replace the list with a truncated file "
             f"or a transitional basket")
 
-    joined = sum(1 for r in out if r["name_source"] == "wikipedia")
-    if joined < SP500_MIN_JOIN_RATE * len(out):
-        raise IndexMembershipError(
-            f"sp500: the Wikipedia cache named only {joined} of {len(out)} holdings "
-            f"(floor {SP500_MIN_JOIN_RATE:.0%}) — refusing to fall back to IVV names "
-            f"for the rest, which would rewrite every published company name")
+    # ⛑ THE THRESHOLD COVERS EVERY FIELD THE JOIN PROMISES, not just the one that
+    # motivated it. Counting company NAMES alone meant a cache that renamed
+    # `GICS Sub-Industry` to `GICS Sub Industry` reported 503/503 joined and wrote a
+    # snapshot with every sub_industry blank -- a check that measures one of the three
+    # things it certifies is a check that passes while two of them are broken.
+    for field, joined in (
+            ("name", sum(1 for r in out if r["name_source"] == "wikipedia")),
+            ("sector", sum(1 for r in out if r["_sector_source"] == "wikipedia")),
+            ("sub_industry", sum(1 for r in out if r["sub_industry"]))):
+        if joined < SP500_MIN_JOIN_RATE * len(out):
+            raise IndexMembershipError(
+                f"sp500: the Wikipedia cache supplied `{field}` for only {joined} of "
+                f"{len(out)} holdings (floor {SP500_MIN_JOIN_RATE:.0%}) — refusing to "
+                f"publish a snapshot whose joined fields are mostly missing (a renamed "
+                f"cache key looks exactly like this)")
+    for r in out:
+        r.pop("_sector_source", None)
     return out
 
 
