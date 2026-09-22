@@ -139,7 +139,7 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import config
@@ -234,6 +234,9 @@ FUNDS = SOURCES
 # have marked the Russell lane unfit on an ordinary week, which is how a guard becomes
 # the outage it was added to prevent.
 STALE_DAYS = 45                                  # default, and the iShares/CM-cache case
+# A fund stamps its holdings in its own calendar; one day covers the timezone gap and
+# nothing else. See the future-as_of guard in `refresh`.
+FUTURE_TOLERANCE_DAYS = 1
 STALE_DAYS_BY_KIND = {"vanguard": 120}           # month-end publishing + annual recon
 
 
@@ -640,6 +643,24 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         return {"key": key, "status": "stale_unfit" if unfit else "stale",
                 "as_of": cached.get("as_of"), "count": cached.get("count"),
                 "age_days": age, "error": str(e), "written": None}
+
+    # ⛑ A FUTURE AS-OF IS REFUSED BEFORE ANYTHING IS WRITTEN, AND IT IS THE WEDGE
+    # CASE. Written once, it becomes the floor the older-than check below compares
+    # against, so every subsequent CORRECT file is refused as `source_older` and the
+    # lane stays stuck until a human deletes the snapshot; `build_sp500_mirror` refuses
+    # a future as_of independently, so the public list would stop updating too. One
+    # day of tolerance, because a fund stamps its own trade date (US Eastern for
+    # iShares) and a run either side of midnight local is not a corrupt file. Applies
+    # to EVERY index -- EAFE and the Russell lanes had the same hole with no mirror
+    # behind them to catch it.
+    if as_of > (today + timedelta(days=FUTURE_TOLERANCE_DAYS)).isoformat():
+        msg = (f"{key}: fetched as_of {as_of} is in the FUTURE against {today.isoformat()} "
+               f"(tolerance {FUTURE_TOLERANCE_DAYS}d) — refusing to write a snapshot "
+               f"that would become an unbeatable floor for every later fetch")
+        log.warning("index_membership[%s]: %s", key, msg)
+        return {"key": key, "status": "source_future", "as_of": as_of,
+                "count": len(rows), "age_days": snapshot_age_days({"as_of": as_of}, today),
+                "error": msg, "written": None}
 
     # ⛑ A VALID BUT OLDER RESPONSE MUST NOT MOVE `<key>_latest.json` BACKWARD.
     # iShares can serve a previous day's file (CDN edge, or a republish), and every

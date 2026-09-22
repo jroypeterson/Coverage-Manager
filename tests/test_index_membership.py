@@ -698,3 +698,48 @@ def test_the_weekly_step_fails_when_a_source_went_backwards(out_dir, monkeypatch
                                   "error": "older than 2026-09-21", "written": None}])
     with pytest.raises(RuntimeError, match="degraded"):
         weekly_universe._step_index_membership()
+
+
+# --- Codex round 2: the monotonicity guard was one-sided ----------------------
+
+def test_a_future_as_of_is_refused_before_anything_is_written(out_dir, monkeypatch, tmp_path):
+    """A future date is the WEDGE case, not merely a wrong one: written once, it
+    becomes the floor the older-than check compares against, so every subsequent
+    (correct) file is refused as `source_older` and the lane stays stuck until a
+    human deletes the file. The public mirror refuses a future as_of too, so the
+    S&P 500 list would simply stop updating."""
+    _serve_ivv(monkeypatch, tmp_path,
+               text=_ivv_text().replace("Sep 21, 2026", "Sep 30, 2026"))
+    r = im.refresh("sp500", today=date(2026, 9, 22))
+    assert r["status"] == "source_future"
+    assert r["as_of"] == "2026-09-30" and r["written"] is None
+    assert not (out_dir / "sp500_latest.json").exists()
+    assert not (out_dir / "sp500_2026-09-30.json").exists()
+
+
+def test_one_day_ahead_is_tolerated_because_the_fund_dates_in_its_own_timezone(
+        out_dir, monkeypatch, tmp_path):
+    """iShares stamps a US-Eastern trade date; a run either side of midnight local
+    must not read that as a corrupt file. One day, and no more."""
+    _serve_ivv(monkeypatch, tmp_path,
+               text=_ivv_text().replace("Sep 21, 2026", "Sep 23, 2026"))
+    assert im.refresh("sp500", today=date(2026, 9, 22))["status"] == "ok"
+
+
+def test_the_future_guard_covers_every_index_not_just_sp500(out_dir, monkeypatch):
+    """EAFE and the Russell lanes had the same hole and no mirror behind them."""
+    _serve(monkeypatch, _csv(500).replace("Sep 04, 2026", "Dec 04, 2027"))
+    r = im.refresh("eafe", today=date(2026, 9, 22))
+    assert r["status"] == "source_future" and r["written"] is None
+    assert not (out_dir / "eafe_latest.json").exists()
+
+
+def test_the_weekly_step_fails_on_a_future_dated_source(out_dir, monkeypatch):
+    import weekly_universe
+
+    monkeypatch.setattr(im, "refresh_all",
+                        lambda: [{"key": "eafe", "status": "source_future",
+                                  "as_of": "2027-12-04", "count": 500, "age_days": -438,
+                                  "error": "dated in the future", "written": None}])
+    with pytest.raises(RuntimeError, match="degraded"):
+        weekly_universe._step_index_membership()
