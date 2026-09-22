@@ -49,7 +49,7 @@ def test_render_txt_matches_refresh_sp500_format():
         "# S&P 500 Constituents\n"
         "# Last updated: 2026-09-18\n"
         "# Check for reconstitution updates quarterly (March, June, September, December)\n"
-        "# Source: https://en.wikipedia.org/wiki/List_of_S%26P_500_companies\n"
+        "# Source: Coverage Manager index membership (S&P 500; fund holdings disclosure)\n"
         "A\nBRK-B\nMMM\n")
 
 
@@ -257,3 +257,27 @@ def test_mirror_payload_is_exactly_tickers_and_names(tmp_path):
     for leak in ("ishares", "239726", "0.1234", "7654321", "99.87", "nyse",
                  "industrials", "widgets", "wikipedia\"", "weight", "market"):
         assert leak not in everything, leak
+
+
+def test_a_header_only_difference_is_not_a_list_change(tmp_path):
+    """The Source line changed 2026-09-22 (Wikipedia URL -> CM label). A mirror still
+    carrying the OLD header with the SAME tickers must stay `unchanged`: the header is
+    not content, so it can neither churn the file nor route around the strictly-newer
+    guard. It is rewritten only alongside a real, guarded list change."""
+    tickers = _tickers()
+    (tmp_path / "sources").mkdir(parents=True)
+    old = se.render_sp500_txt(tickers, "2026-09-18").replace(
+        f"# Source: {se.SP500_SOURCE_LABEL}",
+        "# Source: https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    (tmp_path / "sources" / "sp500.txt").write_text(old, encoding="utf-8")
+    (tmp_path / "sources" / "sp500_names.json").write_text(
+        se.render_sp500_names({t: f"{t} Corp" for t in tickers}), encoding="utf-8")
+    for as_of in ("2026-09-18", "2026-09-25"):
+        res = se.build_sp500_mirror(tmp_path, today=TODAY, doc=_doc(tickers, as_of=as_of))
+        assert res["status"] == "unchanged" and res["files"] == {}, as_of
+    # a same-day DIFFERENT list is still refused, header or not
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-18"))
+    assert res["status"] == "refused"
+    # and nothing that names the fund's URL can appear
+    assert "http" not in se.render_sp500_txt(tickers, "2026-09-25")

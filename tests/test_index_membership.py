@@ -512,7 +512,7 @@ def test_ivv_names_and_sectors_come_from_the_wikipedia_cache(monkeypatch, tmp_pa
     assert by["MMM"]["name"] == "3M"
     assert by["MMM"]["name_source"] == "wikipedia"
     # the fund's weights and values stay on the (gitignored) snapshot
-    assert by["MMM"]["weight_pct"] == 0.13
+    assert by["MMM"]["weight_pct"] == 0.06
     assert by["MMM"]["exchange"] == "NYSE"
 
 

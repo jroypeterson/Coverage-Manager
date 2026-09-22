@@ -255,7 +255,9 @@ SP500_RELPATH = "sources/sp500.txt"
 SP500_NAMES_RELPATH = "sources/sp500_names.json"
 SP500_MIN_COUNT = 495
 SP500_MAX_COUNT = 510
-SP500_SOURCE_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+# Named WITHOUT a URL (2026-09-22): the list now comes from IVV fund holdings via CM's
+# index_membership, and the iShares URL must never reach this public repo.
+SP500_SOURCE_LABEL = "Coverage Manager index membership (S&P 500; fund holdings disclosure)"
 _SP500_UPDATED_PREFIX = "# Last updated:"
 
 
@@ -285,7 +287,7 @@ def render_sp500_txt(tickers, as_of):
         "# S&P 500 Constituents",
         f"# Last updated: {as_of}",
         "# Check for reconstitution updates quarterly (March, June, September, December)",
-        f"# Source: {SP500_SOURCE_URL}",
+        f"# Source: {SP500_SOURCE_LABEL}",
     ]
     return "\n".join(header + sorted(set(tickers))) + "\n"
 
