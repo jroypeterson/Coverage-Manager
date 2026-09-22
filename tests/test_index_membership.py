@@ -920,3 +920,20 @@ def test_the_future_and_older_checks_compare_PARSED_dates(out_dir, monkeypatch, 
     assert im.is_future_as_of("2026-09-23", date(2026, 9, 22)) is False
     with pytest.raises(im.IndexMembershipError, match="2026-09-31"):
         im.parse_as_of("2026-09-31", "test")
+
+
+# --- Codex round 7 -------------------------------------------------------------
+
+def test_a_duplicate_column_name_is_refused(monkeypatch, tmp_path):
+    """`dict(zip(...))` keeps the LAST value, so a second (blank) `Exchange` column
+    passes both the required-column check and the row-width check while blanking
+    "NO MARKET (E.G. UNLISTED)": HOLX survives and a 504-row basket clears the band
+    and the join floor. A header that names one field twice is not a header we can
+    read."""
+    with pytest.raises(im.IndexMembershipError, match="Exchange"):
+        _ivv(monkeypatch, tmp_path, text=_rename_header("Location,", "Exchange,"))
+
+
+def test_the_duplicate_check_names_every_repeat(monkeypatch, tmp_path):
+    with pytest.raises(im.IndexMembershipError, match="duplicate"):
+        _ivv(monkeypatch, tmp_path, text=_rename_header("Name,", "Ticker,"))

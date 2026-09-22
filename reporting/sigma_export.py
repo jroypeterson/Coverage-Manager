@@ -261,6 +261,14 @@ SP500_NAMES_RELPATH = "sources/sp500_names.json"
 # rebased and pushed to origin/master by a SCHEDULED job -- publishing someone's
 # unfinished work, from a lane nobody is watching at the time. Ownership is now two
 # tests, both required: OUR message, and ONLY our files.
+# ⛑ THE BRANCH SIGMA-ALERT'S CONSUMERS ACTUALLY READ, declared rather than inferred.
+# Every sigma-alert job runs in GitHub Actions and clones `master`; the exporter used
+# whatever branch the sibling checkout happened to be on, so a clone parked on a
+# feature branch was rebased onto that branch, pushed there, and reported `pushed` and
+# `sp500 changed` while `origin/master:sources/sp500.txt` never moved. Same reasoning
+# as `index_mirrors.Mirror.ci_branch`, which declares it for the read side.
+PUBLISH_BRANCH = "master"
+
 EXPORT_COMMIT_MESSAGE = "Sync ticker metadata + position lists from Coverage Manager"
 EXPORT_COMMIT_MARKER = "CM-Sigma-Export: v1"
 # ⛑ ONE AUTHORITY FOR THE BAND. These used to be a second copy of the numbers the
@@ -300,7 +308,12 @@ def _mirror_updated(text):
 
     for ln in text.splitlines():
         if ln.startswith(_SP500_UPDATED_PREFIX):
-            raw = ln[len(_SP500_UPDATED_PREFIX):].strip()[:10]
+            # ⛑ THE WHOLE VALUE, NOT ITS FIRST TEN CHARACTERS. Slicing first made an
+            # annotated header parse as its PREFIX -- `2026-09-01 (corrected
+            # 2026-09-30)` read as 2026-09-01, so a snapshot from 2026-09-08 counted
+            # as strictly newer and overwrote the public mirror with the OLDER basket.
+            # Trailing content means we do not know what the file is dated.
+            raw = ln[len(_SP500_UPDATED_PREFIX):].strip()
             try:
                 return _dt.strptime(raw, "%Y-%m-%d").date().isoformat()
             except ValueError:
@@ -503,9 +516,20 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
     # 2026-04-29 core_watchlist drift.
     branch = None
     if push:
-        branch, rc = _git(target_dir, "rev-parse", "--abbrev-ref", "HEAD")
+        active, rc = _git(target_dir, "rev-parse", "--abbrev-ref", "HEAD")
         if rc != 0:
             return {"status": "failed", "reason": "could not determine current branch in sigma-alert clone"}
+        active = active.strip()
+        # ⛑ REFUSE, DO NOT CHECK OUT. A checkout would move someone else's work out
+        # from under them in a repo this lane does not own; naming the branch costs one
+        # command from the operator and cannot lose anything.
+        if active != PUBLISH_BRANCH:
+            return {"status": "failed",
+                    "reason": f"the sigma-alert clone is on branch {active!r}, not the "
+                              f"publishing branch {PUBLISH_BRANCH!r} that its GitHub "
+                              f"Actions clone - refusing to publish sideways "
+                              f"(git -C <clone> checkout {PUBLISH_BRANCH})"}
+        branch = PUBLISH_BRANCH
         _, rc = _git(target_dir, "fetch", "origin", branch)
         if rc != 0:
             return {"status": "failed", "reason": f"git fetch origin {branch} failed in sigma-alert clone"}
@@ -595,7 +619,7 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
                            reason=_foreign_commit_reason(foreign, branch))
         if not ours:
             return _result(status="unchanged")
-        _, rc = _git(target_dir, "push", "origin", "HEAD")
+        _, rc = _git(target_dir, "push", "origin", f"HEAD:refs/heads/{branch}")
         if rc != 0:
             return _result(status="committed_not_pushed",
                            reason=f"{len(ours)} commit(s) from an earlier run are still "
@@ -641,7 +665,9 @@ def export_and_push(csv_path, target_dir=SIGMA_ALERT_DIR, push=True, today=None)
     if not push:
         return _result(status="committed")
 
-    _, rc = _git(target_dir, "push", "origin", "HEAD")
+    # An EXPLICIT refspec: the destination is then a fact, not a consequence of which
+    # branch this checkout happens to have active.
+    _, rc = _git(target_dir, "push", "origin", f"HEAD:refs/heads/{branch}")
     if rc != 0:
         return _result(
             status="committed_not_pushed",

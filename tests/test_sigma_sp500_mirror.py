@@ -354,3 +354,26 @@ def test_a_malformed_last_updated_value_is_refused_like_a_missing_one(tmp_path, 
     assert res["status"] == "refused"
     assert "Last updated" in res["reason"]
     assert res["files"] == {}
+
+
+@pytest.mark.parametrize("stamp", [
+    "2026-09-01 (corrected 2026-09-30)",
+    "2026-09-01T00:00:00",
+    "2026-09-01 by hand",
+])
+def test_a_last_updated_value_with_TRAILING_CONTENT_is_undatable(tmp_path, stamp):
+    """The parser sliced to ten characters first, so an annotated header parsed as its
+    PREFIX: `2026-09-01 (corrected 2026-09-30)` read as 2026-09-01, and a snapshot from
+    2026-09-08 counted as strictly newer and overwrote the public mirror with the older
+    basket. Round 5 required the value to parse; it must parse WHOLE."""
+    tickers = _tickers()
+    _seed(tmp_path, tickers, updated="2026-09-18")
+    txt_path = tmp_path / "sources" / "sp500.txt"
+    txt_path.write_text(txt_path.read_text(encoding="utf-8").replace(
+        "# Last updated: 2026-09-18", f"# Last updated: {stamp}"), encoding="utf-8")
+
+    res = se.build_sp500_mirror(tmp_path, today=TODAY,
+                                doc=_doc(tickers[:-1] + ["NEWCO"], as_of="2026-09-08"))
+    assert res["status"] == "refused"
+    assert "Last updated" in res["reason"]
+    assert res["files"] == {}

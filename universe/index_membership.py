@@ -395,6 +395,17 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
     # from the one the code uses is not a validator.
     rows_iter = csv.reader(io.StringIO("\n".join(lines[header_idx:])))
     header = [h.strip() for h in next(rows_iter)]
+    # ⛑ `dict(zip(...))` KEEPS THE LAST VALUE FOR A REPEATED NAME. A second, blank
+    # `Exchange` column therefore passed the required-column check AND the row-width
+    # check while blanking "NO MARKET (E.G. UNLISTED)" for every row: HOLX survived and
+    # a 504-row basket cleared the count band and the join floor. Which column wins is
+    # not a judgement this parser can make, so a duplicate name is refused.
+    dupes = sorted({h for h in header if header.count(h) > 1})
+    if dupes:
+        raise IndexMembershipError(
+            f"holdings header names the same column twice ({', '.join(dupes)}) — "
+            f"a duplicate silently overwrites the first value, so the filters would "
+            f"read whichever copy came last")
     missing = [c for c in REQUIRED_COLUMNS if c not in header]
     if missing:
         raise IndexMembershipError(

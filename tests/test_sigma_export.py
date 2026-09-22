@@ -404,3 +404,48 @@ def test_a_foreign_commit_is_refused_BEFORE_the_rebase_rewrites_it(
     assert res["status"] == "failed" and "WIP: do not ship" in res["reason"]
     after, _ = sigma_export._git(repo, "rev-parse", "HEAD")
     assert after.strip() == before.strip(), "the foreign commit was rewritten anyway"
+
+
+def test_a_clone_parked_on_a_FEATURE_BRANCH_is_refused_not_published_sideways(
+        monkeypatch, tmp_path, fixture_csv):
+    """Publication followed whatever branch the sibling checkout happened to be on,
+    while every sigma-alert job clones origin/master: parked on a feature branch the
+    exporter rebased, pushed HEAD, reported `pushed`, and origin/master:sources/sp500.txt
+    never moved. The lane must name the active branch and stop."""
+    _positions_stub(monkeypatch, tmp_path)
+    repo, bare = _real_clone(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "wip"],
+                   check=True, capture_output=True)
+
+    res = export_and_push(fixture_csv, target_dir=repo, push=True)
+    assert res["status"] == "failed", res
+    assert "wip" in res["reason"] and sigma_export.PUBLISH_BRANCH in res["reason"]
+    assert not (repo / "ticker_metadata.json").exists()   # nothing written either
+    assert subprocess.run(["git", "-C", str(bare), "show", "master:ticker_metadata.json"],
+                          capture_output=True).returncode != 0
+
+
+def test_the_push_names_the_publishing_branch_not_HEAD(monkeypatch, tmp_path, fixture_csv):
+    """An explicit refspec is what makes the destination a fact rather than a
+    consequence of the local checkout."""
+    _positions_stub(monkeypatch, tmp_path)
+    repo, bare = _real_clone(tmp_path)
+
+    seen = []
+    real_git = sigma_export._git
+
+    def spy(cwd, *args):
+        seen.append(args)
+        return real_git(cwd, *args)
+
+    monkeypatch.setattr(sigma_export, "_git", spy)
+    assert export_and_push(fixture_csv, target_dir=repo, push=True)["status"] == "pushed"
+
+    pushes = [a for a in seen if a and a[0] == "push"]
+    assert pushes, seen
+    assert all("HEAD" not in " ".join(a) or ":" in " ".join(a) for a in pushes), pushes
+    assert any(sigma_export.PUBLISH_BRANCH in " ".join(a) for a in pushes), pushes
+    head, _ = real_git(repo, "rev-parse", "HEAD")
+    remote = subprocess.run(["git", "-C", str(bare), "rev-parse", "master"],
+                            capture_output=True, text=True).stdout
+    assert head.strip() == remote.strip()
