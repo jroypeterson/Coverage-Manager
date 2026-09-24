@@ -1136,13 +1136,17 @@ def newest_usable_dated(key: str, today: date | None = None) -> dict | None:
         m = _DATED_NAME.match(p.name)
         if m and m["key"] == key:
             dated.append((m["d"], p))
-    for as_of, p in sorted(dated, reverse=True):
-        if is_future_as_of(as_of, today) or not _dated_is_usable(p, key, as_of):
+    # Dates come from the base-name regex AND from revisions, so a date whose base is
+    # corrupt but whose revision is good is still found (Codex round 15).
+    rev_name = re.compile(rf"^{re.escape(key)}_(\d{{4}}-\d{{2}}-\d{{2}})_rev\d+\.json$")
+    dates = {d for d, _ in dated}
+    dates |= {m[1] for p in OUT_DIR.glob(f"{key}_*_rev*.json") if (m := rev_name.match(p.name))}
+    for as_of in sorted(dates, reverse=True):
+        if is_future_as_of(as_of, today):
             continue
-        try:
-            return json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):       # pragma: no cover - just validated
-            continue
+        versions, _ = date_versions(key, as_of)
+        if versions:
+            return versions[-1][2]
     return None
 
 
@@ -1176,54 +1180,66 @@ def _ticker_set(doc: dict) -> frozenset:
     return frozenset(h.get("ticker") for h in doc.get("holdings") or [])
 
 
-def _write_revision_if_new(key: str, as_of: str, base: Path, doc: dict) -> Path | None:
-    """Record a same-as_of republish whose MEMBERSHIP differs from every version on file.
+def date_versions(key: str, as_of: str) -> tuple[list[tuple[int, Path, dict]], int]:
+    """Every USABLE version of one date, oldest first, and the highest number in use.
+
+    Version 1 is the base file `<key>_<as_of>.json`; N >= 2 is `<key>_<as_of>_rev<N>.json`.
+    ⛑ ONE DEFINITION FOR EVERY READER (Codex round 15). The revision writer, the recovery
+    scan and the week-over-week reconciliation each looked at a different subset — the
+    writer at all versions, the other two at the base only — so a correction the archive
+    held was invisible to both of the things that read it back. A corrupt version is
+    skipped but still RESERVES its number, so a new revision can never overwrite it.
+    """
+    pat = re.compile(rf"^{re.escape(key)}_{re.escape(as_of)}(?:_rev(\d+))?\.json$")
+    found, highest = [], 0
+    if not OUT_DIR.exists():
+        return found, highest
+    for p in OUT_DIR.glob(f"{key}_{as_of}*.json"):
+        m = pat.match(p.name)
+        if not m:
+            continue
+        n = int(m[1]) if m[1] else 1
+        highest = max(highest, n)
+        if not _dated_is_usable(p, key, as_of):
+            continue
+        try:
+            found.append((n, p, json.loads(p.read_text(encoding="utf-8"))))
+        except (OSError, ValueError):       # pragma: no cover - just validated
+            continue
+    return sorted(found, key=lambda v: v[0]), highest
+
+
+def _write_revision_if_new(key: str, as_of: str, doc: dict) -> Path | None:
+    """Record a same-as_of republish whose MEMBERSHIP differs from the latest version.
 
     ⛑ THE BASE FILE STAYS THE FIRST OBSERVATION AND IS NEVER REWRITTEN; A CORRECTION IS
     ADDED BESIDE IT (Codex round 14, Fable ruling 2026-09-24). A fund can republish the
     same as_of with different members. Only `latest` took the new basket, so when the
-    vendor moved to the next date the corrected version had never entered history — and
-    how often this happens could not even be measured, because the only evidence was
-    overwritten. `<key>_<as_of>_rev<N>.json` (the base is implicitly rev 1) carries the
-    full snapshot plus `revision`, `supersedes` and the `added`/`removed` diff against
-    the previous version, which is what a reader reconstructing membership needs.
+    vendor moved to the next date the corrected version had never entered history.
+    `<key>_<as_of>_rev<N>.json` carries the full snapshot plus `revision`, `supersedes`
+    and the `added`/`removed` diff against the version it supersedes.
 
-    Written only when the ticker SET differs from the base AND from every existing
-    revision — a fund republishing its corrected basket for five days must not write
-    rev2..rev6. Weight-only changes are not revisions: membership is what is archived.
-    Readers of dated files skip these by construction: `_DATED_NAME` requires `.json`
-    right after the date, and `index_reconciliation._snapshots` requires a 10-char stamp.
+    ⛑ COMPARED WITH THE MOST RECENT VERSION ONLY (Codex round 15). Deduplicating against
+    every version meant A -> B -> A wrote no third file, so the archive ended on B while
+    the fund's final word for that date was A. A repeat of the latest version is the
+    only non-event. Weight-only changes are not revisions: membership is what is archived.
     """
-    try:
-        versions = [(1, base, json.loads(base.read_text(encoding="utf-8")))]
-    except (OSError, ValueError):            # pragma: no cover - base just validated
-        return None
-    pat = re.compile(rf"^{re.escape(key)}_{re.escape(as_of)}_rev(\d+)\.json$")
-    highest = 1
-    for p in OUT_DIR.glob(f"{key}_{as_of}_rev*.json"):
-        m = pat.match(p.name)
-        if not m:
-            continue
-        n = int(m[1])
-        highest = max(highest, n)            # a corrupt revision still reserves its number
-        if _snapshot_is_usable(p, key):
-            try:
-                versions.append((n, p, json.loads(p.read_text(encoding="utf-8"))))
-            except (OSError, ValueError):    # pragma: no cover
-                pass
+    versions, highest = date_versions(key, as_of)
     new = _ticker_set(doc)
-    if any(_ticker_set(v) == new for _, _, v in versions):
+    if versions and _ticker_set(versions[-1][2]) == new:
         return None
-    _, prev_path, prev = max(versions, key=lambda v: v[0])
-    before = _ticker_set(prev)
-    n = highest + 1
-    rev_doc = dict(doc, revision=n, supersedes=prev_path.name,
+    n = max(highest, 1) + 1
+    if versions:
+        prev_name, before = versions[-1][1].name, _ticker_set(versions[-1][2])
+    else:                                   # every version on file is unusable
+        prev_name, before = None, frozenset()
+    rev_doc = dict(doc, revision=n, supersedes=prev_name,
                    added=sorted(new - before), removed=sorted(before - new))
     path = _revision_path(key, as_of, n)
     write_snapshot(path, rev_doc)
     log.warning("index_membership[%s]: as_of %s republished with different membership "
-                "(+%d/-%d) — archived as revision %d beside the original",
-                key, as_of, len(rev_doc["added"]), len(rev_doc["removed"]), n)
+                "(+%d/-%d) — archived as revision %d", key, as_of,
+                len(rev_doc["added"]), len(rev_doc["removed"]), n)
     return path
 
 
@@ -1239,6 +1255,47 @@ def _sync_latest_with_archive(key: str, today: date) -> None:
         return
     if latest is None or snapshot_problem(key, latest) or _newer(latest, dated) is dated:
         _repair_latest(key, dated, latest)
+
+
+def _fetch_state_path(key: str) -> Path:
+    return OUT_DIR / f"{key}_fetch_state.json"
+
+
+def _record_fetch(key: str, fetched_at: str) -> None:
+    """Best-effort: the snapshot has already landed; a lost clock only risks a false gap."""
+    try:
+        write_snapshot(_fetch_state_path(key), {"key": key, "last_ok_fetch": fetched_at})
+    except Exception as e:                    # noqa: BLE001
+        log.error("index_membership[%s]: could not record the fetch time: %s", key, e)
+
+
+def last_ok_fetch(key: str, doc: dict | None) -> str | None:
+    """The most recent successful fetch we can prove: the fetch-state file or the doc.
+
+    ⛑ A SNAPSHOT'S `fetched_at` IS WHEN THAT SNAPSHOT WAS FIRST FETCHED (Codex round 15).
+    The archive keeps a date's first fetch time; later successful fetches of the same
+    date only refreshed `latest`. So a `latest` restored from the archive carried a
+    weeks-old time and reported an archive gap the day after a successful fetch. The
+    clock is now its own small file, and the newer of the two readings wins.
+    """
+    stamps = [(doc or {}).get("fetched_at")]
+    try:
+        stamps.append(json.loads(_fetch_state_path(key).read_text(encoding="utf-8"))
+                      .get("last_ok_fetch"))
+    except (OSError, ValueError, AttributeError):
+        pass
+    parsed = []
+    for s in stamps:
+        try:
+            parsed.append((datetime.fromisoformat(s), s))
+        except (TypeError, ValueError):
+            continue
+    if not parsed:
+        return None
+    try:
+        return max(parsed)[1]
+    except TypeError:                         # naive vs aware: compare as dates
+        return max(parsed, key=lambda x: x[0].date())[1]
 
 
 def days_since_fetch(doc: dict | None, today: date) -> int | None:
@@ -1319,7 +1376,7 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
                     "count": cached.get("count"), "age_days": age, "error": msg,
                     "written": None}
         unfit = age is None or age > stale_days_for(key)
-        since = days_since_fetch(cached, today)
+        since = days_since_fetch({"fetched_at": last_ok_fetch(key, cached)}, today)
         gap = not unfit and (since if since is not None else age) > archive_gap_days_for(key)
         log.warning("index_membership[%s]: refresh failed (%s); serving cached "
                     "snapshot as_of=%s age=%sd%s",
@@ -1424,14 +1481,20 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # skipping it on `exists()` alone left the only snapshot for that date corrupt for
     # ever. So: rewrite exactly when the file cannot be read back as this snapshot.
     written = None
-    if not _dated_is_usable(dated, key, as_of):
+    # ⛑ A corrupt base is rewritten only while NOTHING else describes that date. Once a
+    # revision exists, its `supersedes` and diff are claims about the base; rewriting the
+    # base under them made the chain false (Codex round 15). The new basket goes on the
+    # end of the chain instead, and the corrupt base stays as the evidence it is.
+    _, highest = date_versions(key, as_of)
+    if not _dated_is_usable(dated, key, as_of) and highest <= 1:
         write_snapshot(dated, doc)
         written = str(dated)
     else:
-        rev = _write_revision_if_new(key, as_of, dated, doc)
+        rev = _write_revision_if_new(key, as_of, doc)
         if rev is not None:
             written = str(rev)
     write_snapshot(_latest_path(key), doc)
+    _record_fetch(key, doc["fetched_at"])
 
     return {"key": key, "status": "ok", "as_of": as_of, "count": len(rows),
             "age_days": snapshot_age_days(doc, today), "error": None,

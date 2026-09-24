@@ -163,8 +163,10 @@ def test_revision_files_are_never_read_as_a_new_date(out_dir, monkeypatch):
     assert (out_dir / "eafe_2026-09-04_rev2.json").exists()
 
     monkeypatch.setattr(rec, "MEMBERSHIP_DIR", out_dir)
+    # One DATE, not two -- and since round 15 the date is represented by its newest
+    # version, the corrected basket.
     assert [s for s, _ in rec._snapshots("eafe")] == ["2026-09-04"]
-    assert im.newest_usable_dated("eafe", date(2026, 9, 5))["count"] == 500
+    assert im.newest_usable_dated("eafe", date(2026, 9, 5))["count"] == 501
 
 
 def test_a_short_list_is_refused_not_written(out_dir, monkeypatch):
@@ -1751,6 +1753,10 @@ def _set_fetched_at(out_dir, key, when):
     doc = json.loads(p.read_text(encoding="utf-8"))
     doc["fetched_at"] = when
     p.write_text(json.dumps(doc), encoding="utf-8")
+    # The fetch clock has its own file since round 15; move both, or the test measures
+    # the real wall clock instead of the scenario.
+    (out_dir / f"{key}_fetch_state.json").write_text(
+        json.dumps({"key": key, "last_ok_fetch": when}), encoding="utf-8")
 
 
 def test_a_failed_fetch_past_the_archive_window_is_a_gap_not_a_quiet_stale(
@@ -1798,3 +1804,86 @@ def test_the_weekly_step_fails_on_an_archive_gap(out_dir, monkeypatch):
                                   "error": "x", "written": None}])
     with pytest.raises(RuntimeError, match="stale_archive_gap"):
         weekly_universe._step_index_membership()
+
+
+# --- Codex round 15 (2026-09-24, board #442): defects inside round 14's fixes ----
+
+def _csv_members(tickers, day="Sep 04, 2026"):
+    each = round(100.0 / len(tickers), 4)
+    rows = "".join(f'"{t}","CO {t}","Health Care","Equity","1,000.00","{each}","1,000.00",'
+                   f'"10.00","100.00","Japan","Tokyo","USD","1.0","JPY","-"\n' for t in tickers)
+    return (REAL_PREAMBLE.replace('"Sep 04, 2026"', f'"{day}"') + HEADER + rows)
+
+
+_A = [f"T{i}" for i in range(500)]
+_B = _A + ["T500"]
+
+
+def test_a_basket_that_reverts_is_recorded_as_the_latest_revision(out_dir, monkeypatch):
+    """R15-1. A -> B -> A on one as_of. Deduplicating against EVERY version skipped the
+    return to A, so the archive ended on B although the final observation was A. Only a
+    repeat of the MOST RECENT version is a non-event."""
+    for basket in (_A, _B, _A):
+        _serve(monkeypatch, _csv_members(basket))
+        im.refresh("eafe", today=date(2026, 9, 5))
+    rev3 = out_dir / "eafe_2026-09-04_rev3.json"
+    assert rev3.exists()
+    doc = json.loads(rev3.read_text(encoding="utf-8"))
+    assert doc["supersedes"] == "eafe_2026-09-04_rev2.json" and doc["removed"] == ["T500"]
+
+
+def test_recovery_and_reconciliation_use_the_newest_revision_of_a_date(out_dir, monkeypatch):
+    """R15-2. Revisions were invisible to the two readers of dated files, so a lost
+    `latest` was restored to the superseded base, and reconciliation compared it too."""
+    from universe import index_reconciliation as rec
+
+    _serve(monkeypatch, _csv_members(_A))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    _serve(monkeypatch, _csv_members(_B))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    (out_dir / "eafe_latest.json").unlink()
+
+    _fail(monkeypatch)
+    r = im.refresh("eafe", today=date(2026, 9, 6))
+    assert r["count"] == 501
+    monkeypatch.setattr(rec, "MEMBERSHIP_DIR", out_dir)
+    [(stamp, path)] = rec._snapshots("eafe")
+    assert stamp == "2026-09-04" and path.name == "eafe_2026-09-04_rev2.json"
+
+
+def test_a_corrupt_base_with_revisions_is_not_rewritten_under_them(out_dir, monkeypatch):
+    """R15-3. Rewriting an unusable base while revisions exist made rev2's `supersedes`
+    and diff describe a base that no longer holds what they say. The new basket goes on
+    the END of the chain; the corrupt base is left as the evidence it is."""
+    _serve(monkeypatch, _csv_members(_A))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    _serve(monkeypatch, _csv_members(_B))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    base = out_dir / "eafe_2026-09-04.json"
+    base.write_text("{truncated", encoding="utf-8")
+
+    _serve(monkeypatch, _csv_members(_A[:-1] + ["T777"]))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    assert base.read_text(encoding="utf-8") == "{truncated"
+    doc = json.loads((out_dir / "eafe_2026-09-04_rev3.json").read_text(encoding="utf-8"))
+    assert doc["supersedes"] == "eafe_2026-09-04_rev2.json"
+
+
+def test_restoring_latest_from_the_archive_does_not_rewind_the_fetch_clock(out_dir, monkeypatch):
+    """R15-4. The archive keeps the FIRST fetch time of a date; later successful fetches
+    of the same date only refreshed `latest`. Restoring a lost `latest` from the archive
+    rewound the clock and reported a gap the day after a successful fetch."""
+    monkeypatch.setattr(im, "collect", _vanguard_collect())
+    im.refresh("r1000", today=date(2026, 8, 1))
+    dated = out_dir / "r1000_2026-07-31.json"
+    doc = json.loads(dated.read_text(encoding="utf-8"))
+    doc["fetched_at"] = "2026-08-01T09:00:00-04:00"            # first observed Aug 1
+    dated.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+    im.refresh("r1000", today=date(2026, 9, 24))              # a successful fetch, Sep 24
+    (out_dir / "r1000_latest.json").unlink()
+
+    def _down(key):
+        raise im.IndexMembershipError("transient")
+    monkeypatch.setattr(im, "collect", _down)
+    r = im.refresh("r1000", today=date(2026, 9, 25))
+    assert r["status"] == "stale", "a fetch succeeded yesterday; this is not an archive gap"

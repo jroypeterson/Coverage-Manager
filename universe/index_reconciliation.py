@@ -92,14 +92,24 @@ def _snapshots(key: str) -> list[tuple[str, Path]]:
     `<key>_latest.json` is deliberately skipped: it is a copy of the newest dated
     file, and counting it would make the newest snapshot its own predecessor and
     report every week as "no change".
+
+    One entry per DATE: when a date carries revisions (`<key>_<date>_rev<N>.json`, a
+    same-date republish with different members), the highest revision stands for it —
+    comparing the superseded base published the version the fund itself corrected
+    (Codex round 15). Anything else (`latest`, `fetch_state`, a Dropbox conflicted copy)
+    is not a dated snapshot and is skipped.
     """
-    out = []
+    import re
+    pat = re.compile(rf"^{re.escape(key)}_(\d{{4}}-\d{{2}}-\d{{2}})(?:_rev(\d+))?\.json$")
+    best: dict[str, tuple[int, Path]] = {}
     for p in MEMBERSHIP_DIR.glob(f"{key}_*.json"):
-        stamp = p.stem[len(key) + 1:]
-        if stamp == "latest" or len(stamp) != 10:
+        m = pat.match(p.name)
+        if not m:
             continue
-        out.append((stamp, p))
-    return sorted(out, reverse=True)
+        n = int(m[2]) if m[2] else 1
+        if m[1] not in best or n > best[m[1]][0]:
+            best[m[1]] = (n, p)
+    return sorted(((d, p) for d, (_, p) in best.items()), reverse=True)
 
 
 def _members(path: Path) -> set[str]:
