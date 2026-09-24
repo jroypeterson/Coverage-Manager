@@ -182,18 +182,49 @@ SP500_CACHE = config.CACHE_DIR / "constituents" / "sp500.json"
 # `floor` is a REFUSAL, not a warning: a short list means the source changed shape, and
 # half an index is worse than none because it looks usable.
 SOURCES: dict[str, dict] = {
-    "eafe":  {"kind": "ishares",  "pid": "239623", "floor": 400,
+    "eafe":  {"kind": "ishares",  "pid": "239623", "etf": "EFA", "floor": 400,
               "index": "MSCI EAFE", "fund": "iShares MSCI EAFE ETF (EFA)"},
+    # ⛑ RUSSELL MOVED FROM VANGUARD TO iSHARES ON 2026-09-24 (JP; Fable-gated). Measured
+    # that day: VTWO served pages from two different month-ends in one response and a
+    # VTHR holding had no ticker, so both lanes refused every fetch and every consumer
+    # had held 2026-07-31 membership for eight weeks. iShares IWB/IWM publish DAILY
+    # through the same path as EFA and IVV: IWB 1,022 and IWM 1,976 listed equities as
+    # of 2026-09-23, overlap 0.
+    "r1000": {"kind": "ishares", "pid": "239707", "etf": "IWB", "floor": 800,
+              "post": "russell_ishares",
+              "index": "Russell 1000", "fund": "iShares Russell 1000 ETF (IWB)"},
+    "r2000": {"kind": "ishares", "pid": "239710", "etf": "IWM", "floor": 1500,
+              "post": "russell_ishares",
+              "index": "Russell 2000", "fund": "iShares Russell 2000 ETF (IWM)"},
+    # ⛑ DERIVED, NOT IWV. The Russell 3000 IS the Russell 1000 plus the Russell 2000,
+    # and iShares' own Russell 3000 fund (IWV) is SAMPLED: 2,598 names against ~2,966,
+    # dropping ~370 micro-caps. Built by `refresh_all` from the r1000 and r2000 results
+    # of the SAME run, never from `latest` files (two stale caches would agree on a date
+    # trivially). Carries no weights: fund weights are fund-relative, so two funds'
+    # would sum to ~200%, and no consumer reads a Russell weight (measured).
+    "r3000": {"kind": "derived", "from": ("r1000", "r2000"), "etf": "IWB+IWM",
+              "floor": 2400, "index": "Russell 3000",
+              "fund": "derived: iShares IWB + IWM holdings"},
+    # `post` names an S&P-500-only row transform (see `_POST`). Rollback: kind
+    # "cm_cache" with no pid/post restores the Wikipedia-scrape source exactly.
+    "sp500": {"kind": "ishares", "pid": "239726", "etf": "IVV", "floor": 450,
+              "post": "sp500_ivv",
+              "index": "S&P 500", "fund": "iShares Core S&P 500 ETF (IVV)"},
+}
+
+# ⛑ ROLLBACK TO VANGUARD IS NOT A ONE-LINE CHANGE, and that is stated here rather than
+# discovered during an incident. Swap these rows back into SOURCES and the Vanguard
+# as_of (month-end, published weeks late) is OLDER than the iShares dated files already
+# on disk: `refresh` refuses it as `source_older`, and `_sync_latest_with_archive`
+# repoints `latest` at the iShares file every run. The rollback cannot write until
+# Vanguard's as_of passes the last iShares date - typically 4-8 weeks.
+ROLLBACK_SOURCES: dict[str, dict] = {
     "r1000": {"kind": "vanguard", "etf": "VONE", "floor": 800,
               "index": "Russell 1000", "fund": "Vanguard Russell 1000 ETF (VONE)"},
     "r2000": {"kind": "vanguard", "etf": "VTWO", "floor": 1500,
               "index": "Russell 2000", "fund": "Vanguard Russell 2000 ETF (VTWO)"},
     "r3000": {"kind": "vanguard", "etf": "VTHR", "floor": 2400,
               "index": "Russell 3000", "fund": "Vanguard Russell 3000 ETF (VTHR)"},
-    # `post` names an S&P-500-only row transform (see `_POST`). Rollback: kind
-    # "cm_cache" with no pid/post restores the Wikipedia-scrape source exactly.
-    "sp500": {"kind": "ishares", "pid": "239726", "floor": 450, "post": "sp500_ivv",
-              "index": "S&P 500", "fund": "iShares Core S&P 500 ETF (IVV)"},
 }
 
 # Per-source caveats, written into every snapshot rather than left in this docstring —
@@ -222,7 +253,27 @@ CAVEATS: dict[str, list[str]] = {
 # nothing else) would keep stamping every snapshot "full-replication IVV holdings,
 # fund-stated date" onto a Wikipedia scrape, and the archive would be permanently
 # mislabelled with no error anywhere. The per-kind table below is the fallback.
+_RUSSELL_ISHARES = [
+    "iShares holdings - a full-replication fund, not FTSE Russell's constituent list "
+    "(FTSE sells membership; this is the closest free proxy). `as_of` is the fund's "
+    "stated holdings date (`source`).",
+    "Non-equity lines and residual lines on 'NO MARKET (E.G. UNLISTED)' (CVRs, vesting "
+    "rights, post-deal stubs) are dropped and listed under `excluded`.",
+    "Share classes normalised to the dash form (`BRK B` -> BRK-B).",
+    "The Russell includes a few non-US-domiciled US-listed companies; `location` says which.",
+]
 CAVEATS_BY_KEY: dict[tuple[str, str], list[str]] = {
+    ("r1000", "ishares"): _RUSSELL_ISHARES,
+    ("r2000", "ishares"): _RUSSELL_ISHARES,
+    ("r3000", "derived"): [
+        "DERIVED: the union of the r1000 (IWB) and r2000 (IWM) snapshots of the same run "
+        "- the Russell 3000 is by definition the two combined. iShares' own Russell 3000 "
+        "fund (IWV) is sampled and is deliberately not used.",
+        "`weight_pct` is None on every holding: the two funds' weights are relative to "
+        "different funds and cannot be combined without inventing an index weight.",
+        "`derived_from` names the inputs and their as_of; `overlap` counts names held by "
+        "both (reconstitution weeks).",
+    ],
     ("sp500", "ishares"): [
         "iShares Core S&P 500 ETF (IVV) holdings - a full-replication fund, not S&P's own "
         "constituent file. `as_of` is the fund's stated holdings date (`source`).",
@@ -364,7 +415,18 @@ def _fetch_csv(pid: str, timeout: int = 60) -> str:
         raise IndexMembershipError(f"fetch failed for product {pid}: {e}") from e
 
 
+# Residual lines on the no-market venue may carry up to this much of the fund in total.
+# Above it they are not residue: the basket would not describe the index.
+MAX_EXCLUDED_WEIGHT_PCT = 0.25
+
+
 def parse_holdings(text: str) -> tuple[str, list[dict]]:
+    """`(as_of, rows)`; see `parse_holdings_ex` for the lines it drops."""
+    as_of, rows, _ = parse_holdings_ex(text)
+    return as_of, rows
+
+
+def parse_holdings_ex(text: str) -> tuple[str, list[dict], list[dict]]:
     """`(as_of_iso, rows)` from an iShares latest-holdings CSV.
 
     ⛑ RAISES on the HTML app shell. `text/csv` in the response header is not evidence
@@ -462,7 +524,7 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             "no parsable 'Fund Holdings as of' date — refusing to stamp a snapshot with "
             "today's date instead")
 
-    rows = []
+    rows, excluded = [], []
     for raw in rows_iter:
         if not any(f.strip() for f in raw):
             continue                      # a blank line is not a truncated record
@@ -491,6 +553,19 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             continue
         if asset_class != "Equity":
             continue                      # cash, futures and collateral carry `-`
+        # ⛑ A NO-MARKET LINE IS DROPPED BEFORE THE TICKER CHECK, AND LISTED (Fable,
+        # 2026-09-24). IWM and IWV carry `ARCELLX INC CVR` and two `OMNIAB ... VESTING
+        # Prvt` lines: Equity, no ticker, 0.00% weight, venue NO MARKET — contingent
+        # value and vesting rights, not constituents. The blank-ticker guard below fired
+        # on them first and took both lanes down. The exclusion lived only in the S&P
+        # transform, so EFA had none at all; it is ONE rule here now. It keys on the
+        # venue alone — not "and weight 0", because a residual at 0.01% would then raise
+        # and a take-private stub would become the outage. The summed weight is capped
+        # instead, so a basket that is mostly "no market" is still refused.
+        if cell(r, "Exchange").upper() == UNLISTED_EXCHANGE:
+            excluded.append({"ticker": t, "name": cell(r, "Name"),
+                             "weight_pct": _num(cell(r, "Weight (%)"))})
+            continue
         # ⛑ AN EQUITY ROW WITH NO SYMBOL IS NOT A ROW TO DROP. Dropping it removed the
         # holding before any downstream guard could see it: an otherwise complete file
         # with AAPL's ticker blank yields a 502-member basket that clears the count
@@ -523,7 +598,13 @@ def parse_holdings(text: str) -> tuple[str, list[dict]]:
             "market_currency": cell(r, "Market Currency"),
             "market_value_usd": _num(cell(r, "Market Value")),
         })
-    return as_of, rows
+    dropped = round(sum(e["weight_pct"] or 0.0 for e in excluded), 4)
+    if dropped > MAX_EXCLUDED_WEIGHT_PCT:
+        raise IndexMembershipError(
+            f"{len(excluded)} no-market line(s) carry {dropped}% of the fund (cap "
+            f"{MAX_EXCLUDED_WEIGHT_PCT}%) — that is not residue; the basket would not "
+            f"describe the index")
+    return as_of, rows, excluded
 
 
 def normalise_share_class(ticker: str) -> str:
@@ -594,6 +675,22 @@ SP500_MIN_JOIN_RATE = 0.90
 IVV_SECTOR_TO_GICS = {"Communication": "Communication Services"}
 
 
+def _russell_ishares_rows(rows: list[dict]) -> list[dict]:
+    """IWB/IWM equity rows -> Russell membership rows: dash share classes, and refuse
+    two lines that normalise to one ticker. No Wikipedia join: that cache is S&P-only,
+    and its join floor would refuse every Russell basket."""
+    out, seen = [], {}
+    for r in rows:
+        t = normalise_us_ticker(r["ticker"])
+        if t in seen:
+            raise IndexMembershipError(
+                f"lines {seen[t]!r} and {r['ticker']!r} both normalise to {t} - "
+                f"refusing to guess which is the constituent")
+        seen[t] = r["ticker"]
+        out.append({**r, "ticker": t})
+    return out
+
+
 def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
     """IVV equity rows -> S&P 500 membership rows. See the docstring's IVV section.
 
@@ -603,8 +700,6 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
     _, info = _read_cm_sp500()
     out, seen = [], {}
     for r in rows:
-        if (r.get("exchange") or "").strip().upper() in (UNLISTED_EXCHANGE, ""):
-            continue
         t = normalise_us_ticker(r["ticker"])
         if t in seen:
             raise IndexMembershipError(
@@ -645,7 +740,7 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-_POST = {"sp500_ivv": _sp500_ivv_rows}
+_POST = {"sp500_ivv": _sp500_ivv_rows, "russell_ishares": _russell_ishares_rows}
 
 
 VANGUARD_READ_ATTEMPTS = 2        # pairs of full reads before giving up
@@ -923,14 +1018,20 @@ def check_sp500_count(key: str, rows: list[dict]) -> list[dict]:
     return rows
 
 
+_EXCLUDED: dict[str, list[dict]] = {}
+
+
 def collect(key: str) -> tuple[str, str, list[dict]]:
     """`(as_of, as_of_kind, rows)` for one index. Dispatches on the source kind."""
     src = SOURCES[key]
     kind = src["kind"]
     if kind == "ishares":
-        as_of, rows = parse_holdings(_fetch_csv(src["pid"]))
+        as_of, rows, excluded = parse_holdings_ex(_fetch_csv(src["pid"]))
         if src.get("post"):
             rows = _POST[src["post"]](rows)
+        # `collect` keeps its three-value contract (callers and tests unpack it); the
+        # dropped no-market lines travel beside it for `refresh` to put on the snapshot.
+        _EXCLUDED[key] = excluded
         return as_of, "source", check_sp500_count(key, rows)
     if kind == "vanguard":
         as_of, rows = _fetch_vanguard(src["etf"])
@@ -938,7 +1039,37 @@ def collect(key: str) -> tuple[str, str, list[dict]]:
     if kind == "cm_cache":
         as_of, rows = _load_cm_sp500()
         return as_of, "observed", check_sp500_count(key, rows)
+    if kind == "derived":
+        # Reached only when `refresh_all` could not build it from this run's inputs;
+        # the fallback path then serves the last good derived snapshot, if any.
+        raise IndexMembershipError(
+            f"{key}: derived from {', '.join(src['from'])}, which did not all refresh "
+            f"`ok` in this run - not rebuilding it from older files")
     raise IndexMembershipError(f"unknown source kind {kind!r} for {key!r}")
+
+
+def _derive_union(key: str, inputs: list[dict]) -> tuple[str, str, list[dict], list]:
+    """Union of the input snapshots (just written by this run). Raises on disagreement."""
+    dates = {d["as_of"] for d in inputs}
+    if len(dates) != 1:
+        raise IndexMembershipError(
+            f"{key}: inputs are as of {sorted(dates)} - a union of two different days "
+            f"is not a snapshot of either")
+    seen, rows, overlap = set(), [], 0
+    for d in inputs:
+        for h in d["holdings"]:
+            if h["ticker"] in seen:
+                overlap += 1
+                continue
+            seen.add(h["ticker"])
+            rows.append({**h, "weight_pct": None, "from": d["key"]})
+    if overlap > 0.01 * len(rows):
+        raise IndexMembershipError(
+            f"{key}: {overlap} names are held by more than one input (cap 1% of "
+            f"{len(rows)}) - the funds are not partitioning the index")
+    meta = {"derived_from": [{"key": d["key"], "as_of": d["as_of"]} for d in inputs],
+            "overlap": overlap}
+    return dates.pop(), "source", rows, meta
 
 
 def _source_label(key: str) -> str:
@@ -947,6 +1078,8 @@ def _source_label(key: str) -> str:
         return HOLDINGS_URL.format(pid=src["pid"])
     if src["kind"] == "vanguard":
         return VANGUARD_API.format(etf=src["etf"], start=1, count=VANGUARD_PAGE)
+    if src["kind"] == "derived":
+        return "union of " + " + ".join(src["from"])
     return str(SP500_CACHE)
 
 
@@ -1322,7 +1455,8 @@ def snapshot_age_days(doc: dict | None, today: date | None = None) -> int | None
     return ((today or date.today()) - d).days
 
 
-def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
+def refresh(key: str = "eafe", *, today: date | None = None,
+            collected: tuple | None = None) -> dict:
     """Fetch, validate, and write a dated snapshot. Returns a status dict.
 
     Never raises on a fetch failure when a cached snapshot exists — it falls back and
@@ -1340,7 +1474,10 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     _sync_latest_with_archive(key, today)
 
     try:
-        as_of, as_of_kind, rows = collect(key)
+        _EXCLUDED.pop(key, None)            # never carry a previous run's list forward
+        res = collected if collected is not None else collect(key)
+        as_of, as_of_kind, rows = res[:3]
+        extra = res[3] if len(res) > 3 else _EXCLUDED.pop(key, None)
     except IndexMembershipError as e:
         cached = load_latest(key)            # already synced with the archive above
         age = snapshot_age_days(cached, today)
@@ -1457,8 +1594,15 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         # None, not 0.0, where the source publishes no weights: a zero would read as an
         # index whose constituents carry no weight, which is a claim rather than a gap.
         "equity_weight_pct": round(sum(weighted), 4) if weighted else None,
+        # The fund's own ticker, so a consumer can label the source without a table
+        # of its own (sector_chart_pack hardcoded "VONE" in its banner).
+        "etf": src.get("etf"),
         "holdings": rows,
     }
+    if isinstance(extra, list):                     # ishares: dropped no-market lines
+        doc["excluded"] = extra
+    elif isinstance(extra, dict):                   # derived: provenance
+        doc.update(extra)
 
     dated = _snapshot_path(key, as_of)
     # ⛑ A DATED SNAPSHOT IS WRITTEN ONCE — BUT IMMUTABILITY PROTECTS A GOOD FILE, NOT A
@@ -1497,6 +1641,14 @@ def refresh_all(*, today: date | None = None) -> list[dict]:
     out = []
     for k in SOURCES:
         try:
+            src = SOURCES[k]
+            if src["kind"] == "derived":
+                done = {r["key"]: r for r in out}
+                if all(done.get(i, {}).get("status") == "ok" for i in src["from"]):
+                    inputs = [load_latest(i) for i in src["from"]]   # written this run
+                    out.append(refresh(k, today=today,
+                                       collected=_derive_union(k, inputs)))
+                    continue
             out.append(refresh(k, today=today))
         except Exception as e:                       # noqa: BLE001 - see the docstring
             # ⛑ ANY exception, not only ours. The loop caught `IndexMembershipError`

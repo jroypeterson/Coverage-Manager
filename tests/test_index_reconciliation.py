@@ -182,3 +182,26 @@ def test_the_email_block_is_ascii_because_the_console_prints_it():
              "covered": 436, "covered_tickers": [], "prev_as_of": "2026-06-30",
              "entered": ["AAA"], "left": ["BBB"], "universe_us": 1137}]
     ir.format_email(rows).encode("ascii")
+
+
+def test_a_source_switch_week_is_labelled_not_hidden(tmp_path, monkeypatch):
+    """Fable, 2026-09-24: the Russell move from Vanguard (VONE) to iShares (IWB) puts a
+    source difference and eight weeks of real index changes in one diff. The line must
+    say so, and still print the moves."""
+    import json as _json
+    from universe import index_reconciliation as rec
+
+    d = tmp_path / "idx"
+    d.mkdir()
+    (d / "r1000_2026-07-31.json").write_text(_json.dumps(
+        {"fund": "Vanguard Russell 1000 ETF (VONE)", "holdings": [{"ticker": "AAA"}, {"ticker": "OLD"}]}),
+        encoding="utf-8")
+    (d / "r1000_2026-09-23.json").write_text(_json.dumps(
+        {"etf": "IWB", "holdings": [{"ticker": "AAA"}, {"ticker": "NEW"}]}), encoding="utf-8")
+    monkeypatch.setattr(rec, "MEMBERSHIP_DIR", d)
+    row = rec.reconcile_one("r1000", {"AAA": "x", "OLD": "x", "NEW": "x"})
+    assert row["source_change"] == "VONE->IWB"
+    assert row["entered"] == ["NEW"] and row["left"] == ["OLD"]
+    row["universe_us"] = 3
+    assert "source changed VONE->IWB" in rec.format_email([row])
+    assert "not separable" in rec.format_slack([row])

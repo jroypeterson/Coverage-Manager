@@ -298,7 +298,11 @@ def test_num_returns_a_finite_float_or_nothing(raw, want):
 def test_stale_days_is_per_source_because_the_cadences_differ():
     """A flat 45-day rule would mark the Russell lane unfit on an ordinary week —
     Vanguard publishes month-end holdings and Russell reconstitutes annually."""
-    assert im.stale_days_for("r1000") == 120
+    # Russell moved to iShares (daily) on 2026-09-24, so 120 now belongs only to the
+    # Vanguard rollback rows.
+    assert im.STALE_DAYS_BY_KIND["vanguard"] == 120
+    assert im.ROLLBACK_SOURCES["r1000"]["kind"] == "vanguard"
+    assert im.stale_days_for("r1000") == 45
     assert im.stale_days_for("eafe") == im.STALE_DAYS == 45
     assert im.stale_days_for("sp500") == 45
 
@@ -395,9 +399,11 @@ def test_a_snapshot_states_its_own_staleness_threshold(out_dir, monkeypatch):
 def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypatch):
     """Not one number on every file: the Russell lane's 120 is the whole point."""
     def _collect(key):
-        # sp500 gets a plausible S&P 500 count: the band binds every path now.
+        # sp500 gets a plausible S&P 500 count: the band binds every path now. The two
+        # Russell inputs hold DIFFERENT names, as IWB and IWM do, so r3000 can derive.
         n = 503 if key == "sp500" else 3000
-        return "2026-09-08", "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
+        pre = {"r2000": "S"}.get(key, "T")
+        return "2026-09-08", "source", [{"ticker": f"{pre}{i}", "name": "x", "sector": "",
                                          "weight_pct": round(100 / n, 4),
                                          "location": "", "exchange": "",
                                          "market_currency": "", "market_value_usd": None}
@@ -406,7 +412,7 @@ def test_every_source_writes_the_threshold_its_own_kind_earns(out_dir, monkeypat
     im.refresh_all()
     got = {k: json.loads((out_dir / f"{k}_latest.json").read_text(encoding="utf-8"))["stale_days"]
            for k in im.SOURCES}
-    assert got == {"eafe": 45, "sp500": 45, "r1000": 120, "r2000": 120, "r3000": 120}
+    assert got == {"eafe": 45, "sp500": 45, "r1000": 45, "r2000": 45, "r3000": 45}
 
 
 # --- Vanguard guards inherited from sector_chart_pack/russell.py -------------
@@ -1148,16 +1154,16 @@ def test_a_weight_total_far_from_100_refuses(out_dir, monkeypatch, tmp_path):
     """Live totals 2026-09-22: IVV 99.92, EFA 99.48, Russell 97.44-99.80. A basket
     summing to a third of the fund is a different fact, not a rounding difference."""
     _serve_ivv(monkeypatch, tmp_path)
-    real = im.parse_holdings
+    real = im.parse_holdings_ex
 
     def third(text):
-        as_of, rows = real(text)
+        as_of, rows, excluded = real(text)
         for r in rows:
             if r["weight_pct"] is not None:
                 r["weight_pct"] = r["weight_pct"] / 3
-        return as_of, rows
+        return as_of, rows, excluded
 
-    monkeypatch.setattr(im, "parse_holdings", third)
+    monkeypatch.setattr(im, "parse_holdings_ex", third)
     with pytest.raises(im.IndexMembershipError, match="weight"):
         im.refresh("sp500", today=date(2026, 9, 22))
 
@@ -1773,6 +1779,8 @@ def test_a_failed_fetch_past_the_archive_window_is_a_gap_not_a_quiet_stale(
     Vanguard). It was also deciding "is the ARCHIVE missing observations", which it
     cannot: weeks of failed fetches read green while month-end holdings Vanguard
     published and then overwrote were never captured. Measured on the FETCH clock."""
+    # The Vanguard thresholds, exercised through the documented rollback rows.
+    monkeypatch.setitem(im.SOURCES, "r1000", im.ROLLBACK_SOURCES["r1000"])
     monkeypatch.setattr(im, "collect", _vanguard_collect())
     im.refresh("r1000", today=date(2026, 8, 20))
     _set_fetched_at(out_dir, "r1000", "2026-08-20T09:00:00-04:00")
@@ -1792,6 +1800,8 @@ def test_vendor_lag_alone_is_not_an_archive_gap(out_dir, monkeypatch):
     """Fable's catch on the plan: Vanguard's August month-end was still unpublished on
     2026-09-22, so the data can be 56 days old while every fetch works. A gap is OUR
     fetches failing across a publication, not the vendor being late."""
+    # The Vanguard thresholds, exercised through the documented rollback rows.
+    monkeypatch.setitem(im.SOURCES, "r1000", im.ROLLBACK_SOURCES["r1000"])
     monkeypatch.setattr(im, "collect", _vanguard_collect(as_of="2026-07-31"))
     im.refresh("r1000", today=date(2026, 9, 24))
     _set_fetched_at(out_dir, "r1000", "2026-09-24T09:00:00-04:00")
@@ -1877,6 +1887,8 @@ def test_restoring_latest_from_the_archive_does_not_rewind_the_fetch_clock(out_d
     """R15-4. The archive keeps the FIRST fetch time of a date; later successful fetches
     of the same date only refreshed `latest`. Restoring a lost `latest` from the archive
     rewound the clock and reported a gap the day after a successful fetch."""
+    # The Vanguard thresholds, exercised through the documented rollback rows.
+    monkeypatch.setitem(im.SOURCES, "r1000", im.ROLLBACK_SOURCES["r1000"])
     monkeypatch.setattr(im, "collect", _vanguard_collect())
     im.refresh("r1000", today=date(2026, 8, 1))
     dated = out_dir / "r1000_2026-07-31.json"
@@ -1891,3 +1903,123 @@ def test_restoring_latest_from_the_archive_does_not_rewind_the_fetch_clock(out_d
     monkeypatch.setattr(im, "collect", _down)
     r = im.refresh("r1000", today=date(2026, 9, 25))
     assert r["status"] == "stale", "a fetch succeeded yesterday; this is not an archive gap"
+
+
+# --- Russell -> iShares (2026-09-24, JP; Fable-gated) -------------------------
+#
+# The lines below are the REAL no-ticker lines IWM served on 2026-09-24. Fable's
+# condition: a fixture from IWB (which has none) would prove nothing.
+
+IWM_NO_MARKET = (
+    '"-","ARCELLX INC CVR","Health Care","Equity","65,585.87","0.00","65,585.87",'
+    '"936,941.00","0.07","United States","NO MARKET (E.G. UNLISTED)","USD","1.00","USD","-"\n'
+    '"-","OMNIAB INC $12.50 VESTING Prvt","Health Care","Equity","1.31","0.00","1.31",'
+    '"131,100.00","0.00","United States","NO MARKET (E.G. UNLISTED)","USD","1.00","USD","-"\n'
+    '"-","OMNIAB INC $15.00 VESTING Prvt","Health Care","Equity","1.31","0.00","1.31",'
+    '"131,100.00","0.00","United States","NO MARKET (E.G. UNLISTED)","USD","1.00","USD","-"\n')
+
+
+def test_no_market_lines_without_a_ticker_are_dropped_and_listed():
+    as_of, rows, excluded = im.parse_holdings_ex(_csv(3, IWM_NO_MARKET))
+    assert [r["ticker"] for r in rows] == ["T0", "T1", "T2"]
+    assert [e["name"] for e in excluded] == ["ARCELLX INC CVR", "OMNIAB INC $12.50 VESTING Prvt",
+                                             "OMNIAB INC $15.00 VESTING Prvt"]
+
+
+def test_a_no_ticker_line_on_a_real_venue_still_raises():
+    """The exclusion keys on the venue: a missing ticker on a listed venue is still
+    a real constituent that would silently vanish."""
+    real_venue = IWM_NO_MARKET.split("\n")[0].replace("NO MARKET (E.G. UNLISTED)", "NASDAQ") + "\n"
+    with pytest.raises(im.IndexMembershipError, match="no ticker"):
+        im.parse_holdings_ex(_csv(3, real_venue))
+
+
+def test_no_market_lines_carrying_real_weight_are_refused():
+    """Keyed on the venue, not on weight 0 (a 0.01% stub must not become the outage) -
+    but a basket whose no-market lines carry real weight does not describe the index."""
+    heavy = IWM_NO_MARKET.replace('"0.00","65,585.87"', '"0.30","65,585.87"')
+    with pytest.raises(im.IndexMembershipError, match="no-market"):
+        im.parse_holdings_ex(_csv(3, heavy))
+
+
+def test_the_dropped_lines_are_recorded_on_the_snapshot(out_dir, monkeypatch):
+    _serve(monkeypatch, _csv(500, IWM_NO_MARKET))
+    im.refresh("eafe")
+    doc = json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))
+    assert len(doc["excluded"]) == 3 and doc["etf"] == "EFA"
+
+
+def test_russell_rows_normalise_share_classes_and_refuse_collisions():
+    rows = [{"ticker": "BRK B"}, {"ticker": "AAPL"}]
+    assert [r["ticker"] for r in im._russell_ishares_rows(rows)] == ["BRK-B", "AAPL"]
+    with pytest.raises(im.IndexMembershipError, match="normalise"):
+        im._russell_ishares_rows([{"ticker": "BRK B"}, {"ticker": "BRK.B"}])
+
+
+def _russell(prefix, n, weight=None):
+    each = round(100.0 / n, 4) if weight is None else weight
+    return [{"ticker": f"{prefix}{i}", "name": "x", "sector": "", "weight_pct": each,
+             "location": "United States", "exchange": "NYSE", "market_currency": "USD",
+             "market_value_usd": None} for i in range(n)]
+
+
+def _russell_collect(r1000_as_of="2026-09-23", r2000_as_of="2026-09-23", overlap=0, fail=()):
+    def _collect(key):
+        if key in fail:
+            raise im.IndexMembershipError(f"{key} down")
+        if key == "r1000":
+            return r1000_as_of, "source", _russell("L", 1000)
+        if key == "r2000":
+            rows = _russell("S", 2000)
+            for i in range(overlap):
+                rows[i]["ticker"] = f"L{i}"
+            return r2000_as_of, "source", rows
+        if key == "sp500":
+            return "2026-09-23", "source", _russell("P", 503)
+        if key == "r3000":
+            # As production does: a derived key is only ever built by refresh_all.
+            raise im.IndexMembershipError("r3000: derived, inputs not ok this run")
+        return "2026-09-23", "source", _russell("E", 600)
+    return _collect
+
+
+def test_r3000_is_the_union_of_this_runs_r1000_and_r2000(out_dir, monkeypatch):
+    monkeypatch.setattr(im, "collect", _russell_collect())
+    results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 24))}
+    assert results["r3000"]["status"] == "ok" and results["r3000"]["count"] == 3000
+    doc = json.loads((out_dir / "r3000_latest.json").read_text(encoding="utf-8"))
+    assert doc["kind"] == "derived" and doc["etf"] == "IWB+IWM"
+    assert all(h["weight_pct"] is None for h in doc["holdings"])
+    assert doc["derived_from"] == [{"key": "r1000", "as_of": "2026-09-23"},
+                                   {"key": "r2000", "as_of": "2026-09-23"}]
+    assert doc["overlap"] == 0
+
+
+def test_r3000_is_never_rebuilt_from_older_files_when_an_input_failed(out_dir, monkeypatch):
+    """Fable's condition (b): only this run's `ok` results. Two stale caches would
+    agree on a date trivially and overwrite r3000 with an old union."""
+    monkeypatch.setattr(im, "collect", _russell_collect())
+    im.refresh_all(today=date(2026, 9, 24))
+    before = (out_dir / "r3000_latest.json").read_bytes()
+    monkeypatch.setattr(im, "collect", _russell_collect(fail=("r2000",)))
+    results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 25))}
+    assert results["r3000"]["status"] == "stale"
+    assert (out_dir / "r3000_latest.json").read_bytes() == before
+
+
+def test_r3000_refuses_inputs_from_different_days(out_dir, monkeypatch):
+    monkeypatch.setattr(im, "collect", _russell_collect(r2000_as_of="2026-09-22"))
+    results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 24))}
+    assert results["r3000"]["status"] == "failed"
+    assert "different days" in results["r3000"]["error"] or "as of" in results["r3000"]["error"]
+
+
+def test_r3000_tolerates_a_reconstitution_overlap_but_not_a_broken_partition(out_dir, monkeypatch):
+    monkeypatch.setattr(im, "collect", _russell_collect(overlap=20))      # <1%: allowed
+    results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 24))}
+    assert results["r3000"]["status"] == "ok"
+    assert json.loads((out_dir / "r3000_latest.json").read_text(encoding="utf-8"))["overlap"] == 20
+
+    monkeypatch.setattr(im, "collect", _russell_collect(overlap=400))     # the funds overlap
+    results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 25))}
+    assert results["r3000"]["status"] == "failed"

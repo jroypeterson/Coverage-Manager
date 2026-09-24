@@ -118,6 +118,20 @@ def _members(path: Path) -> set[str]:
             for h in doc.get("holdings") or []} - {""}
 
 
+def _source(path: Path) -> str | None:
+    """The fund behind a snapshot: `etf` when stamped, else the `(TICKER)` in `fund`
+    (snapshots before 2026-09-24 carry only `fund`, e.g. "... Russell 1000 ETF (VONE)")."""
+    import re
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if doc.get("etf"):
+        return str(doc["etf"])
+    m = re.search(r"\(([A-Z0-9+]+)\)\s*$", str(doc.get("fund") or ""))
+    return m[1] if m else None
+
+
 def reconcile_one(key: str, universe: dict[str, str]) -> dict | None:
     """One index's row, or None when nothing has ever been snapshotted for it."""
     snaps = _snapshots(key)
@@ -140,6 +154,10 @@ def reconcile_one(key: str, universe: dict[str, str]) -> dict | None:
         "prev_as_of": None,
         "entered": None,
         "left": None,
+        # "VONE->IWB" when the two snapshots came from different funds (Fable,
+        # 2026-09-24). The counts still print: real index changes sit in the same diff,
+        # and suppressing it would hide them; the label says they cannot be separated.
+        "source_change": None,
     }
 
     if len(snaps) > 1:
@@ -150,6 +168,9 @@ def reconcile_one(key: str, universe: dict[str, str]) -> dict | None:
             row["prev_as_of"] = prev_as_of
             row["entered"] = sorted(set(covered) - prev_covered)
             row["left"] = sorted(prev_covered - set(covered))
+            was, now = _source(prev_path), _source(path)
+            if was and now and was != now:
+                row["source_change"] = f"{was}->{now}"
     return row
 
 
@@ -203,6 +224,9 @@ def format_slack(rows: list[dict]) -> str:
             if r["left"]:
                 moves.append("left " + ", ".join(f"`{t}`" for t in r["left"]))
             bit += f" — since {r['prev_as_of']}: " + " · ".join(moves)
+        if r.get("source_change"):
+            bit += (f" _(source changed {r['source_change'].replace('->', '→')}: source and "
+                    f"index changes not separable this week)_")
         lines.append(bit)
     return "\n".join(lines)
 
@@ -226,6 +250,9 @@ def format_email(rows: list[dict]) -> str:
             if r["left"]:
                 moves.append("left " + ", ".join(r["left"]))
             bit += f"; since {r['prev_as_of']}: " + "; ".join(moves)
+        if r.get("source_change"):
+            bit += (f" (source changed {r['source_change']}: source and index changes "
+                    f"not separable this week)")
         lines.append(bit)
     return "\n".join(lines)
 

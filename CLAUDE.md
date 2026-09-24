@@ -661,6 +661,37 @@ Roche, not Roper. Any consumer joining this to coverage must key on `(ticker, ex
 or resolve by name. Both caveats are written into every snapshot's `caveats` array, not
 just this doc.
 
+### ⛑ 2026-09-24 — Russell moved from Vanguard to iShares, and the Russell 3000 is DERIVED
+
+The table and the Vanguard notes below are HISTORY. Measured 2026-09-24: VTWO served pages from
+two different month-ends in one response and a VTHR holding had no ticker, so both lanes refused
+every fetch and every consumer had held 2026-07-31 membership for eight weeks. JP chose iShares;
+Fable gated it (approve-with-changes, all conditions met):
+
+| Key | Source now | Notes |
+|---|---|---|
+| `r1000` | iShares **IWB** (`ishares`, post `russell_ishares`) | 1,022 listed equities as of 2026-09-23, daily |
+| `r2000` | iShares **IWM** | 1,976 as of 2026-09-23; IWB ∩ IWM = 0 (measured) |
+| `r3000` | **derived** = r1000 ∪ r2000 of the SAME run | ~2,998 names; `weight_pct: None`; NOT IWV, which is sampled (2,598 vs ~2,966) |
+
+- **No-market lines are dropped in `parse_holdings_ex` for every iShares source, before the
+  ticker check, and listed on the snapshot as `excluded`.** IWM carries CVRs and vesting rights
+  (Arcellx, OmniAb) with no ticker at 0.00% weight; the blank-ticker guard had fired on them first.
+  Keyed on the venue alone, capped at 0.25% total weight (`MAX_EXCLUDED_WEIGHT_PCT`).
+- **r3000 is built only from this run's `ok` r1000/r2000 results**, never from `latest` files
+  (two stale caches would agree on a date trivially); inputs must share one as_of; overlap is
+  allowed up to 1% (reconstitution weeks).
+- **Every snapshot now carries `etf`**; `sector_chart_pack/index_membership.py` reads it for the
+  banner (its `FUNDS` table is only the fallback for older files).
+- **`index_reconciliation` labels a source switch** ("source changed VONE->IWB: source and index
+  changes not separable") and still prints the moves.
+- **Rollback is `ROLLBACK_SOURCES` and is NOT a one-liner**: a Vanguard as_of older than the
+  iShares dated files is refused as `source_older` until Vanguard's date passes them (4-8 weeks).
+- Same day, Codex rounds 14-15 (board #442): `latest` synced to the newest dated snapshot every
+  run; same-date membership republishes appended to `<key>_republish_log.jsonl` (JP chose a log
+  over revision files); Vanguard read twice; `stale_archive_gap` on the fetch clock
+  (`<key>_fetch_state.json`) fails the weekly step.
+
 ### Extended the same day to five indices, and it found a live outage
 
 JP: *"lets fix the Russell and S&P500 issues if they are issues."* They were.
