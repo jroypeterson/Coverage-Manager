@@ -127,18 +127,27 @@ def test_a_dated_snapshot_is_never_rewritten(out_dir, monkeypatch):
     assert dated.read_bytes() == first      # the first observation is never rewritten
     # latest DOES move — it is the current view, not the archive.
     assert json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))["count"] == 501
-    # ⛑ ...and the correction now enters history beside it (Codex round 14, Fable
-    # ruling). It used to live only in `latest`, which the next date overwrites.
-    rev = out_dir / "eafe_2026-09-04_rev2.json"
-    assert r["written"] == str(rev)
-    doc = json.loads(rev.read_text(encoding="utf-8"))
-    assert doc["revision"] == 2 and doc["supersedes"] == "eafe_2026-09-04.json"
-    assert doc["added"] == ["T500"] and doc["removed"] == []
+    # ⛑ ...and the correction now enters history in the append-only republish log
+    # (Codex round 14; a log rather than revision files by JP's call after round 15).
+    # It used to live only in `latest`, which the next date overwrites.
+    log_path = out_dir / "eafe_republish_log.jsonl"
+    assert r["written"] == str(log_path)
+    [entry] = _log_lines(out_dir, "eafe")
+    assert entry["as_of"] == "2026-09-04"
+    assert entry["added"] == ["T500"] and entry["removed"] == []
+    assert entry["count"] == 501 and "T500" in entry["tickers"]
 
-    # The fund republishing the same corrected basket again is not a new revision.
+    # The fund republishing the same corrected basket again is not a new entry.
     r = im.refresh("eafe")
     assert r["written"] is None
-    assert not (out_dir / "eafe_2026-09-04_rev3.json").exists()
+    assert len(_log_lines(out_dir, "eafe")) == 1
+
+
+def _log_lines(out_dir, key):
+    path = out_dir / f"{key}_republish_log.jsonl"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
 def test_a_weight_only_republish_is_not_a_revision(out_dir, monkeypatch):
@@ -148,25 +157,24 @@ def test_a_weight_only_republish_is_not_a_revision(out_dir, monkeypatch):
     _serve(monkeypatch, _csv(500).replace('"0.2"', '"0.21"', 1))
     r = im.refresh("eafe")
     assert r["written"] is None
-    assert not list(out_dir.glob("*_rev*.json"))
+    assert _log_lines(out_dir, "eafe") == []
 
 
-def test_revision_files_are_never_read_as_a_new_date(out_dir, monkeypatch):
-    """A revision file must not be mistaken for another dated snapshot by the two readers
-    of dated files: the fallback scan here, and the week-over-week reconciliation."""
+def test_the_republish_log_is_never_read_as_a_snapshot(out_dir, monkeypatch):
+    """The log sits beside the dated files. Neither reader of dated files may mistake it
+    for a snapshot, and both keep using the base: the first observation of the date."""
     from universe import index_reconciliation as rec
 
     _serve(monkeypatch, _csv(500))
     im.refresh("eafe", today=date(2026, 9, 5))
     _serve(monkeypatch, _csv(501))
     im.refresh("eafe", today=date(2026, 9, 5))
-    assert (out_dir / "eafe_2026-09-04_rev2.json").exists()
+    assert (out_dir / "eafe_republish_log.jsonl").exists()
 
     monkeypatch.setattr(rec, "MEMBERSHIP_DIR", out_dir)
-    # One DATE, not two -- and since round 15 the date is represented by its newest
-    # version, the corrected basket.
-    assert [s for s, _ in rec._snapshots("eafe")] == ["2026-09-04"]
-    assert im.newest_usable_dated("eafe", date(2026, 9, 5))["count"] == 501
+    [(stamp, path)] = rec._snapshots("eafe")
+    assert stamp == "2026-09-04" and path.name == "eafe_2026-09-04.json"
+    assert im.newest_usable_dated("eafe", date(2026, 9, 5))["count"] == 500
 
 
 def test_a_short_list_is_refused_not_written(out_dir, monkeypatch):
@@ -1819,24 +1827,22 @@ _A = [f"T{i}" for i in range(500)]
 _B = _A + ["T500"]
 
 
-def test_a_basket_that_reverts_is_recorded_as_the_latest_revision(out_dir, monkeypatch):
-    """R15-1. A -> B -> A on one as_of. Deduplicating against EVERY version skipped the
-    return to A, so the archive ended on B although the final observation was A. Only a
-    repeat of the MOST RECENT version is a non-event."""
+def test_a_basket_that_reverts_is_logged_as_a_change(out_dir, monkeypatch):
+    """R15-1, carried into the log. A -> B -> A on one as_of: comparing against EVERY
+    version would drop the return to A, ending the record on B although the fund's
+    final word for the date was A. Only a repeat of the most recent observation is a
+    non-event."""
     for basket in (_A, _B, _A):
         _serve(monkeypatch, _csv_members(basket))
         im.refresh("eafe", today=date(2026, 9, 5))
-    rev3 = out_dir / "eafe_2026-09-04_rev3.json"
-    assert rev3.exists()
-    doc = json.loads(rev3.read_text(encoding="utf-8"))
-    assert doc["supersedes"] == "eafe_2026-09-04_rev2.json" and doc["removed"] == ["T500"]
+    entries = _log_lines(out_dir, "eafe")
+    assert [(e["added"], e["removed"]) for e in entries] == [(["T500"], []), ([], ["T500"])]
 
 
-def test_recovery_and_reconciliation_use_the_newest_revision_of_a_date(out_dir, monkeypatch):
-    """R15-2. Revisions were invisible to the two readers of dated files, so a lost
-    `latest` was restored to the superseded base, and reconciliation compared it too."""
-    from universe import index_reconciliation as rec
-
+def test_recovery_serves_the_base_and_the_log_keeps_the_correction(out_dir, monkeypatch):
+    """The simplification's stated trade (JP, option C): readers use ONE file per date —
+    the base, the first observation — so no reader has to learn a version rule. The
+    correction is not lost: it is in the log, with its full membership."""
     _serve(monkeypatch, _csv_members(_A))
     im.refresh("eafe", today=date(2026, 9, 5))
     _serve(monkeypatch, _csv_members(_B))
@@ -1845,28 +1851,26 @@ def test_recovery_and_reconciliation_use_the_newest_revision_of_a_date(out_dir, 
 
     _fail(monkeypatch)
     r = im.refresh("eafe", today=date(2026, 9, 6))
-    assert r["count"] == 501
-    monkeypatch.setattr(rec, "MEMBERSHIP_DIR", out_dir)
-    [(stamp, path)] = rec._snapshots("eafe")
-    assert stamp == "2026-09-04" and path.name == "eafe_2026-09-04_rev2.json"
+    assert r["count"] == 500
+    [entry] = _log_lines(out_dir, "eafe")
+    assert sorted(entry["tickers"]) == sorted(_B)
 
 
-def test_a_corrupt_base_with_revisions_is_not_rewritten_under_them(out_dir, monkeypatch):
-    """R15-3. Rewriting an unusable base while revisions exist made rev2's `supersedes`
-    and diff describe a base that no longer holds what they say. The new basket goes on
-    the END of the chain; the corrupt base is left as the evidence it is."""
+def test_log_entries_stay_true_when_a_corrupt_base_is_rewritten(out_dir, monkeypatch):
+    """R15-3's class, closed by construction: every log line carries its own full
+    membership and diff against the observation before it, so rewriting a corrupt base
+    cannot make an earlier line describe something false."""
     _serve(monkeypatch, _csv_members(_A))
     im.refresh("eafe", today=date(2026, 9, 5))
     _serve(monkeypatch, _csv_members(_B))
     im.refresh("eafe", today=date(2026, 9, 5))
-    base = out_dir / "eafe_2026-09-04.json"
-    base.write_text("{truncated", encoding="utf-8")
+    before = (out_dir / "eafe_republish_log.jsonl").read_bytes()
+    (out_dir / "eafe_2026-09-04.json").write_text("{truncated", encoding="utf-8")
 
     _serve(monkeypatch, _csv_members(_A[:-1] + ["T777"]))
-    im.refresh("eafe", today=date(2026, 9, 5))
-    assert base.read_text(encoding="utf-8") == "{truncated"
-    doc = json.loads((out_dir / "eafe_2026-09-04_rev3.json").read_text(encoding="utf-8"))
-    assert doc["supersedes"] == "eafe_2026-09-04_rev2.json"
+    r = im.refresh("eafe", today=date(2026, 9, 5))
+    assert r["written"] == str(out_dir / "eafe_2026-09-04.json")      # base restored
+    assert (out_dir / "eafe_republish_log.jsonl").read_bytes() == before
 
 
 def test_restoring_latest_from_the_archive_does_not_rewind_the_fetch_clock(out_dir, monkeypatch):

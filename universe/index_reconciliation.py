@@ -93,23 +93,19 @@ def _snapshots(key: str) -> list[tuple[str, Path]]:
     file, and counting it would make the newest snapshot its own predecessor and
     report every week as "no change".
 
-    One entry per DATE: when a date carries revisions (`<key>_<date>_rev<N>.json`, a
-    same-date republish with different members), the highest revision stands for it —
-    comparing the superseded base published the version the fund itself corrected
-    (Codex round 15). Anything else (`latest`, `fetch_state`, a Dropbox conflicted copy)
-    is not a dated snapshot and is skipped.
+    Exactly `<key>_YYYY-MM-DD.json`. Anything else in the directory -- `latest`, the
+    fetch-state clock, the `_republish_log.jsonl`, a Dropbox conflicted copy -- is not
+    a dated snapshot and is skipped by the pattern, not by a length test that happens
+    to exclude it.
     """
     import re
-    pat = re.compile(rf"^{re.escape(key)}_(\d{{4}}-\d{{2}}-\d{{2}})(?:_rev(\d+))?\.json$")
-    best: dict[str, tuple[int, Path]] = {}
+    pat = re.compile(rf"^{re.escape(key)}_(\d{{4}}-\d{{2}}-\d{{2}})\.json$")
+    out = []
     for p in MEMBERSHIP_DIR.glob(f"{key}_*.json"):
         m = pat.match(p.name)
-        if not m:
-            continue
-        n = int(m[2]) if m[2] else 1
-        if m[1] not in best or n > best[m[1]][0]:
-            best[m[1]] = (n, p)
-    return sorted(((d, p) for d, (_, p) in best.items()), reverse=True)
+        if m:
+            out.append((m[1], p))
+    return sorted(out, reverse=True)
 
 
 def _members(path: Path) -> set[str]:

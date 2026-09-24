@@ -1136,17 +1136,13 @@ def newest_usable_dated(key: str, today: date | None = None) -> dict | None:
         m = _DATED_NAME.match(p.name)
         if m and m["key"] == key:
             dated.append((m["d"], p))
-    # Dates come from the base-name regex AND from revisions, so a date whose base is
-    # corrupt but whose revision is good is still found (Codex round 15).
-    rev_name = re.compile(rf"^{re.escape(key)}_(\d{{4}}-\d{{2}}-\d{{2}})_rev\d+\.json$")
-    dates = {d for d, _ in dated}
-    dates |= {m[1] for p in OUT_DIR.glob(f"{key}_*_rev*.json") if (m := rev_name.match(p.name))}
-    for as_of in sorted(dates, reverse=True):
-        if is_future_as_of(as_of, today):
+    for as_of, p in sorted(dated, reverse=True):
+        if is_future_as_of(as_of, today) or not _dated_is_usable(p, key, as_of):
             continue
-        versions, _ = date_versions(key, as_of)
-        if versions:
-            return versions[-1][2]
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):       # pragma: no cover - just validated
+            continue
     return None
 
 
@@ -1172,74 +1168,65 @@ def _repair_latest(key: str, doc: dict, was: dict | None) -> None:
         log.error("index_membership[%s]: could not repair latest: %s", key, e)
 
 
-def _revision_path(key: str, as_of: str, n: int) -> Path:
-    return OUT_DIR / f"{key}_{as_of}_rev{n}.json"
-
-
 def _ticker_set(doc: dict) -> frozenset:
     return frozenset(h.get("ticker") for h in doc.get("holdings") or [])
 
 
-def date_versions(key: str, as_of: str) -> tuple[list[tuple[int, Path, dict]], int]:
-    """Every USABLE version of one date, oldest first, and the highest number in use.
+def _republish_log_path(key: str) -> Path:
+    return OUT_DIR / f"{key}_republish_log.jsonl"
 
-    Version 1 is the base file `<key>_<as_of>.json`; N >= 2 is `<key>_<as_of>_rev<N>.json`.
-    ⛑ ONE DEFINITION FOR EVERY READER (Codex round 15). The revision writer, the recovery
-    scan and the week-over-week reconciliation each looked at a different subset — the
-    writer at all versions, the other two at the base only — so a correction the archive
-    held was invisible to both of the things that read it back. A corrupt version is
-    skipped but still RESERVES its number, so a new revision can never overwrite it.
+
+def _log_republish_if_changed(key: str, as_of: str, base: Path, doc: dict) -> Path | None:
+    """Append a line when a same-as_of republish changes MEMBERSHIP. Never rewrites.
+
+    ⛑ WHY A LOG AND NOT REVISION FILES (JP, 2026-09-24, after Codex rounds 14-15). A fund
+    can republish the same as_of with different members; only `latest` took the new
+    basket, so the correction was lost when the date moved on. Round 14 recorded it as
+    `<key>_<as_of>_rev<N>.json` files, and round 15 found four defects in that chain —
+    numbering, `supersedes` pointers going false under a rewritten base, and every reader
+    of dated files having to learn which version stood for a date. This keeps the
+    evidence and drops the chain: the dated base file stays the ONE snapshot every reader
+    uses (the first observation, unchanged semantics), and this append-only JSON-lines
+    file records what changed afterwards.
+
+    Each line is self-contained — `as_of`, `observed_at`, `count`, the FULL `tickers`
+    list, and `added`/`removed` against the previous observation of that date — so a
+    line stays true even if the base file is later found corrupt and rewritten, and the
+    membership at any observation can be read off one line without replaying the rest.
+    Compared with the MOST RECENT observation of the date (the last line for it, else
+    the base), so A -> B -> A records both changes. Weight-only changes are not logged.
+    `.jsonl` never matches a dated-snapshot pattern, so no snapshot reader sees it.
     """
-    pat = re.compile(rf"^{re.escape(key)}_{re.escape(as_of)}(?:_rev(\d+))?\.json$")
-    found, highest = [], 0
-    if not OUT_DIR.exists():
-        return found, highest
-    for p in OUT_DIR.glob(f"{key}_{as_of}*.json"):
-        m = pat.match(p.name)
-        if not m:
-            continue
-        n = int(m[1]) if m[1] else 1
-        highest = max(highest, n)
-        if not _dated_is_usable(p, key, as_of):
-            continue
+    path = _republish_log_path(key)
+    previous = None
+    try:
+        with path.open(encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue                 # a torn last line must not block the log
+                if isinstance(entry, dict) and entry.get("as_of") == as_of:
+                    previous = frozenset(entry.get("tickers") or [])
+    except FileNotFoundError:
+        pass
+    if previous is None:
         try:
-            found.append((n, p, json.loads(p.read_text(encoding="utf-8"))))
-        except (OSError, ValueError):       # pragma: no cover - just validated
-            continue
-    return sorted(found, key=lambda v: v[0]), highest
-
-
-def _write_revision_if_new(key: str, as_of: str, doc: dict) -> Path | None:
-    """Record a same-as_of republish whose MEMBERSHIP differs from the latest version.
-
-    ⛑ THE BASE FILE STAYS THE FIRST OBSERVATION AND IS NEVER REWRITTEN; A CORRECTION IS
-    ADDED BESIDE IT (Codex round 14, Fable ruling 2026-09-24). A fund can republish the
-    same as_of with different members. Only `latest` took the new basket, so when the
-    vendor moved to the next date the corrected version had never entered history.
-    `<key>_<as_of>_rev<N>.json` carries the full snapshot plus `revision`, `supersedes`
-    and the `added`/`removed` diff against the version it supersedes.
-
-    ⛑ COMPARED WITH THE MOST RECENT VERSION ONLY (Codex round 15). Deduplicating against
-    every version meant A -> B -> A wrote no third file, so the archive ended on B while
-    the fund's final word for that date was A. A repeat of the latest version is the
-    only non-event. Weight-only changes are not revisions: membership is what is archived.
-    """
-    versions, highest = date_versions(key, as_of)
+            previous = _ticker_set(json.loads(base.read_text(encoding="utf-8")))
+        except (OSError, ValueError):        # pragma: no cover - base just validated
+            return None
     new = _ticker_set(doc)
-    if versions and _ticker_set(versions[-1][2]) == new:
+    if new == previous:
         return None
-    n = max(highest, 1) + 1
-    if versions:
-        prev_name, before = versions[-1][1].name, _ticker_set(versions[-1][2])
-    else:                                   # every version on file is unusable
-        prev_name, before = None, frozenset()
-    rev_doc = dict(doc, revision=n, supersedes=prev_name,
-                   added=sorted(new - before), removed=sorted(before - new))
-    path = _revision_path(key, as_of, n)
-    write_snapshot(path, rev_doc)
+    entry = {"key": key, "as_of": as_of, "observed_at": doc.get("fetched_at"),
+             "count": len(new), "added": sorted(new - previous),
+             "removed": sorted(previous - new), "tickers": sorted(new)}
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+        f.flush()
     log.warning("index_membership[%s]: as_of %s republished with different membership "
-                "(+%d/-%d) — archived as revision %d", key, as_of,
-                len(rev_doc["added"]), len(rev_doc["removed"]), n)
+                "(+%d/-%d) — logged to %s", key, as_of, len(entry["added"]),
+                len(entry["removed"]), path.name)
     return path
 
 
@@ -1481,18 +1468,13 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     # skipping it on `exists()` alone left the only snapshot for that date corrupt for
     # ever. So: rewrite exactly when the file cannot be read back as this snapshot.
     written = None
-    # ⛑ A corrupt base is rewritten only while NOTHING else describes that date. Once a
-    # revision exists, its `supersedes` and diff are claims about the base; rewriting the
-    # base under them made the chain false (Codex round 15). The new basket goes on the
-    # end of the chain instead, and the corrupt base stays as the evidence it is.
-    _, highest = date_versions(key, as_of)
-    if not _dated_is_usable(dated, key, as_of) and highest <= 1:
+    if not _dated_is_usable(dated, key, as_of):
         write_snapshot(dated, doc)
         written = str(dated)
     else:
-        rev = _write_revision_if_new(key, as_of, doc)
-        if rev is not None:
-            written = str(rev)
+        logged = _log_republish_if_changed(key, as_of, dated, doc)
+        if logged is not None:
+            written = str(logged)
     write_snapshot(_latest_path(key), doc)
     _record_fetch(key, doc["fetched_at"])
 
