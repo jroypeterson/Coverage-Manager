@@ -146,6 +146,7 @@ import csv
 import io
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta
@@ -260,6 +261,22 @@ STALE_DAYS_BY_KIND = {"vanguard": 120}           # month-end publishing + annual
 
 def stale_days_for(key: str) -> int:
     return STALE_DAYS_BY_KIND.get(SOURCES[key]["kind"], STALE_DAYS)
+
+
+# ⛑ ONE CONSTANT WAS DOING TWO JOBS (Codex round 14, 2026-09-24). `STALE_DAYS` answers
+# "may a consumer still USE this cache" — and was also silently deciding "is the ARCHIVE
+# missing observations", which it cannot: a Vanguard fetch could fail every week for 119
+# days, report plain `stale`, keep the weekly step green, and lose every month-end the
+# fund published and then overwrote. This is the second job's own number: past it, a
+# failed fetch means history is being lost, even though the cache is still servable.
+# Vanguard: a month-end plus ~10 days of publishing lag. iShares publishes daily, so a
+# failure spanning more than a weekly cycle is a missed week that cannot be recaptured.
+ARCHIVE_GAP_DAYS = 6
+ARCHIVE_GAP_DAYS_BY_KIND = {"vanguard": 40}
+
+
+def archive_gap_days_for(key: str) -> int:
+    return ARCHIVE_GAP_DAYS_BY_KIND.get(SOURCES[key]["kind"], ARCHIVE_GAP_DAYS)
 
 
 def is_future_as_of(as_of: str | None, today: date) -> bool:
@@ -631,9 +648,46 @@ def _sp500_ivv_rows(rows: list[dict]) -> list[dict]:
 _POST = {"sp500_ivv": _sp500_ivv_rows}
 
 
+VANGUARD_READ_ATTEMPTS = 2        # pairs of full reads before giving up
+
+
 def _fetch_vanguard(etf: str, *, page: int = VANGUARD_PAGE,
                     retries: int = VANGUARD_RETRIES) -> tuple[str, list[dict]]:
-    """Paginate one Vanguard ETF's equity holdings.
+    """Read the fund TWICE and accept it only when both full reads agree.
+
+    ⛑ PAGINATION IS ONLY SAFE WHILE THE THING BEING PAGINATED STANDS STILL, AND
+    AGREEING PAGE HEADERS DO NOT PROVE IT DID (Codex round 14, 2026-09-24). Every page
+    had to state the same `asOfDate` and `size`, but Vanguard can republish the SAME
+    date at the SAME size with different members. A republish between page 1 and
+    page 2 (drop T0, add T1000) produced T0..T499 + T501..T1000 — an outgoing name
+    kept, an entrant added, T500 missing: neither version of the fund, 1,000 unique
+    rows, 100% of weight, so every count and weight gate passed and it was archived.
+    Nothing inside one read can detect that; a second read can, because a hybrid is a
+    transient and the fund itself is not. Cost: one more pass over ~2-6 small pages.
+    """
+    reads = []
+    for _ in range(VANGUARD_READ_ATTEMPTS):
+        a = _fetch_vanguard_once(etf, page=page, retries=retries)
+        b = _fetch_vanguard_once(etf, page=page, retries=retries)
+        if _vanguard_signature(a) == _vanguard_signature(b):
+            return b
+        reads.append((a[0], b[0]))
+        log.warning("index_membership[%s]: two consecutive reads disagreed (the fund "
+                    "republished mid-fetch) — reading again", etf)
+    raise IndexMembershipError(
+        f"{etf}: {VANGUARD_READ_ATTEMPTS} pairs of consecutive full reads did not agree "
+        f"(as_of pairs {reads}) — the fund is changing under the fetch, so there is no "
+        f"stable snapshot to archive")
+
+
+def _vanguard_signature(read: tuple[str, list[dict]]) -> tuple:
+    as_of, rows = read
+    return as_of, tuple(sorted((r["ticker"], r["weight_pct"]) for r in rows))
+
+
+def _fetch_vanguard_once(etf: str, *, page: int = VANGUARD_PAGE,
+                         retries: int = VANGUARD_RETRIES) -> tuple[str, list[dict]]:
+    """Paginate one Vanguard ETF's equity holdings — ONE read; see `_fetch_vanguard`.
 
     ⛑ RAISES rather than returning a partial list. A short list quietly shrinks an index,
     and the floor check downstream would then be measuring a truncated fetch rather than
@@ -1057,6 +1111,153 @@ def _latest_path(key: str) -> Path:
     return OUT_DIR / f"{key}_latest.json"
 
 
+# Exactly `<key>_YYYY-MM-DD.json`. Anchored so `<key>_latest.json` and a Dropbox
+# `<key>_<date> (X's conflicted copy <date>).json` can never be read as a snapshot:
+# a conflicted copy is whatever another machine last held, and trusting one would
+# let sync inject membership into the archive's view of itself.
+_DATED_NAME = re.compile(r"^(?P<key>[a-z0-9]+)_(?P<d>\d{4}-\d{2}-\d{2})\.json$")
+
+
+def newest_usable_dated(key: str, today: date | None = None) -> dict | None:
+    """The newest DATED snapshot of `key` that is complete and not future-dated.
+
+    ⛑ `latest` IS A COPY, AND A COPY CAN FALL BEHIND ITS SOURCE (Codex round 14). The
+    dated write and the latest write are two operations: a run killed between them, or
+    Dropbox restoring an older `latest`, left a valid newer snapshot on disk that
+    nothing consulted — the fallback served the older list, and the monotonicity guard
+    judged a fetch only against `latest`, so a response older than the archive moved
+    `latest` behind it. Both now take the newer of the two.
+    """
+    today = today or date.today()
+    if not OUT_DIR.exists():
+        return None
+    dated = []
+    for p in OUT_DIR.glob(f"{key}_*.json"):
+        m = _DATED_NAME.match(p.name)
+        if m and m["key"] == key:
+            dated.append((m["d"], p))
+    for as_of, p in sorted(dated, reverse=True):
+        if is_future_as_of(as_of, today) or not _dated_is_usable(p, key, as_of):
+            continue
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):       # pragma: no cover - just validated
+            continue
+    return None
+
+
+def _newer(a: dict | None, b: dict | None) -> dict | None:
+    """The document with the later `as_of`; `a` wins ties and unparseable dates."""
+    if b is None:
+        return a
+    if a is None:
+        return b
+    da, db = _as_date(a.get("as_of")), _as_date(b.get("as_of"))
+    return b if (da is None or (db is not None and db > da)) else a
+
+
+def _repair_latest(key: str, doc: dict, was: dict | None) -> None:
+    """Point `latest` at a newer dated snapshot it had fallen behind. Best-effort:
+    a failure is logged, never raised — this is a repair, not the run's product."""
+    try:
+        write_snapshot(_latest_path(key), doc)
+        log.warning("index_membership[%s]: latest (as_of %s) had fallen behind the "
+                    "archive — repointed to the dated snapshot as_of %s",
+                    key, (was or {}).get("as_of"), doc.get("as_of"))
+    except Exception as e:                    # noqa: BLE001 - see the docstring
+        log.error("index_membership[%s]: could not repair latest: %s", key, e)
+
+
+def _revision_path(key: str, as_of: str, n: int) -> Path:
+    return OUT_DIR / f"{key}_{as_of}_rev{n}.json"
+
+
+def _ticker_set(doc: dict) -> frozenset:
+    return frozenset(h.get("ticker") for h in doc.get("holdings") or [])
+
+
+def _write_revision_if_new(key: str, as_of: str, base: Path, doc: dict) -> Path | None:
+    """Record a same-as_of republish whose MEMBERSHIP differs from every version on file.
+
+    ⛑ THE BASE FILE STAYS THE FIRST OBSERVATION AND IS NEVER REWRITTEN; A CORRECTION IS
+    ADDED BESIDE IT (Codex round 14, Fable ruling 2026-09-24). A fund can republish the
+    same as_of with different members. Only `latest` took the new basket, so when the
+    vendor moved to the next date the corrected version had never entered history — and
+    how often this happens could not even be measured, because the only evidence was
+    overwritten. `<key>_<as_of>_rev<N>.json` (the base is implicitly rev 1) carries the
+    full snapshot plus `revision`, `supersedes` and the `added`/`removed` diff against
+    the previous version, which is what a reader reconstructing membership needs.
+
+    Written only when the ticker SET differs from the base AND from every existing
+    revision — a fund republishing its corrected basket for five days must not write
+    rev2..rev6. Weight-only changes are not revisions: membership is what is archived.
+    Readers of dated files skip these by construction: `_DATED_NAME` requires `.json`
+    right after the date, and `index_reconciliation._snapshots` requires a 10-char stamp.
+    """
+    try:
+        versions = [(1, base, json.loads(base.read_text(encoding="utf-8")))]
+    except (OSError, ValueError):            # pragma: no cover - base just validated
+        return None
+    pat = re.compile(rf"^{re.escape(key)}_{re.escape(as_of)}_rev(\d+)\.json$")
+    highest = 1
+    for p in OUT_DIR.glob(f"{key}_{as_of}_rev*.json"):
+        m = pat.match(p.name)
+        if not m:
+            continue
+        n = int(m[1])
+        highest = max(highest, n)            # a corrupt revision still reserves its number
+        if _snapshot_is_usable(p, key):
+            try:
+                versions.append((n, p, json.loads(p.read_text(encoding="utf-8"))))
+            except (OSError, ValueError):    # pragma: no cover
+                pass
+    new = _ticker_set(doc)
+    if any(_ticker_set(v) == new for _, _, v in versions):
+        return None
+    _, prev_path, prev = max(versions, key=lambda v: v[0])
+    before = _ticker_set(prev)
+    n = highest + 1
+    rev_doc = dict(doc, revision=n, supersedes=prev_path.name,
+                   added=sorted(new - before), removed=sorted(before - new))
+    path = _revision_path(key, as_of, n)
+    write_snapshot(path, rev_doc)
+    log.warning("index_membership[%s]: as_of %s republished with different membership "
+                "(+%d/-%d) — archived as revision %d beside the original",
+                key, as_of, len(rev_doc["added"]), len(rev_doc["removed"]), n)
+    return path
+
+
+def _sync_latest_with_archive(key: str, today: date) -> None:
+    """Repoint `latest` at the newest usable dated snapshot when it is missing, broken,
+    or older than it. A FUTURE-dated `latest` is left alone: it is a corrupt file the
+    future guard reports by name, and replacing it here would hide that report."""
+    latest = load_latest(key)
+    if latest is not None and is_future_as_of(latest.get("as_of"), today):
+        return
+    dated = newest_usable_dated(key, today)
+    if dated is None:
+        return
+    if latest is None or snapshot_problem(key, latest) or _newer(latest, dated) is dated:
+        _repair_latest(key, dated, latest)
+
+
+def days_since_fetch(doc: dict | None, today: date) -> int | None:
+    """Days since `doc` was last successfully FETCHED -- the process-ran clock.
+
+    ⛑ NOT the data's `as_of` age. Vanguard's August month-end had still not been
+    published by 2026-09-22 (`r2000_latest` rewritten that day, still as-of 07-31), so
+    an as_of clock would call an honest vendor lag an archive gap. What loses history is
+    OUR fetches failing across a publication, and `fetched_at` is when one last worked.
+    """
+    raw = (doc or {}).get("fetched_at")
+    if not raw:
+        return None
+    try:
+        return (today - datetime.fromisoformat(raw).date()).days
+    except (TypeError, ValueError):
+        return None
+
+
 def load_latest(key: str) -> dict | None:
     p = _latest_path(key)
     if not p.exists():
@@ -1088,11 +1289,16 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     floor = src["floor"]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     today = today or date.today()
+    # Before anything else, so EVERY exit below -- fetch failure, source_older,
+    # source_future, cache_unusable, ok -- starts from a `latest` no older than the
+    # archive. A repair made on one exit path only is how this module has shipped the
+    # same hole twice (Fable, round-14 plan review).
+    _sync_latest_with_archive(key, today)
 
     try:
         as_of, as_of_kind, rows = collect(key)
     except IndexMembershipError as e:
-        cached = load_latest(key)
+        cached = load_latest(key)            # already synced with the archive above
         age = snapshot_age_days(cached, today)
         if cached is None:
             raise
@@ -1113,11 +1319,15 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
                     "count": cached.get("count"), "age_days": age, "error": msg,
                     "written": None}
         unfit = age is None or age > stale_days_for(key)
+        since = days_since_fetch(cached, today)
+        gap = not unfit and (since if since is not None else age) > archive_gap_days_for(key)
         log.warning("index_membership[%s]: refresh failed (%s); serving cached "
                     "snapshot as_of=%s age=%sd%s",
                     key, e, cached.get("as_of"), age,
-                    " — REPORTED UNFIT, past STALE_DAYS" if unfit else "")
-        return {"key": key, "status": "stale_unfit" if unfit else "stale",
+                    " — REPORTED UNFIT, past STALE_DAYS" if unfit
+                    else " — ARCHIVE GAP: observations are being lost" if gap else "")
+        return {"key": key,
+                "status": "stale_unfit" if unfit else "stale_archive_gap" if gap else "stale",
                 "as_of": cached.get("as_of"), "count": cached.get("count"),
                 "age_days": age, "error": str(e), "written": None}
 
@@ -1156,6 +1366,10 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
         log.warning("index_membership[%s]: the stored latest (as_of %s) is not a usable "
                     "baseline — this fetch replaces it", key, previous.get("as_of"))
         previous = None
+    # The baseline is the newer of `latest` and the newest usable dated snapshot --
+    # judged against `latest` alone, a restored-older `latest` let a response older
+    # than the archive return `ok` and move `latest` behind it (Codex round 14).
+    previous = _newer(previous, newest_usable_dated(key, today))
     prev_as_of = (previous or {}).get("as_of")
     prev_date, this_date = _as_date(prev_as_of), _as_date(as_of)
     if prev_date and this_date and this_date < prev_date:
@@ -1213,6 +1427,10 @@ def refresh(key: str = "eafe", *, today: date | None = None) -> dict:
     if not _dated_is_usable(dated, key, as_of):
         write_snapshot(dated, doc)
         written = str(dated)
+    else:
+        rev = _write_revision_if_new(key, as_of, dated, doc)
+        if rev is not None:
+            written = str(rev)
     write_snapshot(_latest_path(key), doc)
 
     return {"key": key, "status": "ok", "as_of": as_of, "count": len(rows),

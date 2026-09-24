@@ -926,9 +926,11 @@ def _step_index_membership():
     results = im.refresh_all()
     # `source_older` joins the two: the fetch worked and the answer was unusable, which
     # is the same operator signal -- this lane did not learn what it was asked to learn.
+    # `stale_archive_gap` (Codex round 14): the cache is still usable, but failed fetches
+    # have now spanned a publication the archive will never get back.
     bad = [r for r in results
            if r["status"] in ("stale_unfit", "failed", "source_older", "source_future",
-                              "cache_unusable")]
+                              "cache_unusable", "stale_archive_gap")]
     if bad:
         raise RuntimeError(
             "index membership degraded: "

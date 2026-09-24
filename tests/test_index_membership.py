@@ -122,12 +122,49 @@ def test_a_dated_snapshot_is_never_rewritten(out_dir, monkeypatch):
     dated = out_dir / "eafe_2026-09-04.json"
     first = dated.read_bytes()
 
-    _serve(monkeypatch, _csv(501))          # same as_of, different content
+    _serve(monkeypatch, _csv(501))          # same as_of, different MEMBERSHIP (+T500)
     r = im.refresh("eafe")
-    assert r["written"] is None
-    assert dated.read_bytes() == first
+    assert dated.read_bytes() == first      # the first observation is never rewritten
     # latest DOES move — it is the current view, not the archive.
     assert json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))["count"] == 501
+    # ⛑ ...and the correction now enters history beside it (Codex round 14, Fable
+    # ruling). It used to live only in `latest`, which the next date overwrites.
+    rev = out_dir / "eafe_2026-09-04_rev2.json"
+    assert r["written"] == str(rev)
+    doc = json.loads(rev.read_text(encoding="utf-8"))
+    assert doc["revision"] == 2 and doc["supersedes"] == "eafe_2026-09-04.json"
+    assert doc["added"] == ["T500"] and doc["removed"] == []
+
+    # The fund republishing the same corrected basket again is not a new revision.
+    r = im.refresh("eafe")
+    assert r["written"] is None
+    assert not (out_dir / "eafe_2026-09-04_rev3.json").exists()
+
+
+def test_a_weight_only_republish_is_not_a_revision(out_dir, monkeypatch):
+    """Membership is what the archive records; weights drift on every republish."""
+    _serve(monkeypatch, _csv(500))
+    im.refresh("eafe")
+    _serve(monkeypatch, _csv(500).replace('"0.2"', '"0.21"', 1))
+    r = im.refresh("eafe")
+    assert r["written"] is None
+    assert not list(out_dir.glob("*_rev*.json"))
+
+
+def test_revision_files_are_never_read_as_a_new_date(out_dir, monkeypatch):
+    """A revision file must not be mistaken for another dated snapshot by the two readers
+    of dated files: the fallback scan here, and the week-over-week reconciliation."""
+    from universe import index_reconciliation as rec
+
+    _serve(monkeypatch, _csv(500))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    _serve(monkeypatch, _csv(501))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    assert (out_dir / "eafe_2026-09-04_rev2.json").exists()
+
+    monkeypatch.setattr(rec, "MEMBERSHIP_DIR", out_dir)
+    assert [s for s, _ in rec._snapshots("eafe")] == ["2026-09-04"]
+    assert im.newest_usable_dated("eafe", date(2026, 9, 5))["count"] == 500
 
 
 def test_a_short_list_is_refused_not_written(out_dir, monkeypatch):
@@ -1430,9 +1467,10 @@ def test_pages_reporting_a_DIFFERENT_SIZE_are_not_one_snapshot(monkeypatch):
 
 
 def test_consistent_pages_still_paginate(monkeypatch):
+    # Served twice: an accepted fetch is two agreeing full reads (Codex round 14).
+    # A read stops once it has reached `size`, so it never asks for the empty page.
     _paged(monkeypatch, [_vanguard_page(500, 1, 1000, as_of="2026-08-31"),
-                         _vanguard_page(500, 501, 1000, as_of="2026-08-31"),
-                         _vanguard_page(0, 1001, 1000, as_of="2026-08-31")])
+                         _vanguard_page(500, 501, 1000, as_of="2026-08-31")] * 2)
     as_of, rows = im._fetch_vanguard("VONE")
     assert as_of == "2026-08-31" and len(rows) == 1000
 
@@ -1566,3 +1604,197 @@ def test_a_document_for_ANOTHER_INDEX_is_not_a_usable_snapshot(out_dir, monkeypa
     r = im.refresh("sp500", today=date(2026, 9, 22))
     assert r["status"] == "cache_unusable"
     assert "eafe" in r["error"]
+
+
+# --- Codex round 14 (2026-09-24, board #442): run the schedule FORWARD --------
+#
+# Every earlier round reviewed one run. These four came from walking successive
+# weekly runs, and each is a defect that exists only ACROSS runs.
+
+def _csv_on(day: str, n=500):
+    """An iShares file as of `day` (e.g. "Sep 11, 2026")."""
+    return _csv(n).replace('Fund Holdings as of,"Sep 04, 2026"', f'Fund Holdings as of,"{day}"')
+
+
+def test_a_crash_between_the_dated_and_latest_writes_does_not_hide_the_newer_snapshot(
+        out_dir, monkeypatch):
+    """R14-1. The dated file and `latest` are two writes. Killed between them, the
+    archive holds Sep 11 while `latest` still says Sep 04 — and the next week's
+    failed fetch used to fall back to `latest` alone, serving the OLDER list with a
+    valid newer one on disk."""
+    _serve(monkeypatch, _csv_on("Sep 04, 2026"))
+    im.refresh("eafe", today=date(2026, 9, 5))
+
+    real_write = im.write_snapshot
+
+    def _die_on_latest(path, doc):
+        if path.name.endswith("_latest.json"):
+            raise KeyboardInterrupt("process killed")
+        real_write(path, doc)
+
+    monkeypatch.setattr(im, "write_snapshot", _die_on_latest)
+    _serve(monkeypatch, _csv_on("Sep 11, 2026"))
+    with pytest.raises(KeyboardInterrupt):
+        im.refresh("eafe", today=date(2026, 9, 12))
+    monkeypatch.setattr(im, "write_snapshot", real_write)
+    assert (out_dir / "eafe_2026-09-11.json").exists()
+
+    _fail(monkeypatch)
+    r = im.refresh("eafe", today=date(2026, 9, 14))
+    assert r["as_of"] == "2026-09-11", "fell back to the older `latest`, not the newer archive"
+    # ...and the FILE is repaired, because every consumer reads `latest` from disk,
+    # never this return value (Fable).
+    on_disk = json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))
+    assert on_disk["as_of"] == "2026-09-11"
+
+
+def test_a_restored_older_latest_cannot_let_latest_fall_behind_the_archive(out_dir, monkeypatch):
+    """R14-1. Dropbox restores `latest` to an older version while a newer dated file
+    exists. The vendor then serves something between the two. Judged only against
+    `latest` it looked newer, returned ok, and moved `latest` BEHIND the archive."""
+    _serve(monkeypatch, _csv_on("Sep 04, 2026"))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    old_latest = (out_dir / "eafe_latest.json").read_bytes()
+    _serve(monkeypatch, _csv_on("Sep 11, 2026"))
+    im.refresh("eafe", today=date(2026, 9, 12))
+    (out_dir / "eafe_latest.json").write_bytes(old_latest)          # the restore
+
+    _serve(monkeypatch, _csv_on("Sep 08, 2026"))
+    r = im.refresh("eafe", today=date(2026, 9, 14))
+    assert r["status"] == "source_older"
+    latest = json.loads((out_dir / "eafe_latest.json").read_text(encoding="utf-8"))
+    assert latest["as_of"] != "2026-09-08"
+
+
+def test_a_dropbox_conflicted_copy_is_never_read_as_a_snapshot(out_dir, monkeypatch):
+    """R14-1, and the reason the newest-dated scan is regex-anchored. A conflicted copy
+    is whatever another machine last had; trusting it lets sync inject membership. On
+    2026-09-24 the X1 resync produced 29 of them across the fleet."""
+    _serve(monkeypatch, _csv_on("Sep 04, 2026"))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    doc = json.loads((out_dir / "eafe_2026-09-04.json").read_text(encoding="utf-8"))
+    doc["as_of"] = "2026-09-11"
+    (out_dir / "eafe_2026-09-11 (JP-X1's conflicted copy 2026-09-24).json").write_text(
+        json.dumps(doc), encoding="utf-8")
+
+    _fail(monkeypatch)
+    r = im.refresh("eafe", today=date(2026, 9, 12))
+    assert r["as_of"] == "2026-09-04"
+
+
+def test_a_republish_between_vanguard_pages_cannot_archive_a_hybrid(monkeypatch):
+    """R14-3. Pages agreeing on asOfDate and size were merged. A same-date, same-size
+    republish between page 1 and page 2 (drop T0, add T1000) produced T0..T499 +
+    T501..T1000: it holds an outgoing name, an entrant, and omits T500 — neither
+    version of the fund, and it passes every count and weight gate."""
+    import time
+    import urllib.request as _u
+
+    size = 1000
+    v_a = [f"T{i}" for i in range(0, 1000)]
+    v_b = [f"T{i}" for i in range(1, 1001)]
+    calls = {"n": 0}
+
+    def _page(tickers, start):
+        chunk = tickers[start - 1:start - 1 + 500]
+        return {"size": size, "asOfDate": "2026-08-31T00:00:00-04:00",
+                "fund": {"entity": [{"ticker": t, "longName": t, "percentWeight": "0.1"}
+                                    for t in chunk]}}
+
+    def _fake(req, timeout=None):
+        calls["n"] += 1
+        start = int(req.full_url.split("start=")[1].split("&")[0])
+        # Only the very first page comes from the pre-republish fund.
+        return _JsonResp(_page(v_a if calls["n"] == 1 else v_b, start))
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    as_of, rows = im._fetch_vanguard("VONE")
+    got = {r["ticker"] for r in rows}
+    assert got == set(v_b), "a basket that is neither version of the fund was accepted"
+
+
+def test_a_fund_that_keeps_changing_between_reads_is_refused(monkeypatch):
+    """R14-3. If two consecutive full reads never agree, there is no snapshot to take."""
+    import time
+    import urllib.request as _u
+
+    calls = {"n": 0}
+
+    def _fake(req, timeout=None):
+        calls["n"] += 1
+        start = int(req.full_url.split("start=")[1].split("&")[0])
+        shift = calls["n"]                      # every request sees a different fund
+        tickers = [f"T{i + shift}" for i in range(1000)]
+        chunk = tickers[start - 1:start - 1 + 500]
+        return _JsonResp({"size": 1000, "asOfDate": "2026-08-31T00:00:00-04:00",
+                          "fund": {"entity": [{"ticker": t, "longName": t,
+                                               "percentWeight": "0.1"} for t in chunk]}})
+
+    monkeypatch.setattr(_u, "urlopen", _fake)
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    with pytest.raises(im.IndexMembershipError, match="did not agree"):
+        im._fetch_vanguard("VONE")
+
+
+def _vanguard_collect(as_of="2026-07-31", n=1100):
+    def _collect(key):
+        return as_of, "source", [{"ticker": f"T{i}", "name": "x", "sector": "",
+                                  "weight_pct": round(100 / n, 4), "location": "",
+                                  "exchange": "", "market_currency": "",
+                                  "market_value_usd": None} for i in range(n)]
+    return _collect
+
+
+def _set_fetched_at(out_dir, key, when):
+    p = out_dir / f"{key}_latest.json"
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    doc["fetched_at"] = when
+    p.write_text(json.dumps(doc), encoding="utf-8")
+
+
+def test_a_failed_fetch_past_the_archive_window_is_a_gap_not_a_quiet_stale(
+        out_dir, monkeypatch):
+    """R14-4. `stale_days` answers "may a consumer still USE this cache" (120 days for
+    Vanguard). It was also deciding "is the ARCHIVE missing observations", which it
+    cannot: weeks of failed fetches read green while month-end holdings Vanguard
+    published and then overwrote were never captured. Measured on the FETCH clock."""
+    monkeypatch.setattr(im, "collect", _vanguard_collect())
+    im.refresh("r1000", today=date(2026, 8, 20))
+    _set_fetched_at(out_dir, "r1000", "2026-08-20T09:00:00-04:00")
+
+    def _down(key):
+        raise im.IndexMembershipError("vanguard down")
+    monkeypatch.setattr(im, "collect", _down)
+
+    r = im.refresh("r1000", today=date(2026, 8, 25))       # 5 days of failure
+    assert r["status"] == "stale"
+    r = im.refresh("r1000", today=date(2026, 9, 30))       # 41 days: a month-end spanned
+    assert r["status"] == "stale_archive_gap"
+    assert r["count"] == 1100, "the cache is still served; only the archive is at risk"
+
+
+def test_vendor_lag_alone_is_not_an_archive_gap(out_dir, monkeypatch):
+    """Fable's catch on the plan: Vanguard's August month-end was still unpublished on
+    2026-09-22, so the data can be 56 days old while every fetch works. A gap is OUR
+    fetches failing across a publication, not the vendor being late."""
+    monkeypatch.setattr(im, "collect", _vanguard_collect(as_of="2026-07-31"))
+    im.refresh("r1000", today=date(2026, 9, 24))
+    _set_fetched_at(out_dir, "r1000", "2026-09-24T09:00:00-04:00")
+
+    def _down(key):
+        raise im.IndexMembershipError("one transient failure")
+    monkeypatch.setattr(im, "collect", _down)
+    r = im.refresh("r1000", today=date(2026, 9, 25))       # as_of 56 days old, fetched yesterday
+    assert r["status"] == "stale"
+
+
+def test_the_weekly_step_fails_on_an_archive_gap(out_dir, monkeypatch):
+    import weekly_universe
+
+    monkeypatch.setattr(im, "refresh_all",
+                        lambda: [{"key": "r1000", "status": "stale_archive_gap",
+                                  "as_of": "2026-07-31", "count": 1024, "age_days": 56,
+                                  "error": "x", "written": None}])
+    with pytest.raises(RuntimeError, match="stale_archive_gap"):
+        weekly_universe._step_index_membership()
