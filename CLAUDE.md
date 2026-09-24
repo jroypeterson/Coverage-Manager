@@ -691,6 +691,12 @@ Fable gated it (approve-with-changes, all conditions met):
   run; same-date membership republishes appended to `<key>_republish_log.jsonl` (JP chose a log
   over revision files); Vanguard read twice; `stale_archive_gap` on the fetch clock
   (`<key>_fetch_state.json`) fails the weekly step.
+- Codex round 16 (7 Highs, JP chose fix-and-close): r3000 is derived from the docs the run
+  holds in memory, never a re-read of `latest`; log lines key EAFE on `TICKER@EXCHANGE`
+  (`members`; 4 EFA tickers name two companies each); a base rewrite on a logged date is
+  logged; a torn last line is closed before appending and appends are fsync'd; an unreadable
+  weight on a no-market line is refused. ACCEPTED, not guarded: no lock on the log (one
+  weekly writer). #442 closed on this round; the weekly run and its alarms are the check now.
 
 ### Extended the same day to five indices, and it found a live outage
 

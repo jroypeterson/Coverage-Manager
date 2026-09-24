@@ -598,7 +598,15 @@ def parse_holdings_ex(text: str) -> tuple[str, list[dict], list[dict]]:
             "market_currency": cell(r, "Market Currency"),
             "market_value_usd": _num(cell(r, "Market Value")),
         })
-    dropped = round(sum(e["weight_pct"] or 0.0 for e in excluded), 4)
+    # ⛑ AN UNREADABLE WEIGHT IS NOT A ZERO WEIGHT (Codex round 16). `or 0.0` let a
+    # no-market line whose weight read `-` slip under the cap below whatever it really
+    # held. Every such line seen live reads "0.00", so refusing costs nothing today.
+    unknown = [e["name"] for e in excluded if e["weight_pct"] is None]
+    if unknown:
+        raise IndexMembershipError(
+            f"no-market line(s) {unknown!r} carry an unreadable weight — cannot show they "
+            f"are residue rather than a real share of the fund")
+    dropped = round(sum(e["weight_pct"] for e in excluded), 4)
     if dropped > MAX_EXCLUDED_WEIGHT_PCT:
         raise IndexMembershipError(
             f"{len(excluded)} no-market line(s) carry {dropped}% of the fund (cap "
@@ -1301,12 +1309,72 @@ def _repair_latest(key: str, doc: dict, was: dict | None) -> None:
         log.error("index_membership[%s]: could not repair latest: %s", key, e)
 
 
-def _ticker_set(doc: dict) -> frozenset:
-    return frozenset(h.get("ticker") for h in doc.get("holdings") or [])
+# Sources whose `ticker` is a LOCAL exchange code, so a ticker alone is not an identity
+# (the EAFE caveat). Measured live 2026-09-24: 657 EFA lines, 653 ticker strings — SAN is
+# Santander (Madrid) AND Sanofi (Paris); RIO, IAG and 1928 likewise.
+LOCAL_TICKER_KEYS = frozenset({"eafe"})
+
+
+def _member_set(key: str, doc: dict) -> frozenset:
+    """Membership identities for the republish log (Codex round 16). `TICKER@EXCHANGE`
+    for a local-ticker source, so one of two companies sharing a code can be seen to
+    leave; the bare ticker elsewhere, so a US venue move is not logged as a change."""
+    holdings = doc.get("holdings") or []
+    if key in LOCAL_TICKER_KEYS:
+        return frozenset(f"{h.get('ticker')}@{h.get('exchange')}" for h in holdings)
+    return frozenset(h.get("ticker") for h in holdings)
 
 
 def _republish_log_path(key: str) -> Path:
     return OUT_DIR / f"{key}_republish_log.jsonl"
+
+
+def _log_has_date(key: str, as_of: str) -> bool:
+    return _last_logged(key, as_of) is not None
+
+
+def _last_logged(key: str, as_of: str) -> frozenset | None:
+    """The membership of the most recent log line for `as_of`, or None."""
+    previous = None
+    try:
+        with _republish_log_path(key).open(encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue                 # a torn line must not block the log
+                if isinstance(entry, dict) and entry.get("as_of") == as_of:
+                    previous = frozenset(entry.get("members") or entry.get("tickers") or [])
+    except FileNotFoundError:
+        pass
+    return previous
+
+
+def _append_line(path: Path, line: str) -> None:
+    """Append one JSON line durably.
+
+    ⛑ A TORN LAST LINE IS CLOSED BEFORE APPENDING (Codex round 16). A crash can leave a
+    final fragment with no newline; appending straight onto it fused two observations
+    into one unparseable line and lost both. And the append is fsync'd like every
+    snapshot write: `latest` was durable while the log tail was not, so a power cut
+    could keep the new basket and lose the only record of the correction.
+    """
+    import os
+    needs_newline = False
+    try:
+        with path.open("rb") as f:
+            f.seek(0, 2)
+            if f.tell():
+                f.seek(-1, 2)
+                needs_newline = f.read(1) != b"\n"
+    except FileNotFoundError:
+        pass
+    with path.open("a", encoding="utf-8") as f:
+        if needs_newline:
+            f.write("\n")
+        f.write(line + "\n")
+        f.flush()
+        os.fsync(f.fileno())
 
 
 def _log_republish_if_changed(key: str, as_of: str, base: Path, doc: dict) -> Path | None:
@@ -1329,34 +1397,29 @@ def _log_republish_if_changed(key: str, as_of: str, base: Path, doc: dict) -> Pa
     Compared with the MOST RECENT observation of the date (the last line for it, else
     the base), so A -> B -> A records both changes. Weight-only changes are not logged.
     `.jsonl` never matches a dated-snapshot pattern, so no snapshot reader sees it.
+
+    🔻 ACCEPTED, NOT GUARDED (JP, 2026-09-24, Codex round 16): there is no lock. Two runs
+    writing the same key at once could interleave lines, and diff one against the base
+    rather than the other's line. Exactly one scheduled job writes this directory weekly,
+    and a lock file would add a failure mode (a stale lock stopping the archive) to
+    remove one that needs two concurrent runs. Revisit if a second writer is ever added.
     """
     path = _republish_log_path(key)
-    previous = None
-    try:
-        with path.open(encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line)
-                except ValueError:
-                    continue                 # a torn last line must not block the log
-                if isinstance(entry, dict) and entry.get("as_of") == as_of:
-                    previous = frozenset(entry.get("tickers") or [])
-    except FileNotFoundError:
-        pass
+    previous = _last_logged(key, as_of)
     if previous is None:
         try:
-            previous = _ticker_set(json.loads(base.read_text(encoding="utf-8")))
+            previous = _member_set(key, json.loads(base.read_text(encoding="utf-8")))
         except (OSError, ValueError):        # pragma: no cover - base just validated
             return None
-    new = _ticker_set(doc)
+    new = _member_set(key, doc)
     if new == previous:
         return None
+    # `members` is the identity set compared (TICKER@EXCHANGE for a local-ticker
+    # source); `count` is the number of holdings, which a bare-ticker set undercounted.
     entry = {"key": key, "as_of": as_of, "observed_at": doc.get("fetched_at"),
-             "count": len(new), "added": sorted(new - previous),
-             "removed": sorted(previous - new), "tickers": sorted(new)}
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
-        f.flush()
+             "count": len(doc.get("holdings") or []), "added": sorted(new - previous),
+             "removed": sorted(previous - new), "members": sorted(new)}
+    _append_line(path, json.dumps(entry))
     log.warning("index_membership[%s]: as_of %s republished with different membership "
                 "(+%d/-%d) — logged to %s", key, as_of, len(entry["added"]),
                 len(entry["removed"]), path.name)
@@ -1456,7 +1519,7 @@ def snapshot_age_days(doc: dict | None, today: date | None = None) -> int | None
 
 
 def refresh(key: str = "eafe", *, today: date | None = None,
-            collected: tuple | None = None) -> dict:
+            collected: tuple | None = None, sink: dict | None = None) -> dict:
     """Fetch, validate, and write a dated snapshot. Returns a status dict.
 
     Never raises on a fetch failure when a cached snapshot exists — it falls back and
@@ -1615,12 +1678,19 @@ def refresh(key: str = "eafe", *, today: date | None = None,
     if not _dated_is_usable(dated, key, as_of):
         write_snapshot(dated, doc)
         written = str(dated)
+        # ⛑ If the log already describes this date, the rewrite is an OBSERVATION it must
+        # record (Codex round 16): otherwise the next one is compared with the last logged
+        # basket, and a C -> B move after the rewrite is lost.
+        if _log_has_date(key, as_of):
+            _log_republish_if_changed(key, as_of, dated, doc)
     else:
         logged = _log_republish_if_changed(key, as_of, dated, doc)
         if logged is not None:
             written = str(logged)
     write_snapshot(_latest_path(key), doc)
     _record_fetch(key, doc["fetched_at"])
+    if sink is not None:
+        sink[key] = doc                     # the doc THIS call wrote, for a derived key
 
     return {"key": key, "status": "ok", "as_of": as_of, "count": len(rows),
             "age_days": snapshot_age_days(doc, today), "error": None,
@@ -1638,18 +1708,21 @@ def refresh_all(*, today: date | None = None) -> list[dict]:
     and everything after it was skipped. A failure with no cached fallback becomes a
     `failed` row carrying the exception's class name, never an exception.
     """
-    out = []
+    out, written = [], {}
     for k in SOURCES:
         try:
             src = SOURCES[k]
             if src["kind"] == "derived":
-                done = {r["key"]: r for r in out}
-                if all(done.get(i, {}).get("status") == "ok" for i in src["from"]):
-                    inputs = [load_latest(i) for i in src["from"]]   # written this run
-                    out.append(refresh(k, today=today,
+                # ⛑ From the docs THIS run wrote, held in memory — never a re-read of
+                # `latest` (Codex round 16): another run or a Dropbox sync can replace a
+                # file between the input's `ok` and the derivation, and `derived_from`
+                # would then describe a union that never happened.
+                if all(i in written for i in src["from"]):
+                    inputs = [written[i] for i in src["from"]]
+                    out.append(refresh(k, today=today, sink=written,
                                        collected=_derive_union(k, inputs)))
                     continue
-            out.append(refresh(k, today=today))
+            out.append(refresh(k, today=today, sink=written))
         except Exception as e:                       # noqa: BLE001 - see the docstring
             # ⛑ ANY exception, not only ours. The loop caught `IndexMembershipError`
             # alone, so one raw `AttributeError` from a malformed Vanguard page took

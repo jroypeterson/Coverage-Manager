@@ -134,8 +134,9 @@ def test_a_dated_snapshot_is_never_rewritten(out_dir, monkeypatch):
     assert r["written"] == str(log_path)
     [entry] = _log_lines(out_dir, "eafe")
     assert entry["as_of"] == "2026-09-04"
-    assert entry["added"] == ["T500"] and entry["removed"] == []
-    assert entry["count"] == 501 and "T500" in entry["tickers"]
+    # EAFE identities are TICKER@EXCHANGE (local tickers are not unique; round 16).
+    assert entry["added"] == ["T500@Tokyo"] and entry["removed"] == []
+    assert entry["count"] == 501 and "T500@Tokyo" in entry["members"]
 
     # The fund republishing the same corrected basket again is not a new entry.
     r = im.refresh("eafe")
@@ -1846,7 +1847,8 @@ def test_a_basket_that_reverts_is_logged_as_a_change(out_dir, monkeypatch):
         _serve(monkeypatch, _csv_members(basket))
         im.refresh("eafe", today=date(2026, 9, 5))
     entries = _log_lines(out_dir, "eafe")
-    assert [(e["added"], e["removed"]) for e in entries] == [(["T500"], []), ([], ["T500"])]
+    assert [(e["added"], e["removed"]) for e in entries] == [(["T500@Tokyo"], []),
+                                                             ([], ["T500@Tokyo"])]
 
 
 def test_recovery_serves_the_base_and_the_log_keeps_the_correction(out_dir, monkeypatch):
@@ -1863,7 +1865,7 @@ def test_recovery_serves_the_base_and_the_log_keeps_the_correction(out_dir, monk
     r = im.refresh("eafe", today=date(2026, 9, 6))
     assert r["count"] == 500
     [entry] = _log_lines(out_dir, "eafe")
-    assert sorted(entry["tickers"]) == sorted(_B)
+    assert sorted(entry["members"]) == sorted(f"{t}@Tokyo" for t in _B)
 
 
 def test_log_entries_stay_true_when_a_corrupt_base_is_rewritten(out_dir, monkeypatch):
@@ -1880,7 +1882,9 @@ def test_log_entries_stay_true_when_a_corrupt_base_is_rewritten(out_dir, monkeyp
     _serve(monkeypatch, _csv_members(_A[:-1] + ["T777"]))
     r = im.refresh("eafe", today=date(2026, 9, 5))
     assert r["written"] == str(out_dir / "eafe_2026-09-04.json")      # base restored
-    assert (out_dir / "eafe_republish_log.jsonl").read_bytes() == before
+    # Earlier lines are untouched; the rewrite itself is appended as an observation
+    # (round 16), never edited into what was already recorded.
+    assert (out_dir / "eafe_republish_log.jsonl").read_bytes().startswith(before)
 
 
 def test_restoring_latest_from_the_archive_does_not_rewind_the_fetch_clock(out_dir, monkeypatch):
@@ -2023,3 +2027,79 @@ def test_r3000_tolerates_a_reconstitution_overlap_but_not_a_broken_partition(out
     monkeypatch.setattr(im, "collect", _russell_collect(overlap=400))     # the funds overlap
     results = {r["key"]: r for r in im.refresh_all(today=date(2026, 9, 25))}
     assert results["r3000"]["status"] == "failed"
+
+
+# --- Codex round 16 (2026-09-24, board #442) ---------------------------------
+
+def test_r3000_is_built_from_this_runs_docs_not_a_reread_of_latest(out_dir, monkeypatch):
+    """R16-1. Re-reading `latest` after the inputs returned `ok` let another run or a
+    Dropbox sync substitute a different file, and `derived_from` would still claim a
+    same-run union."""
+    monkeypatch.setattr(im, "collect", _russell_collect())
+    real = im.load_latest
+
+    def _swapped(key):
+        doc = real(key)
+        if doc is not None and key == "r1000":
+            doc = dict(doc, holdings=[dict(h, ticker="X" + h["ticker"]) for h in doc["holdings"]])
+        return doc
+    monkeypatch.setattr(im, "load_latest", _swapped)
+    im.refresh_all(today=date(2026, 9, 24))
+    doc = json.loads((out_dir / "r3000_latest.json").read_text(encoding="utf-8"))
+    assert not any(h["ticker"].startswith("X") for h in doc["holdings"])
+
+
+def _eafe_lines(members):
+    """(ticker, exchange) lines; SAN appears twice, as Santander and Sanofi do in EFA."""
+    each = round(100.0 / len(members), 4)
+    rows = "".join(f'"{t}","CO {t} {x}","Health Care","Equity","1,000.00","{each}","1,000.00",'
+                   f'"10.00","100.00","Spain","{x}","EUR","1.0","EUR","-"\n' for t, x in members)
+    return REAL_PREAMBLE + HEADER + rows
+
+
+def test_the_log_tells_two_companies_sharing_a_local_ticker_apart(out_dir, monkeypatch):
+    """R16-2. EFA carries SAN on Madrid (Santander) AND Paris (Sanofi); measured live 4
+    such tickers in 657 lines. A bare-ticker set could not see one of them leave."""
+    base = [(f"T{i}", "Tokyo") for i in range(498)] + [("SAN", "Bolsa De Madrid"),
+                                                       ("SAN", "Euronext Paris")]
+    _serve(monkeypatch, _eafe_lines(base))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    _serve(monkeypatch, _eafe_lines(base[:-1]))                  # Sanofi's line goes
+    im.refresh("eafe", today=date(2026, 9, 5))
+    [entry] = _log_lines(out_dir, "eafe")
+    assert entry["removed"] == ["SAN@Euronext Paris"] and entry["count"] == 499
+
+
+def test_after_a_corrupt_base_is_rewritten_the_log_chain_continues_from_it(out_dir, monkeypatch):
+    """R16-3. A -> logged B -> corrupt base -> C rewrites the base -> D (= B). Without
+    logging C, D was compared with B and nothing was recorded: C->B vanished."""
+    c_basket = _A[:-1] + ["T777"]
+    for basket in (_A, _B):
+        _serve(monkeypatch, _csv_members(basket))
+        im.refresh("eafe", today=date(2026, 9, 5))
+    (out_dir / "eafe_2026-09-04.json").write_text("{truncated", encoding="utf-8")
+    for basket in (c_basket, _B):
+        _serve(monkeypatch, _csv_members(basket))
+        im.refresh("eafe", today=date(2026, 9, 5))
+    tails = [sorted(e["members"])[-1:] for e in _log_lines(out_dir, "eafe")]
+    assert len(_log_lines(out_dir, "eafe")) == 3, "B, then C (base rewrite), then back to B"
+
+
+def test_a_torn_last_log_line_does_not_swallow_the_next_entry(out_dir, monkeypatch):
+    """R16-5. A crash can leave a final line with no newline; the next append wrote
+    straight onto it, making one unparseable line out of two observations."""
+    _serve(monkeypatch, _csv_members(_A))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    log_path = out_dir / "eafe_republish_log.jsonl"
+    log_path.write_text('{"as_of": "2026-09-04", "tick', encoding="utf-8")   # torn, no \n
+    _serve(monkeypatch, _csv_members(_B))
+    im.refresh("eafe", today=date(2026, 9, 5))
+    parsed = [json.loads(l) for l in log_path.read_text(encoding="utf-8").splitlines()[1:] if l]
+    assert parsed and parsed[-1]["added"] == ["T500@Tokyo"]
+
+
+def test_a_no_market_line_with_an_unreadable_weight_is_refused():
+    """R16-6. An unreadable weight counted as 0% and slipped under the 0.25% cap."""
+    unknown = IWM_NO_MARKET.replace('"0.00","65,585.87"', '"-","65,585.87"')
+    with pytest.raises(im.IndexMembershipError, match="weight"):
+        im.parse_holdings_ex(_csv(3, unknown))
