@@ -34,5 +34,23 @@
   "source_kind": "announcement",
   "source_url": "https://www.investing.com/news/stock-market-news/altera-files-confidential-ipo-registration-with-the-sec-432SI-4901828",
   "status": "open"
+ },
+ {
+  "company": "Sensorion SA",
+  "first_seen": "2026-09-25",
+  "flipped_to": "",
+  "note": "Announced 2026-09-16: confidential draft F-1 for a US IPO of ADSs. ALREADY COVERED as ALSEN.PA (Euronext Growth Paris) - this is a second listing of a covered name, not a new company. Hearing-loss gene therapy (GJB2).",
+  "source_kind": "announcement",
+  "source_url": "https://www.biospace.com/press-releases/sensorion-announces-confidential-submission-of-draft-registration-statement-to-the-sec-for-potential-u-s-initial-public-offering",
+  "status": "open"
+ },
+ {
+  "company": "Westinghouse Electric Company",
+  "first_seen": "2026-09-25",
+  "flipped_to": "",
+  "note": "Company's own 2026-07-31 release; missed by the 08-xx sweeps and found 09-25. Nuclear reactor design, fuel and services; Brookfield/Cameco owned. Bloomberg 09-21 reports a >$50B target valuation (journalist figure) - Bucket 2 on pricing if that holds.",
+  "source_kind": "announcement",
+  "source_url": "https://www.businesswire.com/news/home/20260731940030/en/Westinghouse-Confidentially-Submits-Draft-Registration-Statement-for-Proposed-Initial-Public-Offering",
+  "status": "open"
  }
 ]
