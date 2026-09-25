@@ -1,7 +1,7 @@
 {
   "schema_version": 4,
   "dataset_version": "2026-09-25",
-  "generated_at": "2026-09-25T12:18:50Z",
+  "generated_at": "2026-09-25T12:21:24Z",
   "source_path": "data/positions_and_researching.csv",
   "entry_count": 66,
   "validation_passed": true,
