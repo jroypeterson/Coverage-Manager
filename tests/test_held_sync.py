@@ -882,88 +882,295 @@ def test_accept_partial_join_is_the_RELEASE_from_an_indefinite_defer(tmp_path):
 # ---------------------------------------------------------------------------
 # Board #347 — a broker holding with no positions row
 #
-# `plan_sync` iterates the EXISTING entries, so a feed holding with no row is never
-# promoted and never reported. `not_in_universe` does not catch it either: that check
-# compares against the UNIVERSE, and a freshly bought name IS in the universe. The two
-# checks look past each other and the gap between them is exactly a new purchase.
+# `plan_sync` iterates the EXISTING entries, so a feed holding with no row was never
+# promoted. `not_in_universe` does not catch it either: that check compares against
+# the UNIVERSE, and a freshly bought name IS in the universe. The gap between the two
+# checks is exactly a new purchase.
 #
 # Reproduced from the row verbatim: positions holds AAPL; the feed carries AAPL and a
-# newly bought MSFT; the universe carries both. Before this, `promotions=[]`,
-# `not_in_universe=[]`, `blocked_reason=None`, and the fleet published a book missing a
-# real position on a green run.
+# newly bought MSFT; the universe carries both. Originally `promotions=[]`,
+# `not_in_universe=[]`, `blocked_reason=None`, and the fleet published a book missing
+# a real position on a green run. 2026-09-15..25 it was reported and exited 2.
+#
+# JP 2026-09-26: "once you see it's in my portfolio shouldn't you just update it
+# automatically" -> "yes". So the row is now CREATED and promoted, named per ticker.
 # ---------------------------------------------------------------------------
 
-def test_a_held_name_with_no_positions_row_is_REPORTED(tmp_path):
+def _universe_csv(tmp_path, tickers):
+    """A throwaway universe carrying the metadata `positions.validate` requires."""
+    import csv
+    uni = tmp_path / "universe.csv"
+    with open(uni, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["Ticker", "Company Name", "Sector (JP)",
+                                          "Subsector (JP)", "Currency", "Exchange"])
+        w.writeheader()
+        for t in tickers:
+            w.writerow({"Ticker": t, "Company Name": t, "Sector (JP)": "Tech",
+                        "Subsector (JP)": "", "Currency": "USD", "Exchange": "NASDAQ"})
+    return uni
+
+
+def test_a_held_covered_name_with_no_positions_row_is_AUTO_ADDED(tmp_path):
     feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
     entries = _entries({"AAPL": ("Portfolio", "Y")})
     plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
 
-    assert plan.held_without_row == ["MSFT"]
-    # and the checks that USED to be the only ones stay empty -- which is the point:
-    # neither of them can see this case, so neither is a substitute for it.
+    assert plan.auto_added == ["MSFT"]
+    assert plan.held_without_row == []          # created, so not also "reported"
+    # the pre-existing lists are untouched by it
     assert plan.promotions == []
+    assert plan.refreshed == ["AAPL"]
     assert plan.not_in_universe == []
     assert plan.blocked_reason is None
 
 
-def test_it_appears_in_the_SUMMARY_not_only_in_the_cli(tmp_path):
-    """`summary_lines` is what the dry run prints and what any other consumer of a
-    plan reads. A finding visible on only one of the two paths is half-reported."""
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
-    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
-                              universe_tickers={"AAPL", "MSFT"})
-    text = " | ".join(plan.summary_lines())
-    assert "HELD, NO ROW" in text and "MSFT" in text
-
-
-def test_a_name_outside_the_universe_is_still_not_in_universe_not_this(tmp_path):
-    """The two findings must stay distinct: one says CM does not cover the name, the
-    other says CM covers it and has no row. Different remedies."""
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "ZZZZ"))))
-    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
-                              universe_tickers={"AAPL"})
-    assert plan.not_in_universe == ["ZZZZ"]
-    assert plan.held_without_row == []
-
-
-def test_no_universe_passed_means_no_claim(tmp_path):
-    """Without `universe_tickers` we cannot tell the two cases apart, so we assert
-    neither -- the same discipline `not_in_universe` already follows."""
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
-    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed)
-    assert plan.held_without_row == []
-    assert plan.not_in_universe == []
-
-
-def test_an_existing_row_is_never_reported_as_missing(tmp_path):
-    """The ordinary case must stay silent, or the finding becomes wallpaper."""
-    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
-    entries = _entries({"AAPL": ("Portfolio", "Y"), "MSFT": ("Researching", "")})
-    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
-    assert plan.held_without_row == []
-    assert plan.promotions == ["MSFT"]          # the normal promotion path still works
-
-
-def test_reporting_a_rowless_holding_changes_NOTHING_that_is_written(tmp_path):
-    """#347 is detection only. Whether a purchase creates a row or blocks the sync is
-    JP's call, so the finding must not leak into `apply_plan` in either direction:
-    no row is invented for MSFT, and AAPL's write is exactly what it would be if the
-    finding did not exist."""
+def test_the_auto_added_row_ENDS_HELD_with_the_feeds_figures_and_no_intent(tmp_path):
+    """The MSFT repro, applied: a row is created and the ordinary promotion sets Held.
+    No intent flag -- the shape of every held row in the real book -- so its published
+    `Position` is `Portfolio`, and its provenance is written where a reader of the file
+    will see it."""
     feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
     entries = _entries({"AAPL": ("Portfolio", "Y")})
     plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
-    assert plan.held_without_row == ["MSFT"]
+    out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 9, 26))
 
-    import copy
-    silent = copy.deepcopy(plan)
-    silent.held_without_row = []
-    today = date(2026, 9, 25)
-    reported = held_mod.apply_plan(entries, feed, plan, today=today)
-    unreported = held_mod.apply_plan(entries, feed, silent, today=today)
+    msft = next(e for e in out if e["Ticker"] == "MSFT")
+    assert msft["Held"] == "Y"
+    assert msft["Held As Of"] == "2026-08-22"
+    assert msft["Shares"] == 10.5 and msft["Average Cost"] == 100.25
+    assert msft["Position Date"] == "2026-09-26"
+    assert not any(pos.has_state(msft, f) for f in pos.STATE_FLAGS)
+    assert pos.published_position(msft) == "Portfolio"
+    assert "auto-added by sync-held 2026-09-26" in msft["Notes"]
+    assert "IBKR" in msft["Notes"]
+    assert entries == _entries({"AAPL": ("Portfolio", "Y")})    # input not mutated
 
-    assert reported == unreported
-    assert [e["Ticker"] for e in reported] == ["AAPL"]     # no MSFT row invented
-    assert plan.is_blocked is False                       # and the sync is not refused
+    # Round-trips through the real file and passes the real validator.
+    path = tmp_path / "positions.csv"
+    pos.save(out, path)
+    reloaded = {e["Ticker"]: e for e in pos.load(path)}
+    assert reloaded["MSFT"]["Held"] == "Y"
+    assert reloaded["MSFT"]["Position"] == "Portfolio"
+    errors, _ = pos.validate(list(reloaded.values()),
+                             universe_csv_path=_universe_csv(tmp_path, ("AAPL", "MSFT")))
+    assert errors == []
+
+    # Idempotent: the next run sees an ordinary held row and creates nothing.
+    again = held_mod.plan_sync(list(reloaded.values()), feed,
+                               universe_tickers={"AAPL", "MSFT"})
+    assert again.auto_added == [] and sorted(again.refreshed) == ["AAPL", "MSFT"]
+
+
+def test_auto_add_leaves_every_OTHER_plan_output_and_row_identical(tmp_path):
+    """Adding a covered rowless holding to the feed must change nothing but the new
+    row: same promotions, refreshes, demotions and withholds, and every pre-existing
+    row written byte-for-byte as it would be without the purchase."""
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "SGRY": ("Researching", ""),
+                        "ZZZZ": ("Researching", "")})
+    uni = {"AAPL", "SGRY", "ZZZZ", "MSFT"}
+    base_feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "SGRY"))))
+    base = held_mod.plan_sync(entries, base_feed, universe_tickers=uni)
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "SGRY", "MSFT"))))
+    plan = held_mod.plan_sync(entries, feed, universe_tickers=uni)
+
+    assert plan.auto_added == ["MSFT"] and base.auto_added == []
+    for name in ("promotions", "demotions", "refreshed", "not_in_universe",
+                 "held_without_row", "withheld_demotions", "withheld_refreshes",
+                 "withheld_reason", "blocked_reason", "feed_as_of"):
+        assert getattr(plan, name) == getattr(base, name), name
+
+    today = date(2026, 9, 26)
+    with_new = held_mod.apply_plan(entries, feed, plan, today=today)
+    without = held_mod.apply_plan(entries, base_feed, base, today=today)
+    assert [e for e in with_new if e["Ticker"] != "MSFT"] == without
+
+
+def test_a_STALE_plan_cannot_mint_a_second_row(tmp_path):
+    """`apply_plan` re-checks presence: a plan computed before someone added the row
+    (or applied twice) must not write two rows for one ticker -- `positions.validate`
+    calls a duplicate an ERROR, and every export would then carry the name twice."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers={"AAPL", "MSFT"})
+    assert plan.auto_added == ["MSFT"]
+    now = _entries({"AAPL": ("Portfolio", "Y"), "MSFT": ("Researching", "")})
+    out = held_mod.apply_plan(now, feed, plan, today=date(2026, 9, 26))
+    assert sorted(e["Ticker"] for e in out) == ["AAPL", "MSFT"]
+
+
+def test_a_name_outside_the_universe_is_still_REPORTED_not_created(tmp_path):
+    """Unchanged behaviour: CM owns the follow-list, so a holding it does not cover
+    is named, not added -- it needs a sector and a human decision."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "ZZZZ"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL"})
+    assert plan.not_in_universe == ["ZZZZ"]
+    assert plan.auto_added == [] and plan.held_without_row == []
+    out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 9, 26))
+    assert [e["Ticker"] for e in out] == ["AAPL"]
+    assert any("HELD BUT NOT IN UNIVERSE" in line and "ZZZZ" in line
+               for line in plan.summary_lines())
+
+
+def test_no_universe_passed_means_no_claim_and_no_row(tmp_path):
+    """Without `universe_tickers` we cannot tell covered from uncovered, so we neither
+    report nor create -- the same discipline `not_in_universe` already follows."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed)
+    assert plan.auto_added == [] and plan.held_without_row == []
+    assert plan.not_in_universe == []
+
+
+def test_an_existing_row_is_promoted_not_auto_added(tmp_path):
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "MSFT": ("Researching", "")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
+    assert plan.auto_added == []
+    assert plan.promotions == ["MSFT"]
+
+
+def test_the_auto_added_row_takes_the_UNIVERSE_spelling(tmp_path):
+    """The feed is upper-cased; the universe is the authority on spelling, and
+    `positions.validate` joins verbatim, so the created row must use the universe's."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "BRK.B"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers={"AAPL", "brk.b"})
+    assert plan.auto_added == ["brk.b"]
+    out = held_mod.apply_plan(_entries({"AAPL": ("Portfolio", "Y")}), feed, plan,
+                              today=date(2026, 9, 26))
+    row = next(e for e in out if e["Ticker"] == "brk.b")
+    assert row["Held"] == "Y"
+
+
+def test_an_auto_add_coinciding_with_a_demotion_WITHHOLDS_it(tmp_path):
+    """A covered name joining Held while another leaves is the shape of a rename. A
+    promoted row already triggers the withhold; an auto-added one must too, or a
+    covered rename OLD -> NEW would stamp OLD sold while creating NEW beside it."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "NEW"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "OLD": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "OLD", "NEW"})
+    assert plan.auto_added == ["NEW"]
+    assert plan.demotions == [] and plan.withheld_demotions == ["OLD"]
+    assert "NEW" in plan.withheld_reason
+
+
+def test_a_withheld_mass_demotion_still_TRIPS_the_circuit_breaker(tmp_path):
+    """A fresh, well-formed, WRONG feed carrying one covered new name and none of the
+    real holdings: the auto-add is a promotion, so the demotions are withheld -- and a
+    breaker that counted only the un-withheld list saw zero and let the run write
+    (Codex, #347 round 2). Every name the feed says left Held must count."""
+    n = held_mod.MAX_DEMOTIONS_PER_RUN + 1
+    old = [f"O{i:02d}" for i in range(n)]
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("NEW",))))
+    entries = _entries({t: ("Portfolio", "Y") for t in old})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"NEW", *old})
+    assert plan.is_blocked
+    assert f"{n} names would leave Held" in plan.blocked_reason
+    with pytest.raises(held_mod.HeldFeedError):
+        held_mod.apply_plan(entries, feed, plan)
+
+    # The same with an EXISTING row promoted instead of an auto-add (pre-existing path).
+    entries2 = entries + _entries({"NEW": ("Researching", "")})
+    assert held_mod.plan_sync(entries2, feed, universe_tickers={"NEW", *old}).is_blocked
+
+
+def test_metadata_incomplete_names_are_reported_not_created(tmp_path):
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT", "NVDA"))))
+    plan = held_mod.plan_sync(_entries({"AAPL": ("Portfolio", "Y")}), feed,
+                              universe_tickers={"AAPL", "MSFT", "NVDA"},
+                              metadata_incomplete={"NVDA"})
+    assert plan.auto_added == ["MSFT"]
+    assert plan.held_without_row == ["NVDA"]
+
+
+def test_a_REPORTED_rowless_name_still_withholds_a_rename_and_a_split(tmp_path):
+    """A covered rowless name this run does NOT create (here: incomplete universe
+    metadata) did not join the book, so it can be the other half of a rename or a
+    split. It must withhold a coinciding demotion and a moving refresh exactly as an
+    uncovered holding does (Codex, #347 round 3)."""
+    # rename: OLD held, feed now says NEW (covered, rowless, not creatable)
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "NEW"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y"), "OLD": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "OLD", "NEW"},
+                              metadata_incomplete={"NEW"})
+    assert plan.held_without_row == ["NEW"] and plan.auto_added == []
+    assert plan.demotions == [] and plan.withheld_demotions == ["OLD"]
+
+    # split: OLD 100 recorded, feed OLD 80 + NEW 20
+    payload = _feed_payload(("OLD", "NEW"))
+    payload["held"][0]["shares"] = 80.0
+    feed2 = held_mod.load_feed(_write_feed(tmp_path, payload))
+    entries2 = _entries({"OLD": ("Portfolio", "Y")})
+    entries2[0]["Shares"] = 100.0
+    plan2 = held_mod.plan_sync(entries2, feed2, universe_tickers={"OLD", "NEW"},
+                               metadata_incomplete={"NEW"})
+    assert plan2.withheld_refreshes == ["OLD"] and plan2.refreshed == []
+
+    # ...and the operator's release really releases the figures (Codex, #347 r4):
+    # before, `--accept-partial-join` left them in `withheld_refreshes`, which
+    # `apply_plan` skips, so the stale 100 stood for ever and the run exited 2.
+    released = held_mod.plan_sync(entries2, feed2, universe_tickers={"OLD", "NEW"},
+                                  metadata_incomplete={"NEW"}, accept_partial_join=True)
+    assert released.withheld_refreshes == [] and released.refreshed == ["OLD"]
+    out = held_mod.apply_plan(entries2, feed2, released, today=date(2026, 9, 26))
+    assert out[0]["Shares"] == 80.0
+
+
+def test_a_NEGATIVE_share_count_aborts_before_writing(tmp_path):
+    """`positions.load` rejects a negative share count, so writing one leaves a book
+    nothing can read; the publisher never emits one, so it is a broken feed
+    (Codex, #347 round 6)."""
+    payload = _feed_payload(("AAPL", "MSFT"))
+    payload["held"][1]["shares"] = -5.0
+    with pytest.raises(held_mod.HeldFeedError, match="nothing has been written"):
+        held_mod.load_feed(_write_feed(tmp_path, payload))
+
+
+@pytest.mark.parametrize("cost", [0.0, -1.0])
+def test_a_ZERO_basis_is_unknown_basis_and_the_book_stays_readable(tmp_path, cost):
+    """portfolio_daily publishes avg_cost=0.0 for a holding with no known basis. That
+    must not abort the sync (a guard becoming the outage, Codex #347 round 7), and it
+    must not be written as 0 either (`positions.load` would then refuse the whole
+    book). It is recorded as unknown, end to end through a real save and load."""
+    payload = _feed_payload(("AAPL", "MSFT"))
+    payload["held"][1]["avg_cost"] = cost
+    feed = held_mod.load_feed(_write_feed(tmp_path, payload))
+    assert feed.rows["MSFT"].avg_cost is None
+    entries = _entries({"AAPL": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
+    path = tmp_path / "positions.csv"
+    pos.save(held_mod.apply_plan(entries, feed, plan, today=date(2026, 9, 26)), path)
+    msft = next(e for e in pos.load(path) if e["Ticker"] == "MSFT")
+    assert msft["Held"] == "Y" and msft["Average Cost"] is None
+
+
+def test_more_than_the_cap_are_REPORTED_and_none_created(tmp_path):
+    """A feed carrying a dozen covered names the book never held is a publisher
+    fault, not a week of purchases. Creating the first N would be an arbitrary partial
+    book, so none are created and all fall back to the report."""
+    n = held_mod.MAX_AUTO_ADDS_PER_RUN + 1
+    new = [f"N{i:02d}" for i in range(n)]
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", *new))))
+    entries = _entries({"AAPL": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", *new})
+    assert plan.auto_added == []
+    assert plan.held_without_row == sorted(new)
+    out = held_mod.apply_plan(entries, feed, plan, today=date(2026, 9, 26))
+    assert [e["Ticker"] for e in out] == ["AAPL"]
+    assert any("HELD, NO ROW" in line for line in plan.summary_lines())
+
+    # An incomplete-metadata name still counts toward the cap: cap-many creatable
+    # names plus one that is not must create NOTHING (Codex, #347 round 5).
+    at_cap = new[:held_mod.MAX_AUTO_ADDS_PER_RUN]
+    plan3 = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", *new},
+                               metadata_incomplete={new[-1]})
+    assert plan3.auto_added == [] and plan3.held_without_row == sorted(new)
+
+    # ...and exactly at the cap, all are created.
+    at_cap = new[:held_mod.MAX_AUTO_ADDS_PER_RUN]
+    feed2 = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", *at_cap))))
+    plan2 = held_mod.plan_sync(entries, feed2, universe_tickers={"AAPL", *at_cap})
+    assert plan2.auto_added == sorted(at_cap) and plan2.held_without_row == []
 
 
 def _run_cli(monkeypatch, capsys, argv):
@@ -987,69 +1194,103 @@ def _run_cli(monkeypatch, capsys, argv):
     return (0 if code is None else code), capsys.readouterr().out
 
 
-def test_sync_held_EXITS_2_and_names_the_rowless_holding(tmp_path, monkeypatch, capsys):
-    """End to end through the real CLI, on temp files only. Before 2026-09-25 the
-    `return 2` for this case never reached the process: `cli.py` called `main()`
-    and dropped its value, so the run exited 0 and the only non-ok signal #347 had
-    was lost."""
-    real_positions = pos.POSITIONS_PATH
-    real_bytes = real_positions.read_bytes() if real_positions.exists() else None
-
+def _cli_book(tmp_path, monkeypatch, feed_tickers, universe, incomplete=()):
     book_path = tmp_path / "positions.csv"
     pos.save(_entries({"AAPL": ("Researching", "Y")}), book_path)
-    feed_path = _write_feed(tmp_path, _feed_payload(("AAPL", "MSFT")))
+    feed_path = _write_feed(tmp_path, _feed_payload(feed_tickers))
     monkeypatch.setattr(pos, "POSITIONS_PATH", book_path)
-    monkeypatch.setattr(pos, "_load_universe_tickers", lambda *a, **k: {"AAPL", "MSFT"})
+    rows = {t: {"Ticker": t, "Company Name": t, "Sector (JP)": "Tech",
+                "Currency": "USD", "Exchange": "" if t in incomplete else "NASDAQ"}
+            for t in universe}
+    monkeypatch.setattr(pos, "_load_universe_rows", lambda *a, **k: dict(rows))
+    return book_path, feed_path
+
+
+def test_a_universe_row_MISSING_METADATA_is_reported_not_auto_added(tmp_path, monkeypatch, capsys):
+    """`catalyst_watch` gates the whole positions export on `validation_passed`, and
+    `positions.validate` errors on a row whose universe entry lacks Company Name /
+    Sector / Currency / Exchange. Auto-adding one would drop every name from that
+    lane, so it falls back to the report (Codex, #347 round 2)."""
+    book_path, feed_path = _cli_book(tmp_path, monkeypatch, ("AAPL", "MSFT", "NVDA"),
+                                     {"AAPL", "MSFT", "NVDA"}, incomplete={"NVDA"})
+    code, out = _run_cli(monkeypatch, capsys,
+                         ["positions", "sync-held", "--feed", str(feed_path)])
+    assert code == 2
+    assert "auto-added MSFT - held at IBKR" in out
+    assert "auto-added NVDA" not in out
+    assert "HELD, NO ROW" in out and "NVDA" in out and "lacks Company Name" in out
+    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL", "MSFT"]
+
+
+def test_sync_held_AUTO_ADDS_names_it_and_exits_0(tmp_path, monkeypatch, capsys):
+    """End to end through the real CLI, on temp files only: the MSFT repro ends with
+    MSFT in `Held`, a per-ticker line saying so, and a clean exit."""
+    real_positions = pos.POSITIONS_PATH
+    real_bytes = real_positions.read_bytes() if real_positions.exists() else None
+    book_path, feed_path = _cli_book(tmp_path, monkeypatch, ("AAPL", "MSFT"),
+                                     {"AAPL", "MSFT"})
 
     code, out = _run_cli(monkeypatch, capsys,
                          ["positions", "sync-held", "--feed", str(feed_path)])
 
-    assert code == 2
-    assert "HELD, NO ROW" in out and "MSFT" in out
-    assert "board #347" in out
-    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL"]   # nothing invented
-
-    # Run the remedy forward: the warning says add a row, THEN re-run sync-held.
-    # Following both steps must end with MSFT actually in `Held` and a clean exit.
-    assert "re-run `python cli.py positions sync-held`" in out
-    import csv
-    uni = tmp_path / "universe.csv"
-    with open(uni, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["Ticker", "Company Name", "Sector (JP)",
-                                          "Subsector (JP)", "Currency", "Exchange"])
-        w.writeheader()
-        for t in ("AAPL", "MSFT"):
-            w.writerow({"Ticker": t, "Company Name": t, "Sector (JP)": "Tech",
-                        "Subsector (JP)": "", "Currency": "USD", "Exchange": "NASDAQ"})
-    pos.add("MSFT", position="Researching", path=book_path, universe_csv_path=uni)
-    code2, out2 = _run_cli(monkeypatch, capsys,
-                           ["positions", "sync-held", "--feed", str(feed_path)])
-    assert code2 == 0, out2
+    assert code == 0, out
+    assert "auto-added MSFT - held at IBKR, no coverage row existed" in out
+    assert "auto-add row" in out and "HELD, NO ROW" not in out
     held = {e["Ticker"]: e["Held"] for e in pos.load(book_path)}
     assert held == {"AAPL": "Y", "MSFT": "Y"}
+
+    # A second run is ordinary: nothing created, nothing announced.
+    code2, out2 = _run_cli(monkeypatch, capsys,
+                           ["positions", "sync-held", "--feed", str(feed_path)])
+    assert code2 == 0 and "auto-add" not in out2
+    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL", "MSFT"]
 
     # Assert the negative: the production book was never the file written.
     if real_bytes is not None:
         assert real_positions.read_bytes() == real_bytes
 
 
-def test_the_remedy_the_warning_prints_is_a_command_that_parses(tmp_path, monkeypatch, capsys):
-    """The warning's one instruction said `python cli.py pos add <TICKER> ...` -- a
-    subcommand that does not exist. Parse what is actually printed with the real
-    parser, so the next rename of a subcommand breaks this test, not JP's paste."""
+def test_dry_run_SHOWS_the_auto_add_and_writes_NOTHING(tmp_path, monkeypatch, capsys):
+    book_path, feed_path = _cli_book(tmp_path, monkeypatch, ("AAPL", "MSFT"),
+                                     {"AAPL", "MSFT"})
+    before = book_path.read_bytes()
+    code, out = _run_cli(monkeypatch, capsys,
+                         ["positions", "sync-held", "--dry-run", "--feed", str(feed_path)])
+    assert code == 0
+    assert "would auto-add MSFT - held at IBKR, no coverage row existed" in out
+    assert "[dry run] nothing written" in out
+    assert "auto-added MSFT" not in out
+    assert book_path.read_bytes() == before
+
+
+def test_sync_held_not_in_universe_is_UNCHANGED_exit_2_no_row(tmp_path, monkeypatch, capsys):
+    book_path, feed_path = _cli_book(tmp_path, monkeypatch, ("AAPL", "ZZZZ"), {"AAPL"})
+    code, out = _run_cli(monkeypatch, capsys,
+                         ["positions", "sync-held", "--feed", str(feed_path)])
+    assert code == 2
+    assert "HELD BUT NOT IN UNIVERSE" in out and "ZZZZ" in out
+    assert "auto-add" not in out
+    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL"]
+
+
+def test_over_the_cap_the_cli_EXITS_2_and_its_remedy_parses(tmp_path, monkeypatch, capsys):
+    """Over `MAX_AUTO_ADDS_PER_RUN` nothing is created and the old warning returns.
+    Its remedy said `python cli.py pos add <TICKER> ...` once -- a subcommand that
+    does not exist. Parse what is actually printed with the real parser, so the next
+    rename of a subcommand breaks this test, not JP's paste."""
     import re
     import importlib.util
-
-    book_path = tmp_path / "positions.csv"
-    pos.save(_entries({"AAPL": ("Researching", "Y")}), book_path)
-    feed_path = _write_feed(tmp_path, _feed_payload(("AAPL", "MSFT")))
-    monkeypatch.setattr(pos, "POSITIONS_PATH", book_path)
-    monkeypatch.setattr(pos, "_load_universe_tickers", lambda *a, **k: {"AAPL", "MSFT"})
-
-    _, out = _run_cli(monkeypatch, capsys,
-                      ["positions", "sync-held", "--dry-run", "--feed", str(feed_path)])
-    import csv
     import shlex
+
+    new = [f"N{i:02d}" for i in range(held_mod.MAX_AUTO_ADDS_PER_RUN + 1)]
+    book_path, feed_path = _cli_book(tmp_path, monkeypatch, ("AAPL", *new),
+                                     {"AAPL", *new})
+    code, out = _run_cli(monkeypatch, capsys,
+                         ["positions", "sync-held", "--feed", str(feed_path)])
+    assert code == 2
+    assert "HELD, NO ROW" in out and "board #347" in out
+    assert "auto-added N" not in out
+    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL"]
 
     m = re.search(r"`python cli\.py ([^`]+)`, <state> one of: ([^)]+)\)", out)
     assert m, f"no pasteable command + state list in the warning:\n{out}"
@@ -1063,7 +1304,8 @@ def test_the_remedy_the_warning_prints_is_a_command_that_parses(tmp_path, monkey
 
     # A throwaway universe carrying a SPACED ticker, so `positions.add` gets past the
     # membership check and its POSITION validation is what is under test.
-    uni = tmp_path / "universe.csv"
+    import csv
+    uni = tmp_path / "universe_spaced.csv"
     with open(uni, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["Ticker", "Company Name", "Sector (JP)",
                                           "Subsector (JP)", "Currency", "Exchange"])
@@ -1071,16 +1313,14 @@ def test_the_remedy_the_warning_prints_is_a_command_that_parses(tmp_path, monkey
         w.writerow({"Ticker": "AMP IM", "Company Name": "Amplifon", "Sector (JP)": "MedTech",
                     "Subsector (JP)": "", "Currency": "EUR", "Exchange": "Borsa Italiana"})
 
+    monkeypatch.undo()     # `pos.add` below must read the real (temp) universe file
     for state in states:
-        # A universe ticker can contain a space (`AMP IM`), so the placeholder must
-        # survive substitution as ONE argument -- which is why it is printed quoted.
         argv = shlex.split(template.replace("<TICKER>", "AMP IM").replace("<state>", state))
         args = cli_mod.build_parser().parse_args(argv)      # SystemExit(2) if invalid
         assert (args.command, args.pos_command, args.ticker, args.position) == (
             "positions", "add", "AMP IM", state)
         # Parsing is not enough: the parser accepts `Portfolio`, which the handler
-        # rejects. Run each named state through the function the CLI calls, on
-        # temp files (its default paths are bound at import, so they are passed).
+        # rejects. Run each named state through the function the CLI calls.
         target = tmp_path / f"add_{state.replace(' ', '_')}.csv"
         pos.add(args.ticker, position=args.position, path=target, universe_csv_path=uni)
         assert [e["Ticker"] for e in pos.load(target)] == ["AMP IM"]

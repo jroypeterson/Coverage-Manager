@@ -948,8 +948,15 @@ def main():
 
             entries = positions.load(positions.POSITIONS_PATH)
             entries, migrated, already_sold = held_mod.migrate_legacy_portfolio(entries, feed)
-            plan = held_mod.plan_sync(entries, feed, positions._load_universe_tickers(),
-                                      accept_partial_join=getattr(args, 'accept_partial_join', False))
+            universe_rows = positions._load_universe_rows()
+            plan = held_mod.plan_sync(
+                entries, feed, set(universe_rows),
+                accept_partial_join=getattr(args, 'accept_partial_join', False),
+                # A row `positions.validate` would reject is never auto-added (#347).
+                metadata_incomplete={
+                    t for t, row in universe_rows.items()
+                    if any(not (row.get(f) or "").strip()
+                           for f in positions.REQUIRED_METADATA_FIELDS)})
             plan.migrated_legacy = migrated
             plan.already_sold = already_sold
 
@@ -981,16 +988,30 @@ def main():
                       "<state> one of: "
                       + ", ".join(positions.POSITION_VALUES_ORDERED)
                       + "), then re-run `python cli.py positions sync-held` -- the add alone does "
-                      "not set Held. Or decide the policy (board #347).")
+                      f"not set Held. They were not auto-added: either more than "
+                      f"{held_mod.MAX_AUTO_ADDS_PER_RUN} would be created in one run (check "
+                      "the feed first), or the universe row lacks Company Name / Sector (JP) "
+                      "/ Currency / Exchange (fix the universe row) (board #347).")
 
             if plan.is_blocked:
                 return 2
+
+            def _auto_add_lines(verb):
+                # One line per ticker, named: a row this run creates is a change to the
+                # book nobody typed, so it must be read, not inferred from a count.
+                # ASCII only: this prints to a cp1252 console (test_delisted_check pins it).
+                for t in plan.auto_added:
+                    brokers = ", ".join(feed.rows[t.upper()].brokers) or "a broker"
+                    print(f"  {verb} {t} - held at {brokers}, no coverage row existed")
+
             if args.dry_run:
+                _auto_add_lines("would auto-add")
                 print("  [dry run] nothing written")
                 return 0
 
             updated = held_mod.apply_plan(entries, feed, plan)
             positions.save(updated, positions.POSITIONS_PATH)
+            _auto_add_lines("auto-added")
             print(f"  wrote {positions.POSITIONS_PATH}")
             # A held ticker the universe does not know is NOT fatal, but it must not
             # exit 0 either -- a silent 0 is how it would go unread for months.
@@ -1002,7 +1023,10 @@ def main():
             # holding that IS covered but has no positions row was dropped from `Held`
             # with every counter empty and exit 0 -- the fleet publishing a book
             # missing a real position on a green run. Same reasoning as the line
-            # above: the run did something correct but incomplete.
+            # above: the run did something correct but incomplete. Since 2026-09-26
+            # (JP) such a holding is normally AUTO-ADDED, which is complete and exits
+            # 0; `held_without_row` now holds only the names NOT created (over the
+            # per-run cap, or an incomplete universe row).
             return 2 if (plan.not_in_universe or plan.withheld_demotions
                          or plan.withheld_refreshes
                          or plan.held_without_row) else 0

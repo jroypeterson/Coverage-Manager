@@ -69,27 +69,38 @@ present, fresh, well-formed and WRONG. A real day sells one or two names; thirty
 means the publisher broke, and the circuit breaker turns a silent catastrophe into
 a loud refusal.
 
-## What a broker holding the sync cannot place gets: a REPORT, not a row
+## A covered holding with no row gets a ROW; an uncovered one gets a REPORT
 
-`plan_sync` walks the EXISTING rows of `positions_and_researching.csv`, so it can
-only promote a holding that already has a row. A feed holding that does not map to
-a row is therefore NOT written to `Held` -- it is named instead, in one of two
-lists, because the remedies differ:
+`plan_sync` walks the EXISTING rows of `positions_and_researching.csv`, so on its
+own it can only promote a holding that already has a row. A feed holding that does
+not map to a row falls into one of two cases, handled differently on purpose:
 
-  * `not_in_universe` -- the name is not in the coverage universe at all.
-  * `held_without_row` -- the name IS covered but has no positions row (board
-    #347: a fresh purchase of a covered name). Before 2026-09-15 this case was
-    dropped with every counter empty and a green exit.
+  * **covered, no positions row** (board #347: a fresh purchase of a covered name)
+    -- the row is CREATED. JP, 2026-09-26: *"once you see it's in my portfolio
+    shouldn't you just update it automatically"* -> *"yes"*. `plan_sync` lists it in
+    `auto_added`; `apply_plan` creates the row with no intent flag (the shape of
+    every held row -- ownership is the `Held` fact, not an intent, and `positions.add`
+    rejects `Portfolio`) and then promotes it through the ordinary path, so it ends
+    `Held=Y` with the feed's shares and cost. Each one is printed by name
+    ("auto-added <T> - held at <broker>, no coverage row existed", or "would
+    auto-add" under `--dry-run`, which writes nothing) and stamped in `Notes`. It is
+    NOT a non-zero exit: the run did the complete, correct thing. Before 2026-09-15
+    this case was dropped with every counter empty and a green exit; from then to
+    2026-09-26 it was reported and exited 2 while the policy was open.
+    An auto-added name counts as a name joining `Held` for the rename withhold
+    below, exactly as a promotion does.
+  * **not in the coverage universe** (`not_in_universe`) -- NOT created. CM owns the
+    follow-list; a holding it does not cover needs a sector and a human decision to
+    enter the universe. Reported, exit 2 on a writing run, absent from `Held` and
+    `portfolio.json` until someone adds it.
 
-Both appear in `summary_lines` (so a dry run prints them) and in the CLI's warning
-block, and make a WRITING `sync-held` run exit 2. A `--dry-run` still exits 0 on
-them, as it always has for every finding here: it is a preview, and its exit code
-is not a health signal. Neither is fatal and neither creates a row:
-whether a purchase should auto-create a row or block the sync is JP's call and is
-still open on #347. So the honest contract is "never dropped SILENTLY", not "never
-dropped" -- until a row exists, such a holding is absent from `Held` and from
-`portfolio.json`. Symbols are compared after the alias map (`SYMBOL_ALIASES`) is
-applied, so the FI/FISV split (#345) does not show up here.
+`held_without_row` survives for the covered names NOT created: all of them when
+more than `MAX_AUTO_ADDS_PER_RUN` would be created in one run (that many is a wrong
+feed, not a week of purchases), and any whose universe row lacks a field
+`positions.validate` requires (`metadata_incomplete`). Reported as before, exit 2. A `--dry-run` exits 0 on every finding here, as it always has: it
+is a preview, and its exit code is not a health signal. Symbols are compared after
+the alias map (`SYMBOL_ALIASES`) is applied, so the FI/FISV split (#345) does not
+show up here.
 """
 from __future__ import annotations
 
@@ -123,6 +134,14 @@ HELD_STALE_MAX_DAYS = 10.0
 # the 2026-08-21 pair (2). Five leaves generous headroom for a genuine rebalance
 # while still catching any failure that empties or halves the feed.
 MAX_DEMOTIONS_PER_RUN = 5
+
+# The same breaker for the opposite direction (board #347, 2026-09-26). A real week
+# buys one to three covered names; a feed that suddenly carries a dozen covered names
+# the book has never held is a publisher fault, and creating a dozen rows would
+# publish them all as owned. Above the cap NOTHING is auto-added -- every such name
+# falls back to the pre-2026-09-26 behaviour (named in `held_without_row`, exit 2) --
+# rather than creating the first N, which would be an arbitrary partial book.
+MAX_AUTO_ADDS_PER_RUN = 5
 
 # Where a sold name lands. It was `Researching` for two days because three
 # consumers could not see anything else -- a constraint masquerading as a
@@ -331,12 +350,20 @@ class SyncPlan:
     #: was in it. The two existing checks look past each other and the gap between them
     #: is exactly a new purchase.
     #:
-    #: Reported, not acted on. The row says the remedy — create the row, or block the
-    #: sync until JP adds it — is his call, and it is: blocking stalls every export
-    #: behind a purchase, auto-creating makes CM assert coverage of something nobody
-    #: triaged. Naming them needs no decision and closes the half of the defect that is
-    #: in the title: it is no longer SILENT.
+    #: Since 2026-09-26 this is only the OVERFLOW: JP decided the policy ("once you
+    #: see it's in my portfolio shouldn't you just update it automatically" -> "yes"),
+    #: so a rowless covered holding is normally CREATED (`auto_added`, below). It lands
+    #: here -- reported, not created, exit 2 -- only when more than
+    #: `MAX_AUTO_ADDS_PER_RUN` would be created in one run, which is the shape of a
+    #: wrong feed rather than a week of purchases.
     held_without_row: list[str] = field(default_factory=list)
+    #: Covered feed holdings with no positions row that `apply_plan` will CREATE a row
+    #: for (board #347, JP 2026-09-26). Values are the UNIVERSE's spelling of the
+    #: ticker, so the new row joins its universe row exactly. The created row carries
+    #: no intent flag -- the shape of every held row in the book, since ownership is
+    #: the `Held` fact and not an intent -- and the ordinary promotion path then sets
+    #: `Held`, `Shares` and `Average Cost` from the feed.
+    auto_added: list[str] = field(default_factory=list)
     #: Demotions held back because the join could not be trusted this run. They are
     #: NOT applied and NOT a block -- see the withhold rule in `plan_sync`.
     withheld_demotions: list[str] = field(default_factory=list)
@@ -367,6 +394,16 @@ class SyncPlan:
             + (f"  {', '.join(self.demotions)}" if self.demotions else ""),
             f"refreshed       : {len(self.refreshed)}",
         ]
+        if self.auto_added:
+            # In the SUMMARY as well as the CLI's per-ticker lines: a row this run
+            # CREATES is a change to the book, and it must be as visible as a
+            # promotion -- more so, since nobody typed it.
+            out.append(
+                f"auto-add row    : {len(self.auto_added)}"
+                f"  {', '.join(self.auto_added)}"
+                " - held at a broker, covered, no positions row existed"
+                " (board #347, JP 2026-09-26)"
+            )
         if self.held_without_row:
             # In the SUMMARY, not only in the CLI's warning block: `summary_lines` is
             # what the dry run prints and what any other consumer of a plan reads, and
@@ -374,7 +411,9 @@ class SyncPlan:
             out.append(
                 f"HELD, NO ROW    : {len(self.held_without_row)}"
                 f"  {', '.join(self.held_without_row)}"
-                " - owned, covered, and absent from the positions file (board #347)"
+                " - owned, covered, and absent from the positions file; NOT auto-added "
+                f"(more than {MAX_AUTO_ADDS_PER_RUN} would be created in one run, or the "
+                "universe row lacks required metadata) (board #347)"
             )
         if self.withheld_demotions or self.withheld_refreshes:
             out.append(
@@ -467,6 +506,27 @@ def load_feed(path=None) -> HeldFeed:
                 f"({r.get('avg_cost')!r})")
         shares = float(r.get("shares") or 0.0)
         avg_cost = None if r.get("avg_cost") is None else float(r["avg_cost"])
+        # The positions book cannot HOLD these: `positions.load` rejects a negative
+        # share count and a non-positive cost, so writing one leaves a file every
+        # later sync and export refuses to read (Codex, #347 round 6 -- an auto-added
+        # row made it reachable for a brand-new name; any promotion or refresh could
+        # already do it).
+        #   * cost <= 0 -> UNKNOWN, not an abort. portfolio_daily publishes 0.0 for a
+        #     Fidelity holding with no basis at all (import_fidelity.py), so refusing
+        #     it would stop the whole sync every day over a real position (Codex
+        #     round 7: a guard becoming the outage). None is what it means.
+        #   * shares < 0 -> abort. The publisher never emits it (export_held skips
+        #     any aggregate <= 0), so it can only be a broken feed.
+        if avg_cost is not None and avg_cost <= 0:
+            logger.warning("held feed: %s carries avg_cost=%r - recorded as unknown "
+                           "basis (the positions book cannot hold a non-positive cost)",
+                           t, avg_cost)
+            avg_cost = None
+        if shares < 0:
+            raise HeldFeedError(
+                f"ownership feed row {t} carries shares={shares!r} - the positions book "
+                f"rejects a negative share count, so writing it would leave a file "
+                f"nothing can read. Fix the publisher; nothing has been written")
         brokers = list(r.get("brokers") or [])
         prior = rows.get(t)
         if prior is None:
@@ -604,11 +664,18 @@ def migrate_legacy_portfolio(entries, feed: "HeldFeed"):
     return out, sorted(migrated), sorted(already_sold)
 
 
-def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_join: bool = False) -> SyncPlan:
+def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_join: bool = False,
+              metadata_incomplete=None) -> SyncPlan:
     """Compute the change WITHOUT touching disk.
 
     `entries` is `positions.load()` output. Pure function so the dry-run and the
     real run cannot disagree about what is about to happen.
+
+    `metadata_incomplete` names universe tickers whose row lacks a field
+    `positions.validate` requires. Such a name is never AUTO-ADDED: the row would
+    fail positions validation, and `catalyst_watch` gates the WHOLE positions export
+    on `validation_passed` -- one incomplete auto-added row would drop every name
+    from that lane. It is reported in `held_without_row` instead (Codex, #347 r2).
     """
     plan = SyncPlan(feed_as_of=feed.as_of)
     by_ticker = {e["Ticker"].strip().upper(): e for e in entries}
@@ -622,8 +689,28 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
         # both, so it was dropped from `Held` on a green run with every counter empty.
         # The module's own docstring claimed a held ticker was "reported every run and
         # never silently dropped"; this is the case that claim missed.
-        plan.held_without_row = sorted(
-            t for t in feed.rows if t in known and t not in by_ticker)
+        rowless = sorted(t for t in feed.rows if t in known and t not in by_ticker)
+        incomplete = {t.strip().upper() for t in (metadata_incomplete or ())}
+        unfit = [t for t in rowless if t in incomplete]
+        rowless = [t for t in rowless if t not in incomplete]
+        # JP 2026-09-26: "once you see it's in my portfolio shouldn't you just update
+        # it automatically" -> "yes". So these are CREATED, not merely named -- unless
+        # there are more than a real week of purchases, in which case none are.
+        # The cap counts EVERY covered rowless name, creatable or not: it is a signal
+        # about the FEED, and an incomplete universe row does not make a dozen new
+        # names any likelier to be real (Codex, #347 round 5).
+        if len(rowless) + len(unfit) > MAX_AUTO_ADDS_PER_RUN:
+            plan.held_without_row = sorted(rowless + unfit)
+        else:
+            plan.held_without_row = unfit
+            # The universe's own spelling, so the created row joins its universe row
+            # exactly (`positions.validate` matches tickers verbatim). On a case-only
+            # universe duplicate the upper-case spelling wins, else the first sorted.
+            spellings: dict[str, list[str]] = {}
+            for raw in universe_tickers:
+                spellings.setdefault(raw.strip().upper(), []).append(raw.strip())
+            plan.auto_added = [
+                t if t in spellings[t] else sorted(spellings[t])[0] for t in rowless]
 
     for ticker, entry in sorted(by_ticker.items()):
         was_held = (entry.get("Held") or "").strip().upper() == "Y"
@@ -751,16 +838,30 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
     # that stays stale for a run, reported every time and exiting non-zero -- the
     # trade this module's own docstring already makes: never read absence as sold.
     withhold_reasons = []
-    if plan.demotions and plan.not_in_universe:
+    # A feed holding with no row that this run does NOT create (`held_without_row`:
+    # over the auto-add cap, or an incomplete universe row) did not join the book
+    # either, so it is exactly as able to be the other half of a rename or a split as
+    # an uncovered one. Before #347's auto-add these names were ignored here and a
+    # covered rename OLD -> NEW stamped OLD sold (Codex, #347 round 3).
+    unjoined = plan.not_in_universe + plan.held_without_row
+    if plan.demotions and unjoined:
         withhold_reasons.append(
-            f"{len(plan.not_in_universe)} feed holding(s) did not join the universe "
-            f"({', '.join(plan.not_in_universe[:5])})")
+            f"{len(unjoined)} feed holding(s) did not join the "
+            f"{'positions book' if plan.held_without_row else 'universe'} "
+            f"({', '.join(unjoined[:5])})")
 
     # The same doubt without any unjoined row: a promotion carrying a demotion's
     # share count is the shape of ONE position moving between two covered rows --
     # the case where the universe holds two rows for one issuer and no alias links
     # them. Zero unjoined holdings, so the check above cannot see it.
-    if plan.demotions and plan.promotions:
+    #
+    # An AUTO-ADDED row is a promotion for this purpose (board #347, 2026-09-26): it
+    # is a covered name joining Held, which is exactly the other half of a rename.
+    # Before auto-add such a name was not promoted at all, so this check could not
+    # see it; now that it IS written as held, leaving it out would let a covered
+    # rename OLD -> NEW stamp OLD sold while NEW is created beside it.
+    joined = plan.promotions + [t.upper() for t in plan.auto_added]
+    if plan.demotions and joined:
         # NO SHARE COMPARISON HERE. The previous version required the promoted row
         # to carry the SAME count as the demoted one -- the exact premise this
         # redesign was written to delete, left gating the covered-row path. Codex
@@ -773,8 +874,8 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
         # any promotion is deferred. That over-defers a real rotation week by one
         # run, which is why `--accept-partial-join` exists as the release.
         withhold_reasons.append(
-            f"{len(plan.promotions)} name(s) joined Held in the same run "
-            f"({', '.join(plan.promotions[:5])}) -- with no identity anchor on the "
+            f"{len(joined)} name(s) joined Held in the same run "
+            f"({', '.join(joined[:5])}) -- with no identity anchor on the "
             f"feed, a rename is indistinguishable from a sale plus a purchase")
 
     # A REFRESH CAN LOSE SHARES TO AN UNJOINED SYMBOL TOO, and that is corruption
@@ -783,7 +884,7 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
     # unjoined FISV:20, and writing 10 silently discards two thirds of the holding
     # and one broker's cost basis. Same doubt, same answer -- hold the figures back
     # rather than write a number we cannot trust.
-    if plan.not_in_universe:
+    if unjoined:
         for ticker in list(plan.refreshed):
             recorded = _shares_of(by_ticker.get(ticker, {}))
             now = feed.rows[ticker].shares if ticker in feed.rows else None
@@ -800,7 +901,7 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
                 plan.withheld_refreshes.append(ticker)
                 withhold_reasons.append(
                     f"{ticker} would drop {recorded - now:g} share(s) while "
-                    f"{len(plan.not_in_universe)} holding(s) did not join")
+                    f"{len(unjoined)} holding(s) did not join")
 
     # ⛑ THE RELEASE. Without one, a single persistently-uncovered holding defers
     # every real sale FOREVER, and exit 2 is a repeated warning, not a mechanism --
@@ -810,6 +911,13 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
     # `--accept-partial-join`; the reasons are still printed, so the decision is
     # recorded in the run output rather than made silently by a default.
     if withhold_reasons and accept_partial_join:
+        # The refreshes withheld above go BACK into `refreshed`: the release said it
+        # applied "figure updates", but they stayed in `withheld_refreshes`, which
+        # `apply_plan` skips and the CLI exits 2 on -- so the release could never
+        # release them and the stale count stood for ever (Codex, #347 round 4;
+        # pre-existing, made reachable by more names counting as unjoined).
+        plan.refreshed = sorted(plan.refreshed + plan.withheld_refreshes)
+        plan.withheld_refreshes = []
         logger.warning(
             "accept-partial-join: applying %d demotion(s) and %d figure update(s) "
             "the join could not vouch for, on operator instruction: %s",
@@ -832,10 +940,19 @@ def plan_sync(entries, feed: HeldFeed, universe_tickers=None, accept_partial_joi
         )
         logger.warning("%s", plan.withheld_reason)
 
-    if len(plan.demotions) > MAX_DEMOTIONS_PER_RUN:
+    # ⛑ COUNT THE WITHHELD DEMOTIONS TOO. The withhold above empties
+    # `plan.demotions`, so a breaker counting only what is left never fires on the
+    # exact feed it exists for: a fresh, well-formed, WRONG feed carrying one covered
+    # name and none of the 30 real holdings withheld all 30 and then wrote the one
+    # (Codex, board #347 round 2 -- auto-add made the promotion that triggers the
+    # withhold out of a rowless name, but a promoted or uncovered one did it before).
+    # A name the feed says left Held is a name leaving Held for this test, whether
+    # this run applies the sale or defers it.
+    leaving = plan.demotions + plan.withheld_demotions
+    if len(leaving) > MAX_DEMOTIONS_PER_RUN:
         plan.blocked_reason = (
-            f"{len(plan.demotions)} names would leave Held in one run "
-            f"(limit {MAX_DEMOTIONS_PER_RUN}): {', '.join(plan.demotions)}. "
+            f"{len(leaving)} names would leave Held in one run "
+            f"(limit {MAX_DEMOTIONS_PER_RUN}): {', '.join(sorted(leaving))}. "
             f"That is more than a rebalance — check the publisher before overriding."
         )
     return plan
@@ -850,8 +967,39 @@ def apply_plan(entries, feed: HeldFeed, plan: SyncPlan, today=None):
         raise HeldFeedError(f"refusing to apply a blocked plan: {plan.blocked_reason}")
 
     stamp = (today or date.today()).isoformat()
+
+    # Board #347 (JP 2026-09-26): create the row for a covered holding that had none,
+    # then let the loop below promote it exactly as it promotes any other row -- one
+    # promotion path, so an auto-added row cannot end up in a shape an ordinary
+    # promotion would not produce. No intent flag: every held row in the book carries
+    # none, because ownership is the `Held` fact, not an intent (`positions.add`
+    # would force one, and `Portfolio` is not an intent it accepts). A ticker already
+    # present is never duplicated -- `plan_sync` only lists names with no row, and
+    # this re-checks so a stale plan cannot mint a second row.
+    present = {e["Ticker"].strip().upper() for e in entries}
+    created = []
+    for ticker in plan.auto_added:
+        if ticker.strip().upper() in present:
+            continue
+        brokers = feed.rows[ticker.strip().upper()].brokers
+        created.append({
+            "Ticker": ticker,
+            "Position Date": stamp,
+            "First Buy Date": "",
+            "Average Cost": None,
+            "Shares": None,
+            "Notes": (f"auto-added by sync-held {stamp}: held at "
+                      f"{', '.join(brokers) or 'a broker'}, no positions row existed"),
+            "Held": "",
+            "Held As Of": "",
+            "Previously Held": "",
+            "Held Until": "",
+            **{f: "" for f in STATE_FLAGS_FOR_DEMOTION},
+        })
+        present.add(ticker.strip().upper())
+
     out = []
-    for e in entries:
+    for e in list(entries) + created:
         e = dict(e)
         ticker = e["Ticker"].strip().upper()
         if ticker in plan.withheld_refreshes or ticker in plan.withheld_demotions:
