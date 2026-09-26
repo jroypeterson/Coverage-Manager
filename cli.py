@@ -968,9 +968,20 @@ def main():
                       f"coverage universe but have NO row in "
                       f"{positions.POSITIONS_PATH.name}, so they are NOT in `Held`: "
                       f"{', '.join(plan.held_without_row)}")
-                print("     These are positions the book will omit. Add a row "
-                      "(`python cli.py pos add <TICKER> ...`) or decide they should "
-                      "not be covered -- board #347 leaves that call to JP.")
+                # The command is quoted so it can be pasted, and a test parses it
+                # with the real parser: it said `pos add <TICKER> ...` until
+                # 2026-09-25, a subcommand that does not exist, so the one remedy
+                # the warning offered failed on first use.
+                # The states are read from ALLOWED_POSITION_VALUES, not typed: the
+                # parser still offers `Portfolio`, which `positions.add` rejects
+                # (ownership is not authorable), so "any state" would be wrong.
+                print("     These are positions the book will omit. Add a row to "
+                      f"data/{positions.POSITIONS_PATH.name} "
+                      "(`python cli.py positions add \"<TICKER>\" --position \"<state>\"`, "
+                      "<state> one of: "
+                      + ", ".join(positions.POSITION_VALUES_ORDERED)
+                      + "), then re-run `python cli.py positions sync-held` -- the add alone does "
+                      "not set Held. Or decide the policy (board #347).")
 
             if plan.is_blocked:
                 return 2
@@ -1106,4 +1117,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # ⛑ `sys.exit(main())`, not `main()`. The bare call discarded every `return 2`
+    # in this file, so `positions sync-held` exited 0 on a guard ABORT, on a
+    # withheld sale and on a held name with no positions row (board #347) -- the
+    # exit code was the only non-ok signal those paths had, and the process never
+    # carried it. Same for `instrument-type` and `resolve-cik-by-name`, whose
+    # documented exit 2 was never real. Every branch that does not `return` yields
+    # None -> exit 0, so the scheduled commands (weekly-universe, weekly-build,
+    # performance, enrich, crsp-snapshot, watchlist-report) are unaffected.
+    sys.exit(main())

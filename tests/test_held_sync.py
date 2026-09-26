@@ -942,3 +942,145 @@ def test_an_existing_row_is_never_reported_as_missing(tmp_path):
     plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
     assert plan.held_without_row == []
     assert plan.promotions == ["MSFT"]          # the normal promotion path still works
+
+
+def test_reporting_a_rowless_holding_changes_NOTHING_that_is_written(tmp_path):
+    """#347 is detection only. Whether a purchase creates a row or blocks the sync is
+    JP's call, so the finding must not leak into `apply_plan` in either direction:
+    no row is invented for MSFT, and AAPL's write is exactly what it would be if the
+    finding did not exist."""
+    feed = held_mod.load_feed(_write_feed(tmp_path, _feed_payload(("AAPL", "MSFT"))))
+    entries = _entries({"AAPL": ("Portfolio", "Y")})
+    plan = held_mod.plan_sync(entries, feed, universe_tickers={"AAPL", "MSFT"})
+    assert plan.held_without_row == ["MSFT"]
+
+    import copy
+    silent = copy.deepcopy(plan)
+    silent.held_without_row = []
+    today = date(2026, 9, 25)
+    reported = held_mod.apply_plan(entries, feed, plan, today=today)
+    unreported = held_mod.apply_plan(entries, feed, silent, today=today)
+
+    assert reported == unreported
+    assert [e["Ticker"] for e in reported] == ["AAPL"]     # no MSFT row invented
+    assert plan.is_blocked is False                       # and the sync is not refused
+
+
+def _run_cli(monkeypatch, capsys, argv):
+    """Run `cli.py` exactly as the shell does -- through its `__main__` block -- and
+    return (exit code, stdout). Going through `__main__` is the point: the return
+    value of `main()` is not the exit code unless that block passes it on, and for
+    months it did not."""
+    import runpy
+
+    import logging_utils
+
+    cli_path = Path(__file__).resolve().parent.parent / "cli.py"
+    monkeypatch.setattr(sys, "argv", [str(cli_path)] + argv)
+    # `configure_logging` does `basicConfig(force=True)` onto the CURRENT stdout,
+    # which here is capsys's temporary stream: it would strip pytest's handlers and
+    # leave the root logger writing to a closed file for every later test.
+    monkeypatch.setattr(logging_utils, "configure_logging", lambda **_: None)
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_path(str(cli_path), run_name="__main__")
+    code = exc.value.code
+    return (0 if code is None else code), capsys.readouterr().out
+
+
+def test_sync_held_EXITS_2_and_names_the_rowless_holding(tmp_path, monkeypatch, capsys):
+    """End to end through the real CLI, on temp files only. Before 2026-09-25 the
+    `return 2` for this case never reached the process: `cli.py` called `main()`
+    and dropped its value, so the run exited 0 and the only non-ok signal #347 had
+    was lost."""
+    real_positions = pos.POSITIONS_PATH
+    real_bytes = real_positions.read_bytes() if real_positions.exists() else None
+
+    book_path = tmp_path / "positions.csv"
+    pos.save(_entries({"AAPL": ("Researching", "Y")}), book_path)
+    feed_path = _write_feed(tmp_path, _feed_payload(("AAPL", "MSFT")))
+    monkeypatch.setattr(pos, "POSITIONS_PATH", book_path)
+    monkeypatch.setattr(pos, "_load_universe_tickers", lambda *a, **k: {"AAPL", "MSFT"})
+
+    code, out = _run_cli(monkeypatch, capsys,
+                         ["positions", "sync-held", "--feed", str(feed_path)])
+
+    assert code == 2
+    assert "HELD, NO ROW" in out and "MSFT" in out
+    assert "board #347" in out
+    assert [e["Ticker"] for e in pos.load(book_path)] == ["AAPL"]   # nothing invented
+
+    # Run the remedy forward: the warning says add a row, THEN re-run sync-held.
+    # Following both steps must end with MSFT actually in `Held` and a clean exit.
+    assert "re-run `python cli.py positions sync-held`" in out
+    import csv
+    uni = tmp_path / "universe.csv"
+    with open(uni, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["Ticker", "Company Name", "Sector (JP)",
+                                          "Subsector (JP)", "Currency", "Exchange"])
+        w.writeheader()
+        for t in ("AAPL", "MSFT"):
+            w.writerow({"Ticker": t, "Company Name": t, "Sector (JP)": "Tech",
+                        "Subsector (JP)": "", "Currency": "USD", "Exchange": "NASDAQ"})
+    pos.add("MSFT", position="Researching", path=book_path, universe_csv_path=uni)
+    code2, out2 = _run_cli(monkeypatch, capsys,
+                           ["positions", "sync-held", "--feed", str(feed_path)])
+    assert code2 == 0, out2
+    held = {e["Ticker"]: e["Held"] for e in pos.load(book_path)}
+    assert held == {"AAPL": "Y", "MSFT": "Y"}
+
+    # Assert the negative: the production book was never the file written.
+    if real_bytes is not None:
+        assert real_positions.read_bytes() == real_bytes
+
+
+def test_the_remedy_the_warning_prints_is_a_command_that_parses(tmp_path, monkeypatch, capsys):
+    """The warning's one instruction said `python cli.py pos add <TICKER> ...` -- a
+    subcommand that does not exist. Parse what is actually printed with the real
+    parser, so the next rename of a subcommand breaks this test, not JP's paste."""
+    import re
+    import importlib.util
+
+    book_path = tmp_path / "positions.csv"
+    pos.save(_entries({"AAPL": ("Researching", "Y")}), book_path)
+    feed_path = _write_feed(tmp_path, _feed_payload(("AAPL", "MSFT")))
+    monkeypatch.setattr(pos, "POSITIONS_PATH", book_path)
+    monkeypatch.setattr(pos, "_load_universe_tickers", lambda *a, **k: {"AAPL", "MSFT"})
+
+    _, out = _run_cli(monkeypatch, capsys,
+                      ["positions", "sync-held", "--dry-run", "--feed", str(feed_path)])
+    import csv
+    import shlex
+
+    m = re.search(r"`python cli\.py ([^`]+)`, <state> one of: ([^)]+)\)", out)
+    assert m, f"no pasteable command + state list in the warning:\n{out}"
+    template, states = m.group(1), [s.strip() for s in m.group(2).split(",")]
+    assert states, "the warning named no valid state"
+
+    spec = importlib.util.spec_from_file_location(
+        "_cli_for_parse", Path(__file__).resolve().parent.parent / "cli.py")
+    cli_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli_mod)
+
+    # A throwaway universe carrying a SPACED ticker, so `positions.add` gets past the
+    # membership check and its POSITION validation is what is under test.
+    uni = tmp_path / "universe.csv"
+    with open(uni, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["Ticker", "Company Name", "Sector (JP)",
+                                          "Subsector (JP)", "Currency", "Exchange"])
+        w.writeheader()
+        w.writerow({"Ticker": "AMP IM", "Company Name": "Amplifon", "Sector (JP)": "MedTech",
+                    "Subsector (JP)": "", "Currency": "EUR", "Exchange": "Borsa Italiana"})
+
+    for state in states:
+        # A universe ticker can contain a space (`AMP IM`), so the placeholder must
+        # survive substitution as ONE argument -- which is why it is printed quoted.
+        argv = shlex.split(template.replace("<TICKER>", "AMP IM").replace("<state>", state))
+        args = cli_mod.build_parser().parse_args(argv)      # SystemExit(2) if invalid
+        assert (args.command, args.pos_command, args.ticker, args.position) == (
+            "positions", "add", "AMP IM", state)
+        # Parsing is not enough: the parser accepts `Portfolio`, which the handler
+        # rejects. Run each named state through the function the CLI calls, on
+        # temp files (its default paths are bound at import, so they are passed).
+        target = tmp_path / f"add_{state.replace(' ', '_')}.csv"
+        pos.add(args.ticker, position=args.position, path=target, universe_csv_path=uni)
+        assert [e["Ticker"] for e in pos.load(target)] == ["AMP IM"]

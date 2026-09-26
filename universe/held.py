@@ -69,9 +69,27 @@ present, fresh, well-formed and WRONG. A real day sells one or two names; thirty
 means the publisher broke, and the circuit breaker turns a silent catastrophe into
 a loud refusal.
 
-A held ticker that is absent from the coverage universe is NOT fatal — it is
-reported every run and never silently dropped. Today that fires on FISV, which is
-the FI/FISV symbol split (board row #345): this sync doubles as that bug's detector.
+## What a broker holding the sync cannot place gets: a REPORT, not a row
+
+`plan_sync` walks the EXISTING rows of `positions_and_researching.csv`, so it can
+only promote a holding that already has a row. A feed holding that does not map to
+a row is therefore NOT written to `Held` -- it is named instead, in one of two
+lists, because the remedies differ:
+
+  * `not_in_universe` -- the name is not in the coverage universe at all.
+  * `held_without_row` -- the name IS covered but has no positions row (board
+    #347: a fresh purchase of a covered name). Before 2026-09-15 this case was
+    dropped with every counter empty and a green exit.
+
+Both appear in `summary_lines` (so a dry run prints them) and in the CLI's warning
+block, and make a WRITING `sync-held` run exit 2. A `--dry-run` still exits 0 on
+them, as it always has for every finding here: it is a preview, and its exit code
+is not a health signal. Neither is fatal and neither creates a row:
+whether a purchase should auto-create a row or block the sync is JP's call and is
+still open on #347. So the honest contract is "never dropped SILENTLY", not "never
+dropped" -- until a row exists, such a holding is absent from `Held` and from
+`portfolio.json`. Symbols are compared after the alias map (`SYMBOL_ALIASES`) is
+applied, so the FI/FISV split (#345) does not show up here.
 """
 from __future__ import annotations
 
@@ -380,7 +398,8 @@ class SyncPlan:
         if self.not_in_universe:
             out.append(
                 f"HELD BUT NOT IN UNIVERSE: {', '.join(self.not_in_universe)} "
-                f"— reported, never dropped; add to the universe or fix the symbol"
+                f"— NOT in Held: add it to the universe AND the positions file (or fix the "
+                f"symbol), then re-run sync-held"
             )
         return out
 
