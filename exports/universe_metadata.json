@@ -10838,5 +10838,21 @@
     "sub_subsector": "",
     "core": "",
     "commercial": ""
+  },
+  "VYLR": {
+    "name": "Vylor Inc.",
+    "sector": "Materials",
+    "subsector": "Agricultural Inputs",
+    "sub_subsector": "",
+    "core": "",
+    "commercial": ""
+  },
+  "ADRX": {
+    "name": "ADARx Pharmaceuticals, Inc.",
+    "sector": "Biopharma",
+    "subsector": "Biotech",
+    "sub_subsector": "",
+    "core": "",
+    "commercial": ""
   }
 }

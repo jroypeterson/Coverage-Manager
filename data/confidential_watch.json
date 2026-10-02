@@ -52,5 +52,14 @@
   "source_kind": "announcement",
   "source_url": "https://www.businesswire.com/news/home/20260731940030/en/Westinghouse-Confidentially-Submits-Draft-Registration-Statement-for-Proposed-Initial-Public-Offering",
   "status": "open"
+ },
+ {
+  "company": "LPT Aperture Holdings",
+  "source_kind": "announcement",
+  "source_url": "https://www.businesswire.com/news/home/20260730770032/en/LPT-Aperture-Holdings-Confidentially-Submits-Draft-Registration-Statement-for-Proposed-IPO",
+  "first_seen": "2026-10-02",
+  "note": "Company's own 2026-07-30 release; found 10-02. Parent of LPT Realty (residential brokerage, ~20k agents). Out of sector; reserved Nasdaq ticker LPTA. Bucket 2 only if it prices >=$25B, which nothing suggests.",
+  "status": "open",
+  "flipped_to": ""
  }
 ]

@@ -1,0 +1,18 @@
+{"date": "2026-10-02",
+ "candidates": [
+  {"company": "Vylor Inc.", "ticker": "VYLR", "exchange": "NYSE", "market_cap": 45540000000,
+   "sector": "Materials", "subsector": "Agricultural Inputs", "listing_date": "2026-10-01", "trigger": "Spin-off",
+   "peers": ["LIN", "CMP"],
+   "reason": "Bucket 3 - spin-off above $10B (also clears the $25B Bucket 2 bar). Corteva distributed 100% of its seed segment 1:1 to holders of record 2026-09-24; regular-way trading on NYSE began 2026-10-01 after when-issued trading from 09-25. FMP prices it at $68.26 for ~$45.5B on day two, against ~$8.4B for the remaining crop-protection Corteva (CTVA, not covered). 2025 seed net sales $9.90B (+4%), segment operating EBITDA $2.64B (+19%, ~27% margin). Out of the core sectors; no close peer on the sheet - the add is by size rule, not fit.",
+   "business_summary": "We breed and sell crop seed - mainly corn and soybeans under the Pioneer brand - to farmers worldwide, and license our genetics and trait technology to other seed companies. Farmers buy new seed every season, so revenue recurs annually and is priced per bag on the yield advantage our germplasm delivers. 2025 net sales were $9.9B with $2.6B of operating EBITDA; we were Corteva's seed segment until the October 2026 spin-off."},
+  {"company": "Accelevation Holdings Corp.", "ticker": "ACCV", "exchange": "NASDAQ", "market_cap": 3730000000,
+   "sector": "Industrials", "subsector": "Electrical Equipment", "listing_date": "2026-09-30", "trigger": "IPO",
+   "peers": ["FPS", "GEV"],
+   "reason": "Bucket 4 adjacency (data-center power distribution), not a core sector, so it queues. Priced 30M shares at $18.00 on 2026-09-29, below the $20-24 range, for $540M (10M primary, 20M sold by Olympus Partners); opened $17.55 on 2026-09-30. 224.9M Class A + B shares outstanding: ~$4.0B at the offer, ~$3.7B at $16.59. 2025 net sales $447.8M (+147%), LTM ~$727M, backlog ~$1.1B; ~$650M term loan pre-IPO. Same Industrials / Electrical Equipment subsector as covered Forgent Power (FPS), the February IPO it was marketed against.",
+   "business_summary": "We design, build and install the power-distribution and structural systems that sit inside a data hall - remote power panels, busway and branch whips, steel framing and our SkyBridge modular overhead platform - and we sell them to hyperscale, colocation and AI cloud operators. Revenue is project-based hardware plus installation, sold mostly to a handful of very large customers; 2025 sales were $448M, up 147%, with about $1.1B of backlog. Olympus Partners controls about 85% of the vote."},
+  {"company": "ADARx Pharmaceuticals, Inc.", "ticker": "ADRX", "exchange": "NASDAQ", "market_cap": 1997000000,
+   "sector": "Biopharma", "subsector": "Biotech", "listing_date": "2026-09-25", "trigger": "IPO",
+   "peers": ["ALNY", "ARWR", "IONS", "PHVS"],
+   "reason": "Bucket 1 - core sector listing, any size, no floor. Carried from 2026-09-25, when the auto-add was refused because vendors could not yet return the new listing's currency. Priced 26.25M shares at $17.00 on 2026-09-24 for $446.3M; FMP now quotes $19.54 for ~$2.0B, so the vendor record exists and the add is retried this run.",
+   "business_summary": "We make siRNA drugs that silence the gene behind a disease so the harmful protein is never made. Our lead, onvuzosiran, shuts down liver production of plasma kallikrein to prevent hereditary angioedema attacks and is in Phase 3; behind it sit agazisiran for complement-driven kidney and eye disease and a Factor XI program for stroke prevention. We have no product revenue - AbbVie paid $335M upfront in 2025 to license our platform and owes milestones and royalties."}
+ ]}

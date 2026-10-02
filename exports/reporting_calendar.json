@@ -38863,29 +38863,27 @@
     "filer_type": "us_gaap",
     "typical_lag_days": 44,
     "report_cadence_months": [
-      3,
       5,
-      8,
-      12
+      8
     ],
     "monotonic": true,
     "last_report_date": "2026-08-13",
     "sources": {
       "dates": {
         "provider": "api_ninjas",
-        "fetched_at": "2026-08-28",
+        "fetched_at": "2026-10-02",
         "n_rows": 4,
         "error": null
       },
       "anchor": {
         "provider": "finnhub",
-        "fetched_at": "2026-08-28",
-        "n_events": 1,
+        "fetched_at": "2026-10-02",
+        "n_events": 0,
         "error": null
       },
       "sec_label": {
         "provider": "sec_xbrl",
-        "fetched_at": "2026-08-28",
+        "fetched_at": "2026-10-02",
         "covered": true,
         "error": null
       }
@@ -38899,12 +38897,11 @@
         "period_end": "2026-06-30",
         "eps_actual": 0.3,
         "label_sources": [
-          "sec_xbrl",
-          "finnhub"
+          "sec_xbrl"
         ],
-        "sec_finnhub_agree": true,
-        "confidence": "high",
-        "gating_eligible": true
+        "sec_finnhub_agree": false,
+        "confidence": "low",
+        "gating_eligible": false
       },
       {
         "fiscal_year": 2026,
@@ -38913,34 +38910,7 @@
         "period_end": "2026-03-31",
         "eps_actual": 0.15,
         "label_sources": [
-          "sec_xbrl",
-          "finnhub"
-        ],
-        "sec_finnhub_agree": true,
-        "confidence": "high",
-        "gating_eligible": true
-      },
-      {
-        "fiscal_year": 2025,
-        "fiscal_quarter": 4,
-        "report_date": "2026-03-19",
-        "period_end": null,
-        "eps_actual": 0.18,
-        "label_sources": [
-          "finnhub"
-        ],
-        "sec_finnhub_agree": false,
-        "confidence": "low",
-        "gating_eligible": false
-      },
-      {
-        "fiscal_year": 2025,
-        "fiscal_quarter": 3,
-        "report_date": "2025-12-03",
-        "period_end": null,
-        "eps_actual": 0.401,
-        "label_sources": [
-          "finnhub"
+          "sec_xbrl"
         ],
         "sec_finnhub_agree": false,
         "confidence": "low",
